@@ -1,0 +1,118 @@
+"""Number entities for the xBloom Studio integration.
+
+Stores user-configured brew parameters (grind size, grind speed, brew volume,
+brew temperature, brew flow rate) using RestoreEntity so values survive HA
+restarts. No machine services are called from these entities — they are
+pure storage that other parts of the integration read at brew time.
+"""
+import logging
+
+from homeassistant.components.number import NumberEntity, NumberMode
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.restore_state import RestoreEntity
+
+from .const import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
+
+
+async def async_setup_entry(hass, entry, async_add_entities) -> None:
+    async_add_entities([
+        XBloomGrindSizeNumber(),
+        XBloomGrindSpeedNumber(),
+        XBloomBrewVolumeNumber(),
+        XBloomBrewTemperatureNumber(),
+        XBloomBrewFlowRateNumber(),
+    ])
+
+
+class _XBloomNumberBase(NumberEntity, RestoreEntity):
+    """Shared base for xBloom number entities."""
+
+    _attr_has_entity_name = True
+    _attr_mode = NumberMode.SLIDER
+    _default_value: float = 0.0
+
+    def __init__(self) -> None:
+        self._current_value: float = self._default_value
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, "xbloom_studio")},
+            name="xBloom Studio",
+            manufacturer="xBloom",
+            model="Studio",
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        return self._current_value
+
+    async def async_set_native_value(self, value: float) -> None:
+        self._current_value = value
+        self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        if last is not None and last.state not in ("unknown", "unavailable"):
+            try:
+                self._current_value = float(last.state)
+            except ValueError:
+                pass
+
+
+class XBloomGrindSizeNumber(_XBloomNumberBase):
+    _attr_name = "Grind Size"
+    _attr_unique_id = "xbloom_grind_size"
+    _attr_native_min_value = 1.0
+    _attr_native_max_value = 80.0
+    _attr_native_step = 1.0
+    _attr_native_unit_of_measurement = None
+    _attr_icon = "mdi:grain"
+    _default_value = 65.0
+
+
+class XBloomGrindSpeedNumber(_XBloomNumberBase):
+    _attr_name = "Grind Speed"
+    _attr_unique_id = "xbloom_grind_speed"
+    _attr_native_min_value = 60.0
+    _attr_native_max_value = 120.0
+    _attr_native_step = 10.0
+    _attr_native_unit_of_measurement = "RPM"
+    _attr_icon = "mdi:rotate-right"
+    _default_value = 60.0
+
+
+class XBloomBrewVolumeNumber(_XBloomNumberBase):
+    _attr_name = "Brew Volume"
+    _attr_unique_id = "xbloom_brew_volume"
+    _attr_native_min_value = 0.0
+    _attr_native_max_value = 240.0
+    _attr_native_step = 1.0
+    _attr_native_unit_of_measurement = "ml"
+    _attr_icon = "mdi:cup-water"
+    _default_value = 120.0
+
+
+class XBloomBrewTemperatureNumber(_XBloomNumberBase):
+    _attr_name = "Brew Temperature"
+    _attr_unique_id = "xbloom_brew_temperature"
+    _attr_native_min_value = 20.0
+    _attr_native_max_value = 98.0
+    _attr_native_step = 1.0
+    _attr_native_unit_of_measurement = "°C"
+    _attr_icon = "mdi:thermometer"
+    _default_value = 93.0
+
+
+class XBloomBrewFlowRateNumber(_XBloomNumberBase):
+    _attr_name = "Brew Flow Rate"
+    _attr_unique_id = "xbloom_brew_flow_rate"
+    _attr_native_min_value = 3.0
+    _attr_native_max_value = 3.5
+    _attr_native_step = 0.1
+    _attr_native_unit_of_measurement = "ml/s"
+    _attr_icon = "mdi:water-pump"
+    _default_value = 3.0

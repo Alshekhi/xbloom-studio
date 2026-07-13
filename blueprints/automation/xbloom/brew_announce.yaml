@@ -1,0 +1,128 @@
+blueprint:
+  name: "xBloom — Brew announcements"
+  description: >
+    Announces the xBloom brew lifecycle on Alexa across all three phases:
+    grinding started, pouring started, and coffee ready. Optionally speaks the
+    recipe name on completion. Bilingual (English / Arabic). Replaces the
+    separate brew_started, brew_complete, and brew_complete_with_recipe
+    blueprints.
+  domain: automation
+  author: xbloom-studio-controler
+  input:
+    xbloom_status_entity:
+      name: xBloom Brew Status Sensor
+      description: >
+        The brew status sensor (domain: sensor) created by the integration —
+        typically sensor.xbloom_studio_brew_status. Drives the "started" and
+        plain "ready" announcements.
+      selector:
+        entity:
+          domain: sensor
+    brew_event_entity:
+      name: xBloom Brew Event Entity
+      description: >
+        The brew event entity (domain: event) — typically
+        event.xbloom_studio_brew_event. Only used to read the recipe name when
+        "Announce recipe name" is on; select it anyway (it's always present).
+      selector:
+        entity:
+          domain: event
+    alexa_target:
+      name: Alexa device(s)
+      description: One or more Alexa media_player entities to announce on.
+      selector:
+        entity:
+          integration: alexa_media
+          domain: media_player
+          multiple: true
+    announce_recipe:
+      name: Announce recipe name
+      description: >
+        When on, the completion announcement names the recipe that just finished
+        (from the brew_done event) instead of the generic "coffee is ready".
+      default: false
+      selector:
+        boolean: {}
+    language:
+      name: Announcement language
+      description: English or Arabic.
+      default: en
+      selector:
+        select:
+          options:
+            - { value: en, label: English }
+            - { value: ar, label: Arabic }
+
+variables:
+  lang: !input language
+  announce_recipe: !input announce_recipe
+  recipe_name: >-
+    {{ trigger.to_state.attributes.get('recipe_name', '') if trigger.id == 'done_recipe' else '' }}
+
+trigger:
+  - platform: state
+    entity_id: !input xbloom_status_entity
+    to: "grinding"
+    id: started
+  - platform: state
+    entity_id: !input xbloom_status_entity
+    to: "brewing"
+    id: pouring
+  - platform: state
+    entity_id: !input xbloom_status_entity
+    to: "done"
+    id: done_simple
+  - platform: state
+    entity_id: !input brew_event_entity
+    id: done_recipe
+
+action:
+  - choose:
+      # Grinding started
+      - conditions: "{{ trigger.id == 'started' }}"
+        sequence:
+          - action: notify.alexa_media
+            data:
+              target: !input alexa_target
+              data:
+                type: announce
+              message: >-
+                {% if lang == 'ar' %}بدأت القهوة تُطحن{% else %}Coffee started grinding{% endif %}
+      # Pouring started
+      - conditions: "{{ trigger.id == 'pouring' }}"
+        sequence:
+          - action: notify.alexa_media
+            data:
+              target: !input alexa_target
+              data:
+                type: announce
+              message: >-
+                {% if lang == 'ar' %}بدأ صب القهوة{% else %}Pouring started{% endif %}
+      # Ready — plain (only when NOT announcing the recipe name)
+      - conditions:
+          - "{{ trigger.id == 'done_simple' }}"
+          - "{{ not announce_recipe }}"
+        sequence:
+          - action: notify.alexa_media
+            data:
+              target: !input alexa_target
+              data:
+                type: announce
+              message: >-
+                {% if lang == 'ar' %}قهوتك في انتظارك{% else %}Your coffee is ready{% endif %}
+      # Ready — with recipe name (only when announcing the recipe, on brew_done)
+      - conditions:
+          - "{{ trigger.id == 'done_recipe' }}"
+          - "{{ announce_recipe }}"
+          - "{{ trigger.to_state.attributes.get('event_type') == 'brew_done' }}"
+        sequence:
+          - action: notify.alexa_media
+            data:
+              target: !input alexa_target
+              data:
+                type: announce
+              message: >-
+                {% if lang == 'ar' %}انتهى تحضير قهوتك{% if recipe_name %} — {{ recipe_name }}{% endif %}{% else %}Your coffee is ready{% if recipe_name %} — {{ recipe_name }}{% endif %}{% endif %}
+
+mode: queued
+max: 5
