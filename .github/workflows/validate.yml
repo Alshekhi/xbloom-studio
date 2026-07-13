@@ -1,0 +1,37 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    # Re-run weekly so upstream HACS / hassfest rule changes are caught early.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  hassfest:
+    name: hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run hassfest
+        uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run HACS validation
+        uses: hacs/action@main
+        with:
+          category: integration
+          # 'brands' requires an icon in the home-assistant/brands repo, which
+          # only applies to default-store submission. This integration ships as
+          # a HACS custom repository, so that check is intentionally skipped.
+          # Remove this line if/when submitting to the default HACS store.
+          ignore: brands

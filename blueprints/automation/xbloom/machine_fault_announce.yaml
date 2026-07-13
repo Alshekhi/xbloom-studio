@@ -1,0 +1,87 @@
+blueprint:
+  name: "xBloom — Machine Fault Announcements"
+  description: >
+    Speaks an alert on a chosen Alexa device when the xBloom machine reports a
+    fault during use — out of water, no beans in the grinder, a dose/water
+    mismatch, or a grinder gear error. Bilingual (English / Arabic).
+
+    Triggers on the xBloom Brew Event entity firing one of the fault event
+    types (error_no_water, error_no_beans, error_dose_water,
+    error_gear_position). Pair it with the brew-complete blueprint so a
+    VoiceOver user hears both successes and problems without looking at the
+    machine.
+  domain: automation
+  author: xbloom-studio-controler
+  input:
+    brew_event_entity:
+      name: xBloom Brew Event Entity
+      description: >
+        The brew event entity created by the xBloom integration.
+        Select "xBloom Studio Brew Event" (domain: event).
+      selector:
+        entity:
+          domain: event
+    alexa_target:
+      name: Alexa device(s)
+      description: >
+        One or more Alexa media_player entities that should speak the alerts.
+      selector:
+        entity:
+          integration: alexa_media
+          domain: media_player
+          multiple: true
+    language:
+      name: Announcement language
+      description: English or Arabic.
+      default: en
+      selector:
+        select:
+          options:
+            - { value: en, label: English }
+            - { value: ar, label: Arabic }
+
+variables:
+  ev: "{{ trigger.to_state.attributes.get('event_type') }}"
+  lang: !input language
+
+trigger:
+  - platform: state
+    entity_id: !input brew_event_entity
+
+condition:
+  - condition: template
+    value_template: >
+      {{ trigger.to_state.attributes.get('event_type') in
+         ['error_no_water', 'error_no_beans', 'error_dose_water', 'error_gear_position'] }}
+
+action:
+  - service: notify.alexa_media
+    data:
+      target: !input alexa_target
+      data:
+        type: announce
+      message: >-
+        {%- if lang == 'ar' -%}
+          {%- if ev == 'error_no_water' -%}
+            الماكينة بحاجة إلى ماء — أضف ماءً إلى الخزان
+          {%- elif ev == 'error_no_beans' -%}
+            لا توجد حبوب في المطحنة
+          {%- elif ev == 'error_dose_water' -%}
+            خطأ في كمية الماء أو الجرعة
+          {%- elif ev == 'error_gear_position' -%}
+            خطأ في موضع المطحنة
+          {%- endif -%}
+        {%- else -%}
+          {%- if ev == 'error_no_water' -%}
+            The xBloom is out of water. Please refill the tank.
+          {%- elif ev == 'error_no_beans' -%}
+            No beans detected in the grinder.
+          {%- elif ev == 'error_dose_water' -%}
+            Water and dose mismatch on the xBloom.
+          {%- elif ev == 'error_gear_position' -%}
+            Grinder gear error on the xBloom.
+          {%- endif -%}
+        {%- endif -%}
+
+mode: queued
+max: 5

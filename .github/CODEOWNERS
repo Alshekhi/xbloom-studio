@@ -1,0 +1,4 @@
+# Every change requires review from the repository owner.
+# This auto-requests @Alshekhi on all pull requests and, combined with a
+# branch-protection rule requiring code-owner review, gates every merge.
+* @Alshekhi
