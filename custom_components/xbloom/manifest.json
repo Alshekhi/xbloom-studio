@@ -1,0 +1,17 @@
+{
+  "domain": "xbloom",
+  "name": "xBloom Studio",
+  "bluetooth": [
+    {
+      "local_name": "XBLOOM *"
+    }
+  ],
+  "codeowners": ["@Alshekhi"],
+  "config_flow": true,
+  "dependencies": ["bluetooth"],
+  "documentation": "https://github.com/Alshekhi/xbloom-studio",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/Alshekhi/xbloom-studio/issues",
+  "requirements": [],
+  "version": "3.0.0"
+}

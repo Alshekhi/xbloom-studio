@@ -1,0 +1,337 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "confirm": {
+        "title": "Set up {name}",
+        "description": "Home Assistant detected your xBloom machine over Bluetooth. Confirm to add it.\n\nNo account, no MQTT broker, no setup beyond this — recipes are added afterwards via the integration's *Configure* menu (paste a share URL from the iOS app)."
+      },
+      "user": {
+        "title": "Set up xBloom Studio",
+        "description": "Pick your machine from the list (Home Assistant's Bluetooth integration sees {discovered_count} right now). If your machine isn't listed, type its BLE name — it's printed in the iOS app under *Settings → Machine* (something like *XBLOOM ABC123*).",
+        "data": {
+          "ble_name": "Machine (BLE name)"
+        }
+      }
+    },
+    "error": {
+      "ble_name_required": "Pick a machine from the list, or type its BLE name.",
+      "ble_name_invalid": "BLE names look like 'XBLOOM ABC123'. Check the value from the iOS app's machine settings."
+    },
+    "abort": {
+      "already_configured": "This xBloom machine is already set up.",
+      "not_supported": "This Bluetooth device doesn't look like an xBloom machine."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "xBloom recipe library",
+        "description": "Create, edit, or remove recipes available to the integration. Recipes are stored locally — no xBloom account required.",
+        "menu_options": {
+          "create_recipe": "Create a recipe",
+          "edit_recipe": "Edit a recipe",
+          "delete_recipe": "Delete a recipe",
+          "add_recipe": "Add a recipe by share URL",
+          "done": "Done"
+        }
+      },
+      "add_recipe": {
+        "title": "Add a recipe",
+        "description": "Open the recipe in the xBloom iOS app, tap Share → Copy Link, and paste it here. Or paste just the share id (the value after `?id=`).",
+        "data": {
+          "share_url_or_id": "Share URL or id"
+        }
+      },
+      "create_recipe": {
+        "title": "New recipe — pick a cup",
+        "description": "Name your recipe and pick the cup type. The next step's dose range is locked to what the chosen cup supports (xPod = 15 g; Omni dripper = 5–18 g; Other = 5–25 g; Tea = 1–5 g).",
+        "data": {
+          "name": "Recipe name",
+          "cup_type": "Dripper / cup type"
+        }
+      },
+      "create_recipe_pours": {
+        "title": "Tweak the pours",
+        "description": "Target: {total_ml} ml ({dose} g × {ratio}). Pre-filled at {per_pour_ml} ml each. Current total: {current_total_ml} ml. All pours must sum to exactly {total_ml} ml — too little or too much will be rejected.",
+        "data": {
+          "pour_0_volume_ml": "Bloom — volume (ml)",
+          "pour_0_temperature_c": "Bloom — temperature (°C)",
+          "pour_0_pattern": "Bloom — pattern",
+          "pour_0_flow_rate": "Bloom — flow rate (ml/s)",
+          "pour_0_pause_s": "Bloom — pause (seconds)",
+          "pour_0_vib_before": "Bloom — vibrate before",
+          "pour_0_vib_after": "Bloom — vibrate after",
+          "pour_1_volume_ml": "Pour 1 — volume (ml)",
+          "pour_1_temperature_c": "Pour 1 — temperature (°C)",
+          "pour_1_pattern": "Pour 1 — pattern",
+          "pour_1_flow_rate": "Pour 1 — flow rate (ml/s)",
+          "pour_1_pause_s": "Pour 1 — pause (seconds)",
+          "pour_1_vib_before": "Pour 1 — vibrate before",
+          "pour_1_vib_after": "Pour 1 — vibrate after",
+          "pour_2_volume_ml": "Pour 2 — volume (ml)",
+          "pour_2_temperature_c": "Pour 2 — temperature (°C)",
+          "pour_2_pattern": "Pour 2 — pattern",
+          "pour_2_flow_rate": "Pour 2 — flow rate (ml/s)",
+          "pour_2_pause_s": "Pour 2 — pause (seconds)",
+          "pour_2_vib_before": "Pour 2 — vibrate before",
+          "pour_2_vib_after": "Pour 2 — vibrate after",
+          "pour_3_volume_ml": "Pour 3 — volume (ml)",
+          "pour_3_temperature_c": "Pour 3 — temperature (°C)",
+          "pour_3_pattern": "Pour 3 — pattern",
+          "pour_3_flow_rate": "Pour 3 — flow rate (ml/s)",
+          "pour_3_pause_s": "Pour 3 — pause (seconds)",
+          "pour_3_vib_before": "Pour 3 — vibrate before",
+          "pour_3_vib_after": "Pour 3 — vibrate after",
+          "pour_4_volume_ml": "Pour 4 — volume (ml)",
+          "pour_4_temperature_c": "Pour 4 — temperature (°C)",
+          "pour_4_pattern": "Pour 4 — pattern",
+          "pour_4_flow_rate": "Pour 4 — flow rate (ml/s)",
+          "pour_4_pause_s": "Pour 4 — pause (seconds)",
+          "pour_4_vib_before": "Pour 4 — vibrate before",
+          "pour_4_vib_after": "Pour 4 — vibrate after",
+          "pour_5_volume_ml": "Pour 5 — volume (ml)",
+          "pour_5_temperature_c": "Pour 5 — temperature (°C)",
+          "pour_5_pattern": "Pour 5 — pattern",
+          "pour_5_flow_rate": "Pour 5 — flow rate (ml/s)",
+          "pour_5_pause_s": "Pour 5 — pause (seconds)",
+          "pour_5_vib_before": "Pour 5 — vibrate before",
+          "pour_5_vib_after": "Pour 5 — vibrate after",
+          "pour_6_volume_ml": "Pour 6 — volume (ml)",
+          "pour_6_temperature_c": "Pour 6 — temperature (°C)",
+          "pour_6_pattern": "Pour 6 — pattern",
+          "pour_6_flow_rate": "Pour 6 — flow rate (ml/s)",
+          "pour_6_pause_s": "Pour 6 — pause (seconds)",
+          "pour_6_vib_before": "Pour 6 — vibrate before",
+          "pour_6_vib_after": "Pour 6 — vibrate after",
+          "pour_7_volume_ml": "Pour 7 — volume (ml)",
+          "pour_7_temperature_c": "Pour 7 — temperature (°C)",
+          "pour_7_pattern": "Pour 7 — pattern",
+          "pour_7_flow_rate": "Pour 7 — flow rate (ml/s)",
+          "pour_7_pause_s": "Pour 7 — pause (seconds)",
+          "pour_7_vib_before": "Pour 7 — vibrate before",
+          "pour_7_vib_after": "Pour 7 — vibrate after",
+          "pour_8_volume_ml": "Pour 8 — volume (ml)",
+          "pour_8_temperature_c": "Pour 8 — temperature (°C)",
+          "pour_8_pattern": "Pour 8 — pattern",
+          "pour_8_flow_rate": "Pour 8 — flow rate (ml/s)",
+          "pour_8_pause_s": "Pour 8 — pause (seconds)",
+          "pour_8_vib_before": "Pour 8 — vibrate before",
+          "pour_8_vib_after": "Pour 8 — vibrate after",
+          "pour_9_volume_ml": "Pour 9 — volume (ml)",
+          "pour_9_temperature_c": "Pour 9 — temperature (°C)",
+          "pour_9_pattern": "Pour 9 — pattern",
+          "pour_9_flow_rate": "Pour 9 — flow rate (ml/s)",
+          "pour_9_pause_s": "Pour 9 — pause (seconds)",
+          "pour_9_vib_before": "Pour 9 — vibrate before",
+          "pour_9_vib_after": "Pour 9 — vibrate after",
+          "pour_10_volume_ml": "Pour 10 — volume (ml)",
+          "pour_10_temperature_c": "Pour 10 — temperature (°C)",
+          "pour_10_pattern": "Pour 10 — pattern",
+          "pour_10_flow_rate": "Pour 10 — flow rate (ml/s)",
+          "pour_10_pause_s": "Pour 10 — pause (seconds)",
+          "pour_10_vib_before": "Pour 10 — vibrate before",
+          "pour_10_vib_after": "Pour 10 — vibrate after",
+          "pour_11_volume_ml": "Pour 11 — volume (ml)",
+          "pour_11_temperature_c": "Pour 11 — temperature (°C)",
+          "pour_11_pattern": "Pour 11 — pattern",
+          "pour_11_flow_rate": "Pour 11 — flow rate (ml/s)",
+          "pour_11_pause_s": "Pour 11 — pause (seconds)",
+          "pour_11_vib_before": "Pour 11 — vibrate before",
+          "pour_11_vib_after": "Pour 11 — vibrate after",
+          "pour_12_volume_ml": "Pour 12 — volume (ml)",
+          "pour_12_temperature_c": "Pour 12 — temperature (°C)",
+          "pour_12_pattern": "Pour 12 — pattern",
+          "pour_12_flow_rate": "Pour 12 — flow rate (ml/s)",
+          "pour_12_pause_s": "Pour 12 — pause (seconds)",
+          "pour_12_vib_before": "Pour 12 — vibrate before",
+          "pour_12_vib_after": "Pour 12 — vibrate after",
+          "pour_13_volume_ml": "Pour 13 — volume (ml)",
+          "pour_13_temperature_c": "Pour 13 — temperature (°C)",
+          "pour_13_pattern": "Pour 13 — pattern",
+          "pour_13_flow_rate": "Pour 13 — flow rate (ml/s)",
+          "pour_13_pause_s": "Pour 13 — pause (seconds)",
+          "pour_13_vib_before": "Pour 13 — vibrate before",
+          "pour_13_vib_after": "Pour 13 — vibrate after",
+          "pour_14_volume_ml": "Pour 14 — volume (ml)",
+          "pour_14_temperature_c": "Pour 14 — temperature (°C)",
+          "pour_14_pattern": "Pour 14 — pattern",
+          "pour_14_flow_rate": "Pour 14 — flow rate (ml/s)",
+          "pour_14_pause_s": "Pour 14 — pause (seconds)",
+          "pour_14_vib_before": "Pour 14 — vibrate before",
+          "pour_14_vib_after": "Pour 14 — vibrate after",
+          "pour_15_volume_ml": "Pour 15 — volume (ml)",
+          "pour_15_temperature_c": "Pour 15 — temperature (°C)",
+          "pour_15_pattern": "Pour 15 — pattern",
+          "pour_15_flow_rate": "Pour 15 — flow rate (ml/s)",
+          "pour_15_pause_s": "Pour 15 — pause (seconds)",
+          "pour_15_vib_before": "Pour 15 — vibrate before",
+          "pour_15_vib_after": "Pour 15 — vibrate after",
+          "pour_16_volume_ml": "Pour 16 — volume (ml)",
+          "pour_16_temperature_c": "Pour 16 — temperature (°C)",
+          "pour_16_pattern": "Pour 16 — pattern",
+          "pour_16_flow_rate": "Pour 16 — flow rate (ml/s)",
+          "pour_16_pause_s": "Pour 16 — pause (seconds)",
+          "pour_16_vib_before": "Pour 16 — vibrate before",
+          "pour_16_vib_after": "Pour 16 — vibrate after",
+          "pour_17_volume_ml": "Pour 17 — volume (ml)",
+          "pour_17_temperature_c": "Pour 17 — temperature (°C)",
+          "pour_17_pattern": "Pour 17 — pattern",
+          "pour_17_flow_rate": "Pour 17 — flow rate (ml/s)",
+          "pour_17_pause_s": "Pour 17 — pause (seconds)",
+          "pour_17_vib_before": "Pour 17 — vibrate before",
+          "pour_17_vib_after": "Pour 17 — vibrate after",
+          "pour_18_volume_ml": "Pour 18 — volume (ml)",
+          "pour_18_temperature_c": "Pour 18 — temperature (°C)",
+          "pour_18_pattern": "Pour 18 — pattern",
+          "pour_18_flow_rate": "Pour 18 — flow rate (ml/s)",
+          "pour_18_pause_s": "Pour 18 — pause (seconds)",
+          "pour_18_vib_before": "Pour 18 — vibrate before",
+          "pour_18_vib_after": "Pour 18 — vibrate after",
+          "pour_19_volume_ml": "Pour 19 — volume (ml)",
+          "pour_19_temperature_c": "Pour 19 — temperature (°C)",
+          "pour_19_pattern": "Pour 19 — pattern",
+          "pour_19_flow_rate": "Pour 19 — flow rate (ml/s)",
+          "pour_19_pause_s": "Pour 19 — pause (seconds)",
+          "pour_19_vib_before": "Pour 19 — vibrate before",
+          "pour_19_vib_after": "Pour 19 — vibrate after"
+        }
+      },
+      "edit_recipe": {
+        "title": "Edit a recipe",
+        "description": "Pick the recipe to edit. The next step lets you change the brewing parameters.",
+        "data": {
+          "recipe_id": "Recipe to edit"
+        }
+      },
+      "delete_recipe": {
+        "title": "Delete a recipe",
+        "description": "Pick the recipe to delete.",
+        "data": {
+          "recipe_id": "Recipe to delete"
+        }
+      },
+      "delete_recipe_confirm": {
+        "title": "Confirm delete",
+        "description": "Delete {recipe_name}? This cannot be undone.",
+        "data": {
+          "confirm": "Yes, delete this recipe"
+        }
+      },
+      "write_to_slot": {
+        "title": "Write to machine slot?",
+        "description": "Optional: write {recipe_name} to a machine slot (A/B/C) so it's brewable from the machine alone. Pick 'skip' to finish.",
+        "data": {
+          "slot": "Slot"
+        }
+      },
+      "create_recipe_brew": {
+        "title": "Brew parameters",
+        "description": "Cup type: {cup}. Dose stepper is locked to the cup's allowed range. Ratio is the brew ratio 1:N (5–25, step 0.5).",
+        "data": {
+          "dose_g": "Dose (g)",
+          "ratio": "Ratio",
+          "grind_size": "Grind size (1–80)",
+          "grinder_speed_rpm": "Grinder speed (RPM, 60–120)",
+          "pour_count": "Number of pours (1–9)",
+          "enable_bypass_water": "Enable bypass water",
+          "bypass_volume_ml": "Bypass water volume (ml)",
+          "bypass_temp_c": "Bypass water temperature (°C)"
+        }
+      }
+    },
+    "error": {
+      "required": "Required.",
+      "invalid_share": "Couldn't fetch a recipe from that URL/id. Double-check the link from the xBloom app.",
+      "name_required": "Recipe name is required.",
+      "ratio_invalid": "Ratio must be between 1:5 and 1:25 in 0.5 steps (e.g. 1:5, 1:15.5, 1:25).",
+      "grind_out_of_range": "Grind size must be between 1 and 80.",
+      "rpm_out_of_range": "Grinder speed must be between 60 and 120 RPM.",
+      "pour_count_mismatch": "Pour count must be between 1 and 9 and match the number of pours.",
+      "cup_type_invalid": "Pick Omni dripper, xPod, or Other.",
+      "volume_total_mismatch": "Pour volumes must sum to dose × ratio (within 1 ml).",
+      "temp_out_of_range": "Pour temperature must be between 40 and 98 °C.",
+      "flow_out_of_range": "Flow rate must be between 3.0 and 3.5 ml/s.",
+      "pause_out_of_range": "Pause must be between 0 and 59 seconds.",
+      "pattern_invalid": "Pattern must be centered, circular, or spiral.",
+      "bypass_volume_required": "Bypass water volume is required when bypass is enabled.",
+      "bypass_temp_required": "Bypass water temperature is required when bypass is enabled.",
+      "slot_write_failed": "Couldn't write to machine slot. Make sure the machine is powered on and try again, or pick skip.",
+      "dose_out_of_range_for_cup": "Dose is outside the dripper's allowed range. Omni dripper accepts 5–18 g; Other accepts 5–25 g; xPod is locked at 15 g; Tea accepts 1–5 g.",
+      "volume_out_of_range": "Each pour volume must be between 0 and 240 ml."
+    },
+    "abort": {
+      "no_recipes": "No recipes saved yet."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "current_recipe": {
+        "name": "Current Recipe"
+      },
+      "current_pour": {
+        "name": "Current Pour"
+      },
+      "grind_size": {
+        "name": "Grind Size"
+      },
+      "grind_speed": {
+        "name": "Grind Speed"
+      },
+      "pour_pattern": {
+        "name": "Pour Pattern",
+        "state": {
+          "centered": "Centered",
+          "circular": "Circular",
+          "spiral": "Spiral"
+        }
+      },
+      "brew_temperature": {
+        "name": "Brew Temperature"
+      },
+      "brew_ratio": {
+        "name": "Brew Ratio"
+      },
+      "current_module": {
+        "name": "Current Module",
+        "state": {
+          "home": "Home",
+          "grinder": "Grinder",
+          "scale": "Scale",
+          "brewer": "Brewer",
+          "auto": "Auto Mode"
+        }
+      },
+      "last_recipe_card": {
+        "name": "Last Recipe Card"
+      },
+      "brew_status": {
+        "name": "Brew Status",
+        "state": {
+          "idle": "Idle",
+          "grinding": "Grinding",
+          "brewing": "Brewing",
+          "done": "Done"
+        }
+      },
+      "machine_status": {
+        "name": "Machine Status",
+        "state": {
+          "ok": "OK",
+          "no_water": "No water",
+          "no_beans": "No beans",
+          "dose_water_error": "Dose/water error",
+          "gear_position_error": "Gear position error"
+        }
+      },
+      "scale_weight": {
+        "name": "Scale Weight"
+      }
+    },
+    "switch": {
+      "use_grinder": {
+        "name": "Use Grinder"
+      }
+    }
+  }
+}
