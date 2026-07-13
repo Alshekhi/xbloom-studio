@@ -30,8 +30,3 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          # 'brands' requires an icon in the home-assistant/brands repo, which
-          # only applies to default-store submission. This integration ships as
-          # a HACS custom repository, so that check is intentionally skipped.
-          # Remove this line if/when submitting to the default HACS store.
-          ignore: brands
