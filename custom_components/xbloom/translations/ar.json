@@ -1,0 +1,267 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "confirm": {
+        "title": "إعداد {name}",
+        "description": "اكتشف Home Assistant جهاز xBloom عبر Bluetooth. أكّد لإضافته.\n\nبدون حساب، بدون وسيط MQTT، بدون أي إعداد إضافي — تُضاف الوصفات لاحقاً من قائمة *Configure* الخاصة بالتكامل (الصق رابط مشاركة من تطبيق iOS)."
+      },
+      "user": {
+        "title": "إعداد xBloom Studio",
+        "description": "اختر جهازك من القائمة (يرى تكامل Bluetooth في Home Assistant {discovered_count} حالياً). إذا لم يكن جهازك مدرجاً، اكتب اسم BLE الخاص به — يظهر في تطبيق iOS تحت *Settings → Machine* (مثلاً *XBLOOM ABC123*).",
+        "data": {
+          "ble_name": "الجهاز (اسم BLE)"
+        }
+      }
+    },
+    "error": {
+      "ble_name_required": "اختر جهازاً من القائمة، أو اكتب اسم BLE الخاص به.",
+      "ble_name_invalid": "أسماء BLE تبدو مثل 'XBLOOM ABC123'. تحقق من القيمة في إعدادات الجهاز في تطبيق iOS."
+    },
+    "abort": {
+      "already_configured": "جهاز xBloom هذا مُعدّ مسبقاً.",
+      "not_supported": "جهاز Bluetooth هذا لا يبدو أنه جهاز xBloom."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "مكتبة وصفات xBloom",
+        "description": "أنشئ، عدّل، أو احذف الوصفات المتاحة للتكامل. تُحفظ الوصفات محلياً — لا حاجة لحساب xBloom.",
+        "menu_options": {
+          "create_recipe": "إنشاء وصفة",
+          "edit_recipe": "تعديل وصفة",
+          "delete_recipe": "حذف وصفة",
+          "add_recipe": "إضافة وصفة عبر رابط مشاركة",
+          "done": "تم"
+        }
+      },
+      "add_recipe": {
+        "title": "إضافة وصفة",
+        "description": "افتح الوصفة في تطبيق xBloom على iOS، اضغط Share → Copy Link، والصق الرابط هنا. أو الصق معرّف المشاركة فقط (القيمة بعد `?id=`).",
+        "data": {
+          "share_url_or_id": "رابط المشاركة أو المعرّف"
+        }
+      },
+      "create_recipe": {
+        "title": "وصفة جديدة — اختر القمع",
+        "description": "سمِّ الوصفة واختر نوع القمع. نطاق الجرعة في الخطوة التالية مقفل على ما يدعمه القمع المختار (xPod = 15 g؛ Omni dripper = 5–18 g؛ Other = 5–25 g؛ Tea = 1–5 g).",
+        "data": {
+          "name": "اسم الوصفة",
+          "cup_type": "نوع القمع"
+        }
+      },
+      "create_recipe_pours": {
+        "title": "تعديل الصبّات",
+        "description": "المطلوب: {total_ml} مل ({dose} جم × {ratio}). كل صبّة مُعبّأة مبدئياً بـ {per_pour_ml} مل. المجموع الحالي: {current_total_ml} مل. يجب أن يساوي مجموع الصبّات {total_ml} مل بالضبط — أقل أو أكثر سيُرفض.",
+        "data": {
+          "pour_0_volume_ml": "Bloom — الحجم (ml)",
+          "pour_0_temperature_c": "Bloom — الحرارة (°C)",
+          "pour_0_pattern": "Bloom — النمط",
+          "pour_0_flow_rate": "Bloom — معدّل التدفق (ml/s)",
+          "pour_0_pause_s": "Bloom — التوقّف (ثوانٍ)",
+          "pour_0_vib_before": "Bloom — اهتزاز قبل",
+          "pour_0_vib_after": "Bloom — اهتزاز بعد",
+          "pour_1_volume_ml": "الصبّة 1 — الحجم (ml)",
+          "pour_1_temperature_c": "الصبّة 1 — الحرارة (°C)",
+          "pour_1_pattern": "الصبّة 1 — النمط",
+          "pour_1_flow_rate": "الصبّة 1 — معدّل التدفق (ml/s)",
+          "pour_1_pause_s": "الصبّة 1 — التوقّف (ثوانٍ)",
+          "pour_1_vib_before": "الصبّة 1 — اهتزاز قبل",
+          "pour_1_vib_after": "الصبّة 1 — اهتزاز بعد",
+          "pour_2_volume_ml": "الصبّة 2 — الحجم (ml)",
+          "pour_2_temperature_c": "الصبّة 2 — الحرارة (°C)",
+          "pour_2_pattern": "الصبّة 2 — النمط",
+          "pour_2_flow_rate": "الصبّة 2 — معدّل التدفق (ml/s)",
+          "pour_2_pause_s": "الصبّة 2 — التوقّف (ثوانٍ)",
+          "pour_2_vib_before": "الصبّة 2 — اهتزاز قبل",
+          "pour_2_vib_after": "الصبّة 2 — اهتزاز بعد",
+          "pour_3_volume_ml": "الصبّة 3 — الحجم (ml)",
+          "pour_3_temperature_c": "الصبّة 3 — الحرارة (°C)",
+          "pour_3_pattern": "الصبّة 3 — النمط",
+          "pour_3_flow_rate": "الصبّة 3 — معدّل التدفق (ml/s)",
+          "pour_3_pause_s": "الصبّة 3 — التوقّف (ثوانٍ)",
+          "pour_3_vib_before": "الصبّة 3 — اهتزاز قبل",
+          "pour_3_vib_after": "الصبّة 3 — اهتزاز بعد",
+          "pour_4_volume_ml": "الصبّة 4 — الحجم (ml)",
+          "pour_4_temperature_c": "الصبّة 4 — الحرارة (°C)",
+          "pour_4_pattern": "الصبّة 4 — النمط",
+          "pour_4_flow_rate": "الصبّة 4 — معدّل التدفق (ml/s)",
+          "pour_4_pause_s": "الصبّة 4 — التوقّف (ثوانٍ)",
+          "pour_4_vib_before": "الصبّة 4 — اهتزاز قبل",
+          "pour_4_vib_after": "الصبّة 4 — اهتزاز بعد",
+          "pour_5_volume_ml": "الصبّة 5 — الحجم (ml)",
+          "pour_5_temperature_c": "الصبّة 5 — الحرارة (°C)",
+          "pour_5_pattern": "الصبّة 5 — النمط",
+          "pour_5_flow_rate": "الصبّة 5 — معدّل التدفق (ml/s)",
+          "pour_5_pause_s": "الصبّة 5 — التوقّف (ثوانٍ)",
+          "pour_5_vib_before": "الصبّة 5 — اهتزاز قبل",
+          "pour_5_vib_after": "الصبّة 5 — اهتزاز بعد",
+          "pour_6_volume_ml": "الصبّة 6 — الحجم (ml)",
+          "pour_6_temperature_c": "الصبّة 6 — الحرارة (°C)",
+          "pour_6_pattern": "الصبّة 6 — النمط",
+          "pour_6_flow_rate": "الصبّة 6 — معدّل التدفق (ml/s)",
+          "pour_6_pause_s": "الصبّة 6 — التوقّف (ثوانٍ)",
+          "pour_6_vib_before": "الصبّة 6 — اهتزاز قبل",
+          "pour_6_vib_after": "الصبّة 6 — اهتزاز بعد",
+          "pour_7_volume_ml": "الصبّة 7 — الحجم (ml)",
+          "pour_7_temperature_c": "الصبّة 7 — الحرارة (°C)",
+          "pour_7_pattern": "الصبّة 7 — النمط",
+          "pour_7_flow_rate": "الصبّة 7 — معدّل التدفق (ml/s)",
+          "pour_7_pause_s": "الصبّة 7 — التوقّف (ثوانٍ)",
+          "pour_7_vib_before": "الصبّة 7 — اهتزاز قبل",
+          "pour_7_vib_after": "الصبّة 7 — اهتزاز بعد",
+          "pour_8_volume_ml": "الصبّة 8 — الحجم (ml)",
+          "pour_8_temperature_c": "الصبّة 8 — الحرارة (°C)",
+          "pour_8_pattern": "الصبّة 8 — النمط",
+          "pour_8_flow_rate": "الصبّة 8 — معدّل التدفق (ml/s)",
+          "pour_8_pause_s": "الصبّة 8 — التوقّف (ثوانٍ)",
+          "pour_8_vib_before": "الصبّة 8 — اهتزاز قبل",
+          "pour_8_vib_after": "الصبّة 8 — اهتزاز بعد",
+          "pour_9_volume_ml": "الصبّة 9 — الحجم (ml)",
+          "pour_9_temperature_c": "الصبّة 9 — الحرارة (°C)",
+          "pour_9_pattern": "الصبّة 9 — النمط",
+          "pour_9_flow_rate": "الصبّة 9 — معدّل التدفق (ml/s)",
+          "pour_9_pause_s": "الصبّة 9 — التوقّف (ثوانٍ)",
+          "pour_9_vib_before": "الصبّة 9 — اهتزاز قبل",
+          "pour_9_vib_after": "الصبّة 9 — اهتزاز بعد",
+          "pour_10_volume_ml": "الصبّة 10 — الحجم (ml)",
+          "pour_10_temperature_c": "الصبّة 10 — الحرارة (°C)",
+          "pour_10_pattern": "الصبّة 10 — النمط",
+          "pour_10_flow_rate": "الصبّة 10 — معدّل التدفق (ml/s)",
+          "pour_10_pause_s": "الصبّة 10 — التوقّف (ثوانٍ)",
+          "pour_10_vib_before": "الصبّة 10 — اهتزاز قبل",
+          "pour_10_vib_after": "الصبّة 10 — اهتزاز بعد",
+          "pour_11_volume_ml": "الصبّة 11 — الحجم (ml)",
+          "pour_11_temperature_c": "الصبّة 11 — الحرارة (°C)",
+          "pour_11_pattern": "الصبّة 11 — النمط",
+          "pour_11_flow_rate": "الصبّة 11 — معدّل التدفق (ml/s)",
+          "pour_11_pause_s": "الصبّة 11 — التوقّف (ثوانٍ)",
+          "pour_11_vib_before": "الصبّة 11 — اهتزاز قبل",
+          "pour_11_vib_after": "الصبّة 11 — اهتزاز بعد",
+          "pour_12_volume_ml": "الصبّة 12 — الحجم (ml)",
+          "pour_12_temperature_c": "الصبّة 12 — الحرارة (°C)",
+          "pour_12_pattern": "الصبّة 12 — النمط",
+          "pour_12_flow_rate": "الصبّة 12 — معدّل التدفق (ml/s)",
+          "pour_12_pause_s": "الصبّة 12 — التوقّف (ثوانٍ)",
+          "pour_12_vib_before": "الصبّة 12 — اهتزاز قبل",
+          "pour_12_vib_after": "الصبّة 12 — اهتزاز بعد",
+          "pour_13_volume_ml": "الصبّة 13 — الحجم (ml)",
+          "pour_13_temperature_c": "الصبّة 13 — الحرارة (°C)",
+          "pour_13_pattern": "الصبّة 13 — النمط",
+          "pour_13_flow_rate": "الصبّة 13 — معدّل التدفق (ml/s)",
+          "pour_13_pause_s": "الصبّة 13 — التوقّف (ثوانٍ)",
+          "pour_13_vib_before": "الصبّة 13 — اهتزاز قبل",
+          "pour_13_vib_after": "الصبّة 13 — اهتزاز بعد",
+          "pour_14_volume_ml": "الصبّة 14 — الحجم (ml)",
+          "pour_14_temperature_c": "الصبّة 14 — الحرارة (°C)",
+          "pour_14_pattern": "الصبّة 14 — النمط",
+          "pour_14_flow_rate": "الصبّة 14 — معدّل التدفق (ml/s)",
+          "pour_14_pause_s": "الصبّة 14 — التوقّف (ثوانٍ)",
+          "pour_14_vib_before": "الصبّة 14 — اهتزاز قبل",
+          "pour_14_vib_after": "الصبّة 14 — اهتزاز بعد",
+          "pour_15_volume_ml": "الصبّة 15 — الحجم (ml)",
+          "pour_15_temperature_c": "الصبّة 15 — الحرارة (°C)",
+          "pour_15_pattern": "الصبّة 15 — النمط",
+          "pour_15_flow_rate": "الصبّة 15 — معدّل التدفق (ml/s)",
+          "pour_15_pause_s": "الصبّة 15 — التوقّف (ثوانٍ)",
+          "pour_15_vib_before": "الصبّة 15 — اهتزاز قبل",
+          "pour_15_vib_after": "الصبّة 15 — اهتزاز بعد",
+          "pour_16_volume_ml": "الصبّة 16 — الحجم (ml)",
+          "pour_16_temperature_c": "الصبّة 16 — الحرارة (°C)",
+          "pour_16_pattern": "الصبّة 16 — النمط",
+          "pour_16_flow_rate": "الصبّة 16 — معدّل التدفق (ml/s)",
+          "pour_16_pause_s": "الصبّة 16 — التوقّف (ثوانٍ)",
+          "pour_16_vib_before": "الصبّة 16 — اهتزاز قبل",
+          "pour_16_vib_after": "الصبّة 16 — اهتزاز بعد",
+          "pour_17_volume_ml": "الصبّة 17 — الحجم (ml)",
+          "pour_17_temperature_c": "الصبّة 17 — الحرارة (°C)",
+          "pour_17_pattern": "الصبّة 17 — النمط",
+          "pour_17_flow_rate": "الصبّة 17 — معدّل التدفق (ml/s)",
+          "pour_17_pause_s": "الصبّة 17 — التوقّف (ثوانٍ)",
+          "pour_17_vib_before": "الصبّة 17 — اهتزاز قبل",
+          "pour_17_vib_after": "الصبّة 17 — اهتزاز بعد",
+          "pour_18_volume_ml": "الصبّة 18 — الحجم (ml)",
+          "pour_18_temperature_c": "الصبّة 18 — الحرارة (°C)",
+          "pour_18_pattern": "الصبّة 18 — النمط",
+          "pour_18_flow_rate": "الصبّة 18 — معدّل التدفق (ml/s)",
+          "pour_18_pause_s": "الصبّة 18 — التوقّف (ثوانٍ)",
+          "pour_18_vib_before": "الصبّة 18 — اهتزاز قبل",
+          "pour_18_vib_after": "الصبّة 18 — اهتزاز بعد",
+          "pour_19_volume_ml": "الصبّة 19 — الحجم (ml)",
+          "pour_19_temperature_c": "الصبّة 19 — الحرارة (°C)",
+          "pour_19_pattern": "الصبّة 19 — النمط",
+          "pour_19_flow_rate": "الصبّة 19 — معدّل التدفق (ml/s)",
+          "pour_19_pause_s": "الصبّة 19 — التوقّف (ثوانٍ)",
+          "pour_19_vib_before": "الصبّة 19 — اهتزاز قبل",
+          "pour_19_vib_after": "الصبّة 19 — اهتزاز بعد"
+        }
+      },
+      "edit_recipe": {
+        "title": "تعديل وصفة",
+        "description": "اختر الوصفة التي تريد تعديلها. الخطوة التالية تتيح لك تغيير معطيات التحضير.",
+        "data": {
+          "recipe_id": "الوصفة المراد تعديلها"
+        }
+      },
+      "delete_recipe": {
+        "title": "حذف وصفة",
+        "description": "اختر الوصفة التي تريد حذفها.",
+        "data": {
+          "recipe_id": "الوصفة المراد حذفها"
+        }
+      },
+      "delete_recipe_confirm": {
+        "title": "تأكيد الحذف",
+        "description": "هل تريد حذف {recipe_name}؟ لا يمكن التراجع عن هذه العملية.",
+        "data": {
+          "confirm": "نعم، احذف هذه الوصفة"
+        }
+      },
+      "write_to_slot": {
+        "title": "كتابة الوصفة في خانة الجهاز؟",
+        "description": "اختياري: اكتب {recipe_name} في إحدى خانات الجهاز (A/B/C) لتحضيرها من الجهاز مباشرة. اختر 'skip' للإنهاء.",
+        "data": {
+          "slot": "الخانة"
+        }
+      },
+      "create_recipe_brew": {
+        "title": "إعدادات التحضير",
+        "description": "نوع القمع: {cup}. الجرعة مقفلة على نطاق القمع المسموح. النسبة هي نسبة التحضير 1:N (5–25 بخطوة 0.5).",
+        "data": {
+          "dose_g": "الجرعة (g)",
+          "ratio": "النسبة",
+          "grind_size": "حجم الطحن (1–80)",
+          "grinder_speed_rpm": "سرعة المطحنة (RPM، 60–120)",
+          "pour_count": "عدد الصبّات (1–9)",
+          "enable_bypass_water": "تفعيل ماء الالتفاف",
+          "bypass_volume_ml": "حجم ماء الالتفاف (ml)",
+          "bypass_temp_c": "حرارة ماء الالتفاف (°C)"
+        }
+      }
+    },
+    "error": {
+      "required": "حقل مطلوب.",
+      "invalid_share": "تعذّر جلب وصفة من هذا الرابط/المعرّف. تأكّد من الرابط من تطبيق xBloom.",
+      "name_required": "اسم الوصفة مطلوب.",
+      "ratio_invalid": "النسبة يجب أن تكون بين 1:5 و 1:25 بخطوة 0.5 (مثل 1:5، 1:15.5، 1:25).",
+      "grind_out_of_range": "درجة الطحن يجب أن تكون بين 1 و 80.",
+      "rpm_out_of_range": "سرعة المطحنة يجب أن تكون بين 60 و 120 RPM.",
+      "pour_count_mismatch": "عدد الصبّات يجب أن يكون بين 1 و 9 ومطابقاً لعدد الصبّات.",
+      "cup_type_invalid": "اختر Omni dripper أو xPod أو Other.",
+      "volume_total_mismatch": "مجموع أحجام الصبّات يجب أن يساوي الجرعة × النسبة (بهامش 1 ml).",
+      "temp_out_of_range": "درجة حرارة الصبّة يجب أن تكون بين 40 و 98 °C.",
+      "flow_out_of_range": "معدّل التدفق يجب أن يكون بين 3.0 و 3.5 ml/s.",
+      "pause_out_of_range": "التوقّف يجب أن يكون بين 0 و 59 ثانية.",
+      "pattern_invalid": "النمط يجب أن يكون centered أو circular أو spiral.",
+      "bypass_volume_required": "حجم ماء التجاوز مطلوب عند تفعيل bypass.",
+      "bypass_temp_required": "درجة حرارة ماء التجاوز مطلوبة عند تفعيل bypass.",
+      "slot_write_failed": "تعذّر الكتابة في خانة الجهاز. تأكّد أن الجهاز مشغّل وحاول مرّة أخرى، أو اختر skip.",
+      "dose_out_of_range_for_cup": "الجرعة خارج النطاق المسموح للقمع. Omni dripper يقبل 5–18 g؛ Other يقبل 5–25 g؛ xPod مثبّت على 15 g؛ Tea يقبل 1–5 g.",
+      "volume_out_of_range": "حجم كل صبّة يجب أن يكون بين 0 و 240 ml."
+    },
+    "abort": {
+      "no_recipes": "لا توجد وصفات محفوظة بعد."
+    }
+  }
+}

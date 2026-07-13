@@ -1,0 +1,47 @@
+# Bridge runtime credentials — .env.example is committed; .env is not
+bridge/.env
+
+# Python generated files
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# Claude Code session state
+.claude/
+
+# Personal cleanup notes (host-specific)
+CLEANUP.md
+CLAUDE.md
+
+# GSD planning artifacts
+.planning/
+
+# Generated graph output
+graphify-out/
+
+# Superseded — BLE replaced the cloud API bridge and standalone library
+bridge/
+/xbloom/
+
+# Personal reference
+docs/
+
+# Standalone library (superseded — vendor copy lives in custom_components)
+pyproject.toml
+uv.lock
+tests/
+
+# Virtual environment and dist
+.venv/
+dist/
+
+# Local-only development artifacts (kept out of the repo)
+discovery/*
+!discovery/.gitkeep
+
+# Local tooling
+tools/

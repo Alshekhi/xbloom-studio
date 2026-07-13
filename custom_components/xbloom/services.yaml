@@ -1,0 +1,315 @@
+start_brew:
+  name: Start Brew
+  description: >
+    Trigger a brew for the currently selected recipe on the xBloom Studio.
+    If recipe_name is omitted, uses the recipe currently selected in
+    select.xbloom_studio_recipe.
+  fields:
+    recipe_name:
+      name: Recipe Name
+      description: >
+        Optional recipe name override. If provided, must exactly match a recipe
+        name in select.xbloom_studio_recipe options. If omitted, uses the
+        currently selected recipe.
+      required: false
+      example: "Ethiopia Yirgacheffe"
+      selector:
+        text:
+    use_preground:
+      name: Use pre-ground coffee
+      description: >
+        Skip the grinder for this brew — the machine goes straight to pouring.
+        The recipe's grind settings are not changed; this is a one-time
+        per-brew override. Useful when you are using pre-ground coffee or
+        an external grinder.
+      required: false
+      default: false
+      selector:
+        boolean:
+
+stop_brew:
+  name: Stop Brew
+  description: >
+    Cancel an in-progress brew (BLE cmd 4507 / APP_BREWER_STOP). Single-frame
+    write to FFE1; HA opens BLE, sends, and disconnects.
+
+brew_standalone:
+  name: Standalone Brew
+  description: >
+    Run the brewer directly (BLE cmd 4506) without a recipe, using the current
+    values of the standalone brew entities: number.brew_flow_rate,
+    number.brew_volume, number.brew_temperature, select.brew_pattern, and
+    select.water_source. Set those entities first, then call this service.
+
+tare:
+  name: Tare Scale
+  description: >
+    Zero the integrated scale on the xBloom Studio (BLE cmd 8500). Single-frame
+    write to FFE1; HA opens BLE, sends, and disconnects.
+
+back_to_home:
+  name: Back to Home
+  description: >
+    Return the machine's on-screen UI to the home screen (BLE cmd 8022).
+
+brew_pause:
+  name: Pause Brew
+  description: >
+    Pause an in-flight brew (BLE cmd 40518). The machine holds at the current
+    pour; resume with brew_resume.
+
+brew_resume:
+  name: Resume Brew
+  description: >
+    Resume a paused brew (BLE cmd 8021 / APP_BREWER_RESTART).
+
+grind:
+  name: Standalone Grind
+  description: >
+    Run the grinder in FreeSolo mode for the given duration. Sends the 3-frame
+    enter/start/stop sequence over BLE; HA holds the link for the full grind
+    time, then disconnects.
+  fields:
+    size:
+      name: Grind size
+      description: 1-100 (lower = finer; brAzzi64 reference default is 63).
+      required: false
+      default: 63
+      example: 50
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+    speed:
+      name: Grinder speed (RPM)
+      description: 60-120 (default 100).
+      required: false
+      default: 100
+      example: 100
+      selector:
+        number:
+          min: 60
+          max: 120
+          step: 1
+    seconds:
+      name: Duration (seconds)
+      description: How long to grind (1-30 s; default 5).
+      required: false
+      default: 5
+      example: 5
+      selector:
+        number:
+          min: 1
+          max: 30
+          step: 0.5
+          unit_of_measurement: s
+
+set_mode:
+  name: Set Mode
+  description: >
+    Switch between Auto (Easy) mode and Pro mode (BLE cmd 11511, Type-2 packet).
+  fields:
+    mode:
+      name: Mode
+      description: auto = Easy mode (machine drives recipe), pro = Pro mode (manual control).
+      required: true
+      example: auto
+      selector:
+        select:
+          options:
+            - auto
+            - pro
+
+set_water_source:
+  name: Set Water Source
+  description: >
+    Switch between the internal water tank and an external tap (BLE cmd 4508).
+  fields:
+    source:
+      name: Source
+      required: true
+      example: tank
+      selector:
+        select:
+          options:
+            - tank
+            - tap
+
+set_temp_unit:
+  name: Set Temperature Unit
+  description: >
+    Set the on-screen temperature unit on the machine (BLE cmd 8010).
+  fields:
+    unit:
+      name: Unit
+      required: true
+      example: C
+      selector:
+        select:
+          options:
+            - C
+            - F
+
+set_weight_unit:
+  name: Set Weight Unit
+  description: >
+    Set the on-screen weight unit on the machine (BLE cmd 8005).
+  fields:
+    unit:
+      name: Unit
+      required: true
+      example: g
+      selector:
+        select:
+          options:
+            - g
+            - oz
+            - ml
+
+write_slot:
+  name: Write Recipe to Slot
+  description: >
+    Push a recipe to one of the machine's three on-device Easy-mode slots
+    (A / B / C) over BLE (cmd 11510, Type-2 packet). After the slot is
+    written, the user can trigger that brew from the machine's physical UI
+    alone — no Home Assistant involvement required. Pass exactly one of
+    recipe_name, share_url, or share_id to choose which recipe to push;
+    if none is provided, falls back to the currently-selected recipe.
+  fields:
+    slot:
+      name: Slot
+      description: Which on-device slot to overwrite (A, B, or C).
+      required: true
+      example: A
+      selector:
+        select:
+          options:
+            - A
+            - B
+            - C
+    recipe_name:
+      name: Recipe name
+      description: Name of a recipe in the local library (matches select.xbloom_studio_recipe).
+      required: false
+      example: "Ethiopia Yirgacheffe"
+      selector:
+        text:
+    share_url:
+      name: Share URL
+      description: >
+        A share URL from the xBloom iOS app (e.g. https://share-h5.xbloom.com/?id=...).
+        Fetched fresh — no need to import via Configure menu first.
+      required: false
+      selector:
+        text:
+    share_id:
+      name: Share ID
+      description: Just the id token (the value after `?id=` in a share URL).
+      required: false
+      selector:
+        text:
+    scale_on:
+      name: Scale enabled
+      description: >
+        Whether the slot should activate the integrated scale at brew time
+        (default true).
+      required: false
+      default: true
+      selector:
+        boolean:
+
+ble_connect:
+  name: BLE Connect (debug)
+  description: >
+    Probe the BLE link: open a connection, run the handshake, subscribe to
+    FFE2, then release and disconnect. Logs each step with success/failure
+    detail. Use when diagnosing connection problems; does not touch the brew
+    flow.
+
+ble_disconnect:
+  name: BLE Disconnect (debug)
+  description: >
+    Force-release any BLE handle Home Assistant is holding for the machine, so
+    the iOS app can reconnect. Diagnostic counterpart to ble_connect.
+
+dump_notifications:
+  name: Dump BLE notifications (debug)
+  description: >
+    Open BLE, subscribe to FFE2, log every decoded notification packet for
+    the given duration, then disconnect. Used in plan 08-05 to identify
+    which command codes carry grinder/brewer knob changes — run this
+    service, then turn knobs on the machine, and inspect the HA log for
+    the captured frames.
+  fields:
+    seconds:
+      name: Duration
+      description: How long to listen (5-300 s; default 30).
+      required: false
+      default: 30
+      example: 30
+      selector:
+        number:
+          min: 5
+          max: 300
+          step: 5
+          unit_of_measurement: s
+
+list_recipes:
+  name: List Recipes
+  description: >
+    Return all recipes in the local library as response data.
+    Supports response — call with return_response=true from the REST API.
+
+get_recipe:
+  name: Get Recipe
+  description: >
+    Return a single recipe by name as response data.
+    Returns null if not found.
+  fields:
+    name:
+      name: Recipe name
+      description: Exact recipe name (case-sensitive).
+      required: true
+      example: "Ethiopia Yirgacheffe"
+      selector:
+        text:
+
+add_recipe:
+  name: Add Recipe
+  description: >
+    Add a new recipe to the local library. Replaces an existing recipe with
+    the same name. Pass the full recipe dict as a JSON string.
+  fields:
+    recipe_json:
+      name: Recipe JSON
+      description: Full recipe object serialised as a JSON string.
+      required: true
+      selector:
+        text:
+
+update_recipe:
+  name: Update Recipe
+  description: >
+    Update (replace) an existing recipe by id. Pass the full updated recipe
+    dict as a JSON string. Inserts if no matching id is found.
+  fields:
+    recipe_json:
+      name: Recipe JSON
+      description: Full updated recipe object serialised as a JSON string.
+      required: true
+      selector:
+        text:
+
+delete_recipe:
+  name: Delete Recipe
+  description: >
+    Delete a recipe from the local library by name.
+  fields:
+    name:
+      name: Recipe name
+      description: Exact recipe name to delete (case-sensitive).
+      required: true
+      example: "Ethiopia Yirgacheffe"
+      selector:
+        text:
