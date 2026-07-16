@@ -178,7 +178,6 @@ def encode_recipe_blob(
         to drop into a CMD_RECIPE_GRIND / CMD_RECIPE_NO_GRIND frame.
     """
     total_water = sum(p.get("volume_ml", 0) for p in pours)
-    ratio = (total_water / dose_g) if dose_g > 0 else 0
 
     parts: list[int] = []
     for i, pour in enumerate(pours):
@@ -210,9 +209,15 @@ def encode_recipe_blob(
 
     data_bytes = bytes(parts)
     length_byte = len(data_bytes) & 0xFF
+    # Trailing metadata: [grinder_size, grandWater × 10]. The official app's
+    # GetRecipeCodeService writes grandWater × 10 here (grandWater = total pour
+    # volume), NOT ratio × 10 — our earlier code used ratio, producing a wrong
+    # last byte (0xA5 vs the app's 0x9A for "Omni 20g 5 pours"). This byte is
+    # machine metadata, not the grind toggle (grind is the 8001/8004 command),
+    # but it should match the app exactly.
     grinder_byte = int(grinder_size) & 0xFF
-    ratio_byte = int(ratio * 10) & 0xFF
-    return bytes([length_byte]) + data_bytes + bytes([grinder_byte, ratio_byte])
+    water_byte = int(round(total_water * 10)) & 0xFF
+    return bytes([length_byte]) + data_bytes + bytes([grinder_byte, water_byte])
 
 
 # ---------------------------------------------------------------------------
@@ -789,6 +794,16 @@ class XBloomBleClient:
                 "status updates; brew dispatch is not affected", err
             )
 
+        # Brief settle before the first write, mirroring the Live Mode
+        # listener: yield to the loop so bleak's notification reader spins up,
+        # then a short sleep so the machine acknowledges the handshake (the
+        # audible connect tone) instead of the reader missing the first
+        # response burst. This is a one-off pre-handshake pause, not per-frame
+        # pacing — it does not slow the brew sequence itself.
+        for _ in range(5):
+            await asyncio.sleep(0)
+        await asyncio.sleep(0.3)
+
         # Build and send the 5-frame brew sequence to FFE1. The machine's
         # FFE1 characteristic only supports Write Without Response — using
         # response=True triggers ATT error 0x0e ("Unlikely Error"). A small
@@ -797,16 +812,25 @@ class XBloomBleClient:
         # We verify is_connected after the burst so silent drops surface.
         import asyncio
         frames = build_brew_frames(recipe)
-        # Back to Home (8022) goes between handshake and the brew frames.
-        # The official app always sends it after connecting; without it the
-        # machine accepts the recipe but skips the grind phase entirely
-        # (observed June 2026: every HA-triggered 8001 brew behaved like a
-        # no-grind 8004 brew). The longer post-write delay lets the machine
-        # finish navigating its UI back to the home screen.
-        frames.insert(1, packet_back_to_home())
+        # Force EASY (Auto) mode before the recipe. THE grind fix: the J15
+        # recipe brew (8001) only GRINDS when the machine is in EASY mode; in
+        # PRO mode it accepts the recipe and pours WITHOUT grinding. The
+        # official app guarantees EASY mode via its machine-settings toggle
+        # (BleCodeFactory.easyModeSwitch → cmd RD_EASYMODE_TYPE 11511, payload
+        # "91327856"), which our packet_mode("auto") reproduces byte-for-byte —
+        # but the app never re-sends it per brew, relying on the machine already
+        # being EASY. HA has no such guarantee, so we send the switch on every
+        # brew (idempotent if already EASY). Root cause of the 2026-07-16
+        # grind-skip: the machine was sitting in PRO mode, and a VoiceOver user
+        # can't see the mode indicator to catch it.
+        #
+        # No Back-to-Home (8022): it was our June addition; live testing on
+        # 2026-07-16 showed it did not help, and the official app's brew is just
+        # the handshake + these frames, so we match it.
+        frames.insert(1, packet_mode("auto"))
         sends = [
             ("handshake", 0.5),
-            ("back_to_home", 2.0),
+            ("easy_mode", 1.0),   # let the mode change register before the recipe
             ("bypass+dose", 0.5),
             ("set_cup", 0.5),
             ("recipe", 0.5),
