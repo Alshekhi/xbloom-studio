@@ -17,6 +17,7 @@ all gone. See `git log` for the full evolution.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 
@@ -34,6 +35,11 @@ from .vendor.xbloom.client import XBloomClient
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["select", "button", "number", "sensor", "event", "switch"]
+
+# A start_brew call within this many seconds of the previous dispatch is
+# treated as a duplicate (e.g. a voice-agent HTTP retry) and ignored. A call
+# after the window preempts the earlier session instead — see handle_start_brew.
+BREW_DUP_WINDOW_S = 20.0
 
 
 @dataclass
@@ -171,7 +177,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # background task so the service call returns immediately — voice-agent
     # callers (Sage) time out after ~10 s and retry, which used to start
     # overlapping brew sessions (observed June 2026: 6 calls for 3 brews).
-    brew_session: dict = {"task": None}
+    #
+    # The guard is time-boxed, not permanent. A repeat within
+    # BREW_DUP_WINDOW_S is a retry and is swallowed; a genuine later press
+    # preempts the previous session (cancelling its task, which releases the
+    # held BLE link) and starts fresh. Without this, a brew that never reaches
+    # RD_ENJOY — low water, a machine fault, or a brew stopped from the app —
+    # left the task blocked in wait_for_completion for the full 10-minute
+    # timeout, holding both the guard and BLE so no restart was possible until
+    # the integration reloaded.
+    brew_session: dict = {"task": None, "started_at": 0.0}
+
+    async def _cancel_active_brew(reason: str) -> None:
+        """Cancel the in-flight brew task (if any) and wait for it to unwind.
+
+        Cancelling propagates through ``_run_brew``'s ``async with
+        ble_client`` block, so the held BLE connection is released and the
+        machine/app are free again. A no-op when nothing is running.
+        """
+        active = brew_session["task"]
+        if active is None or active.done():
+            return
+        _LOGGER.info("xbloom: cancelling active brew session (%s)", reason)
+        active.cancel()
+        try:
+            await active
+        except asyncio.CancelledError:
+            pass
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("xbloom: active brew task errored during cancel")
+        finally:
+            brew_session["task"] = None
 
     async def handle_start_brew(call) -> None:
         """Validate + resolve the recipe, then brew in a background task:
@@ -191,11 +227,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
         active = brew_session["task"]
         if active is not None and not active.done():
-            _LOGGER.warning(
-                "xbloom.start_brew: a brew session is already running — "
-                "ignoring duplicate call"
+            elapsed = hass.loop.time() - brew_session["started_at"]
+            if elapsed < BREW_DUP_WINDOW_S:
+                _LOGGER.warning(
+                    "xbloom.start_brew: a brew was dispatched %.1fs ago — "
+                    "ignoring duplicate call (within %.0fs retry window)",
+                    elapsed, BREW_DUP_WINDOW_S,
+                )
+                return
+            # A genuine later press: the previous session is stale or wedged
+            # (e.g. stuck waiting on a brew that will never complete). We
+            # preempt it below, once the new brew is confirmed dispatchable.
+            _LOGGER.info(
+                "xbloom.start_brew: previous session still active after "
+                "%.0fs — preempting it", elapsed,
             )
-            return
 
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
@@ -282,9 +328,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             finally:
                 async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "ended")
 
+        # Preempt any still-running (stale/wedged) session now that we're
+        # committed to dispatching a new brew. No-op on the normal path.
+        await _cancel_active_brew("preempted by a new start_brew")
+
         brew_session["task"] = entry.async_create_background_task(
             hass, _run_brew(), name=f"xbloom_brew_{recipe_name}"
         )
+        brew_session["started_at"] = hass.loop.time()
         _LOGGER.info(
             "xbloom.start_brew: brew '%s' dispatched to background — "
             "service call returning", recipe_name,
@@ -294,8 +345,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # Service: xbloom.stop_brew                                          #
     # ------------------------------------------------------------------ #
     async def handle_stop_brew(call) -> None:
-        """Send APP_BREWER_STOP (4507) over BLE to cancel an in-progress brew."""
+        """Cancel an in-progress brew.
+
+        First stop HA's own brew task (which releases the BLE link it was
+        holding and clears the duplicate-guard), then send APP_BREWER_STOP
+        (4507) so the machine halts too. Cancelling the task first is what
+        makes Cancel Brew a reliable reset: it frees the connection a stuck
+        brew was holding, so the stop frame — and the next start_brew — can
+        get their own connection.
+        """
         from .vendor.xbloom.ble import FFE1_UUID, XBloomBleClient, _build_frame
+
+        await _cancel_active_brew("stop_brew requested")
 
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
