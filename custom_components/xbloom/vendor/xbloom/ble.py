@@ -737,6 +737,13 @@ class XBloomBleClient:
             log.debug("BLE disconnected from %s", self._name)
         self._client = None
 
+    @property
+    def is_connected(self) -> bool:
+        """True while the underlying BLE link is actually up. Bleak flips its
+        own is_connected the moment the machine drops (power-off, out of
+        range), so holders can poll this to detect link loss."""
+        return bool(self._client is not None and self._client.is_connected)
+
     def _on_notify(self, _characteristic: object, data: bytes) -> None:
         """Synchronous BLE notification handler — dispatched by bleak."""
         decoded = decode_notification(bytes(data))
