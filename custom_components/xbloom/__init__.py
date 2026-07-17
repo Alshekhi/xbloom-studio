@@ -31,6 +31,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
 from .coordinator import XBloomCoordinator
 from .vendor.xbloom.client import XBloomClient
+from .vendor.xbloom import spec
 from .vendor.xbloom.recipe_validate import normalize_recipe, validate_recipe
 
 _LOGGER = logging.getLogger(__name__)
@@ -585,11 +586,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         temp_c    = _state_float("number.brew_temperature", 93.0)
 
         pattern_name = _state_str("select.brew_pattern", "spiral")
-        pattern_map = {"centered": 0, "circular": 1, "spiral": 2}
-        pattern_code = pattern_map.get(pattern_name, 2)  # default → spiral
+        pattern_code = spec.PATTERN_NAME_TO_BYTE.get(
+            pattern_name, spec.PATTERN_NAME_TO_BYTE["spiral"]
+        )
 
         water_source = _state_str("select.water_source", "tank")
-        water_feed = 1 if water_source == "tap" else 0
+        water_feed = spec.WATER_SOURCE_CODES.get(
+            water_source, spec.WATER_SOURCE_CODES["tank"]
+        )
 
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
