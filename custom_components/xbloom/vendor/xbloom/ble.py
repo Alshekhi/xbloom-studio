@@ -433,7 +433,7 @@ def packet_temp_unit(unit: str) -> bytes:
     Args:
         unit: 'C' (0) or 'F' (1)
     """
-    return _build_frame(CMD_UNIT_TEMP, [0 if unit.upper() == "C" else 1])
+    return _build_frame(CMD_UNIT_TEMP, [spec.TEMP_UNIT_CODES.get(unit.upper(), 1)])
 
 
 def packet_weight_unit(unit: str) -> bytes:

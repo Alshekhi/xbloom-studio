@@ -161,4 +161,5 @@ VOLUME_TOLERANCE_ML = 0.5
 # --------------------------------------------------------------------------- #
 WATER_SOURCE_CODES: dict[str, int] = {"tank": 0, "tap": 1}
 WEIGHT_UNIT_CODES: dict[str, int] = {"g": 0, "oz": 1, "ml": 2}
-TEMP_UNIT_CODES: dict[str, int] = {"°C": 0, "°F": 1}
+# Keys match what the select entity offers and the BLE frame expects ("C"/"F").
+TEMP_UNIT_CODES: dict[str, int] = {"C": 0, "F": 1}

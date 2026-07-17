@@ -103,6 +103,7 @@ def _checks():
     yield "volume tolerance", spec.VOLUME_TOLERANCE_ML, EXPECTED_VOLUME_TOL
     yield "water source codes", spec.WATER_SOURCE_CODES, EXPECTED_WATER
     yield "weight unit codes", spec.WEIGHT_UNIT_CODES, EXPECTED_WEIGHT_UNIT
+    yield "temp unit codes", spec.TEMP_UNIT_CODES, {"C": 0, "F": 1}
 
     # Behavioural spot-checks on NumRange helpers.
     yield "grind snap 63.4->63", spec.field("grind_size").snap(63.4), 63

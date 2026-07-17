@@ -191,7 +191,7 @@ class XBloomTempUnitSelect(_XBloomSettingSelect):
     _attr_name = "Temperature Unit"
     _attr_unique_id = "xbloom_temp_unit_select"
     _attr_icon = "mdi:thermometer"
-    _attr_options = ["C", "F"]
+    _attr_options = list(spec.TEMP_UNIT_CODES)
     _service = "set_temp_unit"
     _service_arg = "unit"
 
