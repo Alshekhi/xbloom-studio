@@ -786,15 +786,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     )
     hass.services.async_register(
         DOMAIN, "set_water_source", handle_set_water_source,
-        schema=vol.Schema({vol.Required("source"): vol.In(["tank", "tap"])}),
+        schema=vol.Schema({vol.Required("source"): vol.In(list(spec.WATER_SOURCE_CODES))}),
     )
     hass.services.async_register(
         DOMAIN, "set_temp_unit", handle_set_temp_unit,
-        schema=vol.Schema({vol.Required("unit"): vol.In(["C", "F"])}),
+        schema=vol.Schema({vol.Required("unit"): vol.In(list(spec.TEMP_UNIT_CODES))}),
     )
     hass.services.async_register(
         DOMAIN, "set_weight_unit", handle_set_weight_unit,
-        schema=vol.Schema({vol.Required("unit"): vol.In(["g", "oz", "ml"])}),
+        schema=vol.Schema({vol.Required("unit"): vol.In(list(spec.WEIGHT_UNIT_CODES))}),
     )
 
     # ------------------------------------------------------------------ #
