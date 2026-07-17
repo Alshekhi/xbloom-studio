@@ -31,7 +31,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
 from .coordinator import XBloomCoordinator
 from .vendor.xbloom.client import XBloomClient
-from .vendor.xbloom.recipe_validate import validate_recipe
+from .vendor.xbloom.recipe_validate import normalize_recipe, validate_recipe
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -918,6 +918,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             recipe = json.loads(call.data["recipe_json"])
         except (json.JSONDecodeError, KeyError) as err:
             return {"ok": False, "error": f"Invalid recipe_json: {err}"}
+        recipe = normalize_recipe(recipe)
         errors = validate_recipe(recipe)
         if errors:
             _LOGGER.warning("xbloom.add_recipe: rejected — %s", errors)
@@ -933,6 +934,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             recipe = json.loads(call.data["recipe_json"])
         except (json.JSONDecodeError, KeyError) as err:
             return {"ok": False, "error": f"Invalid recipe_json: {err}"}
+        recipe = normalize_recipe(recipe)
         errors = validate_recipe(recipe)
         if errors:
             _LOGGER.warning("xbloom.update_recipe: rejected — %s", errors)

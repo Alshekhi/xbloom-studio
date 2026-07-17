@@ -27,7 +27,12 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
 from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
-from .vendor.xbloom.recipe_validate import validate_recipe
+from .vendor.xbloom.recipe_validate import (
+    denom_to_ratio_str,
+    guess_ratio,
+    snap_ratio,
+    validate_recipe,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -153,24 +158,9 @@ async def _gather_discovered_xbloom_names(hass) -> list[str]:
     return sorted(names)
 
 
-def _denom_to_ratio_str(denom: Any) -> str:
-    """Format a numeric ratio denominator as '1:N' (no trailing '.0')."""
-    d = float(denom)
-    if d == int(d):
-        return f"1:{int(d)}"
-    return f"1:{d:g}"
-
-
 def _ratio_options() -> list[str]:
     """Discrete '1:N' options from 1:5 to 1:25 in 0.5 steps."""
-    return [_denom_to_ratio_str(5 + 0.5 * i) for i in range(41)]
-
-
-def _snap_ratio_denom(denom: float) -> str:
-    """Clamp denom to [5, 25] and round to the nearest 0.5 step."""
-    denom = max(5.0, min(25.0, denom))
-    denom = round(denom * 2) / 2   # snap to 0.5 grid
-    return _denom_to_ratio_str(denom)
+    return [denom_to_ratio_str(5 + 0.5 * i) for i in range(41)]
 
 
 # Per-cup dose ranges — UI-locked stepper bounds (match the xBloom app).
@@ -602,9 +592,10 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             "id": recipe.get("id"),                  # carries through; triggers replace path
             "name": recipe.get("name", ""),
             "dose_g": float(recipe.get("dose_g", 18)),
-            "ratio": self._snap_ratio(
-                recipe.get("ratio") or self._guess_ratio(recipe)
-            ),
+            # Snap rather than preserve: this value feeds a fixed dropdown, so
+            # it must land on a real option. (normalize_recipe deliberately
+            # keeps a malformed ratio instead — see recipe_validate.)
+            "ratio": snap_ratio(recipe.get("ratio") or guess_ratio(recipe)),
             "grind_size": float(recipe.get("grind_size", recipe.get("grinder_size", 40))),
             "grinder_speed_rpm": int(recipe.get("grinder_speed_rpm", recipe.get("rpm", 90))),
             "pour_count": int(recipe.get("pour_count", len(recipe.get("pours") or []))),
@@ -629,43 +620,6 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             ],
             "edit_existing": True,                   # marker; create_recipe_pours uses this
         }
-
-    def _guess_ratio(self, recipe: dict) -> str:
-        """Reconstruct '1:N' from dose_g + water_ratio when 'ratio' is absent.
-
-        xBloom's grandWater field is ambiguous: it stores the ratio denominator
-        N (e.g. 16.2 for 1:16) in share-URL imports, but total water ml (e.g.
-        291.6 for 18 g × 1:16.2) in recipes we create locally.  The two ranges
-        are separated at ~26 ml: valid denominators are 5–25, realistic total
-        water is always ≥ 25 ml.  Values ≤ 25 are treated as the denominator
-        directly; values > 25 are treated as total water and divided by dose.
-        """
-        dose = float(recipe.get("dose_g") or 0)
-        water = float(recipe.get("water_ratio") or 0)
-        if water <= 0:
-            return "1:16"
-        if water <= 25.0:
-            # grandWater is already the denominator N.
-            denom = water
-        elif dose > 0:
-            # grandWater is total water ml — back-calculate N.
-            denom = water / dose
-        else:
-            return "1:16"
-        return _snap_ratio_denom(denom)
-
-    @staticmethod
-    def _snap_ratio(ratio_str: str) -> str:
-        """Return the nearest valid '1:N' option for any raw ratio string.
-
-        Handles denominators outside 5–25 or not on a 0.5 step by clamping
-        and rounding to the nearest valid value.
-        """
-        try:
-            denom = float(ratio_str.split(":", 1)[1])
-        except (ValueError, IndexError, AttributeError):
-            return "1:16"
-        return _snap_ratio_denom(denom)
 
     # ------------------------------------------------------------------ #
     # Delete flow — Phase 9 plan 05                                       #
