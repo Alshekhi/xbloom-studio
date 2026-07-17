@@ -14,7 +14,7 @@ class Pour(TypedDict):
     name: str             # theName: "Bloom", "Pour1", etc.
     volume_ml: float      # volume (mL)
     temperature_c: float  # temperature (°C)
-    pattern: int          # 1=centered, 2=spiral, 3=circular [ASSUMED: enum labels from user description]
+    pattern: int          # 1=centered, 2=spiral, 3=circular (confirmed vs xBloom app UI)
     flow_rate: float      # flowRate (mL/s)
     pause_s: int          # pausing (seconds after pour)
     agitate_before: int   # isEnableVibrationBefore: 1=yes, 2=no

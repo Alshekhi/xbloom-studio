@@ -1,0 +1,10 @@
+# Shell scripts must keep LF endings — CRLF (\r) breaks scripts run under bash
+# and any commands they pipe over ssh.
+*.sh text eol=lf
+
+# Python and other source stay LF for consistency across the repo.
+*.py text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.md text eol=lf

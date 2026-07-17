@@ -37,6 +37,7 @@ from .ble_entities import (
     _device_info,
     signal_event,
 )
+from .vendor.xbloom import spec
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -123,7 +124,7 @@ class XBloomPourPatternSensor(_XBloomReadingSensor):
     _attr_unique_id = "xbloom_pour_pattern"
     _attr_icon = "mdi:vector-circle"
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = ["centered", "circular", "spiral"]
+    _attr_options = list(spec.PATTERN_NAMES)
     _events = (EV_BREWER_SETTING,)
 
     def _extract(self, event_type: str, data: dict) -> Any:
@@ -164,7 +165,7 @@ class XBloomCurrentModuleSensor(_XBloomReadingSensor):
     _attr_unique_id = "xbloom_current_module"
     _attr_icon = "mdi:gesture-tap-button"
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = ["home", "grinder", "scale", "brewer", "auto"]
+    _attr_options = list(spec.MODULES)
     _events = (EV_MODULE_ENTERED,)
 
     def _extract(self, event_type: str, data: dict) -> Any:
