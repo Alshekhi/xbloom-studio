@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import XBloomCoordinator
+from .vendor.xbloom import spec
 
 _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0  # coordinator manages all updates; select is read-only
@@ -168,7 +169,7 @@ class XBloomModeSelect(_XBloomSettingSelect):
     _attr_name = "Mode"
     _attr_unique_id = "xbloom_mode_select"
     _attr_icon = "mdi:cog"
-    _attr_options = ["auto", "pro"]
+    _attr_options = list(spec.MODES)
     _service = "set_mode"
     _service_arg = "mode"
 
@@ -179,7 +180,7 @@ class XBloomWaterSourceSelect(_XBloomSettingSelect):
     _attr_name = "Water Source"
     _attr_unique_id = "xbloom_water_source_select"
     _attr_icon = "mdi:water"
-    _attr_options = ["tank", "tap"]
+    _attr_options = list(spec.WATER_SOURCE_CODES)
     _service = "set_water_source"
     _service_arg = "source"
 
@@ -190,7 +191,7 @@ class XBloomTempUnitSelect(_XBloomSettingSelect):
     _attr_name = "Temperature Unit"
     _attr_unique_id = "xbloom_temp_unit_select"
     _attr_icon = "mdi:thermometer"
-    _attr_options = ["C", "F"]
+    _attr_options = list(spec.TEMP_UNIT_CODES)
     _service = "set_temp_unit"
     _service_arg = "unit"
 
@@ -201,7 +202,7 @@ class XBloomWeightUnitSelect(_XBloomSettingSelect):
     _attr_name = "Weight Unit"
     _attr_unique_id = "xbloom_weight_unit_select"
     _attr_icon = "mdi:scale"
-    _attr_options = ["g", "oz", "ml"]
+    _attr_options = list(spec.WEIGHT_UNIT_CODES)
     _service = "set_weight_unit"
     _service_arg = "unit"
 
@@ -216,7 +217,7 @@ class XBloomBrewPatternSelect(_XBloomSettingSelect):
     _attr_name = "Brew Pattern"
     _attr_unique_id = "xbloom_brew_pattern_select"
     _attr_icon = "mdi:rotate-3d-variant"
-    _attr_options = ["centered", "spiral", "circular"]
+    _attr_options = list(spec.PATTERN_NAMES)
 
     async def async_added_to_hass(self) -> None:
         """Restore last selected pattern; default to 'spiral' on first run."""

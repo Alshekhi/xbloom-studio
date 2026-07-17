@@ -27,7 +27,28 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
 from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
-from .vendor.xbloom.recipe_validate import validate_recipe
+from .vendor.xbloom import spec
+from .vendor.xbloom.recipe_validate import (
+    VOLUME_TOLERANCE_ML,
+    denom_to_ratio_str,
+    guess_ratio,
+    snap_ratio,
+    validate_recipe,
+)
+
+
+def _num_selector(rng: spec.NumRange, *, mode: str = "slider") -> "selector.NumberSelector":
+    """Declarative bridge: build an HA NumberSelector from a spec NumRange.
+
+    This is the seam the adapter talks to the core through — the UI asks the
+    spec for a field's bounds and renders a control, instead of hardcoding
+    min/max/step a second time. `unit_of_measurement` is omitted when the
+    field has no unit, matching how these selectors were written by hand.
+    """
+    cfg: dict = {"min": rng.min, "max": rng.max, "step": rng.step, "mode": mode}
+    if rng.unit:
+        cfg["unit_of_measurement"] = rng.unit
+    return selector.NumberSelector(selector.NumberSelectorConfig(**cfg))
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -153,32 +174,18 @@ async def _gather_discovered_xbloom_names(hass) -> list[str]:
     return sorted(names)
 
 
-def _denom_to_ratio_str(denom: Any) -> str:
-    """Format a numeric ratio denominator as '1:N' (no trailing '.0')."""
-    d = float(denom)
-    if d == int(d):
-        return f"1:{int(d)}"
-    return f"1:{d:g}"
-
-
 def _ratio_options() -> list[str]:
-    """Discrete '1:N' options from 1:5 to 1:25 in 0.5 steps."""
-    return [_denom_to_ratio_str(5 + 0.5 * i) for i in range(41)]
+    """Discrete '1:N' options over the ratio grid, derived from the spec."""
+    r = spec.RATIO_DENOM
+    count = int(round((r.max - r.min) / r.step)) + 1
+    return [denom_to_ratio_str(r.min + r.step * i) for i in range(count)]
 
 
-def _snap_ratio_denom(denom: float) -> str:
-    """Clamp denom to [5, 25] and round to the nearest 0.5 step."""
-    denom = max(5.0, min(25.0, denom))
-    denom = round(denom * 2) / 2   # snap to 0.5 grid
-    return _denom_to_ratio_str(denom)
-
-
-# Per-cup dose ranges — UI-locked stepper bounds (match the xBloom app).
+# Per-cup dose stepper bounds (min, max, step, default), keyed by label —
+# derived from the spec so the UI and the validator share one dose table.
 _CUP_DOSE_UI = {
-    "xPod":          (15.0, 15.0, 0.5, 15.0),  # locked
-    "Omni dripper":  (5.0, 18.0, 0.5, 18.0),
-    "Other":         (5.0, 25.0, 0.5, 18.0),
-    "Tea":           (1.0, 5.0, 0.5, 3.0),
+    c.label: (c.dose.min, c.dose.max, c.dose.step, c.dose.default)
+    for c in spec.CUP_TYPES
 }
 
 
@@ -255,7 +262,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
         # Draft may already be populated when coming from the edit flow.
         draft_name = (self._draft or {}).get("name", "")
-        draft_cup = (self._draft or {}).get("cup_type_label", "Omni dripper")
+        draft_cup = (self._draft or {}).get("cup_type_label", spec.DEFAULT_CUP_LABEL)
 
         if user_input is not None:
             name = (user_input.get("name") or "").strip()
@@ -276,7 +283,9 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             vol.Required("name", default=draft_name): str,
             vol.Required("cup_type", default=draft_cup): selector.SelectSelector(
                 selector.SelectSelectorConfig(
-                    options=["Omni dripper", "xPod", "Tea", "Other"],
+                    # Labels from the spec; the display order (Omni first) is a
+                    # UI choice, expressed as cup api ids.
+                    options=[spec.CUP_API_TO_LABEL[i] for i in (2, 1, 4, 3)],
                     mode="dropdown",
                 )
             ),
@@ -292,7 +301,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Step 2 of create — brew params with cup-locked dose stepper."""
         errors: dict[str, str] = {}
-        cup_label = self._draft.get("cup_type_label", "Omni dripper")
+        cup_label = self._draft.get("cup_type_label", spec.DEFAULT_CUP_LABEL)
         dose_min, dose_max, dose_step, dose_default = _CUP_DOSE_UI.get(
             cup_label, _CUP_DOSE_UI["Other"]
         )
@@ -325,12 +334,29 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                     # No pours yet or count changed — full recalculate.
                     self._draft["pours"] = self._auto_fill_pours(self._draft)
                 else:
-                    # Count unchanged — recalculate volumes from new ratio/dose
-                    # but keep each pour's temperature, pattern, flow, pause, vibrate.
+                    # Count unchanged. Only touch volumes if the total water
+                    # actually moved: this branch used to flatten every pour to
+                    # an even split unconditionally, so merely stepping through
+                    # the edit wizard destroyed a custom distribution (a 30 ml
+                    # bloom + 90 ml second pour became 60/60).
                     ratio_denom = float(self._draft["ratio"].split(":", 1)[1])
                     total_ml = round(float(self._draft["dose_g"]) * ratio_denom, 1)
-                    per_volume = round(total_ml / new_pour_count, 1)
-                    new_pours = [{**p, "volume_ml": per_volume} for p in old_pours]
+                    old_total = round(sum(float(p["volume_ml"]) for p in old_pours), 1)
+                    if abs(total_ml - old_total) <= VOLUME_TOLERANCE_ML:
+                        # No-op edit — leave the user's pours exactly as they are.
+                        new_pours = [dict(p) for p in old_pours]
+                    elif old_total > 0:
+                        # Dose/ratio changed — scale proportionally so the shape
+                        # of the recipe survives instead of being levelled.
+                        factor = total_ml / old_total
+                        new_pours = [
+                            {**p, "volume_ml": round(float(p["volume_ml"]) * factor, 1)}
+                            for p in old_pours
+                        ]
+                    else:
+                        # Degenerate (all-zero volumes) — fall back to an even split.
+                        per_volume = round(total_ml / new_pour_count, 1)
+                        new_pours = [{**p, "volume_ml": per_volume} for p in old_pours]
                     drift = round(total_ml - sum(p["volume_ml"] for p in new_pours), 1)
                     if drift:
                         new_pours[-1]["volume_ml"] = round(
@@ -342,33 +368,22 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         # Use draft values as defaults so edits pre-fill current recipe values.
         d = self._draft or {}
         bypass_enabled = d.get("bypass_water_enabled", False)
+        dose_rng = spec.NumRange(dose_min, dose_max, dose_step, dose_default, "g")
         schema_fields: dict = {
-            vol.Required("dose_g", default=d.get("dose_g", dose_default)): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=dose_min, max=dose_max, step=dose_step, mode="slider", unit_of_measurement="g")
-            ),
+            vol.Required("dose_g", default=d.get("dose_g", dose_default)): _num_selector(dose_rng),
             vol.Required("ratio", default=d.get("ratio", "1:16")): selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=_ratio_options(), mode="dropdown",
                 )
             ),
-            vol.Required("grind_size", default=d.get("grind_size", 40)): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=1, max=80, step=1, mode="slider")
-            ),
-            vol.Required("grinder_speed_rpm", default=d.get("grinder_speed_rpm", 90)): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=60, max=120, step=10, mode="slider", unit_of_measurement="RPM")
-            ),
-            vol.Required("pour_count", default=d.get("pour_count", 3)): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=1, max=9, step=1, mode="slider")
-            ),
+            vol.Required("grind_size", default=d.get("grind_size", spec.field("grind_size").default)): _num_selector(spec.field("grind_size")),
+            vol.Required("grinder_speed_rpm", default=d.get("grinder_speed_rpm", spec.field("grinder_speed_rpm").default)): _num_selector(spec.field("grinder_speed_rpm")),
+            vol.Required("pour_count", default=d.get("pour_count", spec.field("pour_count").default)): _num_selector(spec.field("pour_count")),
             vol.Required("enable_bypass_water", default=bypass_enabled): selector.BooleanSelector(),
         }
         if bypass_enabled:
-            schema_fields[vol.Optional("bypass_volume_ml", default=d.get("bypass_volume_ml", vol.UNDEFINED))] = selector.NumberSelector(
-                selector.NumberSelectorConfig(min=5, max=100, step=1, mode="slider", unit_of_measurement="ml")
-            )
-            schema_fields[vol.Optional("bypass_temp_c", default=d.get("bypass_temp_c", vol.UNDEFINED))] = selector.NumberSelector(
-                selector.NumberSelectorConfig(min=20, max=98, step=1, mode="slider", unit_of_measurement="°C")
-            )
+            schema_fields[vol.Optional("bypass_volume_ml", default=d.get("bypass_volume_ml", vol.UNDEFINED))] = _num_selector(spec.field("bypass_volume_ml"))
+            schema_fields[vol.Optional("bypass_temp_c", default=d.get("bypass_temp_c", vol.UNDEFINED))] = _num_selector(spec.field("bypass_temp_c"))
         schema = vol.Schema(schema_fields)
         return self.async_show_form(
             step_id="create_recipe_brew",
@@ -384,16 +399,17 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         n = max(1, int(draft["pour_count"]))
         per_volume = round(total_ml / n, 1)
         pours: list[dict] = []
+        temp_rng = spec.field("pour_temperature_c")
         for i in range(n):
             # Temperature: start 92°C, descend 1°C per subsequent pour.
-            temp = max(20, 92 - i * 1)
+            temp = max(temp_rng.min, 92 - i * 1)
             pours.append({
                 "id": i,
                 "recipe_id": 0,
                 "name": "",
                 "volume_ml": per_volume,
                 "temperature_c": float(temp),
-                "pattern": 3,            # spiral
+                "pattern": spec.PATTERN_NAME_TO_API["spiral"],
                 "flow_rate": 3.0,
                 "pause_s": 0,
                 "agitate_before": 2,     # off (2 per client.py convention)
@@ -420,7 +436,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                     **pours_now[i],
                     "volume_ml": float(user_input[f"pour_{i}_volume_ml"]),
                     "temperature_c": float(user_input[f"pour_{i}_temperature_c"]),
-                    "pattern": {"centered": 1, "circular": 2, "spiral": 3}[
+                    "pattern": spec.PATTERN_NAME_TO_API[
                         user_input[f"pour_{i}_pattern"]
                     ],
                     "flow_rate": float(user_input[f"pour_{i}_flow_rate"]),
@@ -448,34 +464,25 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             self._draft["pours"] = new_pours
 
         fields: dict = {}
-        pattern_label = {1: "centered", 2: "circular", 3: "spiral"}
         for i, p in enumerate(self._draft["pours"]):
             fields[vol.Required(f"pour_{i}_volume_ml", default=p["volume_ml"])] = (
-                selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=240, step=1, mode="slider", unit_of_measurement="ml")
-                )
+                _num_selector(spec.field("pour_volume_ml"))
             )
             fields[vol.Required(f"pour_{i}_temperature_c", default=p["temperature_c"])] = (
-                selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=20, max=98, step=1, mode="slider", unit_of_measurement="°C")
-                )
+                _num_selector(spec.field("pour_temperature_c"))
             )
-            fields[vol.Required(f"pour_{i}_pattern", default=pattern_label[p["pattern"]])] = (
+            fields[vol.Required(f"pour_{i}_pattern", default=spec.PATTERN_API_TO_NAME[p["pattern"]])] = (
                 selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=["centered", "circular", "spiral"], mode="dropdown"
+                        options=list(spec.PATTERN_NAMES), mode="dropdown"
                     )
                 )
             )
             fields[vol.Required(f"pour_{i}_flow_rate", default=p["flow_rate"])] = (
-                selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=3.0, max=3.5, step=0.1, mode="slider")
-                )
+                _num_selector(spec.field("pour_flow_rate"))
             )
             fields[vol.Required(f"pour_{i}_pause_s", default=p["pause_s"])] = (
-                selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=59, step=1, mode="slider", unit_of_measurement="s")
-                )
+                _num_selector(spec.field("pour_pause_s"))
             )
             fields[vol.Required(
                 f"pour_{i}_vib_before",
@@ -512,7 +519,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
     def _build_recipe(self, draft: dict, pours: list[dict]) -> dict:
         """Assemble the final recipe dict to hand to the validator + store."""
         cup_label = draft["cup_type_label"]
-        cup_int = {"xPod": 1, "Omni dripper": 2, "Other": 3, "Tea": 4}[cup_label]
+        cup_int = spec.CUP_LABEL_TO_API[cup_label]
         ratio_denom = float(draft["ratio"].split(":", 1)[1])
         recipe: dict = {
             "id": f"local-{uuid.uuid4()}",
@@ -597,14 +604,15 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         """Inverse of `_build_recipe` — produce the draft shape used by the
         pours step, pre-filled from a stored recipe (D-40)."""
         cup_int = int(recipe.get("cup_type", 3))
-        cup_label = {1: "xPod", 2: "Omni dripper", 3: "Other", 4: "Tea"}.get(cup_int, "Other")
+        cup_label = spec.CUP_API_TO_LABEL.get(cup_int, "Other")
         return {
             "id": recipe.get("id"),                  # carries through; triggers replace path
             "name": recipe.get("name", ""),
             "dose_g": float(recipe.get("dose_g", 18)),
-            "ratio": self._snap_ratio(
-                recipe.get("ratio") or self._guess_ratio(recipe)
-            ),
+            # Snap rather than preserve: this value feeds a fixed dropdown, so
+            # it must land on a real option. (normalize_recipe deliberately
+            # keeps a malformed ratio instead — see recipe_validate.)
+            "ratio": snap_ratio(recipe.get("ratio") or guess_ratio(recipe)),
             "grind_size": float(recipe.get("grind_size", recipe.get("grinder_size", 40))),
             "grinder_speed_rpm": int(recipe.get("grinder_speed_rpm", recipe.get("rpm", 90))),
             "pour_count": int(recipe.get("pour_count", len(recipe.get("pours") or []))),
@@ -629,43 +637,6 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             ],
             "edit_existing": True,                   # marker; create_recipe_pours uses this
         }
-
-    def _guess_ratio(self, recipe: dict) -> str:
-        """Reconstruct '1:N' from dose_g + water_ratio when 'ratio' is absent.
-
-        xBloom's grandWater field is ambiguous: it stores the ratio denominator
-        N (e.g. 16.2 for 1:16) in share-URL imports, but total water ml (e.g.
-        291.6 for 18 g × 1:16.2) in recipes we create locally.  The two ranges
-        are separated at ~26 ml: valid denominators are 5–25, realistic total
-        water is always ≥ 25 ml.  Values ≤ 25 are treated as the denominator
-        directly; values > 25 are treated as total water and divided by dose.
-        """
-        dose = float(recipe.get("dose_g") or 0)
-        water = float(recipe.get("water_ratio") or 0)
-        if water <= 0:
-            return "1:16"
-        if water <= 25.0:
-            # grandWater is already the denominator N.
-            denom = water
-        elif dose > 0:
-            # grandWater is total water ml — back-calculate N.
-            denom = water / dose
-        else:
-            return "1:16"
-        return _snap_ratio_denom(denom)
-
-    @staticmethod
-    def _snap_ratio(ratio_str: str) -> str:
-        """Return the nearest valid '1:N' option for any raw ratio string.
-
-        Handles denominators outside 5–25 or not on a 0.5 step by clamping
-        and rounding to the nearest valid value.
-        """
-        try:
-            denom = float(ratio_str.split(":", 1)[1])
-        except (ValueError, IndexError, AttributeError):
-            return "1:16"
-        return _snap_ratio_denom(denom)
 
     # ------------------------------------------------------------------ #
     # Delete flow — Phase 9 plan 05                                       #

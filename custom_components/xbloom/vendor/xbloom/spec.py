@@ -1,0 +1,233 @@
+"""Single source of truth for xBloom domain facts.
+
+This module is the one place recipe/brew constants live: pour patterns, cup
+types and their dose ranges, per-field numeric bounds, the ratio grid, and the
+small brew enums. Everything that used to hardcode these — the recipe
+validator, the BLE encoders, and the Home Assistant adapter (config flow,
+dashboard card) — derives from here instead, so a machine limit, an API enum,
+or a wire byte changes in exactly one place.
+
+Platform-agnostic on purpose: NO Home Assistant imports. `vendor.xbloom` is a
+portable core that other home-automation bridges can consume; HA talks to it
+through the plain data structures below (e.g. a `NumRange` an adapter turns
+into whatever slider its UI framework uses) rather than reaching in for magic
+numbers. Keep it dependency-free.
+
+Scope: recipe/brew domain facts. Raw BLE command/notify codes stay in
+`ble.py` (they are already single-sourced there and are protocol-level, not
+recipe-level); this module owns the *semantic* maps those frames carry.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+# --------------------------------------------------------------------------- #
+# Numeric field spec — one per user-settable number. UI sliders AND range     #
+# validation both derive from these, so they can never drift apart again.     #
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class NumRange:
+    """Canonical bounds for one numeric field.
+
+    An adapter builds its input control from this (e.g. HA's NumberSelector)
+    and the validator checks against the same object. `unit` is a display
+    hint the core does not interpret.
+    """
+
+    min: float
+    max: float
+    step: float
+    default: float
+    unit: str = ""
+
+    def contains(self, value: object) -> bool:
+        """True if `value` is numeric and within [min, max]. Step alignment is
+        deliberately NOT enforced here — the machine tolerates off-grid values
+        and the validator's field rules decide where stepping matters (e.g.
+        rpm). Callers wanting grid-snapping use `snap`."""
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return False
+        return self.min <= value <= self.max
+
+    def snap(self, value: float) -> float:
+        """Clamp to [min, max] and round to the nearest `step`."""
+        value = max(self.min, min(self.max, value))
+        if self.step:
+            steps = round((value - self.min) / self.step)
+            value = self.min + steps * self.step
+        return round(value, 6)
+
+
+# --------------------------------------------------------------------------- #
+# Pour patterns — canonical name <-> API integer <-> BLE wire byte.           #
+#                                                                             #
+#   API integer : value in a RecipeDetail/share payload. Confirmed against    #
+#                 the xBloom app UI (recipe 803560 pours read back exactly).  #
+#   BLE byte    : value the machine reads in the recipe blob and reports on   #
+#                 the pattern-knob event. Confirmed live via the voice-box    #
+#                 announcements (pattern_<byte>.wav: 0=centered, 1=circular,   #
+#                 2=spiral).                                                   #
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class Pattern:
+    name: str
+    api: int
+    byte: int
+
+
+PATTERNS: tuple[Pattern, ...] = (
+    Pattern("centered", api=1, byte=0),
+    Pattern("spiral", api=2, byte=2),
+    Pattern("circular", api=3, byte=1),
+)
+
+PATTERN_API_TO_NAME: dict[int, str] = {p.api: p.name for p in PATTERNS}
+PATTERN_NAME_TO_API: dict[str, int] = {p.name: p.api for p in PATTERNS}
+PATTERN_API_TO_BYTE: dict[int, int] = {p.api: p.byte for p in PATTERNS}
+PATTERN_BYTE_TO_NAME: dict[int, str] = {p.byte: p.name for p in PATTERNS}
+PATTERN_NAME_TO_BYTE: dict[str, int] = {p.name: p.byte for p in PATTERNS}
+VALID_PATTERN_APIS: frozenset[int] = frozenset(p.api for p in PATTERNS)
+PATTERN_NAMES: tuple[str, ...] = tuple(p.name for p in PATTERNS)
+
+
+# --------------------------------------------------------------------------- #
+# Cup types — API integer, human label, and per-cup dose range (grams).       #
+# The dose NumRange is the ONE source for both the validator's accept/reject   #
+# bounds and the UI stepper. xPod is locked (min==max==15).                    #
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class CupType:
+    api: int
+    label: str
+    dose: NumRange
+
+
+CUP_TYPES: tuple[CupType, ...] = (
+    CupType(1, "xPod", NumRange(15.0, 15.0, 0.5, 15.0, "g")),
+    CupType(2, "Omni dripper", NumRange(5.0, 18.0, 0.5, 18.0, "g")),
+    CupType(3, "Other", NumRange(5.0, 25.0, 0.5, 18.0, "g")),
+    CupType(4, "Tea", NumRange(1.0, 5.0, 0.5, 3.0, "g")),
+)
+
+CUP_API_TO_LABEL: dict[int, str] = {c.api: c.label for c in CUP_TYPES}
+CUP_LABEL_TO_API: dict[str, int] = {c.label: c.api for c in CUP_TYPES}
+CUP_DOSE: dict[int, NumRange] = {c.api: c.dose for c in CUP_TYPES}
+VALID_CUP_TYPES: frozenset[int] = frozenset(c.api for c in CUP_TYPES)
+# Default cup when none given, by both label and api (Omni dripper).
+DEFAULT_CUP_LABEL = "Omni dripper"
+
+
+# --------------------------------------------------------------------------- #
+# Ratio grid — grandWater denominator N of "1:N". One rule for all cups.       #
+# --------------------------------------------------------------------------- #
+RATIO_DENOM = NumRange(min=5.0, max=25.0, step=0.5, default=16.0)
+
+
+# --------------------------------------------------------------------------- #
+# Per-field numeric ranges (non-cup, non-ratio). Keyed name -> NumRange.       #
+#                                                                             #
+# Temperature: the range is 20-98, where the two ends are the sentinels the
+# xBloom app calls RT and BP (see ROOM_TEMP_C / BOILING_POINT_C below) — a pour
+# at 20 shows "RT", at 98 shows "BP", and the app's numeric slider runs 40-95
+# between them. Validation accepts the whole inclusive span. (An earlier version
+# floored this at 40, which wrongly rejected RT pours — corrected after reading
+# the app's TemperatureConstant.)
+# --------------------------------------------------------------------------- #
+FIELDS: dict[str, NumRange] = {
+    "grind_size": NumRange(1, 80, 1, 40),
+    "grinder_speed_rpm": NumRange(60, 120, 10, 90, "RPM"),
+    "pour_count": NumRange(1, 9, 1, 3),
+    "pour_volume_ml": NumRange(0, 240, 1, 60, "ml"),
+    "pour_temperature_c": NumRange(20, 98, 1, 92, "°C"),
+    "pour_flow_rate": NumRange(3.0, 3.5, 0.1, 3.0),
+    "pour_pause_s": NumRange(0, 59, 1, 0, "s"),
+    "bypass_volume_ml": NumRange(5, 100, 1, 30, "ml"),
+    "bypass_temp_c": NumRange(20, 98, 1, 92, "°C"),
+}
+
+# Temperature sentinels, from the xBloom app's TemperatureConstant. A pour whose
+# temperature equals one of these is shown as text ("RT"/"BP") instead of a
+# number; both are inside pour_temperature_c's range so they validate.
+ROOM_TEMP_C = 20.0      # "RT" — room temperature
+BOILING_POINT_C = 98.0  # "BP" — boiling point (the app derives the real value
+                        # from altitude; the transmitted sentinel is 98)
+
+
+def field(name: str) -> NumRange:
+    """Look up a field's canonical range by name."""
+    return FIELDS[name]
+
+
+# Volumes across a recipe's pours must sum to dose x ratio within this slack.
+VOLUME_TOLERANCE_ML = 0.5
+
+
+# --------------------------------------------------------------------------- #
+# Small brew enums carried in BLE frames — name <-> code. These were mirrored  #
+# inline in ble.py and select.py; both now derive from here.                   #
+# --------------------------------------------------------------------------- #
+WATER_SOURCE_CODES: dict[str, int] = {"tank": 0, "tap": 1}
+WEIGHT_UNIT_CODES: dict[str, int] = {"g": 0, "oz": 1, "ml": 2}
+# Keys match what the select entity offers and the BLE frame expects ("C"/"F").
+TEMP_UNIT_CODES: dict[str, int] = {"C": 0, "F": 1}
+
+
+# --------------------------------------------------------------------------- #
+# Machine state / mode enums — protocol facts a bridge must agree on, not UI.  #
+# --------------------------------------------------------------------------- #
+# Brew lifecycle the machine reports (brew-status sensor).
+BREW_STATES: tuple[str, ...] = ("idle", "grinding", "brewing", "done")
+
+# On-machine UI module the user has entered (current-module sensor).
+MODULES: tuple[str, ...] = ("home", "grinder", "scale", "brewer", "auto")
+
+# Operating mode and its Type-2 wire payload (CMD_MODE_TYPE 11511). "auto" is
+# the machine's EasyMode; "pro" is manual.
+MODES: tuple[str, ...] = ("auto", "pro")
+MODE_PAYLOADS: dict[str, str] = {"auto": "91327856", "pro": "00000000"}  # hex
+
+# EasyMode recipe slots on the machine.
+SLOTS: tuple[str, ...] = ("A", "B", "C")
+
+# Machine status: "ok" plus the fault conditions. FAULTS maps the fault
+# notification command code -> (status enum value, brew-event type). This is
+# the machine's fault vocabulary; the HA sensor and event entity derive from it.
+MACHINE_OK = "ok"
+FAULTS: dict[int, tuple[str, str]] = {
+    40522: ("no_water", "error_no_water"),            # RD_ErrorLackOfWater
+    40517: ("no_beans", "error_no_beans"),            # RD_ErrorIdling
+    8204: ("dose_water_error", "error_dose_water"),   # RD_AbnormalDoseOrWater
+    8203: ("gear_position_error", "error_gear_position"),  # RD_AbnormalGearPosition
+}
+MACHINE_STATUSES: tuple[str, ...] = (MACHINE_OK, *(s for s, _ in FAULTS.values()))
+
+
+# --------------------------------------------------------------------------- #
+# Cup wire weight-range defaults (theMax, theMin) sent in the CMD_SET_CUP /    #
+# recipe-blob frame. Keyed by cup api id. DISTINCT from CUP_DOSE (grams) —     #
+# these are machine weight-range bytes, not a dose window.                     #
+# --------------------------------------------------------------------------- #
+CUP_WEIGHT_RANGE: dict[int, tuple[float, float]] = {
+    1: (200.0, 80.0),   # xPod (default; no HCI capture)
+    2: (110.0, 90.0),   # Omni dripper (HCI confirmed)
+    3: (200.0, 80.0),   # Other / Free Solo (HCI confirmed)
+    4: (200.0, 80.0),   # Tea (default; no HCI capture)
+}
+CUP_WEIGHT_RANGE_DEFAULT: tuple[float, float] = (200.0, 80.0)
+
+
+# --------------------------------------------------------------------------- #
+# Canonical defaults — so every implementer falls back the same way. Values    #
+# are members of the enums above, not free-floating strings.                   #
+# --------------------------------------------------------------------------- #
+DEFAULT_PATTERN = "spiral"
+DEFAULT_WATER_SOURCE = "tank"
+
+# First parameter of the grind-start frame (cmd 3500): [this, size, speed].
+# The official app hardcodes it to 1000 (verified in GrinderActivity's
+# CodeModule(3500, ..., 1000, i, i2)); it is NOT computed. The grinder runs
+# until its single-dose chamber is empty or a STOP (3505) arrives, so this
+# value does not actually time the grind — it's a fixed protocol field we send
+# to match the app.
+GRIND_START_DURATION_MS = 1000

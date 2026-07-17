@@ -22,6 +22,8 @@ import logging
 import struct
 from typing import Callable, Awaitable
 
+from . import spec
+
 log = logging.getLogger("xbloom.ble")
 
 # ---------------------------------------------------------------------------
@@ -120,16 +122,9 @@ HANDSHAKE_DATA = [185, 1]
 #   xbloom.py     — encode_recipe(), build_packet_type1*, cup-type ranges
 # ---------------------------------------------------------------------------
 
-# Pattern code: maps the xBloom API's `pattern` integer to the BLE byte.
-# brAzzi64's reference uses {center→0, circular→1, spiral→2}, but a side-by-
-# side comparison of our captured server `theCode` for the "Omni 20g 5 pours"
-# recipe (API pattern=3 for every pour) shows the server produces BLE byte
-# 0x01, not 0x02. Either this firmware/cup combo doesn't really expose three
-# distinct patterns, or the API integer ↔ on-the-wire byte mapping diverges
-# from the reference repo's string-based mapping. We match the only ground-
-# truth we have (Omni's captured `theCode`) and fall back to brAzzi64's
-# values for inputs we haven't observed.
-_API_PATTERN_TO_BLE = {1: 0, 2: 1, 3: 1}
+# Pattern code: xBloom API `pattern` integer -> BLE wire byte. The mapping and
+# its confirmation (app UI + live voice-box announcements) live in spec.py.
+_API_PATTERN_TO_BLE = spec.PATTERN_API_TO_BYTE
 
 
 def _vibration_code(before: bool, after: bool) -> int:
@@ -138,17 +133,6 @@ def _vibration_code(before: bool, after: bool) -> int:
     return (1 if before else 0) | (2 if after else 0)
 
 
-# Cup-type weight range defaults (theMax, theMin floats) sent via command 8104.
-# In the official app these come from the cloud tuGetRecipeCode response, but
-# the values are tied to cup type only and the machine brews correctly with
-# the defaults below. Values from brAzzi64/xbloom-ble HCI captures.
-# Recipe API cupType:  1=xPod, 2=Omni dripper, 3=Other, 4=Tea
-_CUP_TYPE_RANGES: dict[int, tuple[float, float]] = {
-    1: (200.0, 80.0),    # xPod (default; no HCI capture)
-    2: (110.0, 90.0),    # Omni dripper (HCI confirmed)
-    3: (200.0, 80.0),    # Other / Free Solo (HCI confirmed)
-    4: (200.0, 80.0),    # Tea (default; no HCI capture)
-}
 
 
 def encode_recipe_blob(
@@ -164,7 +148,7 @@ def encode_recipe_blob(
         pours: list of pour dicts using xBloom API field names:
                  volume_ml (float), temperature_c (float|int),
                  pause_s (int seconds AFTER this pour),
-                 pattern (int 1-3 from API; 1=center, 2=circular, 3=spiral),
+                 pattern (int 1-3 from API; 1=centered, 2=spiral, 3=circular),
                  flow_rate (float; e.g. 3.0, 3.5),
                  agitate_before (int; 1=ON, 2=OFF),
                  agitate_after  (int; 1=ON, 2=OFF).
@@ -233,8 +217,8 @@ CMD_BREWER_START    = 4506   # 0x11AA — standalone brewer start
 
 
 def cup_type_range(cup_type: int) -> tuple[float, float]:
-    """Return (theMax, theMin) defaults for a recipe's cupType integer."""
-    return _CUP_TYPE_RANGES.get(int(cup_type), (200.0, 80.0))
+    """Return (theMax, theMin) cup weight-range defaults for a cupType integer."""
+    return spec.CUP_WEIGHT_RANGE.get(int(cup_type), spec.CUP_WEIGHT_RANGE_DEFAULT)
 
 
 def _float_to_int_bits(f: float) -> int:
@@ -379,24 +363,24 @@ CMD_WATER_SOURCE  = 4508   # 0x119C — water source: 0=tank, 1=tap
 CMD_UNIT_WEIGHT   = 8005   # 0x1F45 — display weight unit: 0=g, 1=oz, 2=ml
 CMD_UNIT_TEMP     = 8010   # 0x1F4A — display temperature unit: 0=°C, 1=°F
 
-# Mode type-2 payloads (4 bytes each, sent as raw_bytes)
-MODE_PRO_HEX  = "00000000"
-MODE_EASY_HEX = "91327856"
 
 
 def packets_grind(
-    size: int, speed: int, duration_ms: int = 1000,
+    size: int, speed: int, duration_ms: int = spec.GRIND_START_DURATION_MS,
 ) -> tuple[bytes, bytes, bytes]:
     """Return the 3-frame standalone grinder sequence: (enter, start, stop).
 
-    The CALLER controls actual grind length by sleeping `seconds` between
-    writing `start` and writing `stop`. `duration_ms` is a fallback the
-    machine uses if the stop frame is lost; brAzzi64's CLI hardcodes 1000.
+    Matches the official app's GrinderActivity: enter (8006) with [size, speed],
+    start (3500) with [duration_ms, size, speed], stop (3505). The CALLER
+    controls actual grind length by sleeping between writing `start` and `stop`;
+    the grinder otherwise runs until its single-dose chamber is empty.
+    `duration_ms` is the app's fixed 1000 (spec.GRIND_START_DURATION_MS), not a
+    computed value.
 
     Args:
-        size: 1-100 (lower = finer)
-        speed: 60-120 (grinder RPM)
-        duration_ms: fallback timeout in milliseconds
+        size: grind size (lower = finer) — see spec.field("grind_size")
+        speed: grinder RPM — see spec.field("grinder_speed_rpm")
+        duration_ms: grind-start param 0 (default = the app's constant)
     """
     enter = _build_frame(CMD_GRINDER_ENTER, [int(size), int(speed)])
     start = _build_frame(
@@ -412,7 +396,7 @@ def packet_mode(mode: str) -> bytes:
     Args:
         mode: 'auto' (Easy mode) or 'pro' (Pro mode)
     """
-    payload = MODE_EASY_HEX if mode.lower() == "auto" else MODE_PRO_HEX
+    payload = spec.MODE_PAYLOADS.get(mode.lower(), spec.MODE_PAYLOADS["pro"])
     return _build_frame(
         CMD_MODE_TYPE, raw_bytes=bytes.fromhex(payload), frame_type=2,
     )
@@ -424,7 +408,8 @@ def packet_water_source(source: str) -> bytes:
     Args:
         source: 'tank' (0) or 'tap' (1)
     """
-    return _build_frame(CMD_WATER_SOURCE, [0 if source.lower() == "tank" else 1])
+    code = spec.WATER_SOURCE_CODES.get(source.lower(), spec.WATER_SOURCE_CODES["tap"])
+    return _build_frame(CMD_WATER_SOURCE, [code])
 
 
 def packet_temp_unit(unit: str) -> bytes:
@@ -433,10 +418,7 @@ def packet_temp_unit(unit: str) -> bytes:
     Args:
         unit: 'C' (0) or 'F' (1)
     """
-    return _build_frame(CMD_UNIT_TEMP, [0 if unit.upper() == "C" else 1])
-
-
-_WEIGHT_UNIT_CODES = {"g": 0, "oz": 1, "ml": 2}
+    return _build_frame(CMD_UNIT_TEMP, [spec.TEMP_UNIT_CODES.get(unit.upper(), 1)])
 
 
 def packet_weight_unit(unit: str) -> bytes:
@@ -445,7 +427,7 @@ def packet_weight_unit(unit: str) -> bytes:
     Args:
         unit: 'g' (0), 'oz' (1), or 'ml' (2)
     """
-    return _build_frame(CMD_UNIT_WEIGHT, [_WEIGHT_UNIT_CODES[unit.lower()]])
+    return _build_frame(CMD_UNIT_WEIGHT, [spec.WEIGHT_UNIT_CODES[unit.lower()]])
 
 
 # ---------------------------------------------------------------------------
@@ -530,16 +512,10 @@ NOTIFY_TARE             = 9007   # scale tared via the tare button (no payload).
                                  # followed by 8023 activity=4 → 5 (re-zero/settle).
                                  # Sibling cradle events: 9002 = cup on, 9008 = cup off.
 
-# Pattern-byte mapping. The machine reports the pour pattern on cmd 8107 as
-# a raw 0/1/2 code. Confirmed by live testing on the xbloom-voice-box ESP
-# firmware (a C port of this decoder): the true order is
-# centered → circular → spiral for codes 0 → 1 → 2. An earlier guess here had
-# 1/2 as spiral/circular (reversed); corrected to match the machine.
-PATTERN_NAMES = {
-    0: "centered",
-    1: "circular",
-    2: "spiral",
-}
+# Pattern-byte mapping. The machine reports the pour pattern on cmd 8107 as a
+# raw 0/1/2 code; the byte -> name order (centered/circular/spiral) lives in
+# spec.py, confirmed live via the voice-box announcements.
+PATTERN_NAMES = spec.PATTERN_BYTE_TO_NAME
 
 
 def parse_ffe3_packet(data: bytes) -> dict | None:

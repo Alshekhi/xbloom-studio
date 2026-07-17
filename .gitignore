@@ -30,10 +30,11 @@ bridge/
 # Personal reference
 docs/
 
-# Standalone library (superseded — vendor copy lives in custom_components)
+# Standalone library build files (superseded — vendor copy lives in
+# custom_components). tests/ is intentionally NOT ignored: it holds the
+# spec/validation guards that keep the single source of truth honest.
 pyproject.toml
 uv.lock
-tests/
 
 # Virtual environment and dist
 .venv/
@@ -45,3 +46,9 @@ discovery/*
 
 # Local tooling
 tools/
+
+# Local-only deploy helper (contains Pi host/paths; kept out of git by request)
+scripts/deploy-to-pi.sh
+
+# Local-only deploy reference (contains Pi host/paths; kept out of git by request)
+DEPLOY.md

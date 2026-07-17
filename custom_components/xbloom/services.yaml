@@ -233,28 +233,6 @@ ble_disconnect:
     Force-release any BLE handle Home Assistant is holding for the machine, so
     the iOS app can reconnect. Diagnostic counterpart to ble_connect.
 
-dump_notifications:
-  name: Dump BLE notifications (debug)
-  description: >
-    Open BLE, subscribe to FFE2, log every decoded notification packet for
-    the given duration, then disconnect. Used in plan 08-05 to identify
-    which command codes carry grinder/brewer knob changes — run this
-    service, then turn knobs on the machine, and inspect the HA log for
-    the captured frames.
-  fields:
-    seconds:
-      name: Duration
-      description: How long to listen (5-300 s; default 30).
-      required: false
-      default: 30
-      example: 30
-      selector:
-        number:
-          min: 5
-          max: 300
-          step: 5
-          unit_of_measurement: s
-
 list_recipes:
   name: List Recipes
   description: >
@@ -280,6 +258,12 @@ add_recipe:
   description: >
     Add a new recipe to the local library. Replaces an existing recipe with
     the same name. Pass the full recipe dict as a JSON string.
+
+    The recipe is validated before it is stored — same rules as the options
+    flow (dose range per cup type, ratio 1:5–1:25 in 0.5 steps, grind 1–80,
+    rpm 60–120 in steps of 10, per-pour temp/flow/pattern, and pour volumes
+    summing to dose × ratio). On failure nothing is written and the response
+    is {ok: false, error: "<summary>", errors: {field: reason}}.
   fields:
     recipe_json:
       name: Recipe JSON
@@ -293,6 +277,10 @@ update_recipe:
   description: >
     Update (replace) an existing recipe by id. Pass the full updated recipe
     dict as a JSON string. Inserts if no matching id is found.
+
+    Validated before writing, exactly as add_recipe — on failure nothing is
+    written and the response is {ok: false, error: "<summary>",
+    errors: {field: reason}}.
   fields:
     recipe_json:
       name: Recipe JSON

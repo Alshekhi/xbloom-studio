@@ -118,10 +118,10 @@ class XBloomModeListener:
     # ---- Internals ----------------------------------------------------- #
     async def _run(self) -> None:
         """All BLE work happens inside a single `async with XBloomBleClient`
-        — this matches the dump_notifications pattern that empirically
-        receives notifications. Splitting connect and wait into separate
-        methods (with manual __aenter__) silently broke notification
-        delivery, so we keep them in the same coroutine scope.
+        — the pattern that empirically receives notifications. Splitting
+        connect and wait into separate methods (with manual __aenter__)
+        silently broke notification delivery, so we keep them in the same
+        coroutine scope.
         """
         from .ble import XBloomBleClient
 
@@ -151,8 +151,8 @@ class XBloomModeListener:
                 self._client = ble._client  # noqa: SLF001
                 self._ble = ble
 
-                # Local sync callback — proven-working pattern from
-                # dump_notifications. Holds reference via closure.
+                # Local sync callback — proven-working pattern. Holds
+                # reference via closure.
                 listener = self
                 def _raw_callback(_char, data):  # noqa: ANN001
                     listener._on_notify(_char, data)

@@ -31,8 +31,21 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
 from .coordinator import XBloomCoordinator
 from .vendor.xbloom.client import XBloomClient
+from .vendor.xbloom import spec
+from .vendor.xbloom.recipe_validate import normalize_recipe, validate_recipe
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _describe_errors(errors: dict[str, str]) -> str:
+    """Flatten validate_recipe's field->key map into one human-readable line.
+
+    Callers that can render per-field errors should read the `errors` key of
+    the service response instead; this is the fallback for logs and for voice
+    or REST callers that only surface a single message.
+    """
+    return "; ".join(f"{field}: {key}" for field, key in sorted(errors.items()))
+
 
 PLATFORMS = ["select", "button", "number", "sensor", "event", "switch"]
 
@@ -572,12 +585,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         volume_ml = _state_float("number.brew_volume", 120.0)
         temp_c    = _state_float("number.brew_temperature", 93.0)
 
-        pattern_name = _state_str("select.brew_pattern", "spiral")
-        pattern_map = {"centered": 0, "circular": 1, "spiral": 2}
-        pattern_code = pattern_map.get(pattern_name, 2)  # default → spiral
+        pattern_name = _state_str("select.brew_pattern", spec.DEFAULT_PATTERN)
+        pattern_code = spec.PATTERN_NAME_TO_BYTE.get(
+            pattern_name, spec.PATTERN_NAME_TO_BYTE["spiral"]
+        )
 
-        water_source = _state_str("select.water_source", "tank")
-        water_feed = 1 if water_source == "tap" else 0
+        water_source = _state_str("select.water_source", spec.DEFAULT_WATER_SOURCE)
+        water_feed = spec.WATER_SOURCE_CODES.get(
+            water_source, spec.WATER_SOURCE_CODES["tank"]
+        )
 
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
@@ -745,10 +761,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         DOMAIN, "grind", handle_grind,
         schema=vol.Schema({
             vol.Optional("size", default=63): vol.All(
-                vol.Coerce(int), vol.Range(min=1, max=100),
+                vol.Coerce(int),
+                vol.Range(
+                    min=int(spec.field("grind_size").min),
+                    max=int(spec.field("grind_size").max),
+                ),
             ),
             vol.Optional("speed", default=100): vol.All(
-                vol.Coerce(int), vol.Range(min=60, max=120),
+                vol.Coerce(int),
+                vol.Range(
+                    min=int(spec.field("grinder_speed_rpm").min),
+                    max=int(spec.field("grinder_speed_rpm").max),
+                ),
             ),
             vol.Optional("seconds", default=5): vol.All(
                 vol.Coerce(float), vol.Range(min=1, max=30),
@@ -758,131 +782,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     hass.services.async_register(DOMAIN, "brew_standalone", handle_brew_standalone)
     hass.services.async_register(
         DOMAIN, "set_mode", handle_set_mode,
-        schema=vol.Schema({vol.Required("mode"): vol.In(["auto", "pro"])}),
+        schema=vol.Schema({vol.Required("mode"): vol.In(list(spec.MODES))}),
     )
     hass.services.async_register(
         DOMAIN, "set_water_source", handle_set_water_source,
-        schema=vol.Schema({vol.Required("source"): vol.In(["tank", "tap"])}),
+        schema=vol.Schema({vol.Required("source"): vol.In(list(spec.WATER_SOURCE_CODES))}),
     )
     hass.services.async_register(
         DOMAIN, "set_temp_unit", handle_set_temp_unit,
-        schema=vol.Schema({vol.Required("unit"): vol.In(["C", "F"])}),
+        schema=vol.Schema({vol.Required("unit"): vol.In(list(spec.TEMP_UNIT_CODES))}),
     )
     hass.services.async_register(
         DOMAIN, "set_weight_unit", handle_set_weight_unit,
-        schema=vol.Schema({vol.Required("unit"): vol.In(["g", "oz", "ml"])}),
+        schema=vol.Schema({vol.Required("unit"): vol.In(list(spec.WEIGHT_UNIT_CODES))}),
     )
-
-    # ------------------------------------------------------------------ #
-    # 08-04 debug — xbloom.dump_notifications {seconds}                  #
-    # Open BLE, subscribe to FFE2, log every decoded packet for N        #
-    # seconds. Used in 08-05 Phase A to identify knob-change cmd codes.  #
-    # ------------------------------------------------------------------ #
-    async def handle_dump_notifications(call) -> None:
-        import asyncio as _asyncio
-
-        from .vendor.xbloom.ble import (
-            CMD_HANDSHAKE, FFE1_UUID, FFE2_UUID, HANDSHAKE_DATA,
-            XBloomBleClient, _build_frame, decode_notification,
-        )
-
-        seconds = float(call.data.get("seconds", 30))
-        ble_name = _resolve_ble_name(entry)
-        if not ble_name:
-            _LOGGER.error("xbloom.dump_notifications: BLE name unknown")
-            return
-        ble_device = await _resolve_ble_device(hass, ble_name)
-        if ble_device is None:
-            _LOGGER.error(
-                "xbloom.dump_notifications: HA bluetooth has not seen %r",
-                ble_name,
-            )
-            return
-
-        captured: list[str] = []
-
-        def _on_notify(_char, data: bytes) -> None:
-            decoded = decode_notification(bytes(data))
-            ts = _asyncio.get_event_loop().time()
-            line = (
-                f"[t+{ts:9.3f}] raw={bytes(data).hex()}  decoded={decoded}"
-            )
-            captured.append(line)
-            _LOGGER.info("dump_notifications | %s", line)
-
-        try:
-            ble_client = XBloomBleClient(ble_device)
-            async with ble_client:
-                try:
-                    await ble_client._client.start_notify(  # noqa: SLF001
-                        FFE2_UUID, _on_notify,
-                    )
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.error(
-                        "xbloom.dump_notifications: notify subscription "
-                        "failed: %s", err,
-                    )
-                    return
-
-                # Kickstart: handshake first (some firmware paths only
-                # emit FFE2 after seeing it).
-                handshake = _build_frame(CMD_HANDSHAKE, list(HANDSHAKE_DATA))
-                await ble_client._client.write_gatt_char(  # noqa: SLF001
-                    FFE1_UUID, handshake, response=False,
-                )
-                _LOGGER.info(
-                    "xbloom.dump_notifications: handshake sent (%s)",
-                    handshake.hex(),
-                )
-
-                # Self-test: 2 seconds in, fire a TARE. The machine MUST
-                # emit at least one notification in response (the new
-                # zero weight). If we don't see it, our notify
-                # subscription is broken; if we do see it, the BLE pipe
-                # is fine and any subsequent quiet from knobs means the
-                # machine doesn't broadcast UI events.
-                from .vendor.xbloom.ble import packet_tare
-                _LOGGER.info(
-                    "xbloom.dump_notifications: capturing FFE2 for "
-                    "%.1fs (TARE self-test in 2s)",
-                    seconds,
-                )
-                await _asyncio.sleep(2)
-                _LOGGER.info(
-                    "xbloom.dump_notifications: → firing TARE "
-                    "self-test now"
-                )
-                await ble_client._client.write_gatt_char(  # noqa: SLF001
-                    FFE1_UUID, packet_tare(), response=False,
-                )
-                await _asyncio.sleep(seconds - 2)
-
-            _LOGGER.info(
-                "xbloom.dump_notifications: ✓ done — %d frames captured",
-                len(captured),
-            )
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.error("xbloom.dump_notifications: BLE failed: %s", err)
 
     # 08-03 — Easy Mode slot writer
     hass.services.async_register(
         DOMAIN, "write_slot", handle_write_slot,
         schema=vol.Schema({
-            vol.Required("slot"): vol.In(["A", "B", "C"]),
+            vol.Required("slot"): vol.In(list(spec.SLOTS)),
             vol.Optional("recipe_name"): str,
             vol.Optional("share_url"): str,
             vol.Optional("share_id"): str,
             vol.Optional("scale_on", default=True): bool,
-        }),
-    )
-
-    # 08-04 — debug notification dump
-    hass.services.async_register(
-        DOMAIN, "dump_notifications", handle_dump_notifications,
-        schema=vol.Schema({
-            vol.Optional("seconds", default=30): vol.All(
-                vol.Coerce(float), vol.Range(min=5, max=300),
-            ),
         }),
     )
 
@@ -906,9 +829,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             recipe = json.loads(call.data["recipe_json"])
         except (json.JSONDecodeError, KeyError) as err:
             return {"ok": False, "error": f"Invalid recipe_json: {err}"}
-        name = (recipe.get("name") or "").strip()
-        if not name:
-            return {"ok": False, "error": "recipe_json is missing a non-empty 'name'"}
+        recipe = normalize_recipe(recipe)
+        errors = validate_recipe(recipe)
+        if errors:
+            _LOGGER.warning("xbloom.add_recipe: rejected — %s", errors)
+            return {"ok": False, "error": _describe_errors(errors), "errors": errors}
+        name = recipe["name"].strip()
         coordinator = entry.runtime_data.coordinator
         await coordinator.async_add_recipe(recipe)
         _LOGGER.info("xbloom.add_recipe: added '%s'", name)
@@ -919,10 +845,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             recipe = json.loads(call.data["recipe_json"])
         except (json.JSONDecodeError, KeyError) as err:
             return {"ok": False, "error": f"Invalid recipe_json: {err}"}
+        recipe = normalize_recipe(recipe)
+        errors = validate_recipe(recipe)
+        if errors:
+            _LOGGER.warning("xbloom.update_recipe: rejected — %s", errors)
+            return {"ok": False, "error": _describe_errors(errors), "errors": errors}
         coordinator = entry.runtime_data.coordinator
         await coordinator.async_replace_recipe(recipe)
         _LOGGER.info("xbloom.update_recipe: updated '%s'", recipe.get("name"))
-        return {"ok": True}
+        return {"ok": True, "name": recipe["name"].strip()}
 
     async def handle_delete_recipe(call) -> dict:
         name = call.data["name"]
@@ -964,7 +895,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         "tare", "back_to_home", "brew_pause", "brew_resume",
         "grind", "set_mode", "set_water_source",
         "set_temp_unit", "set_weight_unit",
-        "write_slot", "dump_notifications",
+        "write_slot",
         "list_recipes", "get_recipe", "add_recipe", "update_recipe", "delete_recipe",
     ):
         entry.async_on_unload(

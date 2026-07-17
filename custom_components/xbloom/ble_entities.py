@@ -39,6 +39,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 from .const import DOMAIN
+from .vendor.xbloom import spec
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,21 +67,8 @@ CMD_BREW_END         = 40511
 CMD_ENJOY            = 40512
 CMD_BYPASS           = 40520  # RD_BYPASS — bypass/dilution pour (see discovery ble-protocol.md)
 
-# Machine fault notification codes (machine → phone). Each maps to a message the
-# machine shows on its screen — see discovery/ipa/notes/machine-errors-catalog.md.
-CMD_ERR_NO_WATER     = 40522  # RD_ErrorLackOfWater    — out of water
-CMD_ERR_NO_BEANS     = 40517  # RD_ErrorIdling         — grinder ran with no beans
-CMD_ERR_DOSE_WATER   = 8204   # RD_AbnormalDoseOrWater — dose/water ratio invalid
-CMD_ERR_GEAR         = 8203   # RD_AbnormalGearPosition — grinder gear/position fault
-
-# fault cmd → (machine_status enum value, brew_event type). Single source of
-# truth shared by the machine-status sensor and the brew-event entity.
-_FAULTS: dict[int, tuple[str, str]] = {
-    CMD_ERR_NO_WATER:   ("no_water",            "error_no_water"),
-    CMD_ERR_NO_BEANS:   ("no_beans",            "error_no_beans"),
-    CMD_ERR_DOSE_WATER: ("dose_water_error",    "error_dose_water"),
-    CMD_ERR_GEAR:       ("gear_position_error", "error_gear_position"),
-}
+# The machine's fault vocabulary (cmd -> status, event type) lives in
+# spec.FAULTS, the portable single source of truth.
 
 # Machine activity values (cmd 8023 payload as LE uint32)
 # These reflect the machine's overall state, NOT individual steps.
@@ -116,7 +104,7 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
     _attr_unique_id = "xbloom_brew_status"  # matches MQTT-mode unique_id
     _attr_icon = "mdi:coffee"
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = ["idle", "grinding", "brewing", "done"]
+    _attr_options = list(spec.BREW_STATES)
     _attr_should_poll = False
 
     def __init__(self, entry) -> None:
@@ -204,7 +192,7 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
     """Latest machine fault/condition — mirrors what the machine shows on its
     screen, so a VoiceOver user can query or be announced the machine state.
 
-    Driven by the discrete fault notifications (RD_Error*) in `_FAULTS`. Stays
+    Driven by the discrete fault notifications (RD_Error*) in spec.FAULTS. Stays
     at the reported fault until a new brew starts, which clears it back to "ok".
     """
 
@@ -213,13 +201,7 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
     _attr_unique_id = "xbloom_machine_status"
     _attr_icon = "mdi:coffee-maker"
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = [
-        "ok",
-        "no_water",
-        "no_beans",
-        "dose_water_error",
-        "gear_position_error",
-    ]
+    _attr_options = list(spec.MACHINE_STATUSES)
     _attr_should_poll = False
 
     def __init__(self, entry) -> None:
@@ -259,7 +241,7 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
                 return
 
             # Discrete fault notifications (RD_Error*).
-            fault = _FAULTS.get(decoded.get("cmd"))
+            fault = spec.FAULTS.get(decoded.get("cmd"))
             if fault is None:
                 return
             status = fault[0]
@@ -354,8 +336,8 @@ class XBloomBrewEventBleEntity(EventEntity):
         "pour_started",
         "bypass_started",
         "brew_ended",
-        # Fault notifications (machine → phone), derived from _FAULTS:
-        *[event_type for (_status, event_type) in _FAULTS.values()],
+        # Fault notifications (machine → phone), derived from spec.FAULTS:
+        *[event_type for (_status, event_type) in spec.FAULTS.values()],
     ]
     _attr_should_poll = False
 
@@ -367,7 +349,7 @@ class XBloomBrewEventBleEntity(EventEntity):
         CMD_BLOOM:         "pour_started",
         CMD_BYPASS:        "bypass_started",
         CMD_BREW_END:      "brew_ended",
-        **{cmd: event_type for cmd, (_status, event_type) in _FAULTS.items()},
+        **{cmd: event_type for cmd, (_status, event_type) in spec.FAULTS.items()},
     }
 
     def __init__(self, entry) -> None:
