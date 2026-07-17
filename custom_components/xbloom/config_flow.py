@@ -401,7 +401,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                 "name": "",
                 "volume_ml": per_volume,
                 "temperature_c": float(temp),
-                "pattern": 3,            # spiral
+                "pattern": 2,            # spiral (API: 1=centered, 2=spiral, 3=circular)
                 "flow_rate": 3.0,
                 "pause_s": 0,
                 "agitate_before": 2,     # off (2 per client.py convention)
@@ -428,7 +428,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                     **pours_now[i],
                     "volume_ml": float(user_input[f"pour_{i}_volume_ml"]),
                     "temperature_c": float(user_input[f"pour_{i}_temperature_c"]),
-                    "pattern": {"centered": 1, "circular": 2, "spiral": 3}[
+                    "pattern": {"centered": 1, "spiral": 2, "circular": 3}[
                         user_input[f"pour_{i}_pattern"]
                     ],
                     "flow_rate": float(user_input[f"pour_{i}_flow_rate"]),
@@ -456,7 +456,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             self._draft["pours"] = new_pours
 
         fields: dict = {}
-        pattern_label = {1: "centered", 2: "circular", 3: "spiral"}
+        pattern_label = {1: "centered", 2: "spiral", 3: "circular"}
         for i, p in enumerate(self._draft["pours"]):
             fields[vol.Required(f"pour_{i}_volume_ml", default=p["volume_ml"])] = (
                 selector.NumberSelector(
