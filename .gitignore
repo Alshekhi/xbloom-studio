@@ -30,10 +30,11 @@ bridge/
 # Personal reference
 docs/
 
-# Standalone library (superseded — vendor copy lives in custom_components)
+# Standalone library build files (superseded — vendor copy lives in
+# custom_components). tests/ is intentionally NOT ignored: it holds the
+# spec/validation guards that keep the single source of truth honest.
 pyproject.toml
 uv.lock
-tests/
 
 # Virtual environment and dist
 .venv/
