@@ -121,15 +121,27 @@ HANDSHAKE_DATA = [185, 1]
 # ---------------------------------------------------------------------------
 
 # Pattern code: maps the xBloom API's `pattern` integer to the BLE byte.
-# brAzzi64's reference uses {center→0, circular→1, spiral→2}, but a side-by-
-# side comparison of our captured server `theCode` for the "Omni 20g 5 pours"
-# recipe (API pattern=3 for every pour) shows the server produces BLE byte
-# 0x01, not 0x02. Either this firmware/cup combo doesn't really expose three
-# distinct patterns, or the API integer ↔ on-the-wire byte mapping diverges
-# from the reference repo's string-based mapping. We match the only ground-
-# truth we have (Omni's captured `theCode`) and fall back to brAzzi64's
-# values for inputs we haven't observed.
-_API_PATTERN_TO_BLE = {1: 0, 2: 1, 3: 1}
+#
+# Two mappings compose here:
+#   API integer -> name : 1=centered, 2=spiral, 3=circular
+#                         (confirmed against the xBloom app UI)
+#   name -> BLE byte    : centered=0, circular=1, spiral=2
+#                         (the machine's wire order, confirmed by the
+#                          xbloom-voice-box announcements, which play
+#                          pattern_<byte>.wav — 0=مركزي/centered,
+#                          1=دائري/circular, 2=حلزوني/spiral — and were
+#                          verified correct on a live machine)
+# Composing them gives API 1->0, 2->2, 3->1. brAzzi64's reference
+# {centered:0, circular:1, spiral:2} agrees, and the earlier captured server
+# `theCode` (API pattern=3 -> byte 0x01) is consistent too: 3=circular=byte 1.
+# The previous map {1:0, 2:1, 3:1} was wrong for spiral — it sent API 2
+# (spiral) as byte 1 (circular), so spiral pours brewed circular.
+#
+# NB: the esp32 controller's xbloom_protocol.h labels the bytes
+# spiral=1 / circular=2 — that header is mislabelled; the order above is what
+# the machine actually uses. The firmware's announce path is unaffected
+# because it plays pattern_<byte>.wav by index, not via those constants.
+_API_PATTERN_TO_BLE = {1: 0, 2: 2, 3: 1}
 
 
 def _vibration_code(before: bool, after: bool) -> int:
@@ -164,7 +176,7 @@ def encode_recipe_blob(
         pours: list of pour dicts using xBloom API field names:
                  volume_ml (float), temperature_c (float|int),
                  pause_s (int seconds AFTER this pour),
-                 pattern (int 1-3 from API; 1=center, 2=circular, 3=spiral),
+                 pattern (int 1-3 from API; 1=centered, 2=spiral, 3=circular),
                  flow_rate (float; e.g. 3.0, 3.5),
                  agitate_before (int; 1=ON, 2=OFF),
                  agitate_after  (int; 1=ON, 2=OFF).
