@@ -12,8 +12,20 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN
+from .vendor.xbloom import spec
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _range(field_name: str) -> tuple[float, float, float]:
+    """(min, max, step) for a NumberEntity slider, from the shared spec field.
+
+    Only the *range* is shared with the spec; each entity keeps its own
+    `_default_value` because the standalone-brew defaults differ from the
+    recipe-wizard defaults.
+    """
+    r = spec.field(field_name)
+    return float(r.min), float(r.max), float(r.step)
 
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
@@ -66,9 +78,7 @@ class _XBloomNumberBase(NumberEntity, RestoreEntity):
 class XBloomGrindSizeNumber(_XBloomNumberBase):
     _attr_name = "Grind Size"
     _attr_unique_id = "xbloom_grind_size"
-    _attr_native_min_value = 1.0
-    _attr_native_max_value = 80.0
-    _attr_native_step = 1.0
+    _attr_native_min_value, _attr_native_max_value, _attr_native_step = _range("grind_size")
     _attr_native_unit_of_measurement = None
     _attr_icon = "mdi:grain"
     _default_value = 65.0
@@ -77,9 +87,7 @@ class XBloomGrindSizeNumber(_XBloomNumberBase):
 class XBloomGrindSpeedNumber(_XBloomNumberBase):
     _attr_name = "Grind Speed"
     _attr_unique_id = "xbloom_grind_speed"
-    _attr_native_min_value = 60.0
-    _attr_native_max_value = 120.0
-    _attr_native_step = 10.0
+    _attr_native_min_value, _attr_native_max_value, _attr_native_step = _range("grinder_speed_rpm")
     _attr_native_unit_of_measurement = "RPM"
     _attr_icon = "mdi:rotate-right"
     _default_value = 60.0
@@ -88,9 +96,7 @@ class XBloomGrindSpeedNumber(_XBloomNumberBase):
 class XBloomBrewVolumeNumber(_XBloomNumberBase):
     _attr_name = "Brew Volume"
     _attr_unique_id = "xbloom_brew_volume"
-    _attr_native_min_value = 0.0
-    _attr_native_max_value = 240.0
-    _attr_native_step = 1.0
+    _attr_native_min_value, _attr_native_max_value, _attr_native_step = _range("pour_volume_ml")
     _attr_native_unit_of_measurement = "ml"
     _attr_icon = "mdi:cup-water"
     _default_value = 120.0
@@ -99,6 +105,9 @@ class XBloomBrewVolumeNumber(_XBloomNumberBase):
 class XBloomBrewTemperatureNumber(_XBloomNumberBase):
     _attr_name = "Brew Temperature"
     _attr_unique_id = "xbloom_brew_temperature"
+    # NOT spec.field("pour_temperature_c"): that floor is 40 (recipe rule),
+    # but this standalone-brew slider has historically allowed 20. Left as-is
+    # pending confirmation of the machine's real standalone-brew floor.
     _attr_native_min_value = 20.0
     _attr_native_max_value = 98.0
     _attr_native_step = 1.0
@@ -110,9 +119,7 @@ class XBloomBrewTemperatureNumber(_XBloomNumberBase):
 class XBloomBrewFlowRateNumber(_XBloomNumberBase):
     _attr_name = "Brew Flow Rate"
     _attr_unique_id = "xbloom_brew_flow_rate"
-    _attr_native_min_value = 3.0
-    _attr_native_max_value = 3.5
-    _attr_native_step = 0.1
+    _attr_native_min_value, _attr_native_max_value, _attr_native_step = _range("pour_flow_rate")
     _attr_native_unit_of_measurement = "ml/s"
     _attr_icon = "mdi:water-pump"
     _default_value = 3.0

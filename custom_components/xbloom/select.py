@@ -180,7 +180,7 @@ class XBloomWaterSourceSelect(_XBloomSettingSelect):
     _attr_name = "Water Source"
     _attr_unique_id = "xbloom_water_source_select"
     _attr_icon = "mdi:water"
-    _attr_options = ["tank", "tap"]
+    _attr_options = list(spec.WATER_SOURCE_CODES)
     _service = "set_water_source"
     _service_arg = "source"
 
@@ -202,7 +202,7 @@ class XBloomWeightUnitSelect(_XBloomSettingSelect):
     _attr_name = "Weight Unit"
     _attr_unique_id = "xbloom_weight_unit_select"
     _attr_icon = "mdi:scale"
-    _attr_options = ["g", "oz", "ml"]
+    _attr_options = list(spec.WEIGHT_UNIT_CODES)
     _service = "set_weight_unit"
     _service_arg = "unit"
 
