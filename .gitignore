@@ -49,3 +49,6 @@ tools/
 
 # Local-only deploy helper (contains Pi host/paths; kept out of git by request)
 scripts/deploy-to-pi.sh
+
+# Local-only deploy reference (contains Pi host/paths; kept out of git by request)
+DEPLOY.md
