@@ -262,7 +262,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
         # Draft may already be populated when coming from the edit flow.
         draft_name = (self._draft or {}).get("name", "")
-        draft_cup = (self._draft or {}).get("cup_type_label", "Omni dripper")
+        draft_cup = (self._draft or {}).get("cup_type_label", spec.DEFAULT_CUP_LABEL)
 
         if user_input is not None:
             name = (user_input.get("name") or "").strip()
@@ -299,7 +299,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Step 2 of create — brew params with cup-locked dose stepper."""
         errors: dict[str, str] = {}
-        cup_label = self._draft.get("cup_type_label", "Omni dripper")
+        cup_label = self._draft.get("cup_type_label", spec.DEFAULT_CUP_LABEL)
         dose_min, dose_max, dose_step, dose_default = _CUP_DOSE_UI.get(
             cup_label, _CUP_DOSE_UI["Other"]
         )

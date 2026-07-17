@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import XBloomCoordinator
+from .vendor.xbloom import spec
 
 _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0  # coordinator manages all updates; select is read-only
@@ -216,7 +217,7 @@ class XBloomBrewPatternSelect(_XBloomSettingSelect):
     _attr_name = "Brew Pattern"
     _attr_unique_id = "xbloom_brew_pattern_select"
     _attr_icon = "mdi:rotate-3d-variant"
-    _attr_options = ["centered", "spiral", "circular"]
+    _attr_options = list(spec.PATTERN_NAMES)
 
     async def async_added_to_hass(self) -> None:
         """Restore last selected pattern; default to 'spiral' on first run."""
