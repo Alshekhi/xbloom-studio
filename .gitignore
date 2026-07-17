@@ -46,3 +46,6 @@ discovery/*
 
 # Local tooling
 tools/
+
+# Local-only deploy helper (contains Pi host/paths; kept out of git by request)
+scripts/deploy-to-pi.sh
