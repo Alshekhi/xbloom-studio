@@ -127,23 +127,31 @@ RATIO_DENOM = NumRange(min=5.0, max=25.0, step=0.5, default=16.0)
 # --------------------------------------------------------------------------- #
 # Per-field numeric ranges (non-cup, non-ratio). Keyed name -> NumRange.       #
 #                                                                             #
-# NOTE ON pour_temperature_c: the floor is 40, matching the machine rule the   #
-# validator has always enforced. The edit wizard's slider previously allowed   #
-# 20, which let a user pick a value the save would then reject. Canonicalising  #
-# to 40 makes the control honest; no capability is lost (sub-40 never saved).   #
+# Temperature: the range is 20-98, where the two ends are the sentinels the
+# xBloom app calls RT and BP (see ROOM_TEMP_C / BOILING_POINT_C below) — a pour
+# at 20 shows "RT", at 98 shows "BP", and the app's numeric slider runs 40-95
+# between them. Validation accepts the whole inclusive span. (An earlier version
+# floored this at 40, which wrongly rejected RT pours — corrected after reading
+# the app's TemperatureConstant.)
 # --------------------------------------------------------------------------- #
 FIELDS: dict[str, NumRange] = {
     "grind_size": NumRange(1, 80, 1, 40),
     "grinder_speed_rpm": NumRange(60, 120, 10, 90, "RPM"),
     "pour_count": NumRange(1, 9, 1, 3),
     "pour_volume_ml": NumRange(0, 240, 1, 60, "ml"),
-    "pour_temperature_c": NumRange(40, 98, 1, 92, "°C"),
+    "pour_temperature_c": NumRange(20, 98, 1, 92, "°C"),
     "pour_flow_rate": NumRange(3.0, 3.5, 0.1, 3.0),
     "pour_pause_s": NumRange(0, 59, 1, 0, "s"),
-    # Bypass water is optional and cooler than a pour, so its own floor (20).
     "bypass_volume_ml": NumRange(5, 100, 1, 30, "ml"),
     "bypass_temp_c": NumRange(20, 98, 1, 92, "°C"),
 }
+
+# Temperature sentinels, from the xBloom app's TemperatureConstant. A pour whose
+# temperature equals one of these is shown as text ("RT"/"BP") instead of a
+# number; both are inside pour_temperature_c's range so they validate.
+ROOM_TEMP_C = 20.0      # "RT" — room temperature
+BOILING_POINT_C = 98.0  # "BP" — boiling point (the app derives the real value
+                        # from altitude; the transmitted sentinel is 98)
 
 
 def field(name: str) -> NumRange:

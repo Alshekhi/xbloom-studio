@@ -760,11 +760,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     hass.services.async_register(
         DOMAIN, "grind", handle_grind,
         schema=vol.Schema({
-            # NOTE: standalone grind 'size' is 1-100 (raw BLE scale), which is
-            # NOT spec.field("grind_size") (1-80, the recipe/UI scale). Left as
-            # a literal pending confirmation these are different quantities.
             vol.Optional("size", default=63): vol.All(
-                vol.Coerce(int), vol.Range(min=1, max=100),
+                vol.Coerce(int),
+                vol.Range(
+                    min=int(spec.field("grind_size").min),
+                    max=int(spec.field("grind_size").max),
+                ),
             ),
             vol.Optional("speed", default=100): vol.All(
                 vol.Coerce(int),

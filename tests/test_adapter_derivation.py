@@ -58,13 +58,13 @@ EXPECTED_CUP_UI = {
     "Tea": (1.0, 5.0, 0.5, 3.0),
 }
 # field -> pre-refactor NumberSelectorConfig kwargs (unit omitted when none).
-# pour_temperature_c is 40 by design (old UI slider said 20).
+# pour_temperature_c is 20-98 = the app's RT..BP span.
 EXPECTED_SEL = {
     "grind_size": {"min": 1, "max": 80, "step": 1, "mode": "slider"},
     "grinder_speed_rpm": {"min": 60, "max": 120, "step": 10, "mode": "slider", "unit_of_measurement": "RPM"},
     "pour_count": {"min": 1, "max": 9, "step": 1, "mode": "slider"},
     "pour_volume_ml": {"min": 0, "max": 240, "step": 1, "mode": "slider", "unit_of_measurement": "ml"},
-    "pour_temperature_c": {"min": 40, "max": 98, "step": 1, "mode": "slider", "unit_of_measurement": "°C"},
+    "pour_temperature_c": {"min": 20, "max": 98, "step": 1, "mode": "slider", "unit_of_measurement": "°C"},
     "pour_flow_rate": {"min": 3.0, "max": 3.5, "step": 0.1, "mode": "slider"},
     "pour_pause_s": {"min": 0, "max": 59, "step": 1, "mode": "slider", "unit_of_measurement": "s"},
     "bypass_volume_ml": {"min": 5, "max": 100, "step": 1, "mode": "slider", "unit_of_measurement": "ml"},

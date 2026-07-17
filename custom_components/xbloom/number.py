@@ -105,12 +105,9 @@ class XBloomBrewVolumeNumber(_XBloomNumberBase):
 class XBloomBrewTemperatureNumber(_XBloomNumberBase):
     _attr_name = "Brew Temperature"
     _attr_unique_id = "xbloom_brew_temperature"
-    # NOT spec.field("pour_temperature_c"): that floor is 40 (recipe rule),
-    # but this standalone-brew slider has historically allowed 20. Left as-is
-    # pending confirmation of the machine's real standalone-brew floor.
-    _attr_native_min_value = 20.0
-    _attr_native_max_value = 98.0
-    _attr_native_step = 1.0
+    # 20-98 = the app's RT..BP span (see spec); the standalone slider was right
+    # all along, and the spec now agrees.
+    _attr_native_min_value, _attr_native_max_value, _attr_native_step = _range("pour_temperature_c")
     _attr_native_unit_of_measurement = "°C"
     _attr_icon = "mdi:thermometer"
     _default_value = 93.0

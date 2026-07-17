@@ -56,7 +56,7 @@ EXPECTED_FIELDS = {
     "grinder_speed_rpm": (60, 120, 10),  # validate 60..120 step 10, UI same
     "pour_count": (1, 9, 1),             # validate 1..9, UI 1..9
     "pour_volume_ml": (0, 240, 1),       # validate 0..240, UI 0..240
-    "pour_temperature_c": (40, 98, 1),   # validate 40..98 (UI was 20 — fixed)
+    "pour_temperature_c": (20, 98, 1),   # RT(20)..BP(98) per the app
     "pour_flow_rate": (3.0, 3.5, 0.1),   # validate 3.0..3.5, UI same
     "pour_pause_s": (0, 59, 1),          # validate 0..59, UI 0..59
     "bypass_volume_ml": (5, 100, 1),     # UI only
@@ -105,10 +105,16 @@ def _checks():
     yield "weight unit codes", spec.WEIGHT_UNIT_CODES, EXPECTED_WEIGHT_UNIT
     yield "temp unit codes", spec.TEMP_UNIT_CODES, {"C": 0, "F": 1}
 
+    # RT/BP sentinels sit at the ends of the temperature range and validate.
+    yield "RT sentinel", spec.ROOM_TEMP_C, 20.0
+    yield "BP sentinel", spec.BOILING_POINT_C, 98.0
+    yield "RT within temp range", spec.field("pour_temperature_c").contains(spec.ROOM_TEMP_C), True
+    yield "BP within temp range", spec.field("pour_temperature_c").contains(spec.BOILING_POINT_C), True
+
     # Behavioural spot-checks on NumRange helpers.
     yield "grind snap 63.4->63", spec.field("grind_size").snap(63.4), 63
     yield "rpm snap 95->100", spec.field("grinder_speed_rpm").snap(95), 100
-    yield "temp 30 rejected", spec.field("pour_temperature_c").contains(30), False
+    yield "temp 19 rejected (below RT)", spec.field("pour_temperature_c").contains(19), False
     yield "temp 92 ok", spec.field("pour_temperature_c").contains(92), True
     yield "ratio snap 40->25 (clamp)", spec.RATIO_DENOM.snap(40), 25.0
 
