@@ -223,3 +223,11 @@ CUP_WEIGHT_RANGE_DEFAULT: tuple[float, float] = (200.0, 80.0)
 # --------------------------------------------------------------------------- #
 DEFAULT_PATTERN = "spiral"
 DEFAULT_WATER_SOURCE = "tank"
+
+# First parameter of the grind-start frame (cmd 3500): [this, size, speed].
+# The official app hardcodes it to 1000 (verified in GrinderActivity's
+# CodeModule(3500, ..., 1000, i, i2)); it is NOT computed. The grinder runs
+# until its single-dose chamber is empty or a STOP (3505) arrives, so this
+# value does not actually time the grind — it's a fixed protocol field we send
+# to match the app.
+GRIND_START_DURATION_MS = 1000

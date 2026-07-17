@@ -366,18 +366,21 @@ CMD_UNIT_TEMP     = 8010   # 0x1F4A — display temperature unit: 0=°C, 1=°F
 
 
 def packets_grind(
-    size: int, speed: int, duration_ms: int = 1000,
+    size: int, speed: int, duration_ms: int = spec.GRIND_START_DURATION_MS,
 ) -> tuple[bytes, bytes, bytes]:
     """Return the 3-frame standalone grinder sequence: (enter, start, stop).
 
-    The CALLER controls actual grind length by sleeping `seconds` between
-    writing `start` and writing `stop`. `duration_ms` is a fallback the
-    machine uses if the stop frame is lost; brAzzi64's CLI hardcodes 1000.
+    Matches the official app's GrinderActivity: enter (8006) with [size, speed],
+    start (3500) with [duration_ms, size, speed], stop (3505). The CALLER
+    controls actual grind length by sleeping between writing `start` and `stop`;
+    the grinder otherwise runs until its single-dose chamber is empty.
+    `duration_ms` is the app's fixed 1000 (spec.GRIND_START_DURATION_MS), not a
+    computed value.
 
     Args:
         size: grind size (lower = finer) — see spec.field("grind_size")
         speed: grinder RPM — see spec.field("grinder_speed_rpm")
-        duration_ms: fallback timeout in milliseconds
+        duration_ms: grind-start param 0 (default = the app's constant)
     """
     enter = _build_frame(CMD_GRINDER_ENTER, [int(size), int(speed)])
     start = _build_frame(

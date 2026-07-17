@@ -131,6 +131,7 @@ def _checks():
     }
     yield "default pattern in enum", spec.DEFAULT_PATTERN in spec.PATTERN_NAMES, True
     yield "default water in enum", spec.DEFAULT_WATER_SOURCE in spec.WATER_SOURCE_CODES, True
+    yield "grind-start duration ms", spec.GRIND_START_DURATION_MS, 1000
 
     # Behavioural spot-checks on NumRange helpers.
     yield "grind snap 63.4->63", spec.field("grind_size").snap(63.4), 63
