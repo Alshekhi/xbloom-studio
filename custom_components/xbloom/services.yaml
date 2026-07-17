@@ -233,28 +233,6 @@ ble_disconnect:
     Force-release any BLE handle Home Assistant is holding for the machine, so
     the iOS app can reconnect. Diagnostic counterpart to ble_connect.
 
-dump_notifications:
-  name: Dump BLE notifications (debug)
-  description: >
-    Open BLE, subscribe to FFE2, log every decoded notification packet for
-    the given duration, then disconnect. Used in plan 08-05 to identify
-    which command codes carry grinder/brewer knob changes — run this
-    service, then turn knobs on the machine, and inspect the HA log for
-    the captured frames.
-  fields:
-    seconds:
-      name: Duration
-      description: How long to listen (5-300 s; default 30).
-      required: false
-      default: 30
-      example: 30
-      selector:
-        number:
-          min: 5
-          max: 300
-          step: 5
-          unit_of_measurement: s
-
 list_recipes:
   name: List Recipes
   description: >

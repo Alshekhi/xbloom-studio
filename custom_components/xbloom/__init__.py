@@ -797,97 +797,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         schema=vol.Schema({vol.Required("unit"): vol.In(list(spec.WEIGHT_UNIT_CODES))}),
     )
 
-    # ------------------------------------------------------------------ #
-    # 08-04 debug — xbloom.dump_notifications {seconds}                  #
-    # Open BLE, subscribe to FFE2, log every decoded packet for N        #
-    # seconds. Used in 08-05 Phase A to identify knob-change cmd codes.  #
-    # ------------------------------------------------------------------ #
-    async def handle_dump_notifications(call) -> None:
-        import asyncio as _asyncio
-
-        from .vendor.xbloom.ble import (
-            CMD_HANDSHAKE, FFE1_UUID, FFE2_UUID, HANDSHAKE_DATA,
-            XBloomBleClient, _build_frame, decode_notification,
-        )
-
-        seconds = float(call.data.get("seconds", 30))
-        ble_name = _resolve_ble_name(entry)
-        if not ble_name:
-            _LOGGER.error("xbloom.dump_notifications: BLE name unknown")
-            return
-        ble_device = await _resolve_ble_device(hass, ble_name)
-        if ble_device is None:
-            _LOGGER.error(
-                "xbloom.dump_notifications: HA bluetooth has not seen %r",
-                ble_name,
-            )
-            return
-
-        captured: list[str] = []
-
-        def _on_notify(_char, data: bytes) -> None:
-            decoded = decode_notification(bytes(data))
-            ts = _asyncio.get_event_loop().time()
-            line = (
-                f"[t+{ts:9.3f}] raw={bytes(data).hex()}  decoded={decoded}"
-            )
-            captured.append(line)
-            _LOGGER.info("dump_notifications | %s", line)
-
-        try:
-            ble_client = XBloomBleClient(ble_device)
-            async with ble_client:
-                try:
-                    await ble_client._client.start_notify(  # noqa: SLF001
-                        FFE2_UUID, _on_notify,
-                    )
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.error(
-                        "xbloom.dump_notifications: notify subscription "
-                        "failed: %s", err,
-                    )
-                    return
-
-                # Kickstart: handshake first (some firmware paths only
-                # emit FFE2 after seeing it).
-                handshake = _build_frame(CMD_HANDSHAKE, list(HANDSHAKE_DATA))
-                await ble_client._client.write_gatt_char(  # noqa: SLF001
-                    FFE1_UUID, handshake, response=False,
-                )
-                _LOGGER.info(
-                    "xbloom.dump_notifications: handshake sent (%s)",
-                    handshake.hex(),
-                )
-
-                # Self-test: 2 seconds in, fire a TARE. The machine MUST
-                # emit at least one notification in response (the new
-                # zero weight). If we don't see it, our notify
-                # subscription is broken; if we do see it, the BLE pipe
-                # is fine and any subsequent quiet from knobs means the
-                # machine doesn't broadcast UI events.
-                from .vendor.xbloom.ble import packet_tare
-                _LOGGER.info(
-                    "xbloom.dump_notifications: capturing FFE2 for "
-                    "%.1fs (TARE self-test in 2s)",
-                    seconds,
-                )
-                await _asyncio.sleep(2)
-                _LOGGER.info(
-                    "xbloom.dump_notifications: → firing TARE "
-                    "self-test now"
-                )
-                await ble_client._client.write_gatt_char(  # noqa: SLF001
-                    FFE1_UUID, packet_tare(), response=False,
-                )
-                await _asyncio.sleep(seconds - 2)
-
-            _LOGGER.info(
-                "xbloom.dump_notifications: ✓ done — %d frames captured",
-                len(captured),
-            )
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.error("xbloom.dump_notifications: BLE failed: %s", err)
-
     # 08-03 — Easy Mode slot writer
     hass.services.async_register(
         DOMAIN, "write_slot", handle_write_slot,
@@ -897,16 +806,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             vol.Optional("share_url"): str,
             vol.Optional("share_id"): str,
             vol.Optional("scale_on", default=True): bool,
-        }),
-    )
-
-    # 08-04 — debug notification dump
-    hass.services.async_register(
-        DOMAIN, "dump_notifications", handle_dump_notifications,
-        schema=vol.Schema({
-            vol.Optional("seconds", default=30): vol.All(
-                vol.Coerce(float), vol.Range(min=5, max=300),
-            ),
         }),
     )
 
@@ -996,7 +895,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         "tare", "back_to_home", "brew_pause", "brew_resume",
         "grind", "set_mode", "set_water_source",
         "set_temp_unit", "set_weight_unit",
-        "write_slot", "dump_notifications",
+        "write_slot",
         "list_recipes", "get_recipe", "add_recipe", "update_recipe", "delete_recipe",
     ):
         entry.async_on_unload(
