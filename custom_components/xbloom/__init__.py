@@ -31,8 +31,20 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
 from .coordinator import XBloomCoordinator
 from .vendor.xbloom.client import XBloomClient
+from .vendor.xbloom.recipe_validate import validate_recipe
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _describe_errors(errors: dict[str, str]) -> str:
+    """Flatten validate_recipe's field->key map into one human-readable line.
+
+    Callers that can render per-field errors should read the `errors` key of
+    the service response instead; this is the fallback for logs and for voice
+    or REST callers that only surface a single message.
+    """
+    return "; ".join(f"{field}: {key}" for field, key in sorted(errors.items()))
+
 
 PLATFORMS = ["select", "button", "number", "sensor", "event", "switch"]
 
@@ -906,9 +918,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             recipe = json.loads(call.data["recipe_json"])
         except (json.JSONDecodeError, KeyError) as err:
             return {"ok": False, "error": f"Invalid recipe_json: {err}"}
-        name = (recipe.get("name") or "").strip()
-        if not name:
-            return {"ok": False, "error": "recipe_json is missing a non-empty 'name'"}
+        errors = validate_recipe(recipe)
+        if errors:
+            _LOGGER.warning("xbloom.add_recipe: rejected — %s", errors)
+            return {"ok": False, "error": _describe_errors(errors), "errors": errors}
+        name = recipe["name"].strip()
         coordinator = entry.runtime_data.coordinator
         await coordinator.async_add_recipe(recipe)
         _LOGGER.info("xbloom.add_recipe: added '%s'", name)
@@ -919,10 +933,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             recipe = json.loads(call.data["recipe_json"])
         except (json.JSONDecodeError, KeyError) as err:
             return {"ok": False, "error": f"Invalid recipe_json: {err}"}
+        errors = validate_recipe(recipe)
+        if errors:
+            _LOGGER.warning("xbloom.update_recipe: rejected — %s", errors)
+            return {"ok": False, "error": _describe_errors(errors), "errors": errors}
         coordinator = entry.runtime_data.coordinator
         await coordinator.async_replace_recipe(recipe)
         _LOGGER.info("xbloom.update_recipe: updated '%s'", recipe.get("name"))
-        return {"ok": True}
+        return {"ok": True, "name": recipe["name"].strip()}
 
     async def handle_delete_recipe(call) -> dict:
         name = call.data["name"]
