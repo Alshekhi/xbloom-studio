@@ -585,12 +585,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         volume_ml = _state_float("number.brew_volume", 120.0)
         temp_c    = _state_float("number.brew_temperature", 93.0)
 
-        pattern_name = _state_str("select.brew_pattern", "spiral")
+        pattern_name = _state_str("select.brew_pattern", spec.DEFAULT_PATTERN)
         pattern_code = spec.PATTERN_NAME_TO_BYTE.get(
             pattern_name, spec.PATTERN_NAME_TO_BYTE["spiral"]
         )
 
-        water_source = _state_str("select.water_source", "tank")
+        water_source = _state_str("select.water_source", spec.DEFAULT_WATER_SOURCE)
         water_feed = spec.WATER_SOURCE_CODES.get(
             water_source, spec.WATER_SOURCE_CODES["tank"]
         )
@@ -782,7 +782,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     hass.services.async_register(DOMAIN, "brew_standalone", handle_brew_standalone)
     hass.services.async_register(
         DOMAIN, "set_mode", handle_set_mode,
-        schema=vol.Schema({vol.Required("mode"): vol.In(["auto", "pro"])}),
+        schema=vol.Schema({vol.Required("mode"): vol.In(list(spec.MODES))}),
     )
     hass.services.async_register(
         DOMAIN, "set_water_source", handle_set_water_source,
@@ -892,7 +892,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     hass.services.async_register(
         DOMAIN, "write_slot", handle_write_slot,
         schema=vol.Schema({
-            vol.Required("slot"): vol.In(["A", "B", "C"]),
+            vol.Required("slot"): vol.In(list(spec.SLOTS)),
             vol.Optional("recipe_name"): str,
             vol.Optional("share_url"): str,
             vol.Optional("share_id"): str,

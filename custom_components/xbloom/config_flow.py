@@ -283,7 +283,9 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             vol.Required("name", default=draft_name): str,
             vol.Required("cup_type", default=draft_cup): selector.SelectSelector(
                 selector.SelectSelectorConfig(
-                    options=["Omni dripper", "xPod", "Tea", "Other"],
+                    # Labels from the spec; the display order (Omni first) is a
+                    # UI choice, expressed as cup api ids.
+                    options=[spec.CUP_API_TO_LABEL[i] for i in (2, 1, 4, 3)],
                     mode="dropdown",
                 )
             ),

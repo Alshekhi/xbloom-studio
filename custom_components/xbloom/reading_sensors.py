@@ -165,7 +165,7 @@ class XBloomCurrentModuleSensor(_XBloomReadingSensor):
     _attr_unique_id = "xbloom_current_module"
     _attr_icon = "mdi:gesture-tap-button"
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = ["home", "grinder", "scale", "brewer", "auto"]
+    _attr_options = list(spec.MODULES)
     _events = (EV_MODULE_ENTERED,)
 
     def _extract(self, event_type: str, data: dict) -> Any:

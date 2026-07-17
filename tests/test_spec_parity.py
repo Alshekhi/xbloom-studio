@@ -111,6 +111,27 @@ def _checks():
     yield "RT within temp range", spec.field("pour_temperature_c").contains(spec.ROOM_TEMP_C), True
     yield "BP within temp range", spec.field("pour_temperature_c").contains(spec.BOILING_POINT_C), True
 
+    # Machine enums (moved in from the HA layer / ble.py).
+    yield "brew states", spec.BREW_STATES, ("idle", "grinding", "brewing", "done")
+    yield "modules", spec.MODULES, ("home", "grinder", "scale", "brewer", "auto")
+    yield "modes", spec.MODES, ("auto", "pro")
+    yield "mode payloads", spec.MODE_PAYLOADS, {"auto": "91327856", "pro": "00000000"}
+    yield "slots", spec.SLOTS, ("A", "B", "C")
+    yield "faults", spec.FAULTS, {
+        40522: ("no_water", "error_no_water"),
+        40517: ("no_beans", "error_no_beans"),
+        8204: ("dose_water_error", "error_dose_water"),
+        8203: ("gear_position_error", "error_gear_position"),
+    }
+    yield "machine statuses", spec.MACHINE_STATUSES, (
+        "ok", "no_water", "no_beans", "dose_water_error", "gear_position_error",
+    )
+    yield "cup weight ranges", spec.CUP_WEIGHT_RANGE, {
+        1: (200.0, 80.0), 2: (110.0, 90.0), 3: (200.0, 80.0), 4: (200.0, 80.0),
+    }
+    yield "default pattern in enum", spec.DEFAULT_PATTERN in spec.PATTERN_NAMES, True
+    yield "default water in enum", spec.DEFAULT_WATER_SOURCE in spec.WATER_SOURCE_CODES, True
+
     # Behavioural spot-checks on NumRange helpers.
     yield "grind snap 63.4->63", spec.field("grind_size").snap(63.4), 63
     yield "rpm snap 95->100", spec.field("grinder_speed_rpm").snap(95), 100

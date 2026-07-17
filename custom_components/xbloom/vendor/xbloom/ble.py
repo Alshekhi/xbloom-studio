@@ -133,21 +133,6 @@ def _vibration_code(before: bool, after: bool) -> int:
     return (1 if before else 0) | (2 if after else 0)
 
 
-# Cup-type weight range defaults (theMax, theMin floats) sent via command 8104.
-# In the official app these come from the cloud tuGetRecipeCode response, but
-# the values are tied to cup type only and the machine brews correctly with
-# the defaults below. Values from brAzzi64/xbloom-ble HCI captures.
-# Recipe API cupType:  1=xPod, 2=Omni dripper, 3=Other, 4=Tea
-#
-# NOT the same as spec.CUP_DOSE — these are the machine's cup weight-range
-# BYTES for the 8104 frame, a different quantity that merely shares the cup-type
-# key. Do not fold this into the spec's dose ranges.
-_CUP_TYPE_RANGES: dict[int, tuple[float, float]] = {
-    1: (200.0, 80.0),    # xPod (default; no HCI capture)
-    2: (110.0, 90.0),    # Omni dripper (HCI confirmed)
-    3: (200.0, 80.0),    # Other / Free Solo (HCI confirmed)
-    4: (200.0, 80.0),    # Tea (default; no HCI capture)
-}
 
 
 def encode_recipe_blob(
@@ -232,8 +217,8 @@ CMD_BREWER_START    = 4506   # 0x11AA — standalone brewer start
 
 
 def cup_type_range(cup_type: int) -> tuple[float, float]:
-    """Return (theMax, theMin) defaults for a recipe's cupType integer."""
-    return _CUP_TYPE_RANGES.get(int(cup_type), (200.0, 80.0))
+    """Return (theMax, theMin) cup weight-range defaults for a cupType integer."""
+    return spec.CUP_WEIGHT_RANGE.get(int(cup_type), spec.CUP_WEIGHT_RANGE_DEFAULT)
 
 
 def _float_to_int_bits(f: float) -> int:
@@ -378,9 +363,6 @@ CMD_WATER_SOURCE  = 4508   # 0x119C — water source: 0=tank, 1=tap
 CMD_UNIT_WEIGHT   = 8005   # 0x1F45 — display weight unit: 0=g, 1=oz, 2=ml
 CMD_UNIT_TEMP     = 8010   # 0x1F4A — display temperature unit: 0=°C, 1=°F
 
-# Mode type-2 payloads (4 bytes each, sent as raw_bytes)
-MODE_PRO_HEX  = "00000000"
-MODE_EASY_HEX = "91327856"
 
 
 def packets_grind(
@@ -393,8 +375,8 @@ def packets_grind(
     machine uses if the stop frame is lost; brAzzi64's CLI hardcodes 1000.
 
     Args:
-        size: 1-100 (lower = finer)
-        speed: 60-120 (grinder RPM)
+        size: grind size (lower = finer) — see spec.field("grind_size")
+        speed: grinder RPM — see spec.field("grinder_speed_rpm")
         duration_ms: fallback timeout in milliseconds
     """
     enter = _build_frame(CMD_GRINDER_ENTER, [int(size), int(speed)])
@@ -411,7 +393,7 @@ def packet_mode(mode: str) -> bytes:
     Args:
         mode: 'auto' (Easy mode) or 'pro' (Pro mode)
     """
-    payload = MODE_EASY_HEX if mode.lower() == "auto" else MODE_PRO_HEX
+    payload = spec.MODE_PAYLOADS.get(mode.lower(), spec.MODE_PAYLOADS["pro"])
     return _build_frame(
         CMD_MODE_TYPE, raw_bytes=bytes.fromhex(payload), frame_type=2,
     )

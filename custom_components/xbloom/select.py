@@ -169,7 +169,7 @@ class XBloomModeSelect(_XBloomSettingSelect):
     _attr_name = "Mode"
     _attr_unique_id = "xbloom_mode_select"
     _attr_icon = "mdi:cog"
-    _attr_options = ["auto", "pro"]
+    _attr_options = list(spec.MODES)
     _service = "set_mode"
     _service_arg = "mode"
 

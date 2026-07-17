@@ -171,3 +171,55 @@ WATER_SOURCE_CODES: dict[str, int] = {"tank": 0, "tap": 1}
 WEIGHT_UNIT_CODES: dict[str, int] = {"g": 0, "oz": 1, "ml": 2}
 # Keys match what the select entity offers and the BLE frame expects ("C"/"F").
 TEMP_UNIT_CODES: dict[str, int] = {"C": 0, "F": 1}
+
+
+# --------------------------------------------------------------------------- #
+# Machine state / mode enums — protocol facts a bridge must agree on, not UI.  #
+# --------------------------------------------------------------------------- #
+# Brew lifecycle the machine reports (brew-status sensor).
+BREW_STATES: tuple[str, ...] = ("idle", "grinding", "brewing", "done")
+
+# On-machine UI module the user has entered (current-module sensor).
+MODULES: tuple[str, ...] = ("home", "grinder", "scale", "brewer", "auto")
+
+# Operating mode and its Type-2 wire payload (CMD_MODE_TYPE 11511). "auto" is
+# the machine's EasyMode; "pro" is manual.
+MODES: tuple[str, ...] = ("auto", "pro")
+MODE_PAYLOADS: dict[str, str] = {"auto": "91327856", "pro": "00000000"}  # hex
+
+# EasyMode recipe slots on the machine.
+SLOTS: tuple[str, ...] = ("A", "B", "C")
+
+# Machine status: "ok" plus the fault conditions. FAULTS maps the fault
+# notification command code -> (status enum value, brew-event type). This is
+# the machine's fault vocabulary; the HA sensor and event entity derive from it.
+MACHINE_OK = "ok"
+FAULTS: dict[int, tuple[str, str]] = {
+    40522: ("no_water", "error_no_water"),            # RD_ErrorLackOfWater
+    40517: ("no_beans", "error_no_beans"),            # RD_ErrorIdling
+    8204: ("dose_water_error", "error_dose_water"),   # RD_AbnormalDoseOrWater
+    8203: ("gear_position_error", "error_gear_position"),  # RD_AbnormalGearPosition
+}
+MACHINE_STATUSES: tuple[str, ...] = (MACHINE_OK, *(s for s, _ in FAULTS.values()))
+
+
+# --------------------------------------------------------------------------- #
+# Cup wire weight-range defaults (theMax, theMin) sent in the CMD_SET_CUP /    #
+# recipe-blob frame. Keyed by cup api id. DISTINCT from CUP_DOSE (grams) —     #
+# these are machine weight-range bytes, not a dose window.                     #
+# --------------------------------------------------------------------------- #
+CUP_WEIGHT_RANGE: dict[int, tuple[float, float]] = {
+    1: (200.0, 80.0),   # xPod (default; no HCI capture)
+    2: (110.0, 90.0),   # Omni dripper (HCI confirmed)
+    3: (200.0, 80.0),   # Other / Free Solo (HCI confirmed)
+    4: (200.0, 80.0),   # Tea (default; no HCI capture)
+}
+CUP_WEIGHT_RANGE_DEFAULT: tuple[float, float] = (200.0, 80.0)
+
+
+# --------------------------------------------------------------------------- #
+# Canonical defaults — so every implementer falls back the same way. Values    #
+# are members of the enums above, not free-floating strings.                   #
+# --------------------------------------------------------------------------- #
+DEFAULT_PATTERN = "spiral"
+DEFAULT_WATER_SOURCE = "tank"
