@@ -22,6 +22,8 @@ import logging
 import struct
 from typing import Callable, Awaitable
 
+from . import spec
+
 log = logging.getLogger("xbloom.ble")
 
 # ---------------------------------------------------------------------------
@@ -120,28 +122,9 @@ HANDSHAKE_DATA = [185, 1]
 #   xbloom.py     — encode_recipe(), build_packet_type1*, cup-type ranges
 # ---------------------------------------------------------------------------
 
-# Pattern code: maps the xBloom API's `pattern` integer to the BLE byte.
-#
-# Two mappings compose here:
-#   API integer -> name : 1=centered, 2=spiral, 3=circular
-#                         (confirmed against the xBloom app UI)
-#   name -> BLE byte    : centered=0, circular=1, spiral=2
-#                         (the machine's wire order, confirmed by the
-#                          xbloom-voice-box announcements, which play
-#                          pattern_<byte>.wav — 0=مركزي/centered,
-#                          1=دائري/circular, 2=حلزوني/spiral — and were
-#                          verified correct on a live machine)
-# Composing them gives API 1->0, 2->2, 3->1. brAzzi64's reference
-# {centered:0, circular:1, spiral:2} agrees, and the earlier captured server
-# `theCode` (API pattern=3 -> byte 0x01) is consistent too: 3=circular=byte 1.
-# The previous map {1:0, 2:1, 3:1} was wrong for spiral — it sent API 2
-# (spiral) as byte 1 (circular), so spiral pours brewed circular.
-#
-# NB: the esp32 controller's xbloom_protocol.h labels the bytes
-# spiral=1 / circular=2 — that header is mislabelled; the order above is what
-# the machine actually uses. The firmware's announce path is unaffected
-# because it plays pattern_<byte>.wav by index, not via those constants.
-_API_PATTERN_TO_BLE = {1: 0, 2: 2, 3: 1}
+# Pattern code: xBloom API `pattern` integer -> BLE wire byte. The mapping and
+# its confirmation (app UI + live voice-box announcements) live in spec.py.
+_API_PATTERN_TO_BLE = spec.PATTERN_API_TO_BYTE
 
 
 def _vibration_code(before: bool, after: bool) -> int:
@@ -155,6 +138,10 @@ def _vibration_code(before: bool, after: bool) -> int:
 # the values are tied to cup type only and the machine brews correctly with
 # the defaults below. Values from brAzzi64/xbloom-ble HCI captures.
 # Recipe API cupType:  1=xPod, 2=Omni dripper, 3=Other, 4=Tea
+#
+# NOT the same as spec.CUP_DOSE — these are the machine's cup weight-range
+# BYTES for the 8104 frame, a different quantity that merely shares the cup-type
+# key. Do not fold this into the spec's dose ranges.
 _CUP_TYPE_RANGES: dict[int, tuple[float, float]] = {
     1: (200.0, 80.0),    # xPod (default; no HCI capture)
     2: (110.0, 90.0),    # Omni dripper (HCI confirmed)
@@ -436,7 +423,8 @@ def packet_water_source(source: str) -> bytes:
     Args:
         source: 'tank' (0) or 'tap' (1)
     """
-    return _build_frame(CMD_WATER_SOURCE, [0 if source.lower() == "tank" else 1])
+    code = spec.WATER_SOURCE_CODES.get(source.lower(), spec.WATER_SOURCE_CODES["tap"])
+    return _build_frame(CMD_WATER_SOURCE, [code])
 
 
 def packet_temp_unit(unit: str) -> bytes:
@@ -448,16 +436,13 @@ def packet_temp_unit(unit: str) -> bytes:
     return _build_frame(CMD_UNIT_TEMP, [0 if unit.upper() == "C" else 1])
 
 
-_WEIGHT_UNIT_CODES = {"g": 0, "oz": 1, "ml": 2}
-
-
 def packet_weight_unit(unit: str) -> bytes:
     """Build the display-weight-unit frame (cmd 8005).
 
     Args:
         unit: 'g' (0), 'oz' (1), or 'ml' (2)
     """
-    return _build_frame(CMD_UNIT_WEIGHT, [_WEIGHT_UNIT_CODES[unit.lower()]])
+    return _build_frame(CMD_UNIT_WEIGHT, [spec.WEIGHT_UNIT_CODES[unit.lower()]])
 
 
 # ---------------------------------------------------------------------------
@@ -542,16 +527,10 @@ NOTIFY_TARE             = 9007   # scale tared via the tare button (no payload).
                                  # followed by 8023 activity=4 → 5 (re-zero/settle).
                                  # Sibling cradle events: 9002 = cup on, 9008 = cup off.
 
-# Pattern-byte mapping. The machine reports the pour pattern on cmd 8107 as
-# a raw 0/1/2 code. Confirmed by live testing on the xbloom-voice-box ESP
-# firmware (a C port of this decoder): the true order is
-# centered → circular → spiral for codes 0 → 1 → 2. An earlier guess here had
-# 1/2 as spiral/circular (reversed); corrected to match the machine.
-PATTERN_NAMES = {
-    0: "centered",
-    1: "circular",
-    2: "spiral",
-}
+# Pattern-byte mapping. The machine reports the pour pattern on cmd 8107 as a
+# raw 0/1/2 code; the byte -> name order (centered/circular/spiral) lives in
+# spec.py, confirmed live via the voice-box announcements.
+PATTERN_NAMES = spec.PATTERN_BYTE_TO_NAME
 
 
 def parse_ffe3_packet(data: bytes) -> dict | None:
