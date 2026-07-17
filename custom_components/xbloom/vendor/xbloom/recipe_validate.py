@@ -23,7 +23,8 @@ _RATIO_RE = re.compile(r"^1:\d+(\.\d)?$")
 _RATIO_DENOM_MIN = 5.0
 _RATIO_DENOM_MAX = 25.0
 _RATIO_DENOM_STEP = 0.5
-_VOLUME_TOLERANCE_ML = 0.5   # both over and under rejected if diff > 0.5 ml
+VOLUME_TOLERANCE_ML = 0.5    # both over and under rejected if diff > 0.5 ml
+_VOLUME_TOLERANCE_ML = VOLUME_TOLERANCE_ML  # back-compat alias for internal use
 _VALID_CUP_TYPES = {1, 2, 3, 4}
 _VALID_PATTERNS = {1, 2, 3}
 

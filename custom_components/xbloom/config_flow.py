@@ -28,6 +28,7 @@ from homeassistant.helpers import selector
 
 from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
 from .vendor.xbloom.recipe_validate import (
+    VOLUME_TOLERANCE_ML,
     denom_to_ratio_str,
     guess_ratio,
     snap_ratio,
@@ -315,12 +316,29 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                     # No pours yet or count changed — full recalculate.
                     self._draft["pours"] = self._auto_fill_pours(self._draft)
                 else:
-                    # Count unchanged — recalculate volumes from new ratio/dose
-                    # but keep each pour's temperature, pattern, flow, pause, vibrate.
+                    # Count unchanged. Only touch volumes if the total water
+                    # actually moved: this branch used to flatten every pour to
+                    # an even split unconditionally, so merely stepping through
+                    # the edit wizard destroyed a custom distribution (a 30 ml
+                    # bloom + 90 ml second pour became 60/60).
                     ratio_denom = float(self._draft["ratio"].split(":", 1)[1])
                     total_ml = round(float(self._draft["dose_g"]) * ratio_denom, 1)
-                    per_volume = round(total_ml / new_pour_count, 1)
-                    new_pours = [{**p, "volume_ml": per_volume} for p in old_pours]
+                    old_total = round(sum(float(p["volume_ml"]) for p in old_pours), 1)
+                    if abs(total_ml - old_total) <= VOLUME_TOLERANCE_ML:
+                        # No-op edit — leave the user's pours exactly as they are.
+                        new_pours = [dict(p) for p in old_pours]
+                    elif old_total > 0:
+                        # Dose/ratio changed — scale proportionally so the shape
+                        # of the recipe survives instead of being levelled.
+                        factor = total_ml / old_total
+                        new_pours = [
+                            {**p, "volume_ml": round(float(p["volume_ml"]) * factor, 1)}
+                            for p in old_pours
+                        ]
+                    else:
+                        # Degenerate (all-zero volumes) — fall back to an even split.
+                        per_volume = round(total_ml / new_pour_count, 1)
+                        new_pours = [{**p, "volume_ml": per_volume} for p in old_pours]
                     drift = round(total_ml - sum(p["volume_ml"] for p in new_pours), 1)
                     if drift:
                         new_pours[-1]["volume_ml"] = round(
