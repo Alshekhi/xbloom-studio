@@ -37,6 +37,7 @@ from homeassistant.const import UnitOfMass
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .vendor.xbloom import spec
@@ -53,6 +54,36 @@ def signal_event(entry_id: str) -> str:
 def signal_brew_lifecycle(entry_id: str) -> str:
     """Brew started/ended: payload str ('started'|'ended')."""
     return f"xbloom_ble_brewlife_{entry_id}"
+
+
+async def send_live_frame(entry, frame: bytes) -> bool:
+    """Send any pre-built FFE1 frame over the HELD Connect session.
+
+    Returns False (no-op) when no live session holds the link — callers use this
+    for actions that only make sense while Connected (e.g. the module-enter
+    navigation buttons). Fire-and-forget; the machine echoes but we don't gate.
+    """
+    listener = getattr(getattr(entry, "runtime_data", None), "live_session_listener", None)
+    if listener is None or not getattr(listener, "is_running", False):
+        return False
+    return await listener.send_live(frame)
+
+
+async def send_brewer_temp_live(entry, temp_c_wire: float) -> bool:
+    """Set the brewer temperature over the HELD Connect session — the app's
+    live temp-slider command (cmd 4510, temp-ONLY, plain int ×10). ``temp_c_wire``
+    is the WIRE °C (RT=20/BP=98/literal — convert a display value with
+    spec.brew_temp_display_to_wire first). No-op when not Connected.
+    """
+    from .vendor.xbloom.ble import packet_brewer_temp
+    return await send_live_frame(entry, packet_brewer_temp(float(temp_c_wire)))
+
+
+async def send_brewer_pattern_live(entry, pattern_byte: int) -> bool:
+    """Set the brewer pour pattern over the HELD Connect session — the app's
+    live pattern command (cmd 8016, pattern-ONLY). No-op when not Connected."""
+    from .vendor.xbloom.ble import packet_brewer_pattern
+    return await send_live_frame(entry, packet_brewer_pattern(int(pattern_byte)))
 
 
 # Notification command codes we care about for entity decoding
@@ -72,10 +103,17 @@ CMD_BYPASS           = 40520  # RD_BYPASS — bypass/dilution pour (see discover
 
 # Machine activity values (cmd 8023 payload as LE uint32)
 # These reflect the machine's overall state, NOT individual steps.
+# The machine has TWO home/idle screens — one per mode — and the firmware
+# treats them as equivalent "at rest" states (fw_decompiled.c line 2849:
+# `+0x198 == 1 || +0x198 == 0x41`):
+#   1  = Pro-mode home        65 (0x41) = Auto/Easy-mode home (recipes A/B/C)
+# Neither can fire mid-brew (brewing is 34, homing 8, done 36), so seeing either
+# while brew_status is in-progress means the brew ended.
 # 34 = brewing active (fires at recipe start, even while grinder runs)
 # 36 = brew done / cooldown
 # (16 = grinding complete — reported but not acted on; brew_status uses the
 #  40502/40507 grinder cmds for the grinding->brewing transition instead.)
+ACTIVITY_HOME_STATES = (1, 65)   # Pro home, Auto/Easy home
 ACTIVITY_BREWING    = 34
 ACTIVITY_BREW_DONE  = 36
 
@@ -119,11 +157,15 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
         await super().async_added_to_hass()
         if (last := await self.async_get_last_sensor_data()) is not None:
             value = last.native_value
-            # BLE mode never emits "offline" (that's an MQTT-mode concept).
-            # When migrating an existing entry from MQTT to BLE, the restored
-            # value can still be "offline" — normalize to "idle" so we don't
-            # publish a state outside our options list.
-            self._attr_native_value = value if value in self._attr_options else "idle"
+            # A restored "grinding"/"brewing" is stale: on reload/restart there
+            # is no brew in progress that HA is tracking, so resurrecting a
+            # transient in-progress state wedges the UI (the dashboard hides
+            # Start while brewing). Normalize any in-progress or out-of-options
+            # value (e.g. MQTT-mode "offline") to "idle"; only a terminal "done"
+            # carries meaning across a restart.
+            if value not in self._attr_options or value in ("grinding", "brewing"):
+                value = "idle"
+            self._attr_native_value = value
 
         @callback
         def _on_event(decoded: dict) -> None:
@@ -140,6 +182,19 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
                 # catch the initial transition) or for brew-done.
                 if act == ACTIVITY_BREW_DONE:
                     new_state = "done"
+                elif act in ACTIVITY_HOME_STATES and self._attr_native_value in (
+                    "grinding", "brewing"
+                ):
+                    # Reconciliation: the machine returned to a home/idle screen
+                    # (Pro home 1 or Auto/Easy home 65), so any in-progress
+                    # brew_status is stale — the brew was stopped on the
+                    # machine/app, finished without HA seeing RD_ENJOY while the
+                    # brew task lingers, or was left stale and this is the first
+                    # heartbeat of a fresh connect (idle machines emit their home
+                    # activity on connect). A home state can't fire mid-brew, so
+                    # this clears the phantom "brewing"/"grinding" that greys out
+                    # the Start button. "done" is left intact (cleared next brew).
+                    new_state = "idle"
                 elif act == ACTIVITY_BREWING and self._attr_native_value == "idle":
                     # Fallback: if we missed CMD_GRINDER_START, at least
                     # show something is happening.
@@ -170,9 +225,16 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
 
         @callback
         def _on_lifecycle(phase: str) -> None:
-            if phase == "started" and self._attr_native_value == "done":
-                # Reset to idle at the start of a new brew so subscribers
-                # see the transition.
+            if phase == "started" and self._attr_native_value != "idle":
+                # Reset to idle at the start of a new brew so subscribers see
+                # the transition — covers a prior "done" as well as a stale
+                # in-progress value left behind by an aborted brew.
+                self._attr_native_value = "idle"
+                self.async_write_ha_state()
+            elif phase == "ended" and self._attr_native_value in ("grinding", "brewing"):
+                # The brew task ended (completed, cancelled or errored) without
+                # a terminal event reaching us — clear the stuck in-progress
+                # state so the dashboard's Start button comes back.
                 self._attr_native_value = "idle"
                 self.async_write_ha_state()
 
@@ -306,6 +368,55 @@ class XBloomScaleWeightBleSensor(RestoreSensor, SensorEntity):
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass, signal_event(self._entry.entry_id), _on_event
+            )
+        )
+
+
+# --------------------------------------------------------------------- #
+# sensor.xbloom_studio_last_updated                                     #
+# --------------------------------------------------------------------- #
+class XBloomLastUpdatedSensor(RestoreSensor, SensorEntity):
+    """Timestamp of the last status heartbeat — the freshness signal.
+
+    Stamps ``now`` whenever any connection delivers an RD_MachineInfo heartbeat
+    (a brew, a Connect session, a command's piggyback, or an explicit
+    ``xbloom.refresh_status``). A dashboard/screen-reader shows it as
+    "updated N minutes ago" so a reading's age is always visible — the honest
+    alternative to a value that silently goes stale.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "last_updated"
+    _attr_unique_id = "xbloom_last_updated"
+    _attr_icon = "mdi:clock-check-outline"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_should_poll = False
+
+    def __init__(self, entry) -> None:
+        self._entry = entry
+        self._attr_native_value = None
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return _device_info(self._entry.entry_id)
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_sensor_data()) is not None:
+            if last.native_value is not None:
+                self._attr_native_value = last.native_value
+
+        @callback
+        def _on_event(decoded: dict) -> None:
+            # "water_enough" appears only in the RD_MachineInfo heartbeat decode
+            # — a reliable marker that we just synced machine status.
+            if "water_enough" in decoded:
+                self._attr_native_value = dt_util.utcnow()
+                self.async_write_ha_state()
+
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, signal_event(self._entry.entry_id), _on_event,
             )
         )
 

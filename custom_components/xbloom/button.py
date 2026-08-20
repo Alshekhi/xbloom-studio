@@ -39,6 +39,13 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         # Phase 8 — 08-04: BLE link probes (also reachable as services)
         XBloomBleConnectButton(entry),
         XBloomBleDisconnectButton(entry),
+        XBloomRefreshStatusButton(entry),
+        # Module-enter navigation (over the held Connect session)
+        XBloomEnterGrinderButton(entry),
+        XBloomEnterBrewerButton(entry),
+        XBloomEnterScaleButton(entry),
+        # Brew customizer — save the slider-scaled recipe as a new one
+        XBloomSaveAsNewRecipeButton(entry),
     ])
 
 
@@ -120,19 +127,42 @@ class XBloomStartBrewButton(CoordinatorEntity, ButtonEntity):
             )
         )
 
+    @staticmethod
+    def _num(hass, entity_id: str):
+        """Read a NumberEntity state as float, or None if it isn't usable."""
+        st = hass.states.get(entity_id)
+        if st is None or st.state in ("unknown", "unavailable", ""):
+            return None
+        try:
+            return float(st.state)
+        except (TypeError, ValueError):
+            return None
+
     async def async_press(self) -> None:
         """Delegate to xbloom.start_brew for the currently selected recipe.
 
-        Grinder use is governed by ``switch.xbloom_studio_use_grinder``: the
-        start_brew service reads it when ``use_preground`` isn't passed, so the
-        button doesn't need to compute it here.
+        The brew customizer's three sliders are folded in as one-off overrides:
+        left untouched they equal the recipe's own values, so a plain press
+        still brews the recipe exactly. Grinder use is governed by
+        ``switch.xbloom_studio_use_grinder`` (start_brew reads it when
+        ``use_preground`` isn't passed), so the button doesn't compute it here.
         """
         select_state = self.hass.states.get("select.xbloom_studio_recipe")
         if select_state is None or select_state.state in ("unknown", "unavailable", ""):
             _LOGGER.warning("Start Brew pressed but no recipe selected — ignoring")
             return
+        data: dict = {}
+        ratio = self._num(self.hass, "number.xbloom_studio_brew_ratio")
+        grind = self._num(self.hass, "number.xbloom_studio_brew_grind_size")
+        dose = self._num(self.hass, "number.xbloom_studio_brew_dose")
+        if ratio is not None:
+            data["ratio"] = ratio
+        if grind is not None:
+            data["grind_size"] = int(grind)
+        if dose is not None:          # absent/unavailable (xPod) → keep recipe dose
+            data["dose"] = dose
         await self.hass.services.async_call(
-            DOMAIN, "start_brew", {}, blocking=False
+            DOMAIN, "start_brew", data, blocking=False
         )
 
 
@@ -284,3 +314,185 @@ class XBloomBleDisconnectButton(_XBloomSimpleCommandButton):
     _attr_unique_id = "xbloom_ble_disconnect_button"
     _attr_icon = "mdi:bluetooth-off"
     _service = "ble_disconnect"
+
+
+class XBloomRefreshStatusButton(_XBloomSimpleCommandButton):
+    """Method-1 snapshot: briefly open BLE, capture one status heartbeat, then
+    disconnect — refreshes every machine-status sensor (and stamps "Status
+    updated") without holding a Connect session. Thin shim over the
+    ``xbloom.refresh_status`` service so the dashboard has a real, named button
+    entity instead of an entity-less button card.
+    """
+
+    _attr_name = "Refresh Status"
+    _attr_unique_id = "xbloom_refresh_status_button"
+    _attr_icon = "mdi:cloud-sync"
+    _service = "refresh_status"
+
+
+# ---------------------------------------------------------------------------
+# Module-ENTER (navigation) buttons — route the machine to a module over the
+# HELD Connect session, exactly like tapping Grinder/Brewer/Scale on the app's
+# home screen. They NAVIGATE only (no grind/brew/heat). The dashboard shows
+# them only while Connected; pressing while disconnected is a quiet no-op.
+# When Connected the HA sliders reflect the machine, so entering re-sends the
+# machine's own values (grinder 8006 / brewer 8007) — effectively pure routing.
+# ---------------------------------------------------------------------------
+class _XBloomEnterModuleButton(_XBloomSimpleCommandButton):
+    """Base for the three module-enter buttons (send a frame over the session)."""
+
+    def _num(self, entity_id: str, default: float) -> float:
+        st = self.hass.states.get(entity_id)
+        if st is None or st.state in ("unknown", "unavailable"):
+            return default
+        try:
+            return float(st.state)
+        except ValueError:
+            return default
+
+    async def _send(self, frame: bytes) -> None:
+        from .ble_entities import send_live_frame
+        if not await send_live_frame(self._entry, frame):
+            _LOGGER.info(
+                "%s: no live Connect session — connect first", self._attr_unique_id,
+            )
+
+
+class XBloomEnterGrinderButton(_XBloomEnterModuleButton):
+    """Route the machine to the Grinder screen (cmd 8006 [size, speed])."""
+
+    _attr_name = "Go to Grinder"
+    _attr_unique_id = "xbloom_enter_grinder_button"
+    _attr_icon = "mdi:grain"
+
+    async def async_press(self) -> None:
+        from .vendor.xbloom.ble import packet_grinder_set
+        size = int(self._num("number.xbloom_studio_grind_size", 65))
+        speed = int(self._num("number.xbloom_studio_grind_speed", 60))
+        await self._send(packet_grinder_set(size, speed))
+
+
+class XBloomEnterBrewerButton(_XBloomEnterModuleButton):
+    """Route the machine to the Brewer screen (cmd 8007 [pattern, temp×10])."""
+
+    _attr_name = "Go to Brewer"
+    _attr_unique_id = "xbloom_enter_brewer_button"
+    _attr_icon = "mdi:cup-water"
+
+    async def async_press(self) -> None:
+        from .vendor.xbloom import spec
+        from .vendor.xbloom.ble import packet_brewer_set
+        st = self.hass.states.get("select.xbloom_studio_brew_pattern")
+        name = st.state if st is not None else None
+        pattern = spec.PATTERN_NAME_TO_BYTE.get(
+            name, spec.PATTERN_NAME_TO_BYTE[spec.PATTERN_NAMES[0]],
+        )
+        wire_temp = spec.brew_temp_display_to_wire(
+            self._num("number.xbloom_studio_brew_temperature", 93),
+        )
+        await self._send(packet_brewer_set(pattern, wire_temp))
+
+
+class XBloomEnterScaleButton(_XBloomEnterModuleButton):
+    """Route the machine to the Scale screen (cmd 8003, no data)."""
+
+    _attr_name = "Go to Scale"
+    _attr_unique_id = "xbloom_enter_scale_button"
+    _attr_icon = "mdi:scale-balance"
+
+    async def async_press(self) -> None:
+        from .vendor.xbloom.ble import packet_scale_enter
+        await self._send(packet_scale_enter())
+
+
+class XBloomSaveAsNewRecipeButton(ButtonEntity):
+    """Brew customizer 'Save as new recipe'.
+
+    Saves the picked recipe — scaled by the customizer sliders — under the
+    ``New Recipe Name`` as a brand-new recipe (local when logged out; cloud +
+    local mirror when logged in). Never touches the source. Greys out until a
+    recipe is picked and a non-empty name is entered.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "Save as New Recipe"
+    _attr_unique_id = "xbloom_save_as_new_recipe_button"
+    _attr_icon = "mdi:content-save-plus"
+
+    _SELECT = "select.xbloom_studio_recipe"
+    _NAME = "text.xbloom_studio_new_recipe_name"
+
+    def __init__(self, entry) -> None:
+        self._entry = entry
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, "xbloom_studio")},
+            name="xBloom Studio",
+            manufacturer="xBloom",
+            model="Studio",
+        )
+
+    def _recipe_state(self):
+        st = self.hass.states.get(self._SELECT)
+        if st is None or st.state in ("unknown", "unavailable", ""):
+            return None
+        return st
+
+    def _name(self) -> str:
+        st = self.hass.states.get(self._NAME)
+        return (st.state if st else "").strip()
+
+    @property
+    def available(self) -> bool:
+        return self._recipe_state() is not None and bool(self._name())
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+
+        @callback
+        def _reeval(_event: Event[EventStateChangedData]) -> None:
+            self.async_write_ha_state()
+
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass, [self._SELECT, self._NAME], _reeval
+            )
+        )
+
+    async def async_press(self) -> None:
+        sel = self._recipe_state()
+        if sel is None:
+            _LOGGER.warning("Save as new recipe pressed but no recipe selected")
+            return
+        new_name = self._name()
+        if not new_name:
+            _LOGGER.warning("Save as new recipe pressed but name is empty")
+            return
+        ratio = XBloomStartBrewButton._num(self.hass, "number.xbloom_studio_brew_ratio")
+        grind = XBloomStartBrewButton._num(self.hass, "number.xbloom_studio_brew_grind_size")
+        dose = XBloomStartBrewButton._num(self.hass, "number.xbloom_studio_brew_dose")
+        if dose is None:
+            # xPod (fixed dose) hides the slider — fall back to the recipe's dose.
+            try:
+                dose = float(sel.attributes.get("dose_g"))
+            except (TypeError, ValueError):
+                dose = None
+        if ratio is None or grind is None or dose is None:
+            _LOGGER.warning(
+                "Save as new recipe: missing values (ratio=%s grind=%s dose=%s)",
+                ratio, grind, dose,
+            )
+            return
+        await self.hass.services.async_call(
+            DOMAIN, "save_scaled_recipe",
+            {
+                "new_name": new_name,
+                "recipe_name": sel.state,
+                "dose": dose,
+                "ratio": ratio,
+                "grind_size": int(grind),
+            },
+            blocking=False,
+        )
