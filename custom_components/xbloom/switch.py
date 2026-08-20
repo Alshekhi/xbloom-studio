@@ -1,14 +1,17 @@
-"""Voice Mode switch for the xBloom Studio integration.
+"""Connect switch for the xBloom Studio integration.
 
-Single switch that, when ON, holds a long-lived BLE connection and
-announces every interesting machine event:
-    - Stable scale weight (debounced)
-    - Grinder knob changes (size + speed)
-    - Brewer knob changes (pattern + temperature, when emitted)
+Single switch that, when ON, opens a live session: it holds a long-lived
+BLE connection (Method 2) and streams every interesting machine event onto
+the HA bus. Those events are voice-agnostic — they drive sensors and the
+dashboard, and optionally feed spoken announcements via a blueprint. The
+switch itself has no opinion about speech; speaking is an automation's job.
+
+The session is transient by design (starts OFF, auto-expires on idle) so
+the machine returns to the iOS app when you walk away.
 
 Replaces the previous three separate mode switches (Scale / Grinder /
 Brewer) which conflicted with each other (only one BLE connection per
-device). Now one toggle covers all live announcements.
+device). Now one toggle covers the whole live session.
 """
 from __future__ import annotations
 
@@ -19,9 +22,9 @@ from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN
-from .vendor.xbloom.mode_listener import XBloomModeListener
-from .voice_mode import VoiceModeListener
+from .const import CONF_IDLE_TIMEOUT, DOMAIN
+from .live_session import LiveSessionListener
+from .vendor.xbloom.mode_listener import IDLE_TIMEOUT_SEC
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,16 +42,16 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     runtime = entry.runtime_data
     resolver = runtime.ble_device_resolver
 
-    voice_listener = VoiceModeListener(hass, resolver)
-    runtime.voice_listener = voice_listener
-    # Backward-compat — keep the old slot names empty so async_unload_entry's
-    # cleanup loop doesn't crash if it iterates them.
-    runtime.scale_listener = None
-    runtime.grinder_listener = None
-    runtime.brewer_listener = None
+    # Idle auto-disconnect window: vendor default unless the user overrode it
+    # in the integration's options (CONF_IDLE_TIMEOUT).
+    idle_timeout = float(entry.data.get(CONF_IDLE_TIMEOUT, IDLE_TIMEOUT_SEC))
+    live_listener = LiveSessionListener(
+        hass, resolver, idle_timeout_s=idle_timeout, entry_id=entry.entry_id,
+    )
+    runtime.live_session_listener = live_listener
 
     async_add_entities([
-        XBloomVoiceModeSwitch(voice_listener),
+        XBloomConnectSwitch(live_listener),
         XBloomUseGrinderSwitch(),
     ])
 
@@ -88,15 +91,17 @@ class XBloomUseGrinderSwitch(SwitchEntity, RestoreEntity):
         self.async_write_ha_state()
 
 
-class XBloomVoiceModeSwitch(SwitchEntity):
-    """When ON: HA holds BLE and speaks every interesting event in Arabic."""
+class XBloomConnectSwitch(SwitchEntity):
+    """When ON: HA opens a live session — holds BLE and streams machine
+    events onto the bus (for sensors, dashboard, and optional announcements).
+    Transient by design; auto-expires on idle so the iOS app can reclaim BLE."""
 
     _attr_has_entity_name = True
-    _attr_name = "Live Control"
-    _attr_unique_id = "xbloom_live_control_switch"
-    _attr_icon = "mdi:remote"
+    _attr_name = "Connect"
+    _attr_unique_id = "xbloom_connect_switch"
+    _attr_icon = "mdi:bluetooth-connect"
 
-    def __init__(self, listener: XBloomModeListener) -> None:
+    def __init__(self, listener: LiveSessionListener) -> None:
         self._listener = listener
         self._attr_is_on = False
 
@@ -116,23 +121,23 @@ class XBloomVoiceModeSwitch(SwitchEntity):
         @callback
         def _on_failed(_event) -> None:
             if self._attr_is_on:
-                _LOGGER.info("[voice] failed — flipping switch OFF")
+                _LOGGER.info("[connect] failed — flipping switch OFF")
                 self._attr_is_on = False
                 self.async_write_ha_state()
 
         @callback
         def _on_auto_stopped(_event) -> None:
             if self._attr_is_on:
-                _LOGGER.info("[voice] idle auto-stopped — flipping switch OFF")
+                _LOGGER.info("[connect] idle auto-stopped — flipping switch OFF")
                 self._attr_is_on = False
                 self.async_write_ha_state()
 
         self.async_on_remove(
-            self.hass.bus.async_listen("xbloom_live_control_failed", _on_failed)
+            self.hass.bus.async_listen("xbloom_connect_failed", _on_failed)
         )
         self.async_on_remove(
             self.hass.bus.async_listen(
-                "xbloom_live_control_auto_stopped", _on_auto_stopped,
+                "xbloom_connect_auto_stopped", _on_auto_stopped,
             )
         )
 
@@ -148,3 +153,7 @@ class XBloomVoiceModeSwitch(SwitchEntity):
         await self._listener.stop()
         self._attr_is_on = False
         self.async_write_ha_state()
+        # Signal session end so live-only consumers (e.g. current_module) clear.
+        # Idle-timeout and failure paths already emit their own lifecycle events
+        # from the listener; this covers an explicit/user disconnect.
+        self.hass.bus.async_fire("xbloom_connect_stopped", {"reason": "user"})

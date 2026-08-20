@@ -8,6 +8,7 @@ Two sensors backed by notifications streamed from the machine during a brew
 """
 from .ble_entities import (
     XBloomBrewStatusBleSensor,
+    XBloomLastUpdatedSensor,
     XBloomMachineStatusBleSensor,
     XBloomScaleWeightBleSensor,
 )
@@ -21,5 +22,6 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         XBloomBrewStatusBleSensor(entry),
         XBloomMachineStatusBleSensor(entry),
         XBloomScaleWeightBleSensor(entry),
+        XBloomLastUpdatedSensor(entry),
         *[cls(entry) for cls in READING_SENSORS],
     ])
