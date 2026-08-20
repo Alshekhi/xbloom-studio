@@ -26,7 +26,20 @@ from homeassistant.components.bluetooth import (
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
-from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
+from .const import (
+    CONF_BLE_NAME,
+    CONF_CLOUD,
+    CONF_ENABLE_FLASHING,
+    CONF_CLOUD_EMAIL,
+    CONF_CLOUD_MEMBER_ID,
+    CONF_CLOUD_PASSWORD,
+    CONF_CLOUD_REMEMBER,
+    CONF_CLOUD_TOKEN,
+    CONF_IDLE_TIMEOUT,
+    CONF_PRODUCT_ID,
+    DOMAIN,
+)
+from .vendor.xbloom.mode_listener import IDLE_TIMEOUT_SEC
 from .vendor.xbloom import spec
 from .vendor.xbloom.recipe_validate import (
     VOLUME_TOLERANCE_ML,
@@ -144,6 +157,77 @@ class XBloomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------ #
+    # Reauth — the stored session token is no longer valid and cannot be  #
+    # refreshed (password not remembered, or the credentials changed).    #
+    # ------------------------------------------------------------------ #
+    async def async_step_reauth(
+        self, entry_data: dict[str, Any]
+    ) -> FlowResult:
+        """Entry point when HA requests re-authentication for this entry."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Prompt for the password again and mint a fresh session token."""
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+        from .vendor.xbloom.cloud import XBloomCloudClient, language_type_for
+        from .vendor.xbloom.exceptions import XBloomAPIError
+
+        entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
+        existing = (entry.data.get(CONF_CLOUD) or {}) if entry else {}
+        email = existing.get(CONF_CLOUD_EMAIL, "")
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            password = user_input.get("password") or ""
+            remember = bool(user_input.get("remember", True))
+            if not password:
+                errors["base"] = "credentials_required"
+            else:
+                client = XBloomCloudClient(
+                    async_get_clientsession(self.hass),
+                    language_type=language_type_for(self.hass.config.language),
+                )
+                try:
+                    creds = await client.login(email, password)
+                except XBloomAPIError as err:
+                    _LOGGER.warning("xbloom cloud reauth failed: %s", err)
+                    errors["base"] = "cloud_login_failed"
+                else:
+                    new_cloud = {
+                        CONF_CLOUD_EMAIL: email,
+                        CONF_CLOUD_MEMBER_ID: creds["memberId"],
+                        CONF_CLOUD_TOKEN: creds["token"],
+                        CONF_CLOUD_REMEMBER: remember,
+                    }
+                    if remember:
+                        new_cloud[CONF_CLOUD_PASSWORD] = password
+                    self.hass.config_entries.async_update_entry(
+                        entry, data={**entry.data, CONF_CLOUD: new_cloud}
+                    )
+                    await self.hass.config_entries.async_reload(entry.entry_id)
+                    return self.async_abort(reason="reauth_successful")
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema({
+                vol.Required("password"): selector.TextSelector(
+                    selector.TextSelectorConfig(type="password")
+                ),
+                vol.Required(
+                    "remember",
+                    default=bool(existing.get(CONF_CLOUD_REMEMBER, True)),
+                ): selector.BooleanSelector(),
+            }),
+            errors=errors,
+            description_placeholders={"email": email},
+        )
+
+    # ------------------------------------------------------------------ #
     def _create_entry(self, *, ble_name: str) -> FlowResult:
         suffix = _serial_suffix(ble_name)
         data: dict[str, Any] = {CONF_BLE_NAME: ble_name}
@@ -201,10 +285,17 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         self._draft: dict | None = None
         self._delete_target: dict | None = None
         self._post_save: dict | None = None
+        self._pending_login: dict | None = None
+        self._reconcile_count: int = 0
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
+        coordinator = self.config_entry.runtime_data.coordinator
+        # The cloud entry is contextual: offer login when logged out, and
+        # logout when logged in. Everything else (recipe CRUD) is identical —
+        # the coordinator routes it to the cloud or local storage transparently.
+        cloud_option = "cloud_logout" if coordinator.cloud_logged_in else "cloud_login"
         return self.async_show_menu(
             step_id="init",
             menu_options=[
@@ -212,8 +303,188 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                 "edit_recipe",
                 "delete_recipe",
                 "add_recipe",
+                cloud_option,
+                "connection",
+                "firmware_flashing",
                 "done",
             ],
+        )
+
+    async def async_step_connection(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Set the idle auto-disconnect window for a Connect (live) session.
+
+        HA holds the BLE link server-side, so — unlike the phone app, which the
+        OS disconnects when it backgrounds — a session that no one closes would
+        keep the machine from the iOS app indefinitely. This window is HA's
+        substitute: after this many seconds of silence the session auto-ends and
+        the machine returns to the app.
+        """
+        entry = self.config_entry
+        current = int(entry.data.get(CONF_IDLE_TIMEOUT, IDLE_TIMEOUT_SEC))
+        if user_input is not None:
+            seconds = int(user_input["idle_timeout_s"])
+            self.hass.config_entries.async_update_entry(
+                entry, data={**entry.data, CONF_IDLE_TIMEOUT: seconds}
+            )
+            # Reload so the Connect switch rebuilds its listener with the new
+            # window.
+            self.hass.async_create_task(
+                self.hass.config_entries.async_reload(entry.entry_id)
+            )
+            return self.async_create_entry(title="", data={"_idle_timeout": seconds})
+
+        return self.async_show_form(
+            step_id="connection",
+            data_schema=vol.Schema({
+                vol.Required(
+                    "idle_timeout_s", default=current,
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=60, max=1800, step=30, mode="slider",
+                        unit_of_measurement="s",
+                    )
+                ),
+            }),
+        )
+
+    async def async_step_firmware_flashing(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Arm/disarm the firmware Install button (off by default)."""
+        entry = self.config_entry
+        current = bool(entry.data.get(CONF_ENABLE_FLASHING))
+        if user_input is not None:
+            enabled = bool(user_input.get("enable"))
+            self.hass.config_entries.async_update_entry(
+                entry, data={**entry.data, CONF_ENABLE_FLASHING: enabled}
+            )
+            # Reload so the Firmware entity's Install button reflects the change.
+            self.hass.async_create_task(
+                self.hass.config_entries.async_reload(entry.entry_id)
+            )
+            return self.async_create_entry(title="", data={"_flashing": enabled})
+
+        return self.async_show_form(
+            step_id="firmware_flashing",
+            data_schema=vol.Schema({
+                vol.Required("enable", default=current): selector.BooleanSelector(),
+            }),
+        )
+
+    # ------------------------------------------------------------------ #
+    # Cloud account — login / first-login reconciliation / logout        #
+    # ------------------------------------------------------------------ #
+    async def async_step_cloud_login(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Log in to the xBloom cloud with email + password."""
+        from .vendor.xbloom.exceptions import XBloomAPIError
+
+        errors: dict[str, str] = {}
+        coordinator = self.config_entry.runtime_data.coordinator
+
+        if user_input is not None:
+            email = (user_input.get("email") or "").strip()
+            password = user_input.get("password") or ""
+            remember = bool(user_input.get("remember", True))
+            if not email or not password:
+                errors["base"] = "credentials_required"
+            else:
+                try:
+                    creds = await coordinator.async_validate_login(email, password)
+                except XBloomAPIError as err:
+                    _LOGGER.warning("xbloom cloud login failed: %s", err)
+                    errors["base"] = "cloud_login_failed"
+                else:
+                    self._pending_login = {
+                        "email": email,
+                        "password": password,
+                        "member_id": creds["memberId"],
+                        "token": creds["token"],
+                        "remember": remember,
+                    }
+                    # Only prompt about recipes that are genuinely local (not
+                    # already in the cloud). A pure cached mirror from a previous
+                    # session needs no reconciliation — switch straight over.
+                    local_only = await coordinator.async_local_only_recipes(
+                        creds["memberId"], creds["token"]
+                    )
+                    if local_only:
+                        self._reconcile_count = len(local_only)
+                        return await self.async_step_cloud_reconcile()
+                    await coordinator.async_finalize_login(
+                        **self._pending_login, upload_local=False
+                    )
+                    self._pending_login = None
+                    return self.async_create_entry(title="", data={"_cloud": "login"})
+
+        return self.async_show_form(
+            step_id="cloud_login",
+            data_schema=vol.Schema({
+                vol.Required("email"): selector.TextSelector(
+                    selector.TextSelectorConfig(type="email")
+                ),
+                vol.Required("password"): selector.TextSelector(
+                    selector.TextSelectorConfig(type="password")
+                ),
+                vol.Required("remember", default=True): selector.BooleanSelector(),
+            }),
+            errors=errors,
+        )
+
+    async def async_step_cloud_reconcile(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """First login with genuinely-local recipes — upload or discard them."""
+        assert self._pending_login is not None
+        return self.async_show_menu(
+            step_id="cloud_reconcile",
+            menu_options=["cloud_upload", "cloud_replace"],
+            description_placeholders={"count": str(self._reconcile_count)},
+        )
+
+    async def async_step_cloud_upload(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Reconcile choice: upload local recipes to the cloud, then switch."""
+        return await self._finalize_cloud_login(upload_local=True)
+
+    async def async_step_cloud_replace(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Reconcile choice: discard local recipes, cloud becomes authoritative."""
+        return await self._finalize_cloud_login(upload_local=False)
+
+    async def _finalize_cloud_login(self, *, upload_local: bool) -> FlowResult:
+        assert self._pending_login is not None
+        coordinator = self.config_entry.runtime_data.coordinator
+        await coordinator.async_finalize_login(
+            **self._pending_login, upload_local=upload_local
+        )
+        self._pending_login = None
+        return self.async_create_entry(
+            title="", data={"_cloud": "upload" if upload_local else "replace"}
+        )
+
+    async def async_step_cloud_logout(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Confirm, then log out of the cloud and revert to the local library."""
+        coordinator = self.config_entry.runtime_data.coordinator
+        if user_input is not None:
+            if user_input.get("confirm"):
+                await coordinator.async_cloud_logout()
+                return self.async_create_entry(title="", data={"_cloud": "logout"})
+            return self.async_create_entry(title="", data={"_cancelled": True})
+
+        return self.async_show_form(
+            step_id="cloud_logout",
+            data_schema=vol.Schema({
+                vol.Required("confirm", default=False): selector.BooleanSelector(),
+            }),
+            description_placeholders={"email": coordinator.cloud_email or ""},
         )
 
     async def async_step_add_recipe(
@@ -564,6 +835,38 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         return out
 
     # ------------------------------------------------------------------ #
+    # Recipe picker labels — shared by the edit and delete steps.         #
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _recipe_id_labels(recipes: list[dict]) -> dict[Any, str]:
+        """Build the id → label map used by both the edit and delete pickers.
+
+        Two recipes can carry the same name — most often a downloaded (shared)
+        recipe sitting next to your own copy of it. A bare name is ambiguous,
+        and with a screen reader two identical option labels are impossible to
+        tell apart. So we make every label distinct and audible:
+
+        * shared/downloaded recipes get a trailing ``(shared)`` tag, and
+        * any labels that are *still* identical get a numeric ``(n)`` suffix.
+
+        Both pickers go through here so they can never drift apart again (the
+        old delete step listed duplicates with identical labels — D-?? ).
+        """
+        labels: dict[Any, str] = {}
+        seen: dict[str, int] = {}
+        for r in recipes:
+            rid = r.get("id")
+            if not rid:
+                continue
+            base = str(r.get("name") or rid)
+            if r.get("shared"):
+                base = f"{base} (shared)"
+            n = seen.get(base, 0) + 1
+            seen[base] = n
+            labels[rid] = base if n == 1 else f"{base} ({n})"
+        return labels
+
+    # ------------------------------------------------------------------ #
     # Edit flow — Phase 9 plan 05                                         #
     # ------------------------------------------------------------------ #
     async def async_step_edit_recipe(
@@ -571,20 +874,14 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Pick a recipe to edit, then re-use the create_recipe_pours UI."""
         coordinator = self.config_entry.runtime_data.coordinator
-        recipes: list[dict] = await coordinator.store.async_load()
+        # Pull the latest list on entry so cloud-side edits (e.g. from the phone)
+        # are reflected — event-driven, not waiting on the background poll.
+        await coordinator.async_refresh()
+        recipes: list[dict] = list(coordinator.data or [])
         if not recipes:
             return self.async_abort(reason="no_recipes")
 
-        id_to_label: dict[str, str] = {}
-        seen: dict[str, int] = {}
-        for r in recipes:
-            rid = r.get("id")
-            if not rid:
-                continue
-            base = r.get("name") or rid
-            n = seen.get(base, 0) + 1
-            seen[base] = n
-            id_to_label[rid] = base if n == 1 else f"{base} ({n})"
+        id_to_label = self._recipe_id_labels(recipes)
 
         if user_input is not None:
             table_id = user_input["recipe_id"]
@@ -646,11 +943,13 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Pick a recipe to delete (id-keyed for D-61 rename safety)."""
         coordinator = self.config_entry.runtime_data.coordinator
-        recipes: list[dict] = await coordinator.store.async_load()
+        # Pull the latest list on entry (see edit_recipe) so the dropdown is fresh.
+        await coordinator.async_refresh()
+        recipes: list[dict] = list(coordinator.data or [])
         if not recipes:
             return self.async_abort(reason="no_recipes")
 
-        id_to_label = {r["id"]: r.get("name", r["id"]) for r in recipes if r.get("id")}
+        id_to_label = self._recipe_id_labels(recipes)
 
         if user_input is not None:
             self._delete_target = {
