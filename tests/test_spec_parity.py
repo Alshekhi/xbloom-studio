@@ -66,7 +66,9 @@ EXPECTED_FIELDS = {
 EXPECTED_RATIO = (5.0, 25.0, 0.5)        # recipe_validate _RATIO_DENOM_*
 EXPECTED_VOLUME_TOL = 0.5                # recipe_validate VOLUME_TOLERANCE_ML
 EXPECTED_WATER = {"tank": 0, "tap": 1}   # ble water_feed
-EXPECTED_WEIGHT_UNIT = {"g": 0, "oz": 1, "ml": 2}   # ble _WEIGHT_UNIT_CODES
+# App-confirmed 2026-07-20 (WeightUnitType ml=0/g=1/oz=2; the earlier g=0 guess
+# was wrong). Order-independent dict compare, so key order doesn't matter.
+EXPECTED_WEIGHT_UNIT = {"ml": 0, "g": 1, "oz": 2}
 
 
 def _checks():
@@ -103,7 +105,8 @@ def _checks():
     yield "volume tolerance", spec.VOLUME_TOLERANCE_ML, EXPECTED_VOLUME_TOL
     yield "water source codes", spec.WATER_SOURCE_CODES, EXPECTED_WATER
     yield "weight unit codes", spec.WEIGHT_UNIT_CODES, EXPECTED_WEIGHT_UNIT
-    yield "temp unit codes", spec.TEMP_UNIT_CODES, {"C": 0, "F": 1}
+    # App-confirmed 2026-07-20: NumberExtendsKt.temperatureUnit → 0=°F, 1=°C.
+    yield "temp unit codes", spec.TEMP_UNIT_CODES, {"C": 1, "F": 0}
 
     # RT/BP sentinels sit at the ends of the temperature range and validate.
     yield "RT sentinel", spec.ROOM_TEMP_C, 20.0
