@@ -267,7 +267,10 @@ VOLUME_TOLERANCE_ML = 0.5
 WATER_SOURCE_CODES: dict[str, int] = {"tank": 0, "tap": 1}
 WEIGHT_UNIT_CODES: dict[str, int] = {"g": 1, "ml": 0, "oz": 2}
 # Keys match what the select entity offers and the BLE frame expects ("C"/"F").
-TEMP_UNIT_CODES: dict[str, int] = {"C": 1, "F": 0}
+# Lowercase on purpose: these keys ARE the select entity's state values, and
+# Home Assistant requires a state translation key to match [a-z0-9-_]+ —
+# hassfest rejects "C"/"F". The uppercase label lives in the translations.
+TEMP_UNIT_CODES: dict[str, int] = {"c": 1, "f": 0}
 
 
 # --------------------------------------------------------------------------- #

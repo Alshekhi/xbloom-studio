@@ -338,8 +338,8 @@
       "temperature_unit": {
         "name": "Temperature Unit",
         "state": {
-          "C": "Celsius (°C)",
-          "F": "Fahrenheit (°F)"
+          "c": "Celsius (°C)",
+          "f": "Fahrenheit (°F)"
         }
       },
       "weight_unit": {

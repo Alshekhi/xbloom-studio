@@ -8,6 +8,9 @@ user edit.
 """
 from __future__ import annotations
 
+import json
+import pathlib
+import re
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -126,7 +129,9 @@ def test_water_source_codes_round_trip() -> None:
 
 
 def test_temp_unit_codes_round_trip() -> None:
-    assert spec.TEMP_UNIT_CODES == {"C": 1, "F": 0}
+    """Lowercase: a select's state value doubles as its translation key, and HA
+    requires those to match [a-z0-9-_]+. Uppercase fails hassfest."""
+    assert spec.TEMP_UNIT_CODES == {"c": 1, "f": 0}
 
 
 def test_weight_unit_codes_round_trip() -> None:
@@ -147,3 +152,59 @@ def test_every_option_has_a_wire_code() -> None:
     ):
         for option in cls._attr_options:
             assert option in codes, f"{cls.__name__}: {option!r} has no wire code"
+
+
+# --------------------------------------------------------------------------- #
+# Translation keys — what hassfest enforces                                   #
+# --------------------------------------------------------------------------- #
+# A select's state value doubles as its translation key, and Home Assistant
+# requires translation keys to match [a-z0-9-_]+ (not starting or ending with a
+# separator). Uppercase "C"/"F" shipped for months undetected because no select
+# had state translations at all; adding them is what surfaced it, as a required
+# hassfest failure that blocked the merge. These tests catch it locally instead.
+_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*[a-z0-9]$|^[a-z0-9]$")
+_TRANSLATIONS = [
+    pathlib.Path("custom_components/xbloom/strings.json"),
+    pathlib.Path("custom_components/xbloom/translations/en.json"),
+    pathlib.Path("custom_components/xbloom/translations/ar.json"),
+]
+
+
+@pytest.mark.parametrize("path", _TRANSLATIONS, ids=lambda p: p.name)
+def test_select_state_translation_keys_are_valid(path: pathlib.Path) -> None:
+    """Every select state key must satisfy HA's translation-key rule."""
+    blocks = (json.loads(path.read_text()).get("entity") or {}).get("select") or {}
+    bad = [
+        f"{key}.state.{state}"
+        for key, block in blocks.items()
+        for state in (block.get("state") or {})
+        if not _KEY_RE.match(state)
+    ]
+    assert not bad, f"{path.name}: invalid translation keys {bad}"
+
+
+@pytest.mark.parametrize("path", _TRANSLATIONS, ids=lambda p: p.name)
+def test_translated_states_match_the_entities_options(path: pathlib.Path) -> None:
+    """A translation for a state the select cannot produce is dead, and a missing
+    one means the raw value gets read aloud instead of its label."""
+    blocks = (json.loads(path.read_text()).get("entity") or {}).get("select") or {}
+    for cls in (XBloomModeSelect, XBloomWaterSourceSelect, XBloomTempUnitSelect,
+                XBloomWeightUnitSelect, XBloomBrewPatternSelect):
+        block = blocks.get(cls._attr_translation_key)
+        if not block or "state" not in block:
+            continue
+        assert set(block["state"]) == set(cls._attr_options), (
+            f"{path.name}: {cls._attr_translation_key} translates "
+            f"{sorted(block['state'])} but the entity offers {sorted(cls._attr_options)}"
+        )
+
+
+def test_every_select_option_is_a_valid_translation_key() -> None:
+    """Guards the spec directly, so a new option cannot reintroduce the bug."""
+    for cls in (XBloomModeSelect, XBloomWaterSourceSelect, XBloomTempUnitSelect,
+                XBloomWeightUnitSelect, XBloomBrewPatternSelect):
+        for option in cls._attr_options:
+            assert _KEY_RE.match(option), (
+                f"{cls.__name__}: option {option!r} is not a valid HA "
+                "translation key — hassfest will reject it"
+            )
