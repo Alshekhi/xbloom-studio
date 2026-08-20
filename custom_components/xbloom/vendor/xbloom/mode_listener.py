@@ -1,31 +1,43 @@
-"""Long-lived BLE listener for the Phase-8 accessibility modes.
+"""Long-lived BLE listener for the live/streaming session (Method 2).
 
-Unlike the connect-on-demand pattern used elsewhere in the integration,
-this holds a `BleakClient` open for as long as the corresponding mode
-switch is ON. Auto-disconnects after `IDLE_TIMEOUT_SEC` of silence on
-relevant notifications so the iOS app can reclaim BLE.
+Unlike the connect-on-demand snapshot path (Method 1 —
+``XBloomBleClient.read_status_snapshot``), this holds a ``BleakClient``
+open for as long as the caller keeps the listener started. Auto-disconnects
+after ``idle_timeout_s`` of silence on relevant notifications so the iOS
+app can reclaim BLE.
 
-Lifecycle events fired on the HA bus (CONTEXT D-36):
-    xbloom_<mode>_mode_connecting       — only on slow connect (>1s)
-    xbloom_<mode>_mode_ready { summary } — connect succeeded; subclass
-                                            populates summary via
-                                            `_read_initial_state()`
-    xbloom_<mode>_mode_failed  { reason } — reason ∈ {machine_not_found,
-                                            machine_busy, connection_lost}
-    xbloom_<mode>_mode_auto_stopped { reason } — idle timeout
+This module is **pure vendor** — it has no Home Assistant dependency.
+All host coupling is injected by the integration layer:
+
+    on_lifecycle(phase, payload) — sync callback for lifecycle transitions.
+        phase ∈ {"connecting", "ready", "failed", "auto_stopped"}:
+            "connecting"   {}                    — only on slow connect (>1s)
+            "ready"        {"summary": {...}}     — connect succeeded; subclass
+                                                    populates summary via
+                                                    ``_read_initial_state()``
+            "failed"       {"reason": <str>}      — reason ∈ {machine_not_found,
+                                                    machine_busy, connection_lost}
+            "auto_stopped" {"reason": "idle_timeout"} — idle timeout fired
+        The integration layer typically bridges these onto the HA event bus
+        as ``xbloom_<mode>_<phase>`` events.
+
+    task_factory(coro, name) -> Task — optional. Spawns the long-lived run
+        loop. The integration passes HA's ``async_create_background_task``
+        (empirically the only spawn that reliably delivers bleak
+        notifications); when omitted, falls back to ``loop.create_task``.
 
 Subclasses customise behaviour via three hooks:
     notification_filter — decide if a decoded notify is "interesting"
                           (returns event payload dict, or None to ignore)
     on_event            — async callback fired for each kept event
-    _read_initial_state — async, returns summary dict for mode_ready
+    _read_initial_state — async, returns summary dict for the "ready" phase
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 import time
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable, Coroutine
 
 from .ble import (
     CMD_HANDSHAKE, FFE1_UUID, FFE2_UUID, HANDSHAKE_DATA, _build_frame,
@@ -35,40 +47,59 @@ from .ble import (
 _LOGGER = logging.getLogger("xbloom.mode_listener")
 
 # Tunables — see CONTEXT D-33 / D-36
-IDLE_TIMEOUT_SEC = 600              # auto-stop after 10 min of silence
+IDLE_TIMEOUT_SEC = 300              # vendor default: auto-stop after 5 min silence
+                                    # (integration may override — CONF_IDLE_TIMEOUT)
 SLOW_CONNECT_THRESHOLD_SEC = 1.0    # only announce "connecting…" beyond this
 INITIAL_STATE_TIMEOUT_SEC = 3.0     # how long to wait for RD_MachineInfo
 
 NotificationFilter = Callable[[dict], "dict | None"]
+LifecycleCallback = Callable[[str, dict], None]
+TaskFactory = Callable[[Coroutine[Any, Any, None], str], "asyncio.Task"]
 
 
 class XBloomModeListener:
     """Hold a BLE link, route filtered notifications to an async callback.
 
     Args:
-        hass: Home Assistant instance — used for bus / loop / async_create_task.
         ble_device_resolver: async callable returning a BLEDevice (or None).
-                             Called fresh on each `start()` so adapter routing
+                             Called fresh on each ``start()`` so adapter routing
                              stays correct when devices rediscover.
-        mode_name: short tag used in event names ("scale", "grinder", "brewer").
+        mode_name: short tag used in lifecycle phase routing ("connect", …).
         notification_filter: see module docstring.
         on_event: async callback invoked once per kept notification.
+        on_lifecycle: sync callback for lifecycle transitions (see module
+                      docstring). Called on the event loop thread.
+        task_factory: optional spawner for the long-lived run loop; defaults
+                      to ``loop.create_task``.
+        idle_timeout_s: seconds of notification silence before auto-stopping.
     """
 
     def __init__(
         self,
-        hass,
         ble_device_resolver: Callable[[], Awaitable["object | None"]],
         mode_name: str,
         notification_filter: NotificationFilter,
         on_event: Callable[[dict], Awaitable[None]],
+        on_lifecycle: LifecycleCallback,
+        task_factory: TaskFactory | None = None,
+        idle_timeout_s: float = IDLE_TIMEOUT_SEC,
+        on_raw: Callable[[dict], None] | None = None,
     ) -> None:
-        self.hass = hass
         self._resolve_device = ble_device_resolver
         self.mode_name = mode_name
         self._filter = notification_filter
         self._on_event = on_event
+        self._on_lifecycle = on_lifecycle
+        self._task_factory = task_factory
+        self._idle_timeout_s = idle_timeout_s
+        # Optional sync hook fired for EVERY decoded notification (before the
+        # filter), so the integration can keep its status sensors/settings in
+        # sync with the machine's heartbeat during a held session — not just the
+        # filtered knob/weight events. Scheduled on the loop (bleak calls us on a
+        # worker thread). Injected → the vendor stays HA-free.
+        self._on_raw = on_raw
 
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._client = None       # bleak.BleakClient | None
         self._task: asyncio.Task | None = None
         self._stop_evt = asyncio.Event()
@@ -83,17 +114,21 @@ class XBloomModeListener:
         if self.is_running:
             return
         self._stop_evt.clear()
-        # Use HA's BACKGROUND task helper (not async_create_task and not
-        # raw create_task — both empirically failed to deliver bleak
-        # notifications). Background tasks have different lifecycle
-        # semantics designed for long-lived monitors.
-        if hasattr(self.hass, "async_create_background_task"):
-            self._task = self.hass.async_create_background_task(
-                self._run(),
-                name=f"xbloom_{self.mode_name}_mode_listener",
-            )
+        # Capture the running loop here (start() runs on the host loop). The
+        # bleak notification callback fires from a worker thread and needs
+        # this reference to hand coroutines back to the loop.
+        self._loop = asyncio.get_running_loop()
+        coro = self._run()
+        name = f"xbloom_{self.mode_name}_mode_listener"
+        # The integration injects HA's BACKGROUND task helper (not
+        # async_create_task and not raw create_task — both empirically failed
+        # to deliver bleak notifications). Background tasks have different
+        # lifecycle semantics designed for long-lived monitors. Fall back to
+        # a plain loop task when no factory is supplied (pure/testing use).
+        if self._task_factory is not None:
+            self._task = self._task_factory(coro, name)
         else:
-            self._task = self.hass.loop.create_task(self._run())
+            self._task = self._loop.create_task(coro)
 
     async def stop(self) -> None:
         self._stop_evt.set()
@@ -106,18 +141,37 @@ class XBloomModeListener:
         await self._safe_disconnect()
         self._task = None
 
+    async def send_live(self, frame: bytes) -> bool:
+        """Write a command frame over the *held* session, fire-and-forget.
+
+        For live knob-setting (e.g. dragging a grind-size slider) the official
+        app writes without ACK-gating — gating would make the control lag — so
+        we match that: a single unconfirmed write to FFE1 over the connection
+        the session already holds. Returns False if no session is active (the
+        caller then treats the value as a plain setpoint).
+        """
+        client = self._client
+        if client is None:
+            return False
+        try:
+            await client.write_gatt_char(FFE1_UUID, frame, response=False)
+            return True
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("[%s mode] send_live failed: %s", self.mode_name, err)
+            return False
+
     # ---- Subclass hooks ------------------------------------------------ #
     async def _read_initial_state(self) -> dict:
-        """Override to populate the `summary` field of *_mode_ready.
+        """Override to populate the ``summary`` field of the "ready" phase.
 
         Default: empty dict (Scale Mode has no summary — the next stable
-        weight will fire `_announced` on its own).
+        weight will fire on its own).
         """
         return {}
 
     # ---- Internals ----------------------------------------------------- #
     async def _run(self) -> None:
-        """All BLE work happens inside a single `async with XBloomBleClient`
+        """All BLE work happens inside a single ``async with XBloomBleClient``
         — the pattern that empirically receives notifications. Splitting
         connect and wait into separate methods (with manual __aenter__)
         silently broke notification delivery, so we keep them in the same
@@ -128,20 +182,16 @@ class XBloomModeListener:
         # Resolve device first (no BLE traffic yet).
         device = await self._resolve_device()
         if device is None:
-            self.hass.bus.async_fire(
-                f"xbloom_{self.mode_name}_failed",
-                {"reason": "machine_not_found"},
-            )
+            self._on_lifecycle("failed", {"reason": "machine_not_found"})
             _LOGGER.warning("[%s mode] machine not found", self.mode_name)
             return
 
         # Slow-connect detection: schedule a "connecting…" announcement
         # if connect takes >1s, cancel if it finishes faster.
-        slow_handle = self.hass.loop.call_later(
+        assert self._loop is not None
+        slow_handle = self._loop.call_later(
             SLOW_CONNECT_THRESHOLD_SEC,
-            lambda: self.hass.bus.async_fire(
-                f"xbloom_{self.mode_name}_connecting", {},
-            ),
+            lambda: self._on_lifecycle("connecting", {}),
         )
 
         try:
@@ -168,10 +218,7 @@ class XBloomModeListener:
                         "[%s mode] start_notify failed: %s",
                         self.mode_name, err,
                     )
-                    self.hass.bus.async_fire(
-                        f"xbloom_{self.mode_name}_failed",
-                        {"reason": "connection_lost"},
-                    )
+                    self._on_lifecycle("failed", {"reason": "connection_lost"})
                     return
 
                 # Yield to the loop a few times so bleak's notification
@@ -209,10 +256,7 @@ class XBloomModeListener:
                 except Exception:  # noqa: BLE001
                     summary = {}
 
-                self.hass.bus.async_fire(
-                    f"xbloom_{self.mode_name}_ready",
-                    {"summary": summary},
-                )
+                self._on_lifecycle("ready", {"summary": summary})
                 _LOGGER.info(
                     "[%s mode] ready (summary=%s)",
                     self.mode_name, summary,
@@ -225,14 +269,13 @@ class XBloomModeListener:
                 while not self._stop_evt.is_set():
                     await asyncio.sleep(1.0)
                     idle = time.monotonic() - self._last_activity
-                    if idle > IDLE_TIMEOUT_SEC:
+                    if idle > self._idle_timeout_s:
                         _LOGGER.info(
                             "[%s mode] idle %ds — auto-stopping listener",
                             self.mode_name, int(idle),
                         )
-                        self.hass.bus.async_fire(
-                            f"xbloom_{self.mode_name}_auto_stopped",
-                            {"reason": "idle_timeout"},
+                        self._on_lifecycle(
+                            "auto_stopped", {"reason": "idle_timeout"},
                         )
                         break
         except Exception as err:  # noqa: BLE001
@@ -242,9 +285,7 @@ class XBloomModeListener:
                 "[%s mode] run failed: %s (%s)",
                 self.mode_name, err, reason,
             )
-            self.hass.bus.async_fire(
-                f"xbloom_{self.mode_name}_failed", {"reason": reason},
-            )
+            self._on_lifecycle("failed", {"reason": reason})
         finally:
             self._client = None
             self._ble = None
@@ -265,6 +306,14 @@ class XBloomModeListener:
                 "[%s mode] notify cmd=%s decoded=%s",
                 self.mode_name, cmd, decoded,
             )
+        # Forward every raw decode to the host (before the filter) so status
+        # sensors / settings stay in sync with the machine during the session.
+        # Runs on the loop — bleak invoked us from a worker thread.
+        if self._on_raw is not None and self._loop is not None:
+            try:
+                self._loop.call_soon_threadsafe(self._on_raw, decoded)
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("[%s mode] on_raw failed", self.mode_name)
         event = self._filter(decoded)
         if event is None:
             return
@@ -277,10 +326,13 @@ class XBloomModeListener:
             )
         self._last_activity = time.monotonic()
         # bleak invokes us from a worker thread, so hand the coroutine to the
-        # HA event loop. Dispatch exactly once — a prior duplicate call here
-        # fired every event twice.
+        # captured event loop. Dispatch exactly once — a prior duplicate call
+        # here fired every event twice.
+        loop = self._loop
+        if loop is None:
+            return
         try:
-            asyncio.run_coroutine_threadsafe(self._on_event(event), self.hass.loop)
+            asyncio.run_coroutine_threadsafe(self._on_event(event), loop)
         except Exception:  # noqa: BLE001
             _LOGGER.exception("[%s mode] on_event failed", self.mode_name)
 
