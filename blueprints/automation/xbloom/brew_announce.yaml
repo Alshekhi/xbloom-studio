@@ -1,11 +1,17 @@
 blueprint:
   name: "xBloom — Brew announcements"
   description: >
-    Announces the xBloom brew lifecycle on Alexa across all three phases:
-    grinding started, pouring started, and coffee ready. Optionally speaks the
-    recipe name on completion. Bilingual (English / Arabic). Replaces the
-    separate brew_started, brew_complete, and brew_complete_with_recipe
-    blueprints.
+    Announces the xBloom brew lifecycle on Alexa: the brew starting, pouring
+    started, and coffee ready. Optionally names the recipe at both ends.
+    Bilingual (English / Arabic). Replaces the separate brew_started,
+    brew_complete, and brew_complete_with_recipe blueprints.
+
+    The start announcement fires on the `xbloom_brew_started` bus event, which
+    the xbloom.start_brew service emits the instant it dispatches — before any
+    BLE traffic. That gives immediate confirmation that the intended recipe
+    launched, which matters when you cannot see the machine. A brew started
+    physically at the machine emits no such event, so it announces from
+    "pouring" onward rather than at the start.
   domain: automation
   author: xbloom-studio-controler
   input:
@@ -38,8 +44,9 @@ blueprint:
     announce_recipe:
       name: Announce recipe name
       description: >
-        When on, the completion announcement names the recipe that just finished
-        (from the brew_done event) instead of the generic "coffee is ready".
+        When on, the announcements name the recipe — at the start (from the
+        xbloom_brew_started event) and on completion (from brew_done) — instead
+        of the generic "starting your coffee" / "coffee is ready".
       default: false
       selector:
         boolean: {}
@@ -57,12 +64,18 @@ variables:
   lang: !input language
   announce_recipe: !input announce_recipe
   recipe_name: >-
-    {{ trigger.to_state.attributes.get('recipe_name', '') if trigger.id == 'done_recipe' else '' }}
+    {%- if trigger.id == 'done_recipe' -%}
+      {{ trigger.to_state.attributes.get('recipe_name', '') }}
+    {%- elif trigger.id == 'started' -%}
+      {{ trigger.event.data.get('recipe_name', '') }}
+    {%- else -%}
+    {%- endif -%}
 
 trigger:
-  - platform: state
-    entity_id: !input xbloom_status_entity
-    to: "grinding"
+  # Fired by xbloom.start_brew the moment it dispatches, carrying the recipe
+  # name — earlier and more informative than waiting for the burrs to move.
+  - platform: event
+    event_type: xbloom_brew_started
     id: started
   - platform: state
     entity_id: !input xbloom_status_entity
@@ -78,7 +91,7 @@ trigger:
 
 action:
   - choose:
-      # Grinding started
+      # Brew starting — names the recipe when known
       - conditions: "{{ trigger.id == 'started' }}"
         sequence:
           - action: notify.alexa_media
@@ -87,7 +100,7 @@ action:
               data:
                 type: announce
               message: >-
-                {% if lang == 'ar' %}بدأت القهوة تُطحن{% else %}Coffee started grinding{% endif %}
+                {% if lang == 'ar' %}بدأ تحضير قهوتك{% if announce_recipe and recipe_name %} — {{ recipe_name }}{% endif %}{% else %}Starting your coffee{% if announce_recipe and recipe_name %} — {{ recipe_name }}{% endif %}{% endif %}
       # Pouring started
       - conditions: "{{ trigger.id == 'pouring' }}"
         sequence:
