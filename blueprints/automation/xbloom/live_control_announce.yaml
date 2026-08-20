@@ -1,15 +1,16 @@
 blueprint:
-  name: "xBloom — Live Control announcements"
+  name: "xBloom — Live-session announcements"
   description: >
-    Speaks every live reading from the xBloom Studio while the **Live Control**
-    switch (`switch.xbloom_studio_live_control`) is on: scale weight, grinder
-    knob (size / speed), brewer knob (pattern / temperature / grind / ratio),
-    which module you entered on the machine, and recipe-card scans — plus the
-    Live Control connection lifecycle. Bilingual (English / Arabic).
+    Speaks every live reading from the xBloom Studio while a **Connect** session
+    (`switch.xbloom_studio_connect`) is open: scale weight, grinder knob
+    (size / speed), brewer knob (pattern / temperature / grind / ratio), which
+    module you entered on the machine, and recipe-card scans — plus the
+    connection lifecycle. Bilingual (English / Arabic).
 
-    This is the companion to the integration's Live Control listener: the
-    integration fires the events, this blueprint turns them into speech on the
-    speaker(s) you choose. Import it once, pick your Alexa device and language.
+    This is the companion to the integration's live-session listener: the
+    integration fires the events (voice-agnostic — they also drive sensors and
+    the dashboard), and this blueprint turns them into speech on the speaker(s)
+    you choose. Import it once, pick your Alexa device and language.
   domain: automation
   author: xbloom-studio-controler
   input:
@@ -47,6 +48,8 @@ variables:
   value_name: "{{ trigger.event.data.value_name | default('') }}"
   # module entry
   module: "{{ trigger.event.data.module | default('') }}"
+  # mode change (Auto/Pro switched from the dashboard/service)
+  mode: "{{ trigger.event.data.mode | default('') }}"
   # derived: pour pattern name (correct order — 0 centered / 1 circular / 2 spiral)
   pattern_ar: >-
     {% if value_name == 'centered' or value == 0 %}مركزي
@@ -65,14 +68,15 @@ variables:
 trigger:
   - platform: event
     event_type:
-      - xbloom_live_control_connecting
-      - xbloom_live_control_ready
-      - xbloom_live_control_failed
-      - xbloom_live_control_auto_stopped
-      - xbloom_scale_weight_announced
+      - xbloom_connect_connecting
+      - xbloom_connect_ready
+      - xbloom_connect_failed
+      - xbloom_connect_auto_stopped
+      - xbloom_scale_weight_stable
       - xbloom_grinder_knob_changed
       - xbloom_brewer_setting_changed
       - xbloom_module_entered
+      - xbloom_mode_changed
       - xbloom_scale_tared
       - xbloom_recipe_card_scanned
 
@@ -84,44 +88,48 @@ action:
         type: tts
       message: >-
         {%- if lang == 'ar' -%}
-          {%- if ev == 'xbloom_live_control_connecting' -%}
+          {%- if ev == 'xbloom_connect_connecting' -%}
             جاري الاتصال بـ إكس بلوم
-          {%- elif ev == 'xbloom_live_control_ready' -%}
+          {%- elif ev == 'xbloom_connect_ready' -%}
             تم الاتصال بـ إكس بلوم
-          {%- elif ev == 'xbloom_live_control_failed' -%}
+          {%- elif ev == 'xbloom_connect_failed' -%}
             فشل الاتصال بـ إكس بلوم{% if reason == 'machine_not_found' %}، لم يتم العثور على الجهاز{% elif reason == 'machine_busy' %}، الجهاز مشغول{% elif reason == 'connection_lost' %}، انقطع الاتصال{% endif %}
-          {%- elif ev == 'xbloom_live_control_auto_stopped' -%}
+          {%- elif ev == 'xbloom_connect_auto_stopped' -%}
             انتهت مهلة الاتصال بـ إكس بلوم
-          {%- elif ev == 'xbloom_scale_weight_announced' -%}
+          {%- elif ev == 'xbloom_scale_weight_stable' -%}
             الوزن {{ weight }} جرام
           {%- elif ev == 'xbloom_grinder_knob_changed' -%}
             {% if param == 'size' %}درجة الطحن {{ value }}{% elif param == 'speed' %}سرعة الطحن {{ value }}{% endif %}
           {%- elif ev == 'xbloom_brewer_setting_changed' -%}
-            {% if setting == 'temperature' %}درجة الحرارة {{ value }} مئوية{% elif setting == 'pattern' %}نمط الصب {{ pattern_ar }}{% elif setting == 'size' %}درجة الطحن {{ value }}{% elif setting == 'speed' %}سرعة الطحن {{ value }}{% elif setting == 'ratio' %}النسبة {{ ratio_fmt }}{% endif %}
+            {% if setting == 'temperature' %}{% if value_name == 'RT' %}درجة حرارة الغرفة{% elif value_name == 'BP' %}درجة الغليان{% else %}درجة الحرارة {% if states('select.xbloom_studio_temperature_unit') == 'F' %}{{ (value | float * 1.8 + 32) | round(0) | int }} فهرنهايت{% else %}{{ value }} مئوية{% endif %}{% endif %}{% elif setting == 'pattern' %}نمط الصب {{ pattern_ar }}{% elif setting == 'size' %}درجة الطحن {{ value }}{% elif setting == 'speed' %}سرعة الطحن {{ value }}{% elif setting == 'ratio' %}النسبة {{ ratio_fmt }}{% endif %}
           {%- elif ev == 'xbloom_module_entered' -%}
             {% if module == 'scale' %}الميزان{% elif module == 'grinder' %}المطحنة{% elif module == 'brewer' %}الغلاية{% elif module == 'home' %}الشاشة الرئيسية{% elif module == 'auto' %}الوضع التلقائي{% endif %}
+          {%- elif ev == 'xbloom_mode_changed' -%}
+            {% if mode == 'auto' %}الوضع التلقائي{% elif mode == 'pro' %}الوضع الاحترافي{% endif %}
           {%- elif ev == 'xbloom_scale_tared' -%}
             تم التصفير
           {%- elif ev == 'xbloom_recipe_card_scanned' -%}
             تم مسح بطاقة الوصفة
           {%- endif -%}
         {%- else -%}
-          {%- if ev == 'xbloom_live_control_connecting' -%}
+          {%- if ev == 'xbloom_connect_connecting' -%}
             Connecting to xBloom
-          {%- elif ev == 'xbloom_live_control_ready' -%}
+          {%- elif ev == 'xbloom_connect_ready' -%}
             Connected to xBloom
-          {%- elif ev == 'xbloom_live_control_failed' -%}
+          {%- elif ev == 'xbloom_connect_failed' -%}
             Failed to connect to xBloom{% if reason == 'machine_not_found' %}, device not found{% elif reason == 'machine_busy' %}, device busy{% elif reason == 'connection_lost' %}, connection lost{% endif %}
-          {%- elif ev == 'xbloom_live_control_auto_stopped' -%}
+          {%- elif ev == 'xbloom_connect_auto_stopped' -%}
             xBloom connection timed out
-          {%- elif ev == 'xbloom_scale_weight_announced' -%}
+          {%- elif ev == 'xbloom_scale_weight_stable' -%}
             {{ weight }} grams
           {%- elif ev == 'xbloom_grinder_knob_changed' -%}
             {% if param == 'size' %}Grind size {{ value }}{% elif param == 'speed' %}Grind speed {{ value }}{% endif %}
           {%- elif ev == 'xbloom_brewer_setting_changed' -%}
-            {% if setting == 'temperature' %}Temperature {{ value }} Celsius{% elif setting == 'pattern' %}Pour pattern {{ pattern_en }}{% elif setting == 'size' %}Grind size {{ value }}{% elif setting == 'speed' %}Grind speed {{ value }}{% elif setting == 'ratio' %}Ratio one to {{ ratio_fmt }}{% endif %}
+            {% if setting == 'temperature' %}{% if value_name == 'RT' %}Room temperature{% elif value_name == 'BP' %}Boiling point{% else %}Temperature {% if states('select.xbloom_studio_temperature_unit') == 'F' %}{{ (value | float * 1.8 + 32) | round(0) | int }} Fahrenheit{% else %}{{ value }} Celsius{% endif %}{% endif %}{% elif setting == 'pattern' %}Pour pattern {{ pattern_en }}{% elif setting == 'size' %}Grind size {{ value }}{% elif setting == 'speed' %}Grind speed {{ value }}{% elif setting == 'ratio' %}Ratio one to {{ ratio_fmt }}{% endif %}
           {%- elif ev == 'xbloom_module_entered' -%}
             {% if module == 'scale' %}Scale{% elif module == 'grinder' %}Grinder{% elif module == 'brewer' %}Brewer{% elif module == 'home' %}Home screen{% elif module == 'auto' %}Auto mode{% endif %}
+          {%- elif ev == 'xbloom_mode_changed' -%}
+            {% if mode == 'auto' %}Auto mode{% elif mode == 'pro' %}Pro mode{% endif %}
           {%- elif ev == 'xbloom_scale_tared' -%}
             Scale zeroed
           {%- elif ev == 'xbloom_recipe_card_scanned' -%}
