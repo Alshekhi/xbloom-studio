@@ -56,3 +56,4 @@ class Recipe(_RecipeRequired, total=False):
     bypass_temp_c: float      # bypassTemp — absent when bypass_water_enabled == 2
     bypass_volume_ml: float   # bypassVolume — absent when bypass_water_enabled == 2
     pod: dict                 # podsVo — absent when recipe has no linked pod
+    shared: bool              # True for a downloaded "Shared Recipe" (tuMyRecipeShared)

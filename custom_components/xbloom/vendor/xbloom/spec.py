@@ -154,6 +154,97 @@ BOILING_POINT_C = 98.0  # "BP" — boiling point (the app derives the real value
                         # from altitude; the transmitted sentinel is 98)
 
 
+# --------------------------------------------------------------------------- #
+# Unified brewer-temperature model — the single source of truth for the two    #
+# temperature number spaces and how to move between them. Everything else       #
+# (live_session filter, the brew-temperature number entity, the drive path)     #
+# routes through here so no divergence can creep in.                            #
+#                                                                              #
+# There are TWO domains, confirmed three ways (firmware 7-segment renderer      #
+# thresholds, app CoffeeConstantUtil.getTemperatureJ15RTBP, app BrewerActivity):#
+#                                                                              #
+#  * DISPLAY domain — what the user sees/turns everywhere (on-device screen,    #
+#    app brewer screen, app recipe editor) and what the brewer temperature      #
+#    KNOB broadcasts on cmd 8108. On the J15 it runs 39..96, where the two      #
+#    ends are sentinels, NOT literal degrees: 39 = "RT", 96 = "BP", and 40..95  #
+#    are literal °C.                                                            #
+#  * WIRE domain — what is transmitted/stored when a value is SET or SAVED: a   #
+#    recipe blob byte, a 4510 temp-set, a 4506 brew. Here RT/BP are the         #
+#    ROOM_TEMP_C / BOILING_POINT_C sentinels (20 / 98); 40..95 pass through.    #
+#                                                                              #
+# The ONLY place the raw display value leaks onto the wire is the 8108 knob     #
+# REPORT (a knob position, not a saved value) — which is why HA reads 96, not   #
+# 98, when the knob is at BP. Recipes are STORED in the wire domain (20/98),    #
+# so pour_temperature_c above keeps that 20..98 range; the display domain is    #
+# only for the editing widget / knob reflect and converts on the boundary.     #
+# --------------------------------------------------------------------------- #
+BREW_TEMP_DISPLAY_MIN = 39   # J15 knob/slider floor → "RT" (room temperature)
+BREW_TEMP_DISPLAY_MAX = 96   # J15 knob/slider ceiling → "BP" (boiling point)
+# The KNOB (cmd 8108) reports in the machine's *display unit*: Celsius gives the
+# 39-96 domain above; Fahrenheit gives 103-204 (getTemperatureJ15RTBP's °F
+# branch). We normalize F→C so the rest of the model is unit-free.
+BREW_TEMP_DISPLAY_F_MIN = 103
+BREW_TEMP_DISPLAY_F_MAX = 204
+
+
+def brew_temp_knob_to_celsius(raw: float) -> int | None:
+    """Normalize a raw brewer-temp KNOB value (cmd 8108) to the canonical
+    Celsius display domain (39-96), or None if out of range.
+
+    The knob emits in the machine's current display unit — Celsius 39-96 as-is,
+    Fahrenheit 103-204 converted to °C. The two ranges don't overlap, so the
+    unit is inferred from the value (no state needed).
+    """
+    r = int(round(raw))
+    if BREW_TEMP_DISPLAY_MIN <= r <= BREW_TEMP_DISPLAY_MAX:
+        return r
+    if BREW_TEMP_DISPLAY_F_MIN <= r <= BREW_TEMP_DISPLAY_F_MAX:
+        return int(round((r - 32) / 1.8))
+    return None
+
+
+def brew_temp_sentinel_name(display_value: float) -> str | None:
+    """Return "RT"/"BP" if a DISPLAY-domain value is at a sentinel end, else None.
+
+    Consumers (announce blueprint, dashboard) use this to say "room temperature"
+    / "boiling point" instead of a bare 39 / 96.
+    """
+    d = int(round(display_value))
+    if d <= BREW_TEMP_DISPLAY_MIN:
+        return "RT"
+    if d >= BREW_TEMP_DISPLAY_MAX:
+        return "BP"
+    return None
+
+
+def brew_temp_display_to_wire(display_value: float) -> float:
+    """DISPLAY (39..96) → WIRE °C for SETing/SAVing (recipe byte, 4510, 4506).
+
+    The ends map to the sentinels the machine expects (39→20 RT, 96→98 BP);
+    40..95 pass through unchanged.
+    """
+    d = int(round(display_value))
+    if d <= BREW_TEMP_DISPLAY_MIN:
+        return ROOM_TEMP_C
+    if d >= BREW_TEMP_DISPLAY_MAX:
+        return BOILING_POINT_C
+    return float(d)
+
+
+def brew_temp_wire_to_display(wire_value: float) -> int:
+    """WIRE °C (as stored in a recipe: 20 / 40..95 / 98) → DISPLAY 39..96.
+
+    Inverse of brew_temp_display_to_wire, for showing a stored recipe temp in a
+    display-domain widget. 20→39 (RT), 98→96 (BP); 40..95 pass through.
+    """
+    w = float(wire_value)
+    if w <= ROOM_TEMP_C:
+        return BREW_TEMP_DISPLAY_MIN
+    if w >= BOILING_POINT_C:
+        return BREW_TEMP_DISPLAY_MAX
+    return int(round(w))
+
+
 def field(name: str) -> NumRange:
     """Look up a field's canonical range by name."""
     return FIELDS[name]
@@ -167,10 +258,16 @@ VOLUME_TOLERANCE_ML = 0.5
 # Small brew enums carried in BLE frames — name <-> code. These were mirrored  #
 # inline in ble.py and select.py; both now derive from here.                   #
 # --------------------------------------------------------------------------- #
+# Wire codes CONFIRMED against the decompiled app (2026-07-20) — the earlier
+# guessed values were WRONG (temp C/F swapped; weight order off), which made HA
+# set the opposite unit and misreport the machine's units:
+#   * WaterSourceType enum: TANK=0, TAP=1 (correct as-was).
+#   * WeightUnitType: ml=0, g=1, oz=2.
+#   * temperature (NumberExtendsKt.temperatureUnit): 0 = °F, 1 = °C (default 1).
 WATER_SOURCE_CODES: dict[str, int] = {"tank": 0, "tap": 1}
-WEIGHT_UNIT_CODES: dict[str, int] = {"g": 0, "oz": 1, "ml": 2}
+WEIGHT_UNIT_CODES: dict[str, int] = {"g": 1, "ml": 0, "oz": 2}
 # Keys match what the select entity offers and the BLE frame expects ("C"/"F").
-TEMP_UNIT_CODES: dict[str, int] = {"C": 0, "F": 1}
+TEMP_UNIT_CODES: dict[str, int] = {"C": 1, "F": 0}
 
 
 # --------------------------------------------------------------------------- #
@@ -180,14 +277,30 @@ TEMP_UNIT_CODES: dict[str, int] = {"C": 0, "F": 1}
 BREW_STATES: tuple[str, ...] = ("idle", "grinding", "brewing", "done")
 
 # On-machine UI module the user has entered (current-module sensor).
+# "auto" here = the Auto-mode home screen (recipes A/B/C); the rest are the
+# Pro-mode manual modules. Same naming rule as MODES below.
 MODULES: tuple[str, ...] = ("home", "grinder", "scale", "brewer", "auto")
 
-# Operating mode and its Type-2 wire payload (CMD_MODE_TYPE 11511). "auto" is
-# the machine's EasyMode; "pro" is manual.
+# ---------------------------------------------------------------------------
+# Operating mode — CANONICAL NAMING (one token used everywhere in this repo):
+#   "auto"  = the machine's two-mode toggle labelled "Auto Mode" on the device
+#             screen and in the app UI. Internally the app enum is DeviceMode.
+#             EASY and the BLE feature is "EasyMode" (wire code 91327856) — same
+#             thing, different name. Auto mode = pick one of three saved recipe
+#             slots A/B/C (ship defaults: A Light / B Medium / C Dark, 15 g) and
+#             the machine grinds+brews it whole. Recipe brews (8001) only grind
+#             in this mode, which is why brew() forces it. Slots are writable via
+#             the write_slot service (cmd 11510 RD_EASYMODE_RECIPE_SEND).
+#   "pro"   = "Pro Mode": the manual grinder / brewer / scale modules, driven by
+#             hand (wire code 00000000).
+# Toggle on the machine = three quick presses of the middle knob.
+# So: our token "auto" ≡ app enum EASY ≡ user-facing "Auto Mode". Never rename
+# the token to "easy" — that would diverge from what the device shows the user.
+# ---------------------------------------------------------------------------
 MODES: tuple[str, ...] = ("auto", "pro")
 MODE_PAYLOADS: dict[str, str] = {"auto": "91327856", "pro": "00000000"}  # hex
 
-# EasyMode recipe slots on the machine.
+# Auto-mode recipe slots on the machine (A/B/C).
 SLOTS: tuple[str, ...] = ("A", "B", "C")
 
 # Machine status: "ok" plus the fault conditions. FAULTS maps the fault
