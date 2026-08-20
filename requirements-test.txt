@@ -1,0 +1,19 @@
+# Test-only dependencies.
+#
+# The suite does NOT install Home Assistant: tests/components/xbloom/conftest.py
+# injects stub `homeassistant.*` modules, which keeps CI fast and avoids pinning
+# the integration to one HA release. What is listed here is only what the
+# component's own imports genuinely need at import time.
+#
+# This file exists because pyproject.toml is gitignored (it belongs to the
+# superseded standalone library), so it cannot carry the dev extras.
+pytest>=8
+pytest-asyncio>=0.23
+
+# vendor/xbloom/client.py + cloud.py — HTTP transport.
+aiohttp>=3.9
+
+# vendor/xbloom/cloud.py imports this at module scope for the RSA request
+# envelope, and coordinator.py imports cloud unconditionally. HA core ships it;
+# without it here, tests/conftest.py stubs it and skips tests/test_cloud.py.
+cryptography>=42
