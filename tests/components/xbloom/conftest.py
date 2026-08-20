@@ -78,6 +78,11 @@ def _base_class(name: str) -> type:
         "async_added_to_hass": _async_added_to_hass,
         "async_will_remove_from_hass": _async_will_remove_from_hass,
         "async_get_last_state": _async_get_last_state,
+        # HA's Entity declares these as class attributes, and several of our
+        # entities read them before ever assigning (e.g. the dedup check
+        # `value != self._attr_native_value` on the first event).
+        "_attr_native_value": None,
+        "_attr_is_on": None,
     })
 
 
@@ -101,12 +106,41 @@ def _inject_global_stubs() -> None:
             import asyncio
             return asyncio.get_event_loop().create_task(coro)
 
-    class _ConfigFlow:
+    class _FlowBase:
+        """The flow-result helpers HA gives every flow.
+
+        Each returns the plain dict HA's real helpers produce, so tests can
+        assert on `result["type"]` / `["step_id"]` / `["errors"]` exactly as
+        they would against a live flow.
+        """
+
+        def async_show_form(
+            self, *, step_id, data_schema=None, errors=None,
+            description_placeholders=None, last_step=None,
+        ):
+            return {
+                "type": "form",
+                "step_id": step_id,
+                "data_schema": data_schema,
+                "errors": errors or {},
+                "description_placeholders": description_placeholders or {},
+            }
+
+        def async_show_menu(self, *, step_id, menu_options, **kw):
+            return {"type": "menu", "step_id": step_id, "menu_options": menu_options}
+
+        def async_create_entry(self, *, title, data, **kw):
+            return {"type": "create_entry", "title": title, "data": data}
+
+        def async_abort(self, *, reason, **kw):
+            return {"type": "abort", "reason": reason}
+
+    class _ConfigFlow(_FlowBase):
         def __init_subclass__(cls, domain=None, **kw):
             super().__init_subclass__(**kw)
             cls._domain = domain
 
-    class _OptionsFlow:
+    class _OptionsFlow(_FlowBase):
         pass
 
     ce.ConfigEntry = _ConfigEntry

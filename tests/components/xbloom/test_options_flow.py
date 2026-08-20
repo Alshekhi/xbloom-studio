@@ -34,8 +34,10 @@ def _inject_stubs() -> None:
     core.HomeAssistant = MagicMock
 
     exc = _mod("homeassistant.exceptions")
-    exc.ConfigEntryAuthFailed = type("ConfigEntryAuthFailed", (Exception,), {})
-    exc.ConfigEntryNotReady = type("ConfigEntryNotReady", (Exception,), {})
+    # ConfigEntryAuthFailed / ConfigEntryNotReady are defined once in
+    # conftest.py. Re-creating them here would rebind the shared stub to a
+    # NEW class object, so a module that imported the old one would no
+    # longer match it in `except` / `pytest.raises`.
 
     # config_entries: ConfigFlow + OptionsFlow + ConfigEntry
     ce = _mod("homeassistant.config_entries")
