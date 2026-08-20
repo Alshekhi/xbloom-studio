@@ -13,12 +13,26 @@ collection. Names that must be real classes (entity bases, ConfigFlow,
 Store, …) are defined explicitly because MagicMock cannot serve as a base
 class in multiple-inheritance combinations.
 """
+import enum
 import sys
 import types
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+
+class _UpdateEntityFeature(enum.IntFlag):
+    """Mirror of homeassistant.components.update.UpdateEntityFeature.
+
+    Values match HA so `int(...)` comparisons in tests mean what they say.
+    """
+
+    INSTALL = 1
+    SPECIFIC_VERSION = 2
+    PROGRESS = 4
+    BACKUP = 8
+    RELEASE_NOTES = 16
 
 
 # ---------------------------------------------------------------------------
@@ -40,11 +54,30 @@ def _stub_mod(name: str) -> types.ModuleType:
 def _base_class(name: str) -> type:
     """A permissive, distinct base class (entity bases must not share a
     class object — `class X(RestoreSensor, SensorEntity)` needs two bases)."""
+
+    async def _async_added_to_hass(self) -> None:
+        """No-op terminator for `await super().async_added_to_hass()`.
+
+        Real HA entities inherit this from Entity, and most of our entities
+        call up to it; without it every subclass override raises AttributeError.
+        """
+
+    async def _async_will_remove_from_hass(self) -> None:
+        """No-op terminator for the teardown counterpart."""
+
+    async def _async_get_last_state(self):
+        """RestoreEntity's hook. No prior state by default; tests override it
+        when they want to exercise the restore path."""
+        return None
+
     return type(name, (), {
         "__init__": lambda self, *a, **k: None,
         "__class_getitem__": classmethod(lambda cls, item: cls),
         "async_write_ha_state": lambda self: None,
         "async_on_remove": lambda self, fn: None,
+        "async_added_to_hass": _async_added_to_hass,
+        "async_will_remove_from_hass": _async_will_remove_from_hass,
+        "async_get_last_state": _async_get_last_state,
     })
 
 
@@ -165,7 +198,10 @@ def _inject_global_stubs() -> None:
         "homeassistant.components.text": {"TextEntity": _base_class("TextEntity")},
         "homeassistant.components.update": {
             "UpdateEntity": _base_class("UpdateEntity"),
-            "UpdateEntityFeature": MagicMock(name="UpdateEntityFeature"),
+            # A real IntFlag, not a MagicMock: update.py returns
+            # `UpdateEntityFeature(0)` to hide Install, and a mock would make
+            # that indistinguishable from INSTALL | PROGRESS.
+            "UpdateEntityFeature": _UpdateEntityFeature,
         },
     }
     for mod_name, attrs in entity_bases.items():
