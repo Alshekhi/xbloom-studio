@@ -1,16 +1,17 @@
 start_brew:
   name: Start Brew
   description: >
-    Trigger a brew for the currently selected recipe on the xBloom Studio.
-    If recipe_name is omitted, uses the recipe currently selected in
-    select.xbloom_studio_recipe.
+    Brew a recipe on the xBloom Studio. Uses the recipe selected in
+    select.xbloom_studio_recipe unless you pass recipe_name. The dose, ratio,
+    and grind_size fields are optional one-off overrides for this brew only —
+    the saved recipe is left untouched.
   fields:
     recipe_name:
-      name: Recipe Name
+      name: Recipe name
       description: >
-        Optional recipe name override. If provided, must exactly match a recipe
-        name in select.xbloom_studio_recipe options. If omitted, uses the
-        currently selected recipe.
+        Brew this recipe instead of the selected one. Must match a name in
+        select.xbloom_studio_recipe exactly. Leave blank to use the current
+        selection.
       required: false
       example: "Ethiopia Yirgacheffe"
       selector:
@@ -18,61 +19,96 @@ start_brew:
     use_preground:
       name: Use pre-ground coffee
       description: >
-        Skip the grinder for this brew — the machine goes straight to pouring.
-        The recipe's grind settings are not changed; this is a one-time
-        per-brew override. Useful when you are using pre-ground coffee or
-        an external grinder.
+        Skip the grinder and go straight to pouring, for this brew only. The
+        recipe's grind settings are not changed. Handy with pre-ground coffee
+        or an external grinder.
       required: false
       default: false
       selector:
         boolean:
+    dose:
+      name: Dose override (g)
+      description: >
+        One-off coffee dose in grams. The recipe is rescaled to dose × ratio
+        for this brew only. Leave blank to use the recipe's own dose.
+      required: false
+      example: 18
+      selector:
+        number:
+          min: 1
+          max: 30
+          step: 0.5
+          unit_of_measurement: g
+    ratio:
+      name: Ratio override (1:N)
+      description: >
+        One-off brew ratio N, where water = dose × N. Rescales the pours for
+        this brew only. Leave blank to use the recipe's own ratio.
+      required: false
+      example: 16
+      selector:
+        number:
+          min: 5
+          max: 25
+          step: 0.5
+    grind_size:
+      name: Grind size override
+      description: >
+        One-off grind size for this brew only (1–80, lower is finer). Leave
+        blank to use the recipe's own grind size.
+      required: false
+      example: 50
+      selector:
+        number:
+          min: 1
+          max: 80
+          step: 1
 
 stop_brew:
   name: Stop Brew
   description: >
-    Cancel an in-progress brew (BLE cmd 4507 / APP_BREWER_STOP). Single-frame
-    write to FFE1; HA opens BLE, sends, and disconnects.
+    Cancel the brew in progress. Home Assistant connects over Bluetooth,
+    sends the stop command, and disconnects.
 
 brew_standalone:
   name: Standalone Brew
   description: >
-    Run the brewer directly (BLE cmd 4506) without a recipe, using the current
-    values of the standalone brew entities: number.brew_flow_rate,
-    number.brew_volume, number.brew_temperature, select.brew_pattern, and
-    select.water_source. Set those entities first, then call this service.
+    Run the brewer on its own, without a recipe, using the current standalone
+    brew entities: number.brew_flow_rate, number.brew_volume,
+    number.brew_temperature, select.brew_pattern, and select.water_source.
+    Set those first, then call this action.
 
 tare:
   name: Tare Scale
   description: >
-    Zero the integrated scale on the xBloom Studio (BLE cmd 8500). Single-frame
-    write to FFE1; HA opens BLE, sends, and disconnects.
+    Zero the machine's built-in scale. Home Assistant connects over Bluetooth,
+    sends the command, and disconnects.
 
 back_to_home:
   name: Back to Home
   description: >
-    Return the machine's on-screen UI to the home screen (BLE cmd 8022).
+    Return the machine's on-screen display to the home screen.
 
 brew_pause:
   name: Pause Brew
   description: >
-    Pause an in-flight brew (BLE cmd 40518). The machine holds at the current
-    pour; resume with brew_resume.
+    Pause a brew in progress. The machine holds at the current pour; use
+    Resume Brew to carry on.
 
 brew_resume:
   name: Resume Brew
   description: >
-    Resume a paused brew (BLE cmd 8021 / APP_BREWER_RESTART).
+    Resume a paused brew.
 
 grind:
   name: Standalone Grind
   description: >
-    Run the grinder in FreeSolo mode for the given duration. Sends the 3-frame
-    enter/start/stop sequence over BLE; HA holds the link for the full grind
-    time, then disconnects.
+    Run the grinder on its own for a set time. Home Assistant holds the
+    Bluetooth link for the full grind, then disconnects.
   fields:
     size:
       name: Grind size
-      description: 1-100 (lower = finer; brAzzi64 reference default is 63).
+      description: 1–100 (lower is finer). Default 63.
       required: false
       default: 63
       example: 50
@@ -83,7 +119,7 @@ grind:
           step: 1
     speed:
       name: Grinder speed (RPM)
-      description: 60-120 (default 100).
+      description: 60–120. Default 100.
       required: false
       default: 100
       example: 100
@@ -94,7 +130,7 @@ grind:
           step: 1
     seconds:
       name: Duration (seconds)
-      description: How long to grind (1-30 s; default 5).
+      description: How long to grind, 1–30 seconds. Default 5.
       required: false
       default: 5
       example: 5
@@ -108,11 +144,15 @@ grind:
 set_mode:
   name: Set Mode
   description: >
-    Switch between Auto (Easy) mode and Pro mode (BLE cmd 11511, Type-2 packet).
+    Switch the machine between Auto Mode and Pro Mode. "Auto" is the label the
+    machine and app use; internally it's the same as EasyMode.
   fields:
     mode:
       name: Mode
-      description: auto = Easy mode (machine drives recipe), pro = Pro mode (manual control).
+      description: >
+        auto = Auto Mode: pick a saved recipe (A/B/C) and the machine grinds
+        and brews it. pro = Pro Mode: drive the grinder, brewer, and scale
+        yourself.
       required: true
       example: auto
       selector:
@@ -124,7 +164,7 @@ set_mode:
 set_water_source:
   name: Set Water Source
   description: >
-    Switch between the internal water tank and an external tap (BLE cmd 4508).
+    Switch between the internal water tank and an external tap.
   fields:
     source:
       name: Source
@@ -139,7 +179,7 @@ set_water_source:
 set_temp_unit:
   name: Set Temperature Unit
   description: >
-    Set the on-screen temperature unit on the machine (BLE cmd 8010).
+    Set the temperature unit shown on the machine's display.
   fields:
     unit:
       name: Unit
@@ -154,7 +194,7 @@ set_temp_unit:
 set_weight_unit:
   name: Set Weight Unit
   description: >
-    Set the on-screen weight unit on the machine (BLE cmd 8005).
+    Set the weight unit shown on the machine's display.
   fields:
     unit:
       name: Unit
@@ -170,12 +210,11 @@ set_weight_unit:
 write_slot:
   name: Write Recipe to Slot
   description: >
-    Push a recipe to one of the machine's three on-device Easy-mode slots
-    (A / B / C) over BLE (cmd 11510, Type-2 packet). After the slot is
-    written, the user can trigger that brew from the machine's physical UI
-    alone — no Home Assistant involvement required. Pass exactly one of
-    recipe_name, share_url, or share_id to choose which recipe to push;
-    if none is provided, falls back to the currently-selected recipe.
+    Save a recipe to one of the machine's three on-device slots (A / B / C).
+    Once written, you can brew it from the machine's own controls with no Home
+    Assistant involvement. Pass exactly one of recipe_name, share_url, or
+    share_id to choose the recipe; if none is given, the currently selected
+    recipe is used.
   fields:
     slot:
       name: Slot
@@ -199,7 +238,7 @@ write_slot:
       name: Share URL
       description: >
         A share URL from the xBloom iOS app (e.g. https://share-h5.xbloom.com/?id=...).
-        Fetched fresh — no need to import via Configure menu first.
+        Fetched fresh — no need to import it from the Configure menu first.
       required: false
       selector:
         text:
@@ -212,38 +251,44 @@ write_slot:
     scale_on:
       name: Scale enabled
       description: >
-        Whether the slot should activate the integrated scale at brew time
-        (default true).
+        Whether the slot turns on the built-in scale at brew time. Default on.
       required: false
       default: true
       selector:
         boolean:
 
 ble_connect:
-  name: BLE Connect (debug)
+  name: BLE Connect (diagnostic)
   description: >
-    Probe the BLE link: open a connection, run the handshake, subscribe to
-    FFE2, then release and disconnect. Logs each step with success/failure
-    detail. Use when diagnosing connection problems; does not touch the brew
-    flow.
+    Test the Bluetooth link: connect, run the handshake, subscribe to
+    notifications, then release and disconnect. Each step is logged with a
+    success or failure note. For diagnosing connection problems; it doesn't
+    touch the brew flow.
 
 ble_disconnect:
-  name: BLE Disconnect (debug)
+  name: BLE Disconnect (diagnostic)
   description: >
-    Force-release any BLE handle Home Assistant is holding for the machine, so
-    the iOS app can reconnect. Diagnostic counterpart to ble_connect.
+    Release any Bluetooth link Home Assistant is holding for the machine, so
+    the iOS app can reconnect. The counterpart to BLE Connect.
+
+refresh_status:
+  name: Refresh status
+  description: >
+    Briefly connect to the machine, capture one status update (water, grind
+    size, mode, water source, units, voltage), then disconnect — refreshing
+    the status sensors on demand without opening a live Connect session. You
+    can await it from an automation and then act on the fresh readings.
 
 list_recipes:
   name: List Recipes
   description: >
-    Return all recipes in the local library as response data.
-    Supports response — call with return_response=true from the REST API.
+    Return every recipe in the local library as response data. Call with
+    return_response=true (for example from the REST API).
 
 get_recipe:
   name: Get Recipe
   description: >
-    Return a single recipe by name as response data.
-    Returns null if not found.
+    Return a single recipe by name as response data, or null if it isn't found.
   fields:
     name:
       name: Recipe name
@@ -256,18 +301,19 @@ get_recipe:
 add_recipe:
   name: Add Recipe
   description: >
-    Add a new recipe to the local library. Replaces an existing recipe with
-    the same name. Pass the full recipe dict as a JSON string.
+    Add a new recipe to the local library, replacing any existing recipe with
+    the same name. Pass the full recipe as a JSON string.
 
-    The recipe is validated before it is stored — same rules as the options
-    flow (dose range per cup type, ratio 1:5–1:25 in 0.5 steps, grind 1–80,
-    rpm 60–120 in steps of 10, per-pour temp/flow/pattern, and pour volumes
-    summing to dose × ratio). On failure nothing is written and the response
-    is {ok: false, error: "<summary>", errors: {field: reason}}.
+    The recipe is validated before it's stored, using the same rules as the
+    Configure flow (dose range per cup type, ratio 1:5–1:25 in 0.5 steps,
+    grind 1–80, RPM 60–120 in steps of 10, per-pour temperature/flow/pattern,
+    and pour volumes summing to dose × ratio). If validation fails, nothing is
+    written and the response is {ok: false, error: "<summary>",
+    errors: {field: reason}}.
   fields:
     recipe_json:
       name: Recipe JSON
-      description: Full recipe object serialised as a JSON string.
+      description: The full recipe object as a JSON string.
       required: true
       selector:
         text:
@@ -275,16 +321,16 @@ add_recipe:
 update_recipe:
   name: Update Recipe
   description: >
-    Update (replace) an existing recipe by id. Pass the full updated recipe
-    dict as a JSON string. Inserts if no matching id is found.
+    Update (replace) an existing recipe by id. Pass the full updated recipe as
+    a JSON string. If no recipe with that id exists, it's inserted.
 
-    Validated before writing, exactly as add_recipe — on failure nothing is
-    written and the response is {ok: false, error: "<summary>",
+    Validated before writing, exactly like Add Recipe. If validation fails,
+    nothing is written and the response is {ok: false, error: "<summary>",
     errors: {field: reason}}.
   fields:
     recipe_json:
       name: Recipe JSON
-      description: Full updated recipe object serialised as a JSON string.
+      description: The full updated recipe object as a JSON string.
       required: true
       selector:
         text:
@@ -298,6 +344,62 @@ delete_recipe:
       name: Recipe name
       description: Exact recipe name to delete (case-sensitive).
       required: true
+      example: "Ethiopia Yirgacheffe"
+      selector:
+        text:
+
+save_scaled_recipe:
+  name: Save Scaled Recipe
+  description: >
+    The brew customizer's "Save as new recipe": take a recipe, rescale it to
+    dose × ratio (with an optional new grind size), and save the result as a
+    NEW recipe under new_name — stored locally when signed out, or in the cloud
+    with a local mirror when signed in. The source recipe is never changed.
+  fields:
+    new_name:
+      name: New recipe name
+      description: Name for the new recipe.
+      required: true
+      example: "Ethiopia Yirgacheffe (custom)"
+      selector:
+        text:
+    dose:
+      name: Dose (g)
+      description: Coffee dose in grams for the new recipe.
+      required: true
+      example: 18
+      selector:
+        number:
+          min: 1
+          max: 30
+          step: 0.5
+          unit_of_measurement: g
+    ratio:
+      name: Ratio (1:N)
+      description: Brew ratio N, where water = dose × N, for the new recipe.
+      required: true
+      example: 16
+      selector:
+        number:
+          min: 5
+          max: 25
+          step: 0.5
+    grind_size:
+      name: Grind size
+      description: Grind size for the new recipe (1–80, lower is finer).
+      required: true
+      example: 50
+      selector:
+        number:
+          min: 1
+          max: 80
+          step: 1
+    recipe_name:
+      name: Source recipe name
+      description: >
+        The recipe to scale from. Leave blank to use the currently selected
+        recipe (select.xbloom_studio_recipe).
+      required: false
       example: "Ethiopia Yirgacheffe"
       selector:
         text:
