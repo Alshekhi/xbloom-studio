@@ -31,6 +31,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
 from .coordinator import XBloomCoordinator
 from .vendor.xbloom.client import XBloomClient
+from .vendor.xbloom.cloud import XBloomCloudClient, language_type_for
 from .vendor.xbloom import spec
 from .vendor.xbloom.recipe_validate import normalize_recipe, validate_recipe
 
@@ -47,7 +48,7 @@ def _describe_errors(errors: dict[str, str]) -> str:
     return "; ".join(f"{field}: {key}" for field, key in sorted(errors.items()))
 
 
-PLATFORMS = ["select", "button", "number", "sensor", "event", "switch"]
+PLATFORMS = ["select", "button", "number", "sensor", "event", "switch", "update", "text"]
 
 # A start_brew call within this many seconds of the previous dispatch is
 # treated as a duplicate (e.g. a voice-agent HTTP retry) and ignored. A call
@@ -61,16 +62,20 @@ class XBloomRuntimeData:
 
     coordinator: XBloomCoordinator
     client: XBloomClient
+    cloud: XBloomCloudClient
+    # Installed firmware version as last reported by the machine over BLE
+    # (RD_MachineInfo / ScanDeviceModel.theVersion). None until decoded — the
+    # firmware update entity reads it for its `installed_version`. Wiring the
+    # BLE decode that fills this is a follow-up; the cloud-side "latest version"
+    # check works today regardless.
+    installed_fw_version: str | None = None
     # BLE device resolver — set in async_setup_entry. Phase 8 mode
     # listeners (08-04+) re-resolve on every start so adapter routing
     # stays correct after rediscovery.
     ble_device_resolver: object = None
-    # Long-lived listeners — created by switch.py during platform setup.
-    # We keep refs here so they're stoppable from async_unload_entry.
-    scale_listener: object = None       # legacy slot (Voice Mode replaces it)
-    grinder_listener: object = None     # legacy slot
-    brewer_listener: object = None      # legacy slot
-    voice_listener: object = None       # unified Voice Mode listener
+    # Long-lived live-session listener — created by switch.py during platform
+    # setup. Kept here so it's stoppable from async_unload_entry.
+    live_session_listener: object = None
 
 
 type XBloomConfigEntry = ConfigEntry[XBloomRuntimeData]
@@ -105,8 +110,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     """Set up xBloom Studio from a config entry."""
     session = async_get_clientsession(hass)
     client = XBloomClient(session)
+    # Speak the user's HA language to the cloud so server-returned messages
+    # match their locale (Arabic HA → Arabic API messages, etc.).
+    cloud = XBloomCloudClient(
+        session, language_type=language_type_for(hass.config.language)
+    )
 
-    coordinator = XBloomCoordinator(hass, entry)
+    coordinator = XBloomCoordinator(hass, entry, cloud)
     await coordinator.async_config_entry_first_refresh()
 
     # BLE device resolver — captures `entry` so the switch platform doesn't
@@ -120,8 +130,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     entry.runtime_data = XBloomRuntimeData(
         coordinator=coordinator,
         client=client,
+        cloud=cloud,
         ble_device_resolver=_ble_device_for_listener,
     )
+
+    # ------------------------------------------------------------------ #
+    # Shared BLE-event dispatcher (piggyback refresh)                     #
+    # Every integration BLE connection passes this as on_event, so the    #
+    # machine's heartbeat + notifications reach the entities on ANY        #
+    # connection (a tare, a grind, a status refresh — not just a brew or  #
+    # a Connect session). Any action refreshes the sensors as a side      #
+    # effect.                                                             #
+    # ------------------------------------------------------------------ #
+    from homeassistant.helpers.dispatcher import (
+        async_dispatcher_send as _async_dispatcher_send,
+    )
+    from .ble_entities import signal_event as _signal_event
+
+    async def _dispatch_ble_event(decoded: dict) -> None:
+        _async_dispatcher_send(hass, _signal_event(entry.entry_id), decoded)
 
     # ------------------------------------------------------------------ #
     # Shared recipe-resolution helper                                    #
@@ -286,6 +313,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             recipe = {**recipe, "grinder_size_enabled": 2}
             _LOGGER.info("xbloom.start_brew: grinder skipped (pre-ground override)")
 
+        # Brew-customizer overrides (one-off; never saved). Rescale the resolved
+        # recipe's pours to the requested dose × ratio and override the grind.
+        _ovr_dose = call.data.get("dose")
+        _ovr_ratio = call.data.get("ratio")
+        _ovr_grind = call.data.get("grind_size")
+        if _ovr_dose is not None or _ovr_ratio is not None or _ovr_grind is not None:
+            from .vendor.xbloom.brew_scale import scale_recipe
+            recipe = scale_recipe(
+                recipe,
+                dose_g=(float(_ovr_dose) if _ovr_dose is not None
+                        else float(recipe.get("dose_g") or 0)),
+                ratio=(float(_ovr_ratio) if _ovr_ratio is not None
+                       else float(recipe.get("water_ratio") or 16)),
+                grind_size=(int(_ovr_grind) if _ovr_grind is not None else None),
+            )
+            _LOGGER.info(
+                "xbloom.start_brew: customizer overrides dose=%s ratio=%s grind=%s",
+                _ovr_dose, _ovr_ratio, _ovr_grind,
+            )
+
         async def _on_event(decoded: dict) -> None:
             async_dispatcher_send(hass, signal_event(entry.entry_id), decoded)
 
@@ -361,13 +408,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         """Cancel an in-progress brew.
 
         First stop HA's own brew task (which releases the BLE link it was
-        holding and clears the duplicate-guard), then send APP_BREWER_STOP
-        (4507) so the machine halts too. Cancelling the task first is what
-        makes Cancel Brew a reliable reset: it frees the connection a stuck
-        brew was holding, so the stop frame — and the next start_brew — can
-        get their own connection.
+        holding and clears the duplicate-guard), then send the full-process
+        brew stop (CMD_BREW_STOP 40519) so the machine halts the recipe too.
+        (40519 is the recipe/auto stop from AppJ15AutoManager; the standalone
+        brewer's APP_BREWER_STOP 4507 is a different command for manual pours.)
+        Cancelling the task first is what makes Cancel Brew a reliable reset: it
+        frees the connection a stuck brew was holding, so the stop frame — and
+        the next start_brew — can get their own connection.
         """
-        from .vendor.xbloom.ble import FFE1_UUID, XBloomBleClient, _build_frame
+        from .vendor.xbloom.ble import (
+            CMD_BREW_STOP, FFE1_UUID, XBloomBleClient, _build_frame,
+        )
 
         await _cancel_active_brew("stop_brew requested")
 
@@ -382,12 +433,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             return
 
         try:
-            ble_client = XBloomBleClient(ble_device)
+            ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
             async with ble_client:
-                stop_frame = _build_frame(4507)  # APP_BREWER_STOP, no data
-                await ble_client._client.write_gatt_char(  # noqa: SLF001
-                    FFE1_UUID, stop_frame, response=False,
-                )
+                stop_frame = _build_frame(CMD_BREW_STOP)  # 40519 full-process stop
+                await ble_client.send_command("stop_brew", stop_frame)
             _LOGGER.info("xbloom.stop_brew: stop command sent via BLE '%s'", ble_name)
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("xbloom.stop_brew: BLE dispatch failed: %s", err)
@@ -398,12 +447,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # diagnosing connection failures.                                     #
     # ------------------------------------------------------------------ #
     async def handle_ble_connect(call) -> None:
-        """Open BLE → handshake → start_notify → release → disconnect.
-        Logs every step with success/failure detail."""
+        """Open BLE → handshake (echo-gated) → disconnect. Logs every step.
+
+        Doubles as the safe, no-coffee validation of the send-and-confirm
+        (ACK-gating) layer: it drives the real send path for the harmless
+        handshake (8100, no grind/brew/motion) and reports whether the
+        machine's FFE2 echo arrived — confirming the echo stream works over
+        this host's actual BLE stack without touching the brew flow.
+        """
         from .vendor.xbloom.ble import (
             CMD_HANDSHAKE,
-            FFE1_UUID,
-            FFE2_UUID,
             HANDSHAKE_DATA,
             XBloomBleClient,
             _build_frame,
@@ -421,26 +474,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
         _LOGGER.info("xbloom.ble_connect: opening connection to %s …", ble_name)
         try:
-            ble_client = XBloomBleClient(ble_device)
+            ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
             async with ble_client:
                 _LOGGER.info("xbloom.ble_connect: ✓ connected")
                 handshake = _build_frame(CMD_HANDSHAKE, list(HANDSHAKE_DATA))
-                await ble_client._client.write_gatt_char(  # noqa: SLF001
-                    FFE1_UUID, handshake, response=False,
-                )
-                _LOGGER.info("xbloom.ble_connect: ✓ handshake written")
-                try:
-                    await ble_client._client.start_notify(  # noqa: SLF001
-                        FFE2_UUID, lambda *_: None
+                # send_command subscribes to FFE2 (best-effort) and waits for
+                # the 8100 echo — the ACK layer exercised end-to-end, safely.
+                confirmed = await ble_client.send_command("handshake", handshake)
+                if confirmed:
+                    _LOGGER.info(
+                        "xbloom.ble_connect: ✓ handshake echo CONFIRMED on FFE2 "
+                        "— send-and-confirm layer works on this BLE stack"
                     )
-                    _LOGGER.info("xbloom.ble_connect: ✓ FFE2 notify subscribed")
-                    await ble_client._client.stop_notify(FFE2_UUID)  # noqa: SLF001
-                    _LOGGER.info("xbloom.ble_connect: ✓ FFE2 notify released")
-                except Exception as err:  # noqa: BLE001
+                elif ble_client._notify_active:  # noqa: SLF001
                     _LOGGER.warning(
-                        "xbloom.ble_connect: ✗ FFE2 notify failed: %s "
-                        "(brew flow tolerates this — it just skips live status)",
-                        err,
+                        "xbloom.ble_connect: ✗ FFE2 subscribed but NO handshake "
+                        "echo arrived — echo stream is not delivering (brew will "
+                        "degrade to fixed-delay pacing)"
+                    )
+                else:
+                    _LOGGER.warning(
+                        "xbloom.ble_connect: ✗ FFE2 start_notify failed — no echo "
+                        "stream available (brew tolerates this via fixed delays)"
                     )
             _LOGGER.info("xbloom.ble_connect: ✓ disconnected cleanly")
         except Exception as err:  # noqa: BLE001
@@ -453,8 +508,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # helper so the connect-on-demand boilerplate isn't repeated.        #
     # ------------------------------------------------------------------ #
     async def _send_simple_command(*, label: str, packet: bytes) -> None:
-        """Resolve BLE → connect → write one frame to FFE1 → disconnect."""
-        from .vendor.xbloom.ble import FFE1_UUID, XBloomBleClient
+        """Send a single FFE1 command frame to the machine.
+
+        If a Connect (live) session is holding the BLE link, send the frame over
+        THAT session and stop — the machine accepts only one connection, so
+        opening our own would fight the live session and tear it down. (That is
+        exactly what made the dashboard Back-to-home drop Connect mid-navigation:
+        the standalone service opened a second link and, on disconnect, killed
+        the session, silencing every announcement after it.) When no session is
+        held, fall back to the one-shot connect → echo-gated write → disconnect.
+        """
+        from .ble_entities import send_live_frame
+        from .vendor.xbloom.ble import XBloomBleClient
+
+        if await send_live_frame(entry, packet):
+            _LOGGER.info("xbloom.%s: ✓ sent over the held Connect session", label)
+            return
 
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
@@ -469,12 +538,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             return
 
         try:
-            ble_client = XBloomBleClient(ble_device)
+            ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
             async with ble_client:
-                await ble_client._client.write_gatt_char(  # noqa: SLF001
-                    FFE1_UUID, packet, response=False,
-                )
-            _LOGGER.info("xbloom.%s: ✓ command sent over BLE %r", label, ble_name)
+                confirmed = await ble_client.send_command(label, packet)
+            _LOGGER.info(
+                "xbloom.%s: ✓ command sent over BLE %r (echo %s)",
+                label, ble_name, "confirmed" if confirmed else "unconfirmed",
+            )
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("xbloom.%s: BLE dispatch failed: %s", label, err)
 
@@ -483,9 +553,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         await _send_simple_command(label="tare", packet=packet_tare())
 
     async def handle_back_to_home(call) -> None:
-        from .vendor.xbloom.ble import packet_back_to_home
+        # 8022 is state-gated: the firmware REJECTS it from a live module screen
+        # (grinder/brewer/scale) — it only exits from home/standby — yet still
+        # echoes 8022, which previously read as a FALSE "home" while the machine
+        # stayed on the module. The app leaves a module with its QUIT command
+        # (grinder 8012 / brewer 8013 / scale 8014), which the fw routes home
+        # (fw:1769-1783) and then emits 8023 activity=1. Pick the quit that
+        # matches where we are; fall back to 8022 only from home/unknown.
+        from .vendor.xbloom.ble import (
+            packet_back_to_home, packet_quit_brewer,
+            packet_quit_grinder, packet_quit_scale,
+        )
+        st = hass.states.get("sensor.xbloom_studio_current_module")
+        module = st.state if st and st.state not in ("unknown", "unavailable") else None
+        builder = {
+            "grinder": packet_quit_grinder,
+            "brewer": packet_quit_brewer,
+            "scale": packet_quit_scale,
+        }.get(module, packet_back_to_home)
         await _send_simple_command(
-            label="back_to_home", packet=packet_back_to_home(),
+            label=f"back_to_home({module or 'home'})", packet=builder(),
         )
 
     async def handle_brew_pause(call) -> None:
@@ -513,7 +600,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         import asyncio as _asyncio
 
         from .vendor.xbloom.ble import (
-            FFE1_UUID, XBloomBleClient, packets_grind,
+            XBloomBleClient, packets_grind,
         )
 
         size = int(call.data.get("size", 63))
@@ -533,23 +620,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
         enter, start, stop = packets_grind(size, speed)
         try:
-            ble_client = XBloomBleClient(ble_device)
+            ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
             async with ble_client:
-                await ble_client._client.write_gatt_char(  # noqa: SLF001
-                    FFE1_UUID, enter, response=False,
-                )
-                await _asyncio.sleep(0.5)
-                await ble_client._client.write_gatt_char(  # noqa: SLF001
-                    FFE1_UUID, start, response=False,
-                )
+                # enter → start are echo-gated (send_command); the grind
+                # DURATION between start and stop is caller-controlled, and the
+                # post-stop settle mirrors brAzzi64. send_command uses the
+                # app-exact policy (retry only while sleeping) — safe for a
+                # motion command like grind_start: it never re-sends while the
+                # machine is awake, so it can't double-start a grind.
+                await ble_client.send_command("grind_enter", enter)
+                await ble_client.send_command("grind_start", start)
                 _LOGGER.info(
                     "xbloom.grind: grinding for %.1fs (size=%d, speed=%d)",
                     seconds, size, speed,
                 )
                 await _asyncio.sleep(seconds)
-                await ble_client._client.write_gatt_char(  # noqa: SLF001
-                    FFE1_UUID, stop, response=False,
-                )
+                await ble_client.send_command("grind_stop", stop)
                 # Per brAzzi64: small post-stop hold so the machine settles.
                 await _asyncio.sleep(1.5)
             _LOGGER.info("xbloom.grind: ✓ done")
@@ -563,7 +649,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         number/select entities. Reads water source from XBloomWaterSourceSelect.
         """
         from .vendor.xbloom.ble import (
-            FFE1_UUID, XBloomBleClient, build_brewer_standalone_frame,
+            XBloomBleClient, build_brewer_standalone_frame,
         )
 
         def _state_float(entity_id: str, default: float) -> float:
@@ -608,11 +694,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
         frame = build_brewer_standalone_frame(flow_rate, volume_ml, temp_c, water_feed, pattern_code)
         try:
-            ble_client = XBloomBleClient(ble_device)
+            ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
             async with ble_client:
-                await ble_client._client.write_gatt_char(  # noqa: SLF001
-                    FFE1_UUID, frame, response=False,
-                )
+                # brew_standalone (4506) is a motion command; the app-exact
+                # send_command policy (retry only while sleeping) never re-sends
+                # it while the machine is awake, so it can't restart a pour.
+                await ble_client.send_command("brew_standalone", frame)
             _LOGGER.info(
                 "xbloom.brew_standalone: ✓ sent (flow=%.1f, vol=%.0fml, temp=%.0f°C, "
                 "pattern=%s, water=%s)",
@@ -657,7 +744,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # ------------------------------------------------------------------ #
     async def handle_write_slot(call) -> None:
         from .vendor.xbloom.ble import (
-            FFE1_UUID, SLOT_INDEX, XBloomBleClient, packet_slot_write,
+            SLOT_INDEX, XBloomBleClient, packet_slot_write,
         )
 
         slot_letter = call.data["slot"].upper()
@@ -694,11 +781,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             return
 
         try:
-            ble_client = XBloomBleClient(ble_device)
+            ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
             async with ble_client:
-                await ble_client._client.write_gatt_char(  # noqa: SLF001
-                    FFE1_UUID, packet, response=False,
-                )
+                await ble_client.send_command("write_slot", packet)
             _LOGGER.info(
                 "xbloom.write_slot: ✓ '%s' written to slot %s on %s "
                 "(%d bytes, scale=%s)",
@@ -737,6 +822,42 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("xbloom.ble_disconnect: %s", err)
 
+    async def handle_refresh_status(call) -> None:
+        """Briefly open BLE, capture one heartbeat snapshot, then disconnect.
+
+        This is Method 1 (snapshot), decoupled from the Connect session: it
+        refreshes the machine's status sensors (water, grind size, mode, water
+        source, units, voltage, …) on demand — no persistent session required.
+        Awaitable, so an automation can call this and *then* act on fresh data.
+        If a brew or a Connect session already holds the link, the readings are
+        streaming anyway and this connect will just no-op/fail harmlessly.
+        """
+        from .vendor.xbloom.ble import XBloomBleClient
+
+        ble_name = _resolve_ble_name(entry)
+        if not ble_name:
+            _LOGGER.error("xbloom.refresh_status: BLE name unknown")
+            return
+        ble_device = await _resolve_ble_device(hass, ble_name)
+        if ble_device is None:
+            _LOGGER.error(
+                "xbloom.refresh_status: HA bluetooth has not seen %r", ble_name,
+            )
+            return
+        try:
+            ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
+            async with ble_client:
+                snap = await ble_client.read_status_snapshot(timeout=4.0)
+            if snap is not None:
+                _LOGGER.info("xbloom.refresh_status: ✓ refreshed from heartbeat")
+            else:
+                _LOGGER.warning(
+                    "xbloom.refresh_status: connected but no heartbeat captured "
+                    "(FFE2 notify may be unavailable)"
+                )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.error("xbloom.refresh_status: BLE dispatch failed: %s", err)
+
     hass.services.async_register(
         DOMAIN,
         "start_brew",
@@ -746,11 +867,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             vol.Optional("share_url"): str,
             vol.Optional("share_id"): str,
             vol.Optional("use_preground"): bool,
+            # Brew-customizer one-off overrides (scale pours to dose×ratio).
+            vol.Optional("dose"): vol.Coerce(float),
+            vol.Optional("ratio"): vol.Coerce(float),
+            vol.Optional("grind_size"): vol.Coerce(int),
         }),
     )
     hass.services.async_register(DOMAIN, "stop_brew", handle_stop_brew)
     hass.services.async_register(DOMAIN, "ble_connect", handle_ble_connect)
     hass.services.async_register(DOMAIN, "ble_disconnect", handle_ble_disconnect)
+    hass.services.async_register(DOMAIN, "refresh_status", handle_refresh_status)
     hass.services.async_register(DOMAIN, "tare", handle_tare)
     hass.services.async_register(DOMAIN, "back_to_home", handle_back_to_home)
     hass.services.async_register(DOMAIN, "brew_pause", handle_brew_pause)
@@ -855,6 +981,39 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         _LOGGER.info("xbloom.update_recipe: updated '%s'", recipe.get("name"))
         return {"ok": True, "name": recipe["name"].strip()}
 
+    async def handle_save_scaled_recipe(call) -> dict:
+        """Brew customizer 'Save as new recipe': scale the selected recipe by the
+        customizer's dose/ratio/grind and save it as a NEW recipe (local when
+        logged out; cloud + local mirror when logged in). Never overwrites the
+        source (the id is stripped)."""
+        from .vendor.xbloom.brew_scale import scale_recipe
+
+        new_name = (call.data.get("new_name") or "").strip()
+        if not new_name:
+            return {"ok": False, "error": "new_name is required"}
+        recipe, _ = await _resolve_recipe(
+            recipe_name=call.data.get("recipe_name"),
+            log_label="xbloom.save_scaled_recipe",
+        )
+        if recipe is None:
+            return {"ok": False, "error": "recipe not found"}
+        scaled = scale_recipe(
+            recipe,
+            dose_g=float(call.data["dose"]),
+            ratio=float(call.data["ratio"]),
+            grind_size=int(call.data["grind_size"]),
+        )
+        scaled["name"] = new_name
+        scaled.pop("id", None)          # a NEW recipe, not an overwrite
+        coordinator = entry.runtime_data.coordinator
+        try:
+            await coordinator.async_add_recipe(scaled)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.error("xbloom.save_scaled_recipe: %s", err)
+            return {"ok": False, "error": str(err)}
+        _LOGGER.info("xbloom.save_scaled_recipe: saved '%s'", new_name)
+        return {"ok": True, "name": new_name}
+
     async def handle_delete_recipe(call) -> dict:
         name = call.data["name"]
         coordinator = entry.runtime_data.coordinator
@@ -889,14 +1048,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         schema=vol.Schema({vol.Required("name"): str}),
         supports_response=SupportsResponse.ONLY,
     )
+    hass.services.async_register(
+        DOMAIN, "save_scaled_recipe", handle_save_scaled_recipe,
+        schema=vol.Schema({
+            vol.Required("new_name"): str,
+            vol.Required("dose"): vol.Coerce(float),
+            vol.Required("ratio"): vol.Coerce(float),
+            vol.Required("grind_size"): vol.Coerce(int),
+            vol.Optional("recipe_name"): str,
+        }),
+        supports_response=SupportsResponse.ONLY,
+    )
 
     for svc in (
         "start_brew", "stop_brew", "ble_connect", "ble_disconnect",
+        "refresh_status",
         "tare", "back_to_home", "brew_pause", "brew_resume",
         "grind", "set_mode", "set_water_source",
         "set_temp_unit", "set_weight_unit",
         "write_slot",
         "list_recipes", "get_recipe", "add_recipe", "update_recipe", "delete_recipe",
+        "save_scaled_recipe",
     ):
         entry.async_on_unload(
             lambda s=svc: hass.services.async_remove(DOMAIN, s)
@@ -908,18 +1080,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bool:
-    """Unload a config entry — make sure mode listeners are stopped first."""
+    """Unload a config entry — make sure the live session is stopped first."""
     runtime = entry.runtime_data
-    for attr in (
-        "voice_listener",
-        "scale_listener", "grinder_listener", "brewer_listener",
-    ):
-        listener = getattr(runtime, attr, None)
-        if listener is not None:
-            try:
-                await listener.stop()
-            except Exception:  # noqa: BLE001
-                _LOGGER.exception("Failed to stop %s during unload", attr)
+    listener = getattr(runtime, "live_session_listener", None)
+    if listener is not None:
+        try:
+            await listener.stop()
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Failed to stop live session during unload")
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
