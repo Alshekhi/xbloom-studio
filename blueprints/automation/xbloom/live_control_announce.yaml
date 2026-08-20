@@ -101,7 +101,7 @@ action:
           {%- elif ev == 'xbloom_grinder_knob_changed' -%}
             {% if param == 'size' %}درجة الطحن {{ value }}{% elif param == 'speed' %}سرعة الطحن {{ value }}{% endif %}
           {%- elif ev == 'xbloom_brewer_setting_changed' -%}
-            {% if setting == 'temperature' %}{% if value_name == 'RT' %}درجة حرارة الغرفة{% elif value_name == 'BP' %}درجة الغليان{% else %}درجة الحرارة {% if states('select.xbloom_studio_temperature_unit') == 'F' %}{{ (value | float * 1.8 + 32) | round(0) | int }} فهرنهايت{% else %}{{ value }} مئوية{% endif %}{% endif %}{% elif setting == 'pattern' %}نمط الصب {{ pattern_ar }}{% elif setting == 'size' %}درجة الطحن {{ value }}{% elif setting == 'speed' %}سرعة الطحن {{ value }}{% elif setting == 'ratio' %}النسبة {{ ratio_fmt }}{% endif %}
+            {% if setting == 'temperature' %}{% if value_name == 'RT' %}درجة حرارة الغرفة{% elif value_name == 'BP' %}درجة الغليان{% else %}درجة الحرارة {% if states('select.xbloom_studio_temperature_unit') == 'f' %}{{ (value | float * 1.8 + 32) | round(0) | int }} فهرنهايت{% else %}{{ value }} مئوية{% endif %}{% endif %}{% elif setting == 'pattern' %}نمط الصب {{ pattern_ar }}{% elif setting == 'size' %}درجة الطحن {{ value }}{% elif setting == 'speed' %}سرعة الطحن {{ value }}{% elif setting == 'ratio' %}النسبة {{ ratio_fmt }}{% endif %}
           {%- elif ev == 'xbloom_module_entered' -%}
             {% if module == 'scale' %}الميزان{% elif module == 'grinder' %}المطحنة{% elif module == 'brewer' %}الغلاية{% elif module == 'home' %}الشاشة الرئيسية{% elif module == 'auto' %}الوضع التلقائي{% endif %}
           {%- elif ev == 'xbloom_mode_changed' -%}
@@ -125,7 +125,7 @@ action:
           {%- elif ev == 'xbloom_grinder_knob_changed' -%}
             {% if param == 'size' %}Grind size {{ value }}{% elif param == 'speed' %}Grind speed {{ value }}{% endif %}
           {%- elif ev == 'xbloom_brewer_setting_changed' -%}
-            {% if setting == 'temperature' %}{% if value_name == 'RT' %}Room temperature{% elif value_name == 'BP' %}Boiling point{% else %}Temperature {% if states('select.xbloom_studio_temperature_unit') == 'F' %}{{ (value | float * 1.8 + 32) | round(0) | int }} Fahrenheit{% else %}{{ value }} Celsius{% endif %}{% endif %}{% elif setting == 'pattern' %}Pour pattern {{ pattern_en }}{% elif setting == 'size' %}Grind size {{ value }}{% elif setting == 'speed' %}Grind speed {{ value }}{% elif setting == 'ratio' %}Ratio one to {{ ratio_fmt }}{% endif %}
+            {% if setting == 'temperature' %}{% if value_name == 'RT' %}Room temperature{% elif value_name == 'BP' %}Boiling point{% else %}Temperature {% if states('select.xbloom_studio_temperature_unit') == 'f' %}{{ (value | float * 1.8 + 32) | round(0) | int }} Fahrenheit{% else %}{{ value }} Celsius{% endif %}{% endif %}{% elif setting == 'pattern' %}Pour pattern {{ pattern_en }}{% elif setting == 'size' %}Grind size {{ value }}{% elif setting == 'speed' %}Grind speed {{ value }}{% elif setting == 'ratio' %}Ratio one to {{ ratio_fmt }}{% endif %}
           {%- elif ev == 'xbloom_module_entered' -%}
             {% if module == 'scale' %}Scale{% elif module == 'grinder' %}Grinder{% elif module == 'brewer' %}Brewer{% elif module == 'home' %}Home screen{% elif module == 'auto' %}Auto mode{% endif %}
           {%- elif ev == 'xbloom_mode_changed' -%}

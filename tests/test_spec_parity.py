@@ -6,7 +6,7 @@ centralised into spec.py. The spec must reproduce every one of them, so this
 proves the refactor changed no behaviour — and stays a regression guard after
 migration, since the consumers now derive from spec.
 
-The single deliberate exception is documented inline: pour temperature's floor
+The deliberate exceptions are documented inline: pour temperature's floor
 is 40 (the machine rule the validator always enforced), not the 20 the edit
 wizard's slider previously allowed.
 
@@ -106,7 +106,11 @@ def _checks():
     yield "water source codes", spec.WATER_SOURCE_CODES, EXPECTED_WATER
     yield "weight unit codes", spec.WEIGHT_UNIT_CODES, EXPECTED_WEIGHT_UNIT
     # App-confirmed 2026-07-20: NumberExtendsKt.temperatureUnit → 0=°F, 1=°C.
-    yield "temp unit codes", spec.TEMP_UNIT_CODES, {"C": 1, "F": 0}
+    # Deliberate exception #2: these were "C"/"F" pre-refactor, but a select's
+    # state value doubles as its Home Assistant translation key and must match
+    # [a-z0-9-_]+ — uppercase fails hassfest, a required check. The wire codes
+    # (1/0) are unchanged; only the token case moved.
+    yield "temp unit codes", spec.TEMP_UNIT_CODES, {"c": 1, "f": 0}
 
     # RT/BP sentinels sit at the ends of the temperature range and validate.
     yield "RT sentinel", spec.ROOM_TEMP_C, 20.0

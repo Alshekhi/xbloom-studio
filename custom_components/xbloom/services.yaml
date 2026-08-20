@@ -184,12 +184,12 @@ set_temp_unit:
     unit:
       name: Unit
       required: true
-      example: C
+      example: c
       selector:
         select:
           options:
-            - C
-            - F
+            - c
+            - f
 
 set_weight_unit:
   name: Set Weight Unit
