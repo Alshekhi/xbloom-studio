@@ -7,22 +7,59 @@ blueprint:
     module you entered on the machine, and recipe-card scans — plus the
     connection lifecycle. Bilingual (English / Arabic).
 
+    Speaks through Alexa, any TTS engine and speaker, or any notify service —
+    pick one under "How to announce".
+
     This is the companion to the integration's live-session listener: the
     integration fires the events (voice-agnostic — they also drive sensors and
     the dashboard), and this blueprint turns them into speech on the speaker(s)
-    you choose. Import it once, pick your Alexa device and language.
+    you choose. Import it once, pick how to announce and a language.
   domain: automation
   author: xbloom-studio-controler
   input:
-    alexa_target:
-      name: Alexa device(s)
+    delivery_method:
+      name: How to announce
       description: >
-        One or more Alexa media_player entities that should speak the readings.
+        Alexa — uses the Alexa Media Player integration's TTS mode.
+        Speaker (TTS) — speaks through a TTS engine on the speakers you pick.
+        Notify service — sends the text to any notify service, such as a phone.
+        Fill in only the fields for the method you choose; the rest are ignored.
+      default: alexa
+      selector:
+        select:
+          options:
+            - { value: alexa, label: Alexa }
+            - { value: tts, label: Speaker (TTS) }
+            - { value: notify, label: Notify service }
+    speakers:
+      name: Speakers
+      description: >
+        Used by the Alexa and Speaker (TTS) methods. The media players that
+        should speak the readings. Leave empty for the Notify service method.
+      default: []
       selector:
         entity:
-          integration: alexa_media
           domain: media_player
           multiple: true
+    tts_engine:
+      name: TTS engine
+      description: >
+        Used by the Speaker (TTS) method only — the TTS entity to speak with,
+        for example tts.google_translate_en_com or tts.piper. Leave empty for
+        the other methods.
+      default: ""
+      selector:
+        entity:
+          domain: tts
+    notify_service:
+      name: Notify service
+      description: >
+        Used by the Notify service method only — the full service name to call,
+        for example notify.mobile_app_my_phone or notify.persistent_notification.
+        Leave empty for the other methods.
+      default: ""
+      selector:
+        text:
     language:
       name: Announcement language
       description: English or Arabic.
@@ -35,6 +72,8 @@ blueprint:
 
 variables:
   lang: !input language
+  method: !input delivery_method
+  notify_service: !input notify_service
   ev: "{{ trigger.event.event_type }}"
   reason: "{{ trigger.event.data.reason | default('') }}"
   reason_pretty: "{{ reason | replace('_', ' ') }}"
@@ -64,6 +103,56 @@ variables:
   # derived: brew ratio formatted without a trailing .0 (15.0 -> 15, 16.5 -> 16.5)
   ratio_fmt: >-
     {% set r = value | float %}{{ (r | round(0) | int) if r == (r | round(0)) else (r | round(1)) }}
+  message: >-
+    {%- if lang == 'ar' -%}
+      {%- if ev == 'xbloom_connect_connecting' -%}
+        جاري الاتصال بـ إكس بلوم
+      {%- elif ev == 'xbloom_connect_ready' -%}
+        تم الاتصال بـ إكس بلوم
+      {%- elif ev == 'xbloom_connect_failed' -%}
+        فشل الاتصال بـ إكس بلوم{% if reason == 'machine_not_found' %}، لم يتم العثور على الجهاز{% elif reason == 'machine_busy' %}، الجهاز مشغول{% elif reason == 'connection_lost' %}، انقطع الاتصال{% endif %}
+      {%- elif ev == 'xbloom_connect_auto_stopped' -%}
+        انتهت مهلة الاتصال بـ إكس بلوم
+      {%- elif ev == 'xbloom_scale_weight_stable' -%}
+        الوزن {{ weight }} جرام
+      {%- elif ev == 'xbloom_grinder_knob_changed' -%}
+        {% if param == 'size' %}درجة الطحن {{ value }}{% elif param == 'speed' %}سرعة الطحن {{ value }}{% endif %}
+      {%- elif ev == 'xbloom_brewer_setting_changed' -%}
+        {% if setting == 'temperature' %}{% if value_name == 'RT' %}درجة حرارة الغرفة{% elif value_name == 'BP' %}درجة الغليان{% else %}درجة الحرارة {% if states('select.xbloom_studio_temperature_unit') == 'f' %}{{ (value | float * 1.8 + 32) | round(0) | int }} فهرنهايت{% else %}{{ value }} مئوية{% endif %}{% endif %}{% elif setting == 'pattern' %}نمط الصب {{ pattern_ar }}{% elif setting == 'size' %}درجة الطحن {{ value }}{% elif setting == 'speed' %}سرعة الطحن {{ value }}{% elif setting == 'ratio' %}النسبة {{ ratio_fmt }}{% endif %}
+      {%- elif ev == 'xbloom_module_entered' -%}
+        {% if module == 'scale' %}الميزان{% elif module == 'grinder' %}المطحنة{% elif module == 'brewer' %}الغلاية{% elif module == 'home' %}الشاشة الرئيسية{% elif module == 'auto' %}الوضع التلقائي{% endif %}
+      {%- elif ev == 'xbloom_mode_changed' -%}
+        {% if mode == 'auto' %}الوضع التلقائي{% elif mode == 'pro' %}الوضع الاحترافي{% endif %}
+      {%- elif ev == 'xbloom_scale_tared' -%}
+        تم التصفير
+      {%- elif ev == 'xbloom_recipe_card_scanned' -%}
+        تم مسح بطاقة الوصفة
+      {%- endif -%}
+    {%- else -%}
+      {%- if ev == 'xbloom_connect_connecting' -%}
+        Connecting to xBloom
+      {%- elif ev == 'xbloom_connect_ready' -%}
+        Connected to xBloom
+      {%- elif ev == 'xbloom_connect_failed' -%}
+        Failed to connect to xBloom{% if reason == 'machine_not_found' %}, device not found{% elif reason == 'machine_busy' %}, device busy{% elif reason == 'connection_lost' %}, connection lost{% endif %}
+      {%- elif ev == 'xbloom_connect_auto_stopped' -%}
+        xBloom connection timed out
+      {%- elif ev == 'xbloom_scale_weight_stable' -%}
+        {{ weight }} grams
+      {%- elif ev == 'xbloom_grinder_knob_changed' -%}
+        {% if param == 'size' %}Grind size {{ value }}{% elif param == 'speed' %}Grind speed {{ value }}{% endif %}
+      {%- elif ev == 'xbloom_brewer_setting_changed' -%}
+        {% if setting == 'temperature' %}{% if value_name == 'RT' %}Room temperature{% elif value_name == 'BP' %}Boiling point{% else %}Temperature {% if states('select.xbloom_studio_temperature_unit') == 'f' %}{{ (value | float * 1.8 + 32) | round(0) | int }} Fahrenheit{% else %}{{ value }} Celsius{% endif %}{% endif %}{% elif setting == 'pattern' %}Pour pattern {{ pattern_en }}{% elif setting == 'size' %}Grind size {{ value }}{% elif setting == 'speed' %}Grind speed {{ value }}{% elif setting == 'ratio' %}Ratio one to {{ ratio_fmt }}{% endif %}
+      {%- elif ev == 'xbloom_module_entered' -%}
+        {% if module == 'scale' %}Scale{% elif module == 'grinder' %}Grinder{% elif module == 'brewer' %}Brewer{% elif module == 'home' %}Home screen{% elif module == 'auto' %}Auto mode{% endif %}
+      {%- elif ev == 'xbloom_mode_changed' -%}
+        {% if mode == 'auto' %}Auto mode{% elif mode == 'pro' %}Pro mode{% endif %}
+      {%- elif ev == 'xbloom_scale_tared' -%}
+        Scale zeroed
+      {%- elif ev == 'xbloom_recipe_card_scanned' -%}
+        Recipe card scanned
+      {%- endif -%}
+    {%- endif -%}
 
 trigger:
   - platform: event
@@ -80,62 +169,33 @@ trigger:
       - xbloom_scale_tared
       - xbloom_recipe_card_scanned
 
+condition:
+  - condition: template
+    value_template: "{{ message | trim != '' }}"
+
 action:
-  - service: notify.alexa_media
-    data:
-      target: !input alexa_target
-      data:
-        type: tts
-      message: >-
-        {%- if lang == 'ar' -%}
-          {%- if ev == 'xbloom_connect_connecting' -%}
-            جاري الاتصال بـ إكس بلوم
-          {%- elif ev == 'xbloom_connect_ready' -%}
-            تم الاتصال بـ إكس بلوم
-          {%- elif ev == 'xbloom_connect_failed' -%}
-            فشل الاتصال بـ إكس بلوم{% if reason == 'machine_not_found' %}، لم يتم العثور على الجهاز{% elif reason == 'machine_busy' %}، الجهاز مشغول{% elif reason == 'connection_lost' %}، انقطع الاتصال{% endif %}
-          {%- elif ev == 'xbloom_connect_auto_stopped' -%}
-            انتهت مهلة الاتصال بـ إكس بلوم
-          {%- elif ev == 'xbloom_scale_weight_stable' -%}
-            الوزن {{ weight }} جرام
-          {%- elif ev == 'xbloom_grinder_knob_changed' -%}
-            {% if param == 'size' %}درجة الطحن {{ value }}{% elif param == 'speed' %}سرعة الطحن {{ value }}{% endif %}
-          {%- elif ev == 'xbloom_brewer_setting_changed' -%}
-            {% if setting == 'temperature' %}{% if value_name == 'RT' %}درجة حرارة الغرفة{% elif value_name == 'BP' %}درجة الغليان{% else %}درجة الحرارة {% if states('select.xbloom_studio_temperature_unit') == 'f' %}{{ (value | float * 1.8 + 32) | round(0) | int }} فهرنهايت{% else %}{{ value }} مئوية{% endif %}{% endif %}{% elif setting == 'pattern' %}نمط الصب {{ pattern_ar }}{% elif setting == 'size' %}درجة الطحن {{ value }}{% elif setting == 'speed' %}سرعة الطحن {{ value }}{% elif setting == 'ratio' %}النسبة {{ ratio_fmt }}{% endif %}
-          {%- elif ev == 'xbloom_module_entered' -%}
-            {% if module == 'scale' %}الميزان{% elif module == 'grinder' %}المطحنة{% elif module == 'brewer' %}الغلاية{% elif module == 'home' %}الشاشة الرئيسية{% elif module == 'auto' %}الوضع التلقائي{% endif %}
-          {%- elif ev == 'xbloom_mode_changed' -%}
-            {% if mode == 'auto' %}الوضع التلقائي{% elif mode == 'pro' %}الوضع الاحترافي{% endif %}
-          {%- elif ev == 'xbloom_scale_tared' -%}
-            تم التصفير
-          {%- elif ev == 'xbloom_recipe_card_scanned' -%}
-            تم مسح بطاقة الوصفة
-          {%- endif -%}
-        {%- else -%}
-          {%- if ev == 'xbloom_connect_connecting' -%}
-            Connecting to xBloom
-          {%- elif ev == 'xbloom_connect_ready' -%}
-            Connected to xBloom
-          {%- elif ev == 'xbloom_connect_failed' -%}
-            Failed to connect to xBloom{% if reason == 'machine_not_found' %}, device not found{% elif reason == 'machine_busy' %}, device busy{% elif reason == 'connection_lost' %}, connection lost{% endif %}
-          {%- elif ev == 'xbloom_connect_auto_stopped' -%}
-            xBloom connection timed out
-          {%- elif ev == 'xbloom_scale_weight_stable' -%}
-            {{ weight }} grams
-          {%- elif ev == 'xbloom_grinder_knob_changed' -%}
-            {% if param == 'size' %}Grind size {{ value }}{% elif param == 'speed' %}Grind speed {{ value }}{% endif %}
-          {%- elif ev == 'xbloom_brewer_setting_changed' -%}
-            {% if setting == 'temperature' %}{% if value_name == 'RT' %}Room temperature{% elif value_name == 'BP' %}Boiling point{% else %}Temperature {% if states('select.xbloom_studio_temperature_unit') == 'f' %}{{ (value | float * 1.8 + 32) | round(0) | int }} Fahrenheit{% else %}{{ value }} Celsius{% endif %}{% endif %}{% elif setting == 'pattern' %}Pour pattern {{ pattern_en }}{% elif setting == 'size' %}Grind size {{ value }}{% elif setting == 'speed' %}Grind speed {{ value }}{% elif setting == 'ratio' %}Ratio one to {{ ratio_fmt }}{% endif %}
-          {%- elif ev == 'xbloom_module_entered' -%}
-            {% if module == 'scale' %}Scale{% elif module == 'grinder' %}Grinder{% elif module == 'brewer' %}Brewer{% elif module == 'home' %}Home screen{% elif module == 'auto' %}Auto mode{% endif %}
-          {%- elif ev == 'xbloom_mode_changed' -%}
-            {% if mode == 'auto' %}Auto mode{% elif mode == 'pro' %}Pro mode{% endif %}
-          {%- elif ev == 'xbloom_scale_tared' -%}
-            Scale zeroed
-          {%- elif ev == 'xbloom_recipe_card_scanned' -%}
-            Recipe card scanned
-          {%- endif -%}
-        {%- endif -%}
+  - choose:
+      - conditions: "{{ method == 'alexa' }}"
+        sequence:
+          - action: notify.alexa_media
+            data:
+              target: !input speakers
+              data:
+                type: tts
+              message: "{{ message }}"
+      - conditions: "{{ method == 'tts' }}"
+        sequence:
+          - action: tts.speak
+            target:
+              entity_id: !input tts_engine
+            data:
+              media_player_entity_id: !input speakers
+              message: "{{ message }}"
+      - conditions: "{{ method == 'notify' }}"
+        sequence:
+          - action: "{{ notify_service }}"
+            data:
+              message: "{{ message }}"
 
 mode: queued
 max: 10
