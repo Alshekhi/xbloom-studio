@@ -1,10 +1,12 @@
 blueprint:
   name: "xBloom — Brew announcements"
   description: >
-    Announces the xBloom brew lifecycle on Alexa: the brew starting, pouring
-    started, and coffee ready. Optionally names the recipe at both ends.
-    Bilingual (English / Arabic). Replaces the separate brew_started,
-    brew_complete, and brew_complete_with_recipe blueprints.
+    Announces the xBloom brew lifecycle: the brew starting, pouring started, and
+    coffee ready. Optionally names the recipe at both ends. Bilingual
+    (English / Arabic).
+
+    Speaks through Alexa, any TTS engine and speaker, or any notify service —
+    pick one under "How to announce".
 
     The start announcement fires on the `xbloom_brew_started` bus event, which
     the xbloom.start_brew service emits the instant it dispatches — before any
@@ -33,14 +35,50 @@ blueprint:
       selector:
         entity:
           domain: event
-    alexa_target:
-      name: Alexa device(s)
-      description: One or more Alexa media_player entities to announce on.
+    delivery_method:
+      name: How to announce
+      description: >
+        Alexa — uses the Alexa Media Player integration's announce mode.
+        Speaker (TTS) — speaks through a TTS engine on the speakers you pick.
+        Notify service — sends the text to any notify service, such as a phone.
+        Fill in only the fields for the method you choose; the rest are ignored.
+      default: alexa
+      selector:
+        select:
+          options:
+            - { value: alexa, label: Alexa }
+            - { value: tts, label: Speaker (TTS) }
+            - { value: notify, label: Notify service }
+    speakers:
+      name: Speakers
+      description: >
+        Used by the Alexa and Speaker (TTS) methods. The media players to speak
+        on. For Alexa, pick your Alexa devices. Leave empty for the Notify
+        service method.
+      default: []
       selector:
         entity:
-          integration: alexa_media
           domain: media_player
           multiple: true
+    tts_engine:
+      name: TTS engine
+      description: >
+        Used by the Speaker (TTS) method only — the TTS entity to speak with,
+        for example tts.google_translate_en_com or tts.piper. Leave empty for
+        the other methods.
+      default: ""
+      selector:
+        entity:
+          domain: tts
+    notify_service:
+      name: Notify service
+      description: >
+        Used by the Notify service method only — the full service name to call,
+        for example notify.mobile_app_my_phone or notify.persistent_notification.
+        Leave empty for the other methods.
+      default: ""
+      selector:
+        text:
     announce_recipe:
       name: Announce recipe name
       description: >
@@ -63,12 +101,36 @@ blueprint:
 variables:
   lang: !input language
   announce_recipe: !input announce_recipe
+  method: !input delivery_method
+  notify_service: !input notify_service
   recipe_name: >-
     {%- if trigger.id == 'done_recipe' -%}
       {{ trigger.to_state.attributes.get('recipe_name', '') }}
     {%- elif trigger.id == 'started' -%}
       {{ trigger.event.data.get('recipe_name', '') }}
     {%- else -%}
+    {%- endif -%}
+  # Everything the automation might say, resolved to one line. An empty result
+  # means "this trigger should not announce" and the condition below drops it —
+  # which keeps the delivery block a single action instead of one per branch.
+  message: >-
+    {%- if trigger.id == 'started' -%}
+      {%- if lang == 'ar' -%}
+        {%- if announce_recipe and recipe_name %}بدأ تحضير {{ recipe_name }}{% else %}بدأ تحضير قهوتك{% endif -%}
+      {%- else -%}
+        {%- if announce_recipe and recipe_name %}Started preparing {{ recipe_name }}{% else %}Starting your coffee{% endif -%}
+      {%- endif -%}
+    {%- elif trigger.id == 'pouring' -%}
+      {%- if lang == 'ar' %}بدأ صب القهوة{% else %}Pouring started{% endif -%}
+    {%- elif trigger.id == 'done_simple' and not announce_recipe -%}
+      {%- if lang == 'ar' %}قهوتك في انتظارك{% else %}Your coffee is ready{% endif -%}
+    {%- elif trigger.id == 'done_recipe' and announce_recipe
+            and trigger.to_state.attributes.get('event_type') == 'brew_done' -%}
+      {%- if lang == 'ar' -%}
+        {%- if recipe_name %}انتهى تحضير {{ recipe_name }}{% else %}انتهى تحضير قهوتك{% endif -%}
+      {%- else -%}
+        {%- if recipe_name %}Finished preparing {{ recipe_name }}{% else %}Your coffee is ready{% endif -%}
+      {%- endif -%}
     {%- endif -%}
 
 trigger:
@@ -89,53 +151,33 @@ trigger:
     entity_id: !input brew_event_entity
     id: done_recipe
 
+condition:
+  - condition: template
+    value_template: "{{ message | trim != '' }}"
+
 action:
   - choose:
-      # Brew starting — names the recipe when known
-      - conditions: "{{ trigger.id == 'started' }}"
+      - conditions: "{{ method == 'alexa' }}"
         sequence:
           - action: notify.alexa_media
             data:
-              target: !input alexa_target
+              target: !input speakers
               data:
                 type: announce
-              message: >-
-                {% if lang == 'ar' %}{% if announce_recipe and recipe_name %}بدأ تحضير {{ recipe_name }}{% else %}بدأ تحضير قهوتك{% endif %}{% else %}{% if announce_recipe and recipe_name %}Started preparing {{ recipe_name }}{% else %}Starting your coffee{% endif %}{% endif %}
-      # Pouring started
-      - conditions: "{{ trigger.id == 'pouring' }}"
+              message: "{{ message }}"
+      - conditions: "{{ method == 'tts' }}"
         sequence:
-          - action: notify.alexa_media
+          - action: tts.speak
+            target:
+              entity_id: !input tts_engine
             data:
-              target: !input alexa_target
-              data:
-                type: announce
-              message: >-
-                {% if lang == 'ar' %}بدأ صب القهوة{% else %}Pouring started{% endif %}
-      # Ready — plain (only when NOT announcing the recipe name)
-      - conditions:
-          - "{{ trigger.id == 'done_simple' }}"
-          - "{{ not announce_recipe }}"
+              media_player_entity_id: !input speakers
+              message: "{{ message }}"
+      - conditions: "{{ method == 'notify' }}"
         sequence:
-          - action: notify.alexa_media
+          - action: "{{ notify_service }}"
             data:
-              target: !input alexa_target
-              data:
-                type: announce
-              message: >-
-                {% if lang == 'ar' %}قهوتك في انتظارك{% else %}Your coffee is ready{% endif %}
-      # Ready — with recipe name (only when announcing the recipe, on brew_done)
-      - conditions:
-          - "{{ trigger.id == 'done_recipe' }}"
-          - "{{ announce_recipe }}"
-          - "{{ trigger.to_state.attributes.get('event_type') == 'brew_done' }}"
-        sequence:
-          - action: notify.alexa_media
-            data:
-              target: !input alexa_target
-              data:
-                type: announce
-              message: >-
-                {% if lang == 'ar' %}{% if recipe_name %}انتهى تحضير {{ recipe_name }}{% else %}انتهى تحضير قهوتك{% endif %}{% else %}{% if recipe_name %}Finished preparing {{ recipe_name }}{% else %}Your coffee is ready{% endif %}{% endif %}
+              message: "{{ message }}"
 
 mode: queued
 max: 5
