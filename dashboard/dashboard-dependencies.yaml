@@ -1,0 +1,67 @@
+# xBloom dashboard — helper & script dependencies
+# The dashboard YAML references three non-integration entities you must create
+# first. Everything else on the dashboard is provided by the xBloom integration.
+#
+# OPTIONAL, nothing to create: the Machine view also has toggles for the three
+# announcement automations (automation.xbloom_brew_announcements,
+# automation.xbloom_machine_fault_announcements,
+# automation.xbloom_live_control_announcements). Those come from importing the
+# blueprints in blueprints/automation/xbloom/. The whole "Voice announcements"
+# section is hidden until at least one of them exists, so you can ignore this
+# if you do not want spoken announcements. If you import the blueprints and the
+# section still does not appear, your automations were given different entity
+# IDs — rename them to match, or edit the entity names in the dashboard YAML.
+#
+# 1) Two input_boolean helpers (Settings -> Devices & Services -> Helpers -> Toggle),
+#    or drop this into configuration.yaml under `input_boolean:`.
+
+input_boolean:
+  xbloom_show_advanced:
+    name: xBloom show advanced
+    icon: mdi:tune-variant
+  xbloom_show_per_pour:
+    name: xBloom show per-pour
+    icon: mdi:format-list-numbered
+
+# 2) One script (Settings -> Automations & Scenes -> Scripts -> add in YAML mode),
+#    or drop this under `script:` in configuration.yaml.
+#    It deletes whatever recipe is selected in the picker, then refreshes the list.
+#    Note: xbloom.delete_recipe is SupportsResponse.ONLY, so it MUST be called with
+#    response_variable or it raises.
+
+script:
+  xbloom_delete_selected_recipe:
+    alias: "xBloom — Delete selected recipe"
+    description: >-
+      Deletes whichever recipe is currently selected in
+      select.xbloom_studio_recipe, then refreshes the recipe list. Bails out if
+      nothing is selected, since xbloom.delete_recipe matches on an exact name.
+    icon: mdi:delete-alert
+    mode: single
+    sequence:
+      - alias: Bail out unless a real recipe is selected
+        condition: not
+        conditions:
+          - condition: state
+            entity_id: select.xbloom_studio_recipe
+            state:
+              - unknown
+              - unavailable
+      - alias: Delete the selected recipe by name
+        action: xbloom.delete_recipe
+        data:
+          name: "{{ states('select.xbloom_studio_recipe') }}"
+        response_variable: delete_result
+      - alias: Stop with an error if the recipe was not found
+        if:
+          - condition: template
+            value_template: "{{ not delete_result.ok }}"
+        then:
+          - stop: >-
+              xBloom did not delete '{{ states('select.xbloom_studio_recipe') }}'
+              — no matching recipe in the library.
+            error: true
+      - alias: Refresh the recipe list so the picker drops the deleted entry
+        action: button.press
+        target:
+          entity_id: button.xbloom_studio_refresh_recipes
