@@ -1,13 +1,16 @@
 blueprint:
   name: "xBloom — Machine Fault Announcements"
   description: >
-    Speaks an alert on a chosen Alexa device when the xBloom machine reports a
-    fault during use — out of water, no beans in the grinder, a dose/water
-    mismatch, or a grinder gear error. Bilingual (English / Arabic).
+    Speaks an alert when the xBloom machine reports a fault during use — out of
+    water, no beans in the grinder, a dose/water mismatch, or a grinder gear
+    error. Bilingual (English / Arabic).
+
+    Speaks through Alexa, any TTS engine and speaker, or any notify service —
+    pick one under "How to announce".
 
     Triggers on the xBloom Brew Event entity firing one of the fault event
     types (error_no_water, error_no_beans, error_dose_water,
-    error_gear_position). Pair it with the brew-complete blueprint so a
+    error_gear_position). Pair it with the brew-announcements blueprint so a
     VoiceOver user hears both successes and problems without looking at the
     machine.
   domain: automation
@@ -21,15 +24,49 @@ blueprint:
       selector:
         entity:
           domain: event
-    alexa_target:
-      name: Alexa device(s)
+    delivery_method:
+      name: How to announce
       description: >
-        One or more Alexa media_player entities that should speak the alerts.
+        Alexa — uses the Alexa Media Player integration's announce mode.
+        Speaker (TTS) — speaks through a TTS engine on the speakers you pick.
+        Notify service — sends the text to any notify service, such as a phone.
+        Fill in only the fields for the method you choose; the rest are ignored.
+      default: alexa
+      selector:
+        select:
+          options:
+            - { value: alexa, label: Alexa }
+            - { value: tts, label: Speaker (TTS) }
+            - { value: notify, label: Notify service }
+    speakers:
+      name: Speakers
+      description: >
+        Used by the Alexa and Speaker (TTS) methods. The media players that
+        should speak the alerts. Leave empty for the Notify service method.
+      default: []
       selector:
         entity:
-          integration: alexa_media
           domain: media_player
           multiple: true
+    tts_engine:
+      name: TTS engine
+      description: >
+        Used by the Speaker (TTS) method only — the TTS entity to speak with,
+        for example tts.google_translate_en_com or tts.piper. Leave empty for
+        the other methods.
+      default: ""
+      selector:
+        entity:
+          domain: tts
+    notify_service:
+      name: Notify service
+      description: >
+        Used by the Notify service method only — the full service name to call,
+        for example notify.mobile_app_my_phone or notify.persistent_notification.
+        Leave empty for the other methods.
+      default: ""
+      selector:
+        text:
     language:
       name: Announcement language
       description: English or Arabic.
@@ -43,6 +80,30 @@ blueprint:
 variables:
   ev: "{{ trigger.to_state.attributes.get('event_type') }}"
   lang: !input language
+  method: !input delivery_method
+  notify_service: !input notify_service
+  message: >-
+    {%- if lang == 'ar' -%}
+      {%- if ev == 'error_no_water' -%}
+        الماكينة بحاجة إلى ماء — أضف ماءً إلى الخزان
+      {%- elif ev == 'error_no_beans' -%}
+        لا توجد حبوب في المطحنة
+      {%- elif ev == 'error_dose_water' -%}
+        خطأ في كمية الماء أو الجرعة
+      {%- elif ev == 'error_gear_position' -%}
+        خطأ في موضع المطحنة
+      {%- endif -%}
+    {%- else -%}
+      {%- if ev == 'error_no_water' -%}
+        The xBloom is out of water. Please refill the tank.
+      {%- elif ev == 'error_no_beans' -%}
+        No beans detected in the grinder.
+      {%- elif ev == 'error_dose_water' -%}
+        Water and dose mismatch on the xBloom.
+      {%- elif ev == 'error_gear_position' -%}
+        Grinder gear error on the xBloom.
+      {%- endif -%}
+    {%- endif -%}
 
 trigger:
   - platform: state
@@ -55,33 +116,28 @@ condition:
          ['error_no_water', 'error_no_beans', 'error_dose_water', 'error_gear_position'] }}
 
 action:
-  - service: notify.alexa_media
-    data:
-      target: !input alexa_target
-      data:
-        type: announce
-      message: >-
-        {%- if lang == 'ar' -%}
-          {%- if ev == 'error_no_water' -%}
-            الماكينة بحاجة إلى ماء — أضف ماءً إلى الخزان
-          {%- elif ev == 'error_no_beans' -%}
-            لا توجد حبوب في المطحنة
-          {%- elif ev == 'error_dose_water' -%}
-            خطأ في كمية الماء أو الجرعة
-          {%- elif ev == 'error_gear_position' -%}
-            خطأ في موضع المطحنة
-          {%- endif -%}
-        {%- else -%}
-          {%- if ev == 'error_no_water' -%}
-            The xBloom is out of water. Please refill the tank.
-          {%- elif ev == 'error_no_beans' -%}
-            No beans detected in the grinder.
-          {%- elif ev == 'error_dose_water' -%}
-            Water and dose mismatch on the xBloom.
-          {%- elif ev == 'error_gear_position' -%}
-            Grinder gear error on the xBloom.
-          {%- endif -%}
-        {%- endif -%}
+  - choose:
+      - conditions: "{{ method == 'alexa' }}"
+        sequence:
+          - action: notify.alexa_media
+            data:
+              target: !input speakers
+              data:
+                type: announce
+              message: "{{ message }}"
+      - conditions: "{{ method == 'tts' }}"
+        sequence:
+          - action: tts.speak
+            target:
+              entity_id: !input tts_engine
+            data:
+              media_player_entity_id: !input speakers
+              message: "{{ message }}"
+      - conditions: "{{ method == 'notify' }}"
+        sequence:
+          - action: "{{ notify_service }}"
+            data:
+              message: "{{ message }}"
 
 mode: queued
 max: 5
