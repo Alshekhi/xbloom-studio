@@ -100,7 +100,7 @@ action:
               data:
                 type: announce
               message: >-
-                {% if lang == 'ar' %}{% if announce_recipe and recipe_name %}بدأ تحضير وصفة {{ recipe_name }}{% else %}بدأ تحضير قهوتك{% endif %}{% else %}{% if announce_recipe and recipe_name %}Started preparing recipe {{ recipe_name }}{% else %}Starting your coffee{% endif %}{% endif %}
+                {% if lang == 'ar' %}{% if announce_recipe and recipe_name %}بدأ تحضير {{ recipe_name }}{% else %}بدأ تحضير قهوتك{% endif %}{% else %}{% if announce_recipe and recipe_name %}Started preparing {{ recipe_name }}{% else %}Starting your coffee{% endif %}{% endif %}
       # Pouring started
       - conditions: "{{ trigger.id == 'pouring' }}"
         sequence:
@@ -135,7 +135,7 @@ action:
               data:
                 type: announce
               message: >-
-                {% if lang == 'ar' %}{% if recipe_name %}انتهى تحضير وصفة {{ recipe_name }}{% else %}انتهى تحضير قهوتك{% endif %}{% else %}{% if recipe_name %}Finished preparing recipe {{ recipe_name }}{% else %}Your coffee is ready{% endif %}{% endif %}
+                {% if lang == 'ar' %}{% if recipe_name %}انتهى تحضير {{ recipe_name }}{% else %}انتهى تحضير قهوتك{% endif %}{% else %}{% if recipe_name %}Finished preparing {{ recipe_name }}{% else %}Your coffee is ready{% endif %}{% endif %}
 
 mode: queued
 max: 5
