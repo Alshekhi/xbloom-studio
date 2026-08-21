@@ -20,37 +20,46 @@ An **optional** xBloom account adds cloud recipe sync and a firmware-update chec
 - **Firmware update** *(cloud + Bluetooth)* — when signed in, a Firmware entity compares the machine's installed firmware (read over Bluetooth) against the latest version xBloom publishes, with release notes. Pressing **Install** downloads the firmware from xBloom, verifies its MD5, and flashes it over Bluetooth, acknowledged block by block and verified byte-for-byte against a real captured update. It's off until you enable it in the Configure menu. **⚠️ See [Firmware updates](#firmware-updates) before turning it on.**
 - **One-tap brewing** — start, pause, resume, or cancel a brew; brew with pre-ground coffee; write a recipe to one of the machine's on-device slots.
 - **Standalone control** — run the grinder or brewer on their own, tare the scale, switch water source, and change the machine's on-screen units.
+- **Ready-made dashboard** — a context-aware, screen-reader-first dashboard built from stock Home Assistant cards. It follows the machine from screen to screen and hides controls that can't work right now.
 - **Announcement blueprints** — ready-made, one-click blueprints that speak brew progress, live machine feedback, and faults. Bilingual (English / Arabic), and they work with Alexa, any TTS engine and speaker, or any notify service.
 
-## Requirements
+## Getting started
+
+### Requirements
 
 - Home Assistant **2025.1** or newer.
 - **Bluetooth on your Home Assistant host.** In most cases this is already there and there's nothing to buy or set up — a Raspberry Pi, an Intel NUC, or a mini PC running Home Assistant has Bluetooth built in, and the machine only has to be within its range.
   - If your host has no Bluetooth, or it's too far from the kitchen to reach the machine, an [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy.html) placed near the machine is one way to extend the range. **You don't need one otherwise** — it's an alternative for hosts that can't reach the machine, not a requirement. The integration uses whatever Home Assistant's own Bluetooth gives it and doesn't care which.
 - The xBloom Studio powered on and in Bluetooth range during setup and while sending commands.
 
-## Installation
+### Installation
 
-### HACS (recommended)
+#### HACS (recommended)
 
-Install it as a HACS **custom repository**:
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Alshekhi&repository=xbloom-studio&category=integration)
+
+Click the button, press **Download**, then restart Home Assistant. It adds the repository to
+HACS for you.
+
+Prefer to do it by hand — or never set up [My Home Assistant](https://my.home-assistant.io/)
+links, which the button relies on?
 
 1. In Home Assistant, open **HACS**.
 2. Open the menu (three dots, top right) → **Custom repositories**.
 3. Add the URL `https://github.com/Alshekhi/xbloom-studio` and choose the category **Integration**.
 4. Install **xBloom Studio**, then restart Home Assistant.
 
-### Manual
+#### Manual
 
 Copy `custom_components/xbloom/` into your Home Assistant `config/custom_components/` directory, then restart Home Assistant.
 
-## Setup
+### Setup
 
 With the machine powered on and in range, Home Assistant discovers it automatically over Bluetooth (it advertises as `XBLOOM …`). A discovered device appears under **Settings → Devices & Services**; confirm it to finish setup. If it isn't discovered, use **Add Integration → xBloom Studio** and pick it from the list or type its BLE name.
 
 Recipes are managed after setup from the integration's **Configure** menu: add one from an xBloom share link, or create, edit, and delete recipes by hand. The **Recipe** select entity always reflects the current library.
 
-### Optional: xBloom cloud sign-in
+#### Optional: xBloom cloud sign-in
 
 The same **Configure** menu has **Sign in to xBloom cloud**. Sign in with your xBloom account to sync recipes: once signed in, the cloud becomes the home for your recipes and every create, edit, and delete is written back to your account. If you already have local recipes, you'll be asked whether to upload them or discard them.
 
@@ -58,7 +67,9 @@ Tick **Remember my credentials** to store your password locally (in `.storage`, 
 
 Recipe sync is event-driven, not polled: changes you make in Home Assistant apply immediately, and the Configure recipe lists pull fresh from the cloud each time you open them. A recipe you added or edited on your phone shows up in the dashboard dropdowns after you press the **Refresh Recipes** button.
 
-## Entities
+## Entities and services
+
+### Entities
 
 - **Sensors** — Brew Status, Machine Status, Scale Weight, and live readings: Current Recipe, Current Pour, Current Module, Grind Size, Grind Speed, Pour Pattern, Brew Temperature, Brew Ratio, Last Recipe Card, Status Updated.
 - **Event** — Brew Event, fired on brew lifecycle changes (useful as an automation trigger).
@@ -69,7 +80,7 @@ Recipe sync is event-driven, not polled: changes you make in Home Assistant appl
 - **Switches** — Use Grinder, Connect (opens a live session that holds the BLE link and streams machine events for sensors, the dashboard, and optional spoken announcements).
 - **Update** — Firmware (installed vs latest, with an Install button; available when signed in to the xBloom cloud).
 
-## Services
+### Services
 
 The integration registers its services under the `xbloom.` domain:
 
@@ -79,6 +90,21 @@ The integration registers its services under the `xbloom.` domain:
 - **Diagnostics** — `ble_connect`, `ble_disconnect`, `refresh_status`.
 
 Each service, its fields, and examples appear in **Developer Tools → Actions**, and are documented in `custom_components/xbloom/services.yaml`.
+
+## Dashboard
+
+A ready-made dashboard lives in [`dashboard/`](dashboard/), built from stock Home Assistant
+cards — nothing custom to install. It follows the machine from screen to screen, showing the
+grinder's controls when you're at the grinder and the brew panel while a recipe runs, and
+it's laid out for screen-reader navigation throughout.
+
+1. Create the helpers and script from
+   [`dashboard/dashboard-dependencies.yaml`](dashboard/dashboard-dependencies.yaml).
+2. New dashboard → **Edit dashboard** → three-dot menu → **Raw configuration editor** →
+   paste [`dashboard/dashboard-xbloom-studio.yaml`](dashboard/dashboard-xbloom-studio.yaml).
+
+[`dashboard/README.md`](dashboard/README.md) documents the two views and what to change if
+you adapt it.
 
 ## Automations
 
@@ -128,7 +154,7 @@ Every example speaks through `tts.speak`. Replace that action with any `notify.*
 service to get a phone notification instead — the triggers and templates are the
 same either way.
 
-### Announce the brew from start to finish
+#### Announce the brew from start to finish
 
 The main one. Without it a brew is silent: the machine grinds, pauses, pours, and finishes
 with nothing to tell you which stage you're at or when to come back. This narrates the whole
@@ -174,7 +200,7 @@ name, and it fires only for brews Home Assistant started.
 
 **Want just the ending?** Keep the `ready` trigger and drop the other three.
 
-### Say something when the machine needs you
+#### Say something when the machine needs you
 
 A brew that stalls because the tank ran dry looks exactly like a brew that's still working.
 This is the difference between waiting two minutes and waiting twenty.
@@ -201,7 +227,7 @@ actions:
         {% else %}The xBloom reported a dose or water problem{% endif %}
 ```
 
-### Start the coffee without walking to the machine
+#### Start the coffee without walking to the machine
 
 `xbloom.start_brew` with no fields brews whatever `select.xbloom_studio_recipe` is set to,
 which is all a dashboard button or a voice assistant needs. The optional fields rescale the
