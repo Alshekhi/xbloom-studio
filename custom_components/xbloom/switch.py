@@ -42,7 +42,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     runtime = entry.runtime_data
     resolver = runtime.ble_device_resolver
 
-    # Idle auto-disconnect window: vendor default unless the user overrode it
+    # Idle auto-disconnect window: the library default unless the user overrode it
     # in the integration's options (CONF_IDLE_TIMEOUT).
     idle_timeout = float(entry.data.get(CONF_IDLE_TIMEOUT, IDLE_TIMEOUT_SEC))
     live_listener = LiveSessionListener(
