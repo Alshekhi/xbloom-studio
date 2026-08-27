@@ -2,7 +2,7 @@
 
 One file per config entry, persisted under
 ``<config>/.storage/xbloom.recipes.<entry_id>``. The schema is just the list
-of Recipe dicts that ``vendor.xbloom.client._parse_recipe`` produces; we
+of Recipe dicts that ``xbloom.client._parse_recipe`` produces; we
 don't transform on the way in or out.
 
 API:

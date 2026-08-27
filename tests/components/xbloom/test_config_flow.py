@@ -31,7 +31,7 @@ from custom_components.xbloom.const import (
     CONF_CLOUD_TOKEN,
     CONF_PRODUCT_ID,
 )
-from custom_components.xbloom.vendor.xbloom.exceptions import XBloomAPIError
+from xbloom.exceptions import XBloomAPIError
 
 BLE_NAME = "XBLOOM ABC123"
 
@@ -223,7 +223,7 @@ def _reauth_flow(*, remember_stored: bool = True):
 
 def _patch_login(result=None, error: Exception | None = None):
     """Patch the cloud client reauth_confirm imports at their source module."""
-    import custom_components.xbloom.vendor.xbloom.cloud as cloud_mod
+    import xbloom.cloud as cloud_mod
 
     client = MagicMock()
     client.login = AsyncMock(

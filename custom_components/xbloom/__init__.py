@@ -7,7 +7,7 @@ Architecture:
   * Recipes the user wants in HA are stored in HA's local storage and added
     via the integration's options flow.
   * Brewing is BLE-only: connect-on-demand via HA's bluetooth integration.
-    The recipe blob is built locally by `vendor.xbloom.ble.encode_recipe_blob`
+    The recipe blob is built locally by `xbloom.ble.encode_recipe_blob`
     and the 5-frame brew sequence is written to the machine. Live status
     (scale weight, brew state, brew events) streams from FFE2 notifications
     during the brew, then HA disconnects so the iOS app can take BLE.
@@ -30,10 +30,10 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
 from .coordinator import XBloomCoordinator
-from .vendor.xbloom.client import XBloomClient
-from .vendor.xbloom.cloud import XBloomCloudClient, language_type_for
-from .vendor.xbloom import spec
-from .vendor.xbloom.recipe_validate import normalize_recipe, validate_recipe
+from xbloom.client import XBloomClient
+from xbloom.cloud import XBloomCloudClient, language_type_for
+from xbloom import spec
+from xbloom.recipe_validate import normalize_recipe, validate_recipe
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -263,7 +263,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         from homeassistant.helpers.dispatcher import async_dispatcher_send
 
         from .ble_entities import signal_brew_lifecycle, signal_event
-        from .vendor.xbloom.ble import XBloomBleClient
+        from xbloom.ble import XBloomBleClient
 
         active = brew_session["task"]
         if active is not None and not active.done():
@@ -319,7 +319,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         _ovr_ratio = call.data.get("ratio")
         _ovr_grind = call.data.get("grind_size")
         if _ovr_dose is not None or _ovr_ratio is not None or _ovr_grind is not None:
-            from .vendor.xbloom.brew_scale import scale_recipe
+            from xbloom.brew_scale import scale_recipe
             recipe = scale_recipe(
                 recipe,
                 dose_g=(float(_ovr_dose) if _ovr_dose is not None
@@ -416,7 +416,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         frees the connection a stuck brew was holding, so the stop frame — and
         the next start_brew — can get their own connection.
         """
-        from .vendor.xbloom.ble import (
+        from xbloom.ble import (
             CMD_BREW_STOP, FFE1_UUID, XBloomBleClient, _build_frame,
         )
 
@@ -455,7 +455,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         machine's FFE2 echo arrived — confirming the echo stream works over
         this host's actual BLE stack without touching the brew flow.
         """
-        from .vendor.xbloom.ble import (
+        from xbloom.ble import (
             CMD_HANDSHAKE,
             HANDSHAKE_DATA,
             XBloomBleClient,
@@ -519,7 +519,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         held, fall back to the one-shot connect → echo-gated write → disconnect.
         """
         from .ble_entities import send_live_frame
-        from .vendor.xbloom.ble import XBloomBleClient
+        from xbloom.ble import XBloomBleClient
 
         if await send_live_frame(entry, packet):
             _LOGGER.info("xbloom.%s: ✓ sent over the held Connect session", label)
@@ -549,7 +549,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _LOGGER.error("xbloom.%s: BLE dispatch failed: %s", label, err)
 
     async def handle_tare(call) -> None:
-        from .vendor.xbloom.ble import packet_tare
+        from xbloom.ble import packet_tare
         await _send_simple_command(label="tare", packet=packet_tare())
 
     async def handle_back_to_home(call) -> None:
@@ -560,7 +560,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         # (grinder 8012 / brewer 8013 / scale 8014), which the fw routes home
         # (fw:1769-1783) and then emits 8023 activity=1. Pick the quit that
         # matches where we are; fall back to 8022 only from home/unknown.
-        from .vendor.xbloom.ble import (
+        from xbloom.ble import (
             packet_back_to_home, packet_quit_brewer,
             packet_quit_grinder, packet_quit_scale,
         )
@@ -576,13 +576,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         )
 
     async def handle_brew_pause(call) -> None:
-        from .vendor.xbloom.ble import packet_brew_pause
+        from xbloom.ble import packet_brew_pause
         await _send_simple_command(
             label="brew_pause", packet=packet_brew_pause(),
         )
 
     async def handle_brew_resume(call) -> None:
-        from .vendor.xbloom.ble import packet_brew_resume
+        from xbloom.ble import packet_brew_resume
         await _send_simple_command(
             label="brew_resume", packet=packet_brew_resume(),
         )
@@ -599,7 +599,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         """
         import asyncio as _asyncio
 
-        from .vendor.xbloom.ble import (
+        from xbloom.ble import (
             XBloomBleClient, packets_grind,
         )
 
@@ -648,7 +648,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         Reads flow rate, volume, temperature, and pattern from their respective
         number/select entities. Reads water source from XBloomWaterSourceSelect.
         """
-        from .vendor.xbloom.ble import (
+        from xbloom.ble import (
             XBloomBleClient, build_brewer_standalone_frame,
         )
 
@@ -709,14 +709,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _LOGGER.error("xbloom.brew_standalone: BLE dispatch failed: %s", err)
 
     async def handle_set_mode(call) -> None:
-        from .vendor.xbloom.ble import packet_mode
+        from xbloom.ble import packet_mode
         mode = call.data["mode"]
         await _send_simple_command(
             label=f"set_mode[{mode}]", packet=packet_mode(mode),
         )
 
     async def handle_set_water_source(call) -> None:
-        from .vendor.xbloom.ble import packet_water_source
+        from xbloom.ble import packet_water_source
         source = call.data["source"]
         await _send_simple_command(
             label=f"set_water_source[{source}]",
@@ -724,14 +724,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         )
 
     async def handle_set_temp_unit(call) -> None:
-        from .vendor.xbloom.ble import packet_temp_unit
+        from xbloom.ble import packet_temp_unit
         unit = call.data["unit"]
         await _send_simple_command(
             label=f"set_temp_unit[{unit}]", packet=packet_temp_unit(unit),
         )
 
     async def handle_set_weight_unit(call) -> None:
-        from .vendor.xbloom.ble import packet_weight_unit
+        from xbloom.ble import packet_weight_unit
         unit = call.data["unit"]
         await _send_simple_command(
             label=f"set_weight_unit[{unit}]", packet=packet_weight_unit(unit),
@@ -743,7 +743,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # one of the machine's 3 on-device slots A/B/C.                      #
     # ------------------------------------------------------------------ #
     async def handle_write_slot(call) -> None:
-        from .vendor.xbloom.ble import (
+        from xbloom.ble import (
             SLOT_INDEX, XBloomBleClient, packet_slot_write,
         )
 
@@ -832,7 +832,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         If a brew or a Connect session already holds the link, the readings are
         streaming anyway and this connect will just no-op/fail harmlessly.
         """
-        from .vendor.xbloom.ble import XBloomBleClient
+        from xbloom.ble import XBloomBleClient
 
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
@@ -986,7 +986,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         customizer's dose/ratio/grind and save it as a NEW recipe (local when
         logged out; cloud + local mirror when logged in). Never overwrites the
         source (the id is stripped)."""
-        from .vendor.xbloom.brew_scale import scale_recipe
+        from xbloom.brew_scale import scale_recipe
 
         new_name = (call.data.get("new_name") or "").strip()
         if not new_name:

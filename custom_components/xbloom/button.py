@@ -366,7 +366,7 @@ class XBloomEnterGrinderButton(_XBloomEnterModuleButton):
     _attr_icon = "mdi:grain"
 
     async def async_press(self) -> None:
-        from .vendor.xbloom.ble import packet_grinder_set
+        from xbloom.ble import packet_grinder_set
         size = int(self._num("number.xbloom_studio_grind_size", 65))
         speed = int(self._num("number.xbloom_studio_grind_speed", 60))
         await self._send(packet_grinder_set(size, speed))
@@ -380,8 +380,8 @@ class XBloomEnterBrewerButton(_XBloomEnterModuleButton):
     _attr_icon = "mdi:cup-water"
 
     async def async_press(self) -> None:
-        from .vendor.xbloom import spec
-        from .vendor.xbloom.ble import packet_brewer_set
+        from xbloom import spec
+        from xbloom.ble import packet_brewer_set
         st = self.hass.states.get("select.xbloom_studio_brew_pattern")
         name = st.state if st is not None else None
         pattern = spec.PATTERN_NAME_TO_BYTE.get(
@@ -401,7 +401,7 @@ class XBloomEnterScaleButton(_XBloomEnterModuleButton):
     _attr_icon = "mdi:scale-balance"
 
     async def async_press(self) -> None:
-        from .vendor.xbloom.ble import packet_scale_enter
+        from xbloom.ble import packet_scale_enter
         await self._send(packet_scale_enter())
 
 

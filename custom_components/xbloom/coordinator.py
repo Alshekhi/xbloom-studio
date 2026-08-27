@@ -16,7 +16,7 @@ the xBloom cloud:
 This module is the Home Assistant *integration layer*: it owns credential
 storage (the config entry), the HA data surface, and the local mirror. All
 xBloom protocol/API knowledge — login, RSA, re-login-on-expiry — lives in the
-portable vendor library (``vendor.xbloom.cloud``). The coordinator only
+portable vendor library (``xbloom.cloud``). The coordinator only
 *supplies* the token to a vendor :class:`XBloomCloudSession` and *persists* a
 refreshed one via a callback.
 
@@ -47,12 +47,12 @@ from .const import (
     DOMAIN,
 )
 from .storage import XBloomRecipeStore
-from .vendor.xbloom.cloud import (
+from xbloom.cloud import (
     XBloomAuthError,
     XBloomCloudClient,
     XBloomCloudSession,
 )
-from .vendor.xbloom.exceptions import XBloomAPIError
+from xbloom.exceptions import XBloomAPIError
 
 _LOGGER = logging.getLogger(__name__)
 

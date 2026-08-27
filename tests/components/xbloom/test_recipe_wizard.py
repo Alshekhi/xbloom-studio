@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.xbloom.config_flow import XBloomOptionsFlow
-from custom_components.xbloom.vendor.xbloom import spec
+from xbloom import spec
 
 
 def _make_flow(draft: dict | None = None):

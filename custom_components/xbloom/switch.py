@@ -24,7 +24,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import CONF_IDLE_TIMEOUT, DOMAIN
 from .live_session import LiveSessionListener
-from .vendor.xbloom.mode_listener import IDLE_TIMEOUT_SEC
+from xbloom.mode_listener import IDLE_TIMEOUT_SEC
 
 _LOGGER = logging.getLogger(__name__)
 

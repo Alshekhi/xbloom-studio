@@ -14,11 +14,11 @@ from custom_components.xbloom.ble_entities import (  # noqa: E402
     XBloomBrewEventBleEntity,
     XBloomMachineStatusBleSensor,
 )
-from custom_components.xbloom.vendor.xbloom import spec  # noqa: E402
+from xbloom import spec  # noqa: E402
 
 # The fault table used to live in ble_entities as module-level CMD_ERR_*
 # constants plus _FAULTS. PR #2 moved it into the portable spec module so the
-# HA layer and the vendor protocol layer share one source of truth.
+# HA layer and the protocol library share one source of truth.
 #
 # The aliases below are resolved OUT of spec.FAULTS by status name rather than
 # hardcoded, so the wire-code assertions further down still guard the real

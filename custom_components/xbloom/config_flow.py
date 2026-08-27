@@ -39,9 +39,9 @@ from .const import (
     CONF_PRODUCT_ID,
     DOMAIN,
 )
-from .vendor.xbloom.mode_listener import IDLE_TIMEOUT_SEC
-from .vendor.xbloom import spec
-from .vendor.xbloom.recipe_validate import (
+from xbloom.mode_listener import IDLE_TIMEOUT_SEC
+from xbloom import spec
+from xbloom.recipe_validate import (
     VOLUME_TOLERANCE_ML,
     denom_to_ratio_str,
     guess_ratio,
@@ -172,8 +172,8 @@ class XBloomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Prompt for the password again and mint a fresh session token."""
         from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-        from .vendor.xbloom.cloud import XBloomCloudClient, language_type_for
-        from .vendor.xbloom.exceptions import XBloomAPIError
+        from xbloom.cloud import XBloomCloudClient, language_type_for
+        from xbloom.exceptions import XBloomAPIError
 
         entry = self.hass.config_entries.async_get_entry(
             self.context["entry_id"]
@@ -380,7 +380,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Log in to the xBloom cloud with email + password."""
-        from .vendor.xbloom.exceptions import XBloomAPIError
+        from xbloom.exceptions import XBloomAPIError
 
         errors: dict[str, str] = {}
         coordinator = self.config_entry.runtime_data.coordinator

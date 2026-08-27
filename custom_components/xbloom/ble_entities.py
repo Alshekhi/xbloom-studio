@@ -40,7 +40,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-from .vendor.xbloom import spec
+from xbloom import spec
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,14 +75,14 @@ async def send_brewer_temp_live(entry, temp_c_wire: float) -> bool:
     is the WIRE °C (RT=20/BP=98/literal — convert a display value with
     spec.brew_temp_display_to_wire first). No-op when not Connected.
     """
-    from .vendor.xbloom.ble import packet_brewer_temp
+    from xbloom.ble import packet_brewer_temp
     return await send_live_frame(entry, packet_brewer_temp(float(temp_c_wire)))
 
 
 async def send_brewer_pattern_live(entry, pattern_byte: int) -> bool:
     """Set the brewer pour pattern over the HELD Connect session — the app's
     live pattern command (cmd 8016, pattern-ONLY). No-op when not Connected."""
-    from .vendor.xbloom.ble import packet_brewer_pattern
+    from xbloom.ble import packet_brewer_pattern
     return await send_live_frame(entry, packet_brewer_pattern(int(pattern_byte)))
 
 

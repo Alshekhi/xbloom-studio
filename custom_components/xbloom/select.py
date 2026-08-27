@@ -19,7 +19,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .ble_entities import send_brewer_pattern_live, signal_event
 from .const import DOMAIN
 from .coordinator import XBloomCoordinator
-from .vendor.xbloom import spec
+from xbloom import spec
 
 _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0  # coordinator manages all updates; select is read-only

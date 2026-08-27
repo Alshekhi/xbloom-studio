@@ -23,7 +23,7 @@ from custom_components.xbloom.select import (
     XBloomWaterSourceSelect,
     XBloomWeightUnitSelect,
 )
-from custom_components.xbloom.vendor.xbloom import spec
+from xbloom import spec
 
 
 def _make(cls):

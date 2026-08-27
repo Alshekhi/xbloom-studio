@@ -31,8 +31,8 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from .ble_entities import send_brewer_temp_live, signal_event
 from .const import DOMAIN
-from .vendor.xbloom import spec
-from .vendor.xbloom.ble import packet_grinder_set
+from xbloom import spec
+from xbloom.ble import packet_grinder_set
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -377,7 +377,7 @@ class XBloomBrewFlowRateNumber(_XBloomNumberBase):
 #
 # Each resets to the picked recipe's value whenever the recipe picker changes,
 # and is a pure input (no machine drive). The brew-customizer Start/Save actions
-# read these three + the recipe to scale the pours (vendor.brew_scale). Dose is
+# read these three + the recipe to scale the pours (xbloom.brew_scale). Dose is
 # clamped to the recipe's cup-type dose window and hidden (unavailable) for the
 # fixed-dose xPod cup.
 # --------------------------------------------------------------------------- #

@@ -35,7 +35,7 @@ import pytest
 # Inject minimal homeassistant stubs.
 #
 # `recipe_validate.py` itself depends only on stdlib + `re`, but importing it
-# through `custom_components.xbloom.vendor.xbloom.*` triggers the parent
+# through `xbloom.*` triggers the parent
 # package's `__init__.py`, which imports `homeassistant`. HA is not installed
 # in this dev environment, so we mirror the stub pattern from
 # tests/components/xbloom/test_client.py to make the import path reachable.
@@ -81,7 +81,7 @@ def _inject_stubs() -> None:
 
 _inject_stubs()
 
-from custom_components.xbloom.vendor.xbloom.recipe_validate import validate_recipe  # noqa: E402
+from xbloom.recipe_validate import validate_recipe  # noqa: E402
 
 
 def _valid_recipe() -> dict:

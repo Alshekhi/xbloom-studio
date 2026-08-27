@@ -22,7 +22,7 @@ from custom_components.xbloom.live_session import (
     _ble_size_to_ui,
     session_event_filter,
 )
-from custom_components.xbloom.vendor.xbloom import spec
+from xbloom import spec
 
 NOTIFY_WEIGHT_2 = 20501
 NOTIFY_GRIND_SIZE = 8105

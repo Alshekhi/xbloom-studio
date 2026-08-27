@@ -26,7 +26,7 @@ from custom_components.xbloom.reading_sensors import (
     XBloomGrindSizeSensor,
     XBloomLastRecipeCardSensor,
 )
-from custom_components.xbloom.vendor.xbloom import spec
+from xbloom import spec
 
 CMD_BLOOM = 40510
 
