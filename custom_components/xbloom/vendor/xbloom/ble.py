@@ -106,6 +106,7 @@ def _build_frame(
 # Constants in command 8100 (handshake/MTU). Originally we thought these
 # were a derived "grind step" — they are not. The official Android app sends
 # the literal pair [185, 1] on every brew regardless of grinder settings.
+# Source: https://github.com/brAzzi64/xbloom-ble (PROTOCOL.md, MIT licensed)
 # ---------------------------------------------------------------------------
 HANDSHAKE_DATA = [185, 1]
 
@@ -114,8 +115,11 @@ HANDSHAKE_DATA = [185, 1]
 # Local recipe encoder — produces the BLE recipe blob (theCode equivalent)
 # WITHOUT calling the cloud tuGetRecipeCode endpoint.
 #
-# The trailing 2 bytes are not a CRC: they are [grinder_size, ratio × 10]
-# metadata.
+# Ported from brAzzi64/xbloom-ble (MIT) — the trailing 2 bytes that we
+# couldn't crack as a CRC are actually [grinder_size, ratio × 10] metadata.
+# Sources of truth in that repo:
+#   PROTOCOL.md   — wire format & per-pour byte layout
+#   xbloom.py     — encode_recipe(), build_packet_type1*, cup-type ranges
 # ---------------------------------------------------------------------------
 
 # Pattern code: xBloom API `pattern` integer -> BLE wire byte. The mapping and
@@ -324,7 +328,8 @@ def build_brewer_standalone_frame(
 
 # ---------------------------------------------------------------------------
 # Build the brew packet sequence ENTIRELY LOCALLY — no cloud call needed.
-# Frame order matches the official Android app's HCI capture.
+# Frame order matches the official Android app's HCI capture (see
+# brAzzi64/xbloom-ble PROTOCOL.md "Full Brew Sequence" section).
 # ---------------------------------------------------------------------------
 def build_brew_frames(recipe: dict) -> list[bytes]:
     """Return the ordered BLE frames to brew `recipe`. No cloud call needed.
@@ -388,6 +393,7 @@ def build_brew_frames(recipe: dict) -> list[bytes]:
 
 # ---------------------------------------------------------------------------
 # Simple-command codes (Type-1 packets, no parameters)
+# Source: brAzzi64/xbloom-ble PROTOCOL.md (MIT)
 # ---------------------------------------------------------------------------
 CMD_TARE          = 8500   # 0x2134 — zero the scale
 CMD_BACK_TO_HOME  = 8022   # 0x1F56 — home, but ONLY from home/standby: the fw
@@ -452,6 +458,7 @@ def packet_brew_resume() -> bytes:
 
 # ---------------------------------------------------------------------------
 # 08-02: Standalone grinder + mode / water source / unit commands
+# Source: brAzzi64/xbloom-ble (MIT)
 # ---------------------------------------------------------------------------
 CMD_GRINDER_ENTER = 8006   # 0x1F46 — enter grinder UI with [size, speed]
 CMD_GRINDER_START = 3500   # 0x0DAC — start grind  with [duration_ms, size, speed]
@@ -612,7 +619,7 @@ def packet_weight_unit(unit: str) -> bytes:
 #
 # Writes a recipe to one of the three on-device slots A/B/C. After this, the
 # user can trigger that brew from the machine's physical UI alone, no HA
-# needed.
+# needed. Source: brAzzi64/xbloom-ble PROTOCOL.md (MIT).
 # ---------------------------------------------------------------------------
 CMD_SLOT_RECIPE_SEND = 11510   # 0x2CF6 — write recipe to slot (Type-2)
 
@@ -661,8 +668,8 @@ def packet_slot_write(
 
 
 # ---------------------------------------------------------------------------
-# Notification command codes we surface to callers via on_event (a subset of
-# the codes the machine emits)
+# Notification command codes we surface to callers via on_event
+# (subset — see brAzzi64/xbloom-ble PROTOCOL.md for the full set)
 # ---------------------------------------------------------------------------
 NOTIFY_MACHINE_ACTIVITY = 8023
 NOTIFY_WEIGHT_2         = 20501

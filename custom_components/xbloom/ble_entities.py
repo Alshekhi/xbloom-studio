@@ -104,7 +104,8 @@ CMD_BYPASS           = 40520  # RD_BYPASS — bypass/dilution pour (see discover
 # Machine activity values (cmd 8023 payload as LE uint32)
 # These reflect the machine's overall state, NOT individual steps.
 # The machine has TWO home/idle screens — one per mode — and the firmware
-# treats them as equivalent "at rest" states:
+# treats them as equivalent "at rest" states (fw_decompiled.c line 2849:
+# `+0x198 == 1 || +0x198 == 0x41`):
 #   1  = Pro-mode home        65 (0x41) = Auto/Easy-mode home (recipes A/B/C)
 # Neither can fire mid-brew (brewing is 34, homing 8, done 36), so seeing either
 # while brew_status is in-progress means the brew ended.
