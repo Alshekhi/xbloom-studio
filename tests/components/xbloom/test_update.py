@@ -232,7 +232,7 @@ async def test_update_falls_back_to_chinese_notes() -> None:
 @pytest.mark.asyncio
 async def test_update_survives_cloud_error() -> None:
     """A failed poll must not blow up the entity or wipe a known version."""
-    from custom_components.xbloom.vendor.xbloom.exceptions import XBloomAPIError
+    from xbloom.exceptions import XBloomAPIError
 
     entity = _make_entity()
     entity._latest = "1.2.3"

@@ -164,7 +164,7 @@ _inject_stubs()
 
 
 from custom_components.xbloom.config_flow import XBloomOptionsFlow  # noqa: E402
-from custom_components.xbloom.vendor.xbloom.recipe_validate import (  # noqa: E402
+from xbloom.recipe_validate import (  # noqa: E402
     validate_recipe,
 )
 

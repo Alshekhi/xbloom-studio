@@ -44,7 +44,7 @@ from .ble_entities import (
     signal_brew_lifecycle,
     signal_event,
 )
-from .vendor.xbloom import spec
+from xbloom import spec
 
 _LOGGER = logging.getLogger(__name__)
 

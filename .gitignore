@@ -23,9 +23,8 @@ CLAUDE.md
 # Generated graph output
 graphify-out/
 
-# Superseded — BLE replaced the cloud API bridge and standalone library
+# Superseded — BLE replaced the cloud API bridge
 bridge/
-/xbloom/
 
 # Personal reference
 docs/
