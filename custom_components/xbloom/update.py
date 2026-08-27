@@ -46,7 +46,7 @@ SCAN_INTERVAL = timedelta(hours=6)
 PARALLEL_UPDATES = 0
 
 # BLE write pacing for the flash, supplied by this (HA) integration layer to the
-# vendor flasher. 0 relies on the BLE stack's own backpressure (correct on
+# library's flasher. 0 relies on the BLE stack's own backpressure (correct on
 # BlueZ); a few ms is safer through an ESPHome BLE proxy. Conservative default;
 # tune here if a real flash is flaky on your setup.
 _OTA_CHUNK_DELAY_S = 0.004
