@@ -7,7 +7,7 @@ the xBloom cloud:
 
   * **Logged out** — the library is HA's local ``Store`` (``storage.py``).
     Recipes are created/edited/deleted locally via the options flow. This is
-    the original BLE-only behavior; no cloud/vendor calls happen at all.
+    the original BLE-only behavior; no cloud calls happen at all.
   * **Logged in** — the xBloom cloud is the single source of truth. Every
     refresh pulls the user's cloud recipe list and mirrors it into the local
     ``Store`` so entities keep working offline. Create/edit/delete route to the
@@ -16,8 +16,8 @@ the xBloom cloud:
 This module is the Home Assistant *integration layer*: it owns credential
 storage (the config entry), the HA data surface, and the local mirror. All
 xBloom protocol/API knowledge — login, RSA, re-login-on-expiry — lives in the
-portable vendor library (``xbloom.cloud``). The coordinator only
-*supplies* the token to a vendor :class:`XBloomCloudSession` and *persists* a
+portable ``xbloom`` package (``xbloom.cloud``). The coordinator only
+*supplies* the token to an :class:`XBloomCloudSession` and *persists* a
 refreshed one via a callback.
 
 Refresh is fully event-driven — there is no background poll. The library is
@@ -117,7 +117,7 @@ class XBloomCoordinator(DataUpdateCoordinator):
         })
 
     def _session(self) -> XBloomCloudSession | None:
-        """Build a vendor session from stored creds, or None if logged out.
+        """Build a cloud session from stored creds, or None if logged out.
 
         The password may be absent (the user didn't opt to remember it); the
         session then can't self-refresh and re-raises on token expiry, which we

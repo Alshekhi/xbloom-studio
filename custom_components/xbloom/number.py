@@ -298,7 +298,7 @@ class XBloomBrewTemperatureNumber(_XBloomNumberBase):
     # DISPLAY domain 39..96 — the unified model (spec.brew_temp_*): this is what
     # the machine's brewer knob (cmd 8108) reports and what the app's brewer
     # screen shows, so the slider mirrors it 1:1 (39 = RT, 96 = BP, 40..95 °C).
-    # The wire translation (39→20 / 96→98) happens on DRIVE, in the vendor layer.
+    # The wire translation (39→20 / 96→98) happens on DRIVE, in the library.
     _attr_native_min_value = spec.BREW_TEMP_DISPLAY_MIN
     _attr_native_max_value = spec.BREW_TEMP_DISPLAY_MAX
     _attr_native_step = 1

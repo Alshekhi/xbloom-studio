@@ -27,7 +27,7 @@ CONF_ENABLE_FLASHING = "enable_firmware_flashing"  # entry.data flag
 # How long a Connect (live) session may sit idle before HA auto-disconnects,
 # handing the machine back to the iOS app. There is no upstream value to mirror
 # (the app leans on the phone OS killing the link when it backgrounds; HA's link
-# lives on the always-on host), so this is a deployment choice. The vendor gives
+# lives on the always-on host), so this is a deployment choice. The library gives
 # the default (mode_listener.IDLE_TIMEOUT_SEC); this overrides it. entry.data.
 CONF_IDLE_TIMEOUT = "idle_timeout_s"
 

@@ -40,7 +40,7 @@ RATIO_MIN, RATIO_MAX = 1.0, 30.0       # brew ratio 1:N
 
 # Brewer temperature knob (cmd 8108) domain. The knob broadcasts the *display*
 # value (39..96 on the J15), whose two ends are the RT/BP sentinels. The domain
-# bounds and the RT/BP naming both live in the vendor's unified temperature model
+# bounds and the RT/BP naming both live in the library's unified temperature model
 # (spec.brew_temp_*) so nothing here can diverge from the recipe/drive paths.
 TEMP_C_MIN, TEMP_C_MAX = spec.BREW_TEMP_DISPLAY_MIN, spec.BREW_TEMP_DISPLAY_MAX
 
@@ -211,7 +211,7 @@ class LiveSessionListener(XBloomModeListener):
         self, hass, ble_device_resolver, idle_timeout_s: float = IDLE_TIMEOUT_SEC,
         entry_id: str | None = None,
     ) -> None:
-        # Integration layer owns the HA handle; the vendor base is HA-free and
+        # Integration layer owns the HA handle; the library base is HA-free and
         # reaches the host only through the injected callbacks below.
         self.hass = hass
         self._entry_id = entry_id
@@ -238,7 +238,7 @@ class LiveSessionListener(XBloomModeListener):
         brew paths use, so the machine-status sensors and setting selects stay
         in sync with the machine's heartbeat during a held Connect session — the
         integration reflects the machine with no exception, not just via
-        Refresh status. Runs on the event loop (scheduled by the vendor)."""
+        Refresh status. Runs on the event loop (scheduled by the library)."""
         if self._entry_id is None:
             return
         from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -246,13 +246,13 @@ class LiveSessionListener(XBloomModeListener):
         async_dispatcher_send(self.hass, signal_event(self._entry_id), decoded)
 
     def _fire_lifecycle(self, phase: str, payload: dict) -> None:
-        """Bridge vendor lifecycle transitions onto the HA event bus as
+        """Bridge the listener's lifecycle transitions onto the HA event bus as
         ``xbloom_connect_<phase>`` (consumed by switch.py + the
         live_control_announce blueprint)."""
         self.hass.bus.async_fire(f"xbloom_{self.mode_name}_{phase}", payload)
 
     def _make_background_task(self, coro, name):
-        """Spawn the vendor run loop via HA's background-task helper — the
+        """Spawn the library's run loop via HA's background-task helper — the
         only spawn empirically observed to deliver bleak notifications."""
         if hasattr(self.hass, "async_create_background_task"):
             return self.hass.async_create_background_task(coro, name=name)
