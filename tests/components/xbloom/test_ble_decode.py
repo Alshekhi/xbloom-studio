@@ -1,7 +1,7 @@
 """Tests for decode_notification — MachineInfo (40521) status decode.
 
 Verifies the byte offsets of the periodic status heartbeat against the Android
-MachineInfoBleModel parse (cross-confirmed by brAzzi64/xbloom-ble):
+MachineInfoBleModel parse:
 byte 33 = waterEnough, byte 34 = systemStatus, byte 37 = grinder, byte 39 = voltage.
 The conftest injects homeassistant stubs so the vendor import path resolves.
 """

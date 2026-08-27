@@ -39,7 +39,7 @@ CMD_ACTIVITY = 8023
 # Grind size wire → UI                                                        #
 # --------------------------------------------------------------------------- #
 def test_ble_grind_size_offset() -> None:
-    """Per brAzzi64's PROTOCOL.md: UI = max(1, BLE − 30)."""
+    """Grind size on the wire is offset by 30: UI = max(1, BLE − 30)."""
     assert _ble_size_to_ui(31) == 1
     assert _ble_size_to_ui(80) == 50
     assert _ble_size_to_ui(110) == 80

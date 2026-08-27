@@ -6,8 +6,7 @@ cloud layer: when the user logs in, the cloud becomes the single source of
 truth for recipes; when they don't, the integration stays fully local
 (``storage.py``) and BLE-only.
 
-Auth model — confirmed against the shipping ``denull0/xbloom-agent`` MCP server,
-which does the same CRUD against the same backend:
+Auth model:
 
   * Login (``tMemberLogin.thtml``) posts **plain** JSON and returns
     ``{token, member.tableId}``. We persist ``memberId`` + ``token`` (and, for
@@ -21,9 +20,6 @@ which does the same CRUD against the same backend:
     separate ``api-iot.xbloom.com`` IoT backend).
   * On error code ``10001`` (token expired) the caller re-logs-in.
 
-This host is SSL-pinned in the mobile apps, so the request shapes here come
-from static analysis of the iOS binary cross-checked against the working MCP —
-see ``discovery/cloud-api-spec.md`` for provenance.
 """
 from __future__ import annotations
 
@@ -45,7 +41,7 @@ log = logging.getLogger("xbloom.cloud")
 
 API_BASE = "https://client-api.xbloom.com"
 
-# Sent on every client-api request (confirmed from the MCP). The Referer/UA
+# Sent on every client-api request. The Referer/UA
 # mimic the share-h5 web client the endpoint expects.
 _HEADERS = {
     "Content-Type": "application/json",
@@ -90,7 +86,7 @@ _BASE_ENVELOPE = {
 }
 
 # RSA public key baked into the xBloom clients (1024-bit). Bodies of tu* calls
-# are encrypted with it. Verbatim from denull0/xbloom-agent (confirmed working).
+# are encrypted with it.
 _RSA_PUBLIC_KEY_B64 = (
     "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC4LF40GZ72SdhMyl765K/i4nY5"
     "CPcHz2Q1IKWKZ9S79xmK7G8pUhbVf4EZLvnNF1+9IvOFQUKV5Z7ZNNviqSpnql9"
@@ -155,7 +151,7 @@ def _ratio_denominator(recipe: dict) -> float:
     Recipes carry a ``ratio`` string ("1:16") once normalised; failing that we
     fall back to the ambiguous ``water_ratio``/``grinder`` reconstruction the
     validator uses. The cloud ``grandWater`` field is this denominator, NOT the
-    total water in ml (confirmed: the MCP sends ``grandWater = ratio``).
+    total water in ml — ``grandWater`` carries the ratio denominator.
     """
     ratio = recipe.get("ratio")
     if isinstance(ratio, str) and ":" in ratio:
