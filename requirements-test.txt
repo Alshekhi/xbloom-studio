@@ -13,7 +13,7 @@ pytest-asyncio>=0.23
 # The protocol library, now installed from PyPI rather than vendored. The
 # [cloud] extra brings aiohttp and cryptography, which coordinator.py needs at
 # import time because it imports xbloom.cloud unconditionally.
-xbloom-py[cloud]==0.1.0
+xbloom-py[cloud]==0.1.2
 
 # xbloom.client + xbloom.cloud — HTTP transport.
 aiohttp>=3.9
