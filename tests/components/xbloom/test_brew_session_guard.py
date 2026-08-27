@@ -131,7 +131,7 @@ async def test_duplicate_within_window_is_ignored():
     entry = _Entry()
     with patch("custom_components.xbloom._resolve_ble_device",
                AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
-         patch("custom_components.xbloom.vendor.xbloom.ble.XBloomBleClient", _FakeBle):
+         patch("xbloom.ble.XBloomBleClient", _FakeBle):
         handlers = await _setup_and_get_handlers(hass, entry)
         start = handlers["start_brew"]
 
@@ -156,7 +156,7 @@ async def test_later_press_preempts_stuck_session():
     entry = _Entry()
     with patch("custom_components.xbloom._resolve_ble_device",
                AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
-         patch("custom_components.xbloom.vendor.xbloom.ble.XBloomBleClient", _FakeBle):
+         patch("xbloom.ble.XBloomBleClient", _FakeBle):
         handlers = await _setup_and_get_handlers(hass, entry)
         start = handlers["start_brew"]
 
@@ -184,7 +184,7 @@ async def test_stop_brew_cancels_active_task():
     entry = _Entry()
     with patch("custom_components.xbloom._resolve_ble_device",
                AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
-         patch("custom_components.xbloom.vendor.xbloom.ble.XBloomBleClient", _FakeBle):
+         patch("xbloom.ble.XBloomBleClient", _FakeBle):
         handlers = await _setup_and_get_handlers(hass, entry)
 
         await handlers["start_brew"](MagicMock(data={}))

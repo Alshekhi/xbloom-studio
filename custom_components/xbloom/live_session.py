@@ -20,7 +20,7 @@ import logging
 import time
 from typing import Awaitable, Callable
 
-from .vendor.xbloom.ble import (
+from xbloom.ble import (
     NOTIFY_BREW_PATTERN, NOTIFY_BREW_RATIO, NOTIFY_BREW_TEMP,
     NOTIFY_GRIND_SIZE, NOTIFY_GRIND_SPEED,
     NOTIFY_PODS,
@@ -28,8 +28,8 @@ from .vendor.xbloom.ble import (
     NOTIFY_WEIGHT_2, NOTIFY_WEIGHT_ALT,
     PATTERN_NAMES,
 )
-from .vendor.xbloom.mode_listener import IDLE_TIMEOUT_SEC, XBloomModeListener
-from .vendor.xbloom import spec
+from xbloom.mode_listener import IDLE_TIMEOUT_SEC, XBloomModeListener
+from xbloom import spec
 
 _LOGGER = logging.getLogger(__name__)
 

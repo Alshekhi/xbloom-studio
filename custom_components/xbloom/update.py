@@ -15,7 +15,7 @@ Two data sources, mirroring the rest of the integration:
 
 The **Install** flow downloads the ``.bin`` from the cloud-provided S3 URL
 (plain GET, no auth), verifies its MD5 against the API value, then runs the
-ACK-gated BLE flasher (``vendor.xbloom.ota``, byte-exact-validated against a real
+ACK-gated BLE flasher (``xbloom.ota``, byte-exact-validated against a real
 capture). Any Connect session is paused for the duration so the flasher owns the
 BLE link. ⚠️ Flashing can brick the machine if the link drops mid-transfer — it is a
 deliberate, user-initiated action.
@@ -36,8 +36,8 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from .ble_entities import signal_event
 from .const import CONF_ENABLE_FLASHING, CONF_PRODUCT_ID, DOMAIN
-from .vendor.xbloom.exceptions import XBloomAPIError
-from .vendor.xbloom.ota import XBloomOtaError, XBloomOtaFlasher
+from xbloom.exceptions import XBloomAPIError
+from xbloom.ota import XBloomOtaError, XBloomOtaFlasher
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -3,11 +3,11 @@
 Verifies the byte offsets of the periodic status heartbeat against the Android
 MachineInfoBleModel parse (cross-confirmed by brAzzi64/xbloom-ble):
 byte 33 = waterEnough, byte 34 = systemStatus, byte 37 = grinder, byte 39 = voltage.
-The conftest injects homeassistant stubs so the vendor import path resolves.
+The conftest injects homeassistant stubs so the library import path resolves.
 """
 import struct
 
-from custom_components.xbloom.vendor.xbloom.ble import (  # noqa: E402
+from xbloom.ble import (  # noqa: E402
     NOTIFY_MACHINE_INFO,
     decode_notification,
 )

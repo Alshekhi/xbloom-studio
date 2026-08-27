@@ -25,8 +25,8 @@ from custom_components.xbloom.const import (
     CONF_CLOUD_TOKEN,
 )
 from custom_components.xbloom.coordinator import XBloomCoordinator
-from custom_components.xbloom.vendor.xbloom.cloud import XBloomAuthError
-from custom_components.xbloom.vendor.xbloom.exceptions import XBloomAPIError
+from xbloom.cloud import XBloomAuthError
+from xbloom.exceptions import XBloomAPIError
 
 CREDS = {
     CONF_CLOUD_EMAIL: "user@example.invalid",

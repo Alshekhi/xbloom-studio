@@ -31,7 +31,7 @@ from custom_components.xbloom.number import (
     XBloomGrindSizeNumber,
     XBloomGrindSpeedNumber,
 )
-from custom_components.xbloom.vendor.xbloom import spec
+from xbloom import spec
 
 ALL_NUMBERS = [
     XBloomGrindSizeNumber, XBloomGrindSpeedNumber, XBloomBrewVolumeNumber,
