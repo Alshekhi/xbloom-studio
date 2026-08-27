@@ -258,7 +258,7 @@ VOLUME_TOLERANCE_ML = 0.5
 # Small brew enums carried in BLE frames — name <-> code. These were mirrored  #
 # inline in ble.py and select.py; both now derive from here.                   #
 # --------------------------------------------------------------------------- #
-# Wire codes CONFIRMED against the decompiled app (2026-07-20) — the earlier
+# Wire codes corrected 2026-07-20 — the earlier
 # guessed values were WRONG (temp C/F swapped; weight order off), which made HA
 # set the opposite unit and misreport the machine's units:
 #   * WaterSourceType enum: TANK=0, TAP=1 (correct as-was).

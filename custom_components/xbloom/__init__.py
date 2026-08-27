@@ -624,7 +624,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             async with ble_client:
                 # enter → start are echo-gated (send_command); the grind
                 # DURATION between start and stop is caller-controlled, and the
-                # post-stop settle mirrors brAzzi64. send_command uses the
+                # post-stop settle is deliberate. send_command uses the
                 # app-exact policy (retry only while sleeping) — safe for a
                 # motion command like grind_start: it never re-sends while the
                 # machine is awake, so it can't double-start a grind.
@@ -636,7 +636,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 )
                 await _asyncio.sleep(seconds)
                 await ble_client.send_command("grind_stop", stop)
-                # Per brAzzi64: small post-stop hold so the machine settles.
+                # Small post-stop hold so the machine settles.
                 await _asyncio.sleep(1.5)
             _LOGGER.info("xbloom.grind: ✓ done")
         except Exception as err:  # noqa: BLE001

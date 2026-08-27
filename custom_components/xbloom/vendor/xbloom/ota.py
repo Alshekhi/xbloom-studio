@@ -1,10 +1,9 @@
 """xBloom firmware OTA over BLE — byte-exact encoder + ACK-gated flasher.
 
-Reverse-engineered from a real captured firmware update (V12.0D.500) and
-**validated byte-for-byte**: the stream this module writes to
-the OTA data characteristic is identical to what the official app sent in a
-successful flash, and reconstructs to the same MD5 as the S3 download. See
-``discovery/ios/discovery/xbloom-fw-trace-2026-07-18/REVERSE_ENGINEERING.md``.
+**Validated byte-for-byte** against a real firmware update (V12.0D.500): the
+stream this module writes to the OTA data characteristic is identical to the
+one a successful flash sends, and reconstructs to the same MD5 as the
+published download.
 
 Transport — a YMODEM-flavoured protocol over a **dedicated** vendor OTA GATT
 service (distinct from the command service ``0000e0ff-…`` used for brewing):
