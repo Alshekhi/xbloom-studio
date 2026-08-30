@@ -16,6 +16,21 @@ start_brew:
       example: "Ethiopia Yirgacheffe"
       selector:
         text:
+    share_url:
+      name: Share URL
+      description: >
+        Brew straight from an xBloom app share URL (e.g.
+        https://share-h5.xbloom.com/?id=...). Fetched fresh — the recipe does
+        not have to be in the library first, and nothing is saved.
+      required: false
+      selector:
+        text:
+    share_id:
+      name: Share ID
+      description: Just the id token (the value after `?id=` in a share URL).
+      required: false
+      selector:
+        text:
     use_preground:
       name: Use pre-ground coffee
       description: >
@@ -74,8 +89,9 @@ brew_standalone:
   name: Standalone Brew
   description: >
     Run the brewer on its own, without a recipe, using the current standalone
-    brew entities: number.brew_flow_rate, number.brew_volume,
-    number.brew_temperature, select.brew_pattern, and select.water_source.
+    brew entities: number.xbloom_studio_brew_flow_rate,
+    number.xbloom_studio_brew_volume, number.xbloom_studio_brew_temperature,
+    select.xbloom_studio_brew_pattern, and select.xbloom_studio_water_source.
     Set those first, then call this action.
 
 tare:
@@ -108,14 +124,14 @@ grind:
   fields:
     size:
       name: Grind size
-      description: 1–100 (lower is finer). Default 63.
+      description: 1–80 (lower is finer). Default 63.
       required: false
       default: 63
       example: 50
       selector:
         number:
           min: 1
-          max: 100
+          max: 80
           step: 1
     speed:
       name: Grinder speed (RPM)
@@ -297,6 +313,136 @@ get_recipe:
       example: "Ethiopia Yirgacheffe"
       selector:
         text:
+
+build_recipe:
+  name: Build Recipe
+  description: >
+    Turn loose recipe fields into a brewable recipe. Every value is snapped
+    onto the machine's grid rather than rejected — a ratio of 1:16.3 becomes
+    1:16.5, a 105 °C pour becomes 98 °C — and the response lists each change
+    in plain language, so a caller can tell the user what was adapted.
+
+    Made for callers working from a recipe as a person described it (a web
+    recipe, a spoken request) rather than a validated form. Only faults that
+    cannot be snapped away — a missing name, more pours than the machine
+    accepts, a single pour over 240 ml — come back as errors.
+
+    The response is {ok, recipe, adjustments, errors}. With save: true the
+    recipe is stored in the same call: it replaces the recipe named by id
+    when one is given, and adds a new one otherwise.
+  fields:
+    name:
+      name: Recipe name
+      description: Name for the recipe.
+      required: true
+      example: "Ethiopia Yirgacheffe"
+      selector:
+        text:
+    dose:
+      name: Dose (g)
+      description: >
+        Coffee dose in grams. Snapped to the chosen cup's range — 15 g exactly
+        for an xPod, 5–18 g for the Omni dripper, 5–25 g for Other, 1–5 g for
+        Tea. Defaults to the cup's own default.
+      required: false
+      example: 18
+      selector:
+        number:
+          min: 1
+          max: 25
+          step: 0.5
+          unit_of_measurement: g
+    ratio:
+      name: Ratio
+      description: >
+        Brew ratio, as "1:16" or just the number 16. Water is dose × ratio.
+        Snapped to the 0.5 grid within 5–25.
+      required: false
+      example: "1:16"
+      selector:
+        text:
+    grind_size:
+      name: Grind size
+      description: 1–80, lower is finer. Defaults to 40.
+      required: false
+      example: 50
+      selector:
+        number:
+          min: 1
+          max: 80
+          step: 1
+    grinder_speed_rpm:
+      name: Grinder speed (RPM)
+      description: 60–120 in steps of 10. Defaults to 90.
+      required: false
+      example: 90
+      selector:
+        number:
+          min: 60
+          max: 120
+          step: 10
+    cup_type:
+      name: Cup type
+      description: >
+        The brewer in use, by name or by id — xPod (1), Omni dripper (2),
+        Other (3), Tea (4). Defaults to the Omni dripper.
+      required: false
+      example: "Omni dripper"
+      selector:
+        text:
+    pour_count:
+      name: Pour count
+      description: >
+        How many pours to generate when you don't supply them yourself, 1–9.
+        Ignored when pours_json is given. Defaults to 3.
+      required: false
+      example: 3
+      selector:
+        number:
+          min: 1
+          max: 9
+          step: 1
+    pours_json:
+      name: Pours JSON
+      description: >
+        The pours, as a JSON array. Every field is optional and anything left
+        out is filled in: [{"volume_ml": 56, "temperature_c": 94,
+        "flow_rate": 3.0, "pause_s": 41, "pattern": "spiral",
+        "agitate_before": 2, "agitate_after": 2}, ...]. Volumes that don't sum
+        to dose × ratio are rescaled proportionally, so the shape of the
+        recipe survives. Leave blank to generate pours from pour_count.
+      required: false
+      selector:
+        text:
+    id:
+      name: Recipe id
+      description: >
+        The id of an existing recipe. With save, the recipe is replaced rather
+        than added — this is how an edit avoids leaving a duplicate behind.
+      required: false
+      selector:
+        text:
+    save:
+      name: Save
+      description: >
+        Store the result. Off by default, so you can build a recipe and show
+        it to the user before committing to it.
+      required: false
+      default: false
+      selector:
+        boolean:
+    apply_brew_defaults:
+      name: Apply brewing defaults
+      description: >
+        On by default: the first pour gets a bloom pause targeting a 60-second
+        window, later pours pause 10 seconds, and any pause between 1 and 9
+        seconds is lifted to 10. These are brewing preferences, not machine
+        limits — turn this off to get the machine's own defaults, where an
+        unspecified pause is simply zero.
+      required: false
+      default: true
+      selector:
+        boolean:
 
 add_recipe:
   name: Add Recipe

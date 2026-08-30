@@ -14,7 +14,6 @@ via the integration's options flow ("Add recipe by share URL").
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import Any
 
 import voluptuous as vol
@@ -40,9 +39,8 @@ from .const import (
     DOMAIN,
 )
 from xbloom.mode_listener import IDLE_TIMEOUT_SEC
-from xbloom import spec
+from xbloom import recipe_build, spec
 from xbloom.recipe_validate import (
-    VOLUME_TOLERANCE_ML,
     denom_to_ratio_str,
     guess_ratio,
     snap_ratio,
@@ -605,35 +603,13 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                     # No pours yet or count changed — full recalculate.
                     self._draft["pours"] = self._auto_fill_pours(self._draft)
                 else:
-                    # Count unchanged. Only touch volumes if the total water
-                    # actually moved: this branch used to flatten every pour to
-                    # an even split unconditionally, so merely stepping through
-                    # the edit wizard destroyed a custom distribution (a 30 ml
-                    # bloom + 90 ml second pour became 60/60).
+                    # Count unchanged — move the existing pours onto the new
+                    # total without levelling the user's distribution.
                     ratio_denom = float(self._draft["ratio"].split(":", 1)[1])
                     total_ml = round(float(self._draft["dose_g"]) * ratio_denom, 1)
-                    old_total = round(sum(float(p["volume_ml"]) for p in old_pours), 1)
-                    if abs(total_ml - old_total) <= VOLUME_TOLERANCE_ML:
-                        # No-op edit — leave the user's pours exactly as they are.
-                        new_pours = [dict(p) for p in old_pours]
-                    elif old_total > 0:
-                        # Dose/ratio changed — scale proportionally so the shape
-                        # of the recipe survives instead of being levelled.
-                        factor = total_ml / old_total
-                        new_pours = [
-                            {**p, "volume_ml": round(float(p["volume_ml"]) * factor, 1)}
-                            for p in old_pours
-                        ]
-                    else:
-                        # Degenerate (all-zero volumes) — fall back to an even split.
-                        per_volume = round(total_ml / new_pour_count, 1)
-                        new_pours = [{**p, "volume_ml": per_volume} for p in old_pours]
-                    drift = round(total_ml - sum(p["volume_ml"] for p in new_pours), 1)
-                    if drift:
-                        new_pours[-1]["volume_ml"] = round(
-                            new_pours[-1]["volume_ml"] + drift, 1
-                        )
-                    self._draft["pours"] = new_pours
+                    self._draft["pours"] = recipe_build.redistribute_pours(
+                        old_pours, total_ml=total_ml, pour_count=new_pour_count,
+                    )
                 return await self.async_step_create_recipe_pours()
 
         # Use draft values as defaults so edits pre-fill current recipe values.
@@ -665,32 +641,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
 
     def _auto_fill_pours(self, draft: dict) -> list[dict]:
         """xbloom-app heuristic — D-20 verbatim."""
-        ratio_denom = float(draft["ratio"].split(":", 1)[1])
-        total_ml = round(draft["dose_g"] * ratio_denom, 1)
-        n = max(1, int(draft["pour_count"]))
-        per_volume = round(total_ml / n, 1)
-        pours: list[dict] = []
-        temp_rng = spec.field("pour_temperature_c")
-        for i in range(n):
-            # Temperature: start 92°C, descend 1°C per subsequent pour.
-            temp = max(temp_rng.min, 92 - i * 1)
-            pours.append({
-                "id": i,
-                "recipe_id": 0,
-                "name": "",
-                "volume_ml": per_volume,
-                "temperature_c": float(temp),
-                "pattern": spec.PATTERN_NAME_TO_API["spiral"],
-                "flow_rate": 3.0,
-                "pause_s": 0,
-                "agitate_before": 2,     # off (2 per client.py convention)
-                "agitate_after": 2,
-            })
-        # Adjust last pour for rounding drift so volumes sum to total exactly.
-        drift = round(total_ml - sum(p["volume_ml"] for p in pours), 1)
-        if drift:
-            pours[-1]["volume_ml"] = round(pours[-1]["volume_ml"] + drift, 1)
-        return pours
+        return recipe_build.auto_fill_pours(draft)
 
     async def async_step_create_recipe_pours(
         self, user_input: dict[str, Any] | None = None
@@ -789,33 +740,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
 
     def _build_recipe(self, draft: dict, pours: list[dict]) -> dict:
         """Assemble the final recipe dict to hand to the validator + store."""
-        cup_label = draft["cup_type_label"]
-        cup_int = spec.CUP_LABEL_TO_API[cup_label]
-        ratio_denom = float(draft["ratio"].split(":", 1)[1])
-        recipe: dict = {
-            "id": f"local-{uuid.uuid4()}",
-            "name": draft["name"],
-            "dose_g": draft["dose_g"],
-            "ratio": draft["ratio"],
-            "water_ratio": round(draft["dose_g"] * ratio_denom, 1),
-            "grind_size": draft["grind_size"],
-            "grinder_size": draft["grind_size"],
-            "grinder_size_enabled": 1,
-            "grinder_speed_rpm": draft["grinder_speed_rpm"],
-            "rpm": draft["grinder_speed_rpm"],
-            "pour_count": int(draft["pour_count"]),
-            "cup_type": cup_int,
-            "cup_type_name": cup_label,
-            "bypass_water_enabled": 1 if draft["bypass_water_enabled"] else 2,
-            "pours": pours,
-            "meta": {"created_locally": True},
-        }
-        if draft["bypass_water_enabled"]:
-            if draft.get("bypass_volume_ml") not in (None, ""):
-                recipe["bypass_volume_ml"] = float(draft["bypass_volume_ml"])
-            if draft.get("bypass_temp_c") not in (None, ""):
-                recipe["bypass_temp_c"] = float(draft["bypass_temp_c"])
-        return recipe
+        return recipe_build.assemble(draft, pours)
 
     def _map_errors_to_form(self, errors_map: dict[str, str]) -> dict[str, str]:
         """Translate validator field paths into form keys for the pours step.
