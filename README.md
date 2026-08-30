@@ -31,6 +31,7 @@ An **optional** xBloom account adds cloud recipe sync and a firmware-update chec
 - **Bluetooth on your Home Assistant host.** In most cases this is already there and there's nothing to buy or set up — a Raspberry Pi, an Intel NUC, or a mini PC running Home Assistant has Bluetooth built in, and the machine only has to be within its range.
   - If your host has no Bluetooth, or it's too far from the kitchen to reach the machine, an [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy.html) placed near the machine is one way to extend the range. **You don't need one otherwise** — it's an alternative for hosts that can't reach the machine, not a requirement. The integration uses whatever Home Assistant's own Bluetooth gives it and doesn't care which.
 - The xBloom Studio powered on and in Bluetooth range during setup and while sending commands.
+- **Internet access the first time it starts.** The BLE protocol library ships separately as [`xbloom-py`](https://pypi.org/project/xbloom-py/), and Home Assistant installs it from PyPI when the integration is first set up or updated. After that it runs entirely locally — brewing has never needed the internet and still doesn't.
 
 ### Installation
 
