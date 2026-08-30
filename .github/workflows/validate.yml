@@ -54,6 +54,32 @@ jobs:
           fi
           echo "No vendored library. The component imports xbloom from the installed package."
 
+  pins-agree:
+    name: library pin agrees
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: manifest.json and requirements-test.txt must name the same version
+        # Home Assistant installs what manifest.json pins; CI tests what
+        # requirements-test.txt pins. Bump one and forget the other and the
+        # suite stays green over a version nobody runs — a silent failure,
+        # because nothing goes red until a user hits code CI never exercised.
+        run: |
+          manifest=$(python -c "import json;print(json.load(open('custom_components/xbloom/manifest.json'))['requirements'][0].split('==')[1])")
+          tests=$(grep -oE '^xbloom-py(\[[a-z,]+\])?==[0-9][^ ]*' requirements-test.txt | head -1 | sed 's/.*==//')
+          echo "manifest.json:          $manifest"
+          echo "requirements-test.txt:  $tests"
+          if [ -z "$manifest" ] || [ -z "$tests" ]; then
+            echo "::error::Could not read one of the pins. Has the format changed?"
+            exit 1
+          fi
+          if [ "$manifest" != "$tests" ]; then
+            echo "::error::xbloom-py pin mismatch — manifest.json says $manifest, requirements-test.txt says $tests. See docs/releasing.md in xbloom-py."
+            exit 1
+          fi
+          echo "Both pin xbloom-py $manifest."
+
   tests:
     name: pytest
     runs-on: ubuntu-latest
