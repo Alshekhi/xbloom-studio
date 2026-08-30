@@ -32,7 +32,7 @@ from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
 from .coordinator import XBloomCoordinator
 from xbloom.client import XBloomClient
 from xbloom.cloud import XBloomCloudClient, language_type_for
-from xbloom import spec
+from xbloom import recipe_build, spec
 from xbloom.recipe_validate import normalize_recipe, validate_recipe
 
 _LOGGER = logging.getLogger(__name__)
@@ -950,6 +950,66 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         )
         return {"recipe": recipe}
 
+    async def handle_build_recipe(call) -> dict:
+        """Snap loose recipe fields onto the machine's grid, then validate.
+
+        The entry point for callers who have a recipe in the shape a person
+        described it — a web recipe, something asked for out loud — rather
+        than a form-validated draft. Values that are merely off the grid are
+        moved onto it and reported in `adjustments`, so the caller can say
+        what changed; only faults that cannot be snapped away come back as
+        `errors`. With `save`, the result is stored in one round trip:
+        replacing the recipe named by `id` when one is given, otherwise
+        adding a new one.
+        """
+        fields = dict(call.data)
+        save = bool(fields.pop("save", False))
+        apply_defaults = bool(fields.pop("apply_brew_defaults", True))
+        # The rest of the service surface calls this field `dose`; the recipe
+        # dict and the validator call it `dose_g`.
+        if "dose" in fields:
+            fields["dose_g"] = fields.pop("dose")
+        raw_pours = fields.pop("pours_json", None)
+        if raw_pours is not None:
+            try:
+                pours = json.loads(raw_pours)
+            except json.JSONDecodeError as err:
+                return {"ok": False, "error": f"Invalid pours_json: {err}"}
+            if not isinstance(pours, list):
+                return {"ok": False, "error": "pours_json must be a JSON array"}
+            fields["pours"] = pours
+
+        result = recipe_build.build(fields, apply_brew_defaults=apply_defaults)
+        payload: dict = {
+            "ok": result.ok,
+            "recipe": result.recipe,
+            "adjustments": result.adjustments,
+            "errors": result.errors,
+        }
+        if not result.ok:
+            payload["error"] = _describe_errors(result.errors)
+            _LOGGER.warning("xbloom.build_recipe: rejected — %s", result.errors)
+            return payload
+        if result.adjustments:
+            _LOGGER.info(
+                "xbloom.build_recipe: adapted '%s' — %s",
+                result.recipe["name"], "; ".join(result.adjustments),
+            )
+        if save:
+            coordinator = entry.runtime_data.coordinator
+            try:
+                if call.data.get("id"):
+                    await coordinator.async_replace_recipe(result.recipe)
+                else:
+                    await coordinator.async_add_recipe(result.recipe)
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.error("xbloom.build_recipe: save failed: %s", err)
+                return {**payload, "ok": False, "error": str(err)}
+            _LOGGER.info("xbloom.build_recipe: saved '%s'", result.recipe["name"])
+        payload["saved"] = save
+        payload["name"] = result.recipe["name"]
+        return payload
+
     async def handle_add_recipe(call) -> dict:
         try:
             recipe = json.loads(call.data["recipe_json"])
@@ -1034,6 +1094,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(
+        DOMAIN, "build_recipe", handle_build_recipe,
+        # `name` is deliberately Optional here: the builder reports a missing
+        # name as a structured `name_required` error the caller can relay,
+        # which is more use to a voice agent than a schema exception.
+        schema=vol.Schema({
+            vol.Optional("name"): str,
+            vol.Optional("dose"): vol.Coerce(float),
+            vol.Optional("ratio"): vol.Any(str, vol.Coerce(float)),
+            vol.Optional("grind_size"): vol.Coerce(int),
+            vol.Optional("grinder_speed_rpm"): vol.Coerce(int),
+            vol.Optional("cup_type"): vol.Any(str, vol.Coerce(int)),
+            vol.Optional("pour_count"): vol.Coerce(int),
+            vol.Optional("pours_json"): str,
+            vol.Optional("id"): str,
+            vol.Optional("save", default=False): bool,
+            vol.Optional("apply_brew_defaults", default=True): bool,
+        }),
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register(
         DOMAIN, "add_recipe", handle_add_recipe,
         schema=vol.Schema({vol.Required("recipe_json"): str}),
         supports_response=SupportsResponse.ONLY,
@@ -1064,9 +1144,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         "start_brew", "stop_brew", "ble_connect", "ble_disconnect",
         "refresh_status",
         "tare", "back_to_home", "brew_pause", "brew_resume",
+        "brew_standalone",
         "grind", "set_mode", "set_water_source",
         "set_temp_unit", "set_weight_unit",
         "write_slot",
+        "build_recipe",
         "list_recipes", "get_recipe", "add_recipe", "update_recipe", "delete_recipe",
         "save_scaled_recipe",
     ):

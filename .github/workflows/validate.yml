@@ -31,6 +31,29 @@ jobs:
         with:
           category: integration
 
+  no-vendoring:
+    name: no vendored library
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Fail if the protocol library is vendored again
+        # The library is xbloom-py, installed from PyPI via manifest
+        # requirements. It used to live in-tree, and a second, drifting copy of
+        # its rules grew in a downstream consumer as a direct result. Copying a
+        # module back in would pass every other check here, so this is the one
+        # that has to notice.
+        run: |
+          if [ -d custom_components/xbloom/vendor ]; then
+            echo "::error::custom_components/xbloom/vendor/ is back. The protocol library is xbloom-py, installed from PyPI — see manifest.json requirements."
+            exit 1
+          fi
+          if grep -rn --include='*.py' -E 'from +\.+vendor|import +\.*vendor' custom_components/; then
+            echo "::error::Something under custom_components/ imports a vendored library path."
+            exit 1
+          fi
+          echo "No vendored library. The component imports xbloom from the installed package."
+
   tests:
     name: pytest
     runs-on: ubuntu-latest
