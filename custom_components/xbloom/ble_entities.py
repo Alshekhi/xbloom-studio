@@ -238,12 +238,27 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
                 self._attr_native_value = "idle"
                 self.async_write_ha_state()
 
+        @callback
+        def _on_completed(event) -> None:
+            # The brew-completion contract is the arbiter of "the coffee is
+            # ready", because CMD_ENJOY — the only thing this sensor used to
+            # accept — is not guaranteed to arrive. A `presumed` completion
+            # means BREW_END came and ENJOY never did; the coffee still got
+            # made, so the sensor must say `done` rather than leave the
+            # home-activity reconciliation's `idle` standing.
+            if event.data.get("outcome") in ("confirmed", "presumed"):
+                self._attr_native_value = "done"
+                self.async_write_ha_state()
+
         eid = self._entry.entry_id
         self.async_on_remove(
             async_dispatcher_connect(self.hass, signal_event(eid), _on_event)
         )
         self.async_on_remove(
             async_dispatcher_connect(self.hass, signal_brew_lifecycle(eid), _on_lifecycle)
+        )
+        self.async_on_remove(
+            self.hass.bus.async_listen("xbloom_brew_completed", _on_completed)
         )
 
 
@@ -466,6 +481,7 @@ class XBloomBrewEventBleEntity(EventEntity):
     def __init__(self, entry) -> None:
         self._entry = entry
         self._brew_started_fired = False
+        self._brew_done_fired = False
         self._last_recipe_name: str | None = None
 
     @property
@@ -486,9 +502,18 @@ class XBloomBrewEventBleEntity(EventEntity):
                 self._trigger_event(granular, attrs)
                 self.async_write_ha_state()
 
+            # A new brew is beginning. Reset the done-latch here, from the
+            # machine's own frames, rather than only on the HA brew task's
+            # lifecycle signal — a brew started at the machine runs no such
+            # task, so a lifecycle-only reset would let it announce once and
+            # then stay silent for every brew after it.
+            if cmd in (CMD_GRINDER_START, CMD_BREWER_START):
+                self._brew_done_fired = False
+
             # Aggregate `brew_started` — first pour after the brew started
             if cmd == CMD_BLOOM and not self._brew_started_fired:
                 self._brew_started_fired = True
+                self._brew_done_fired = False
                 self._trigger_event(
                     "brew_started",
                     {"recipe_name": self._last_recipe_name or ""},
@@ -496,7 +521,8 @@ class XBloomBrewEventBleEntity(EventEntity):
                 self.async_write_ha_state()
 
             # Aggregate `brew_done` — RD_ENJOY
-            if cmd == CMD_ENJOY:
+            if cmd == CMD_ENJOY and not self._brew_done_fired:
+                self._brew_done_fired = True
                 self._trigger_event(
                     "brew_done",
                     {"recipe_name": self._last_recipe_name or ""},
@@ -506,10 +532,35 @@ class XBloomBrewEventBleEntity(EventEntity):
                 self.async_write_ha_state()
 
         @callback
+        def _on_completed(event) -> None:
+            # The completion contract decides that a brew finished even when
+            # RD_ENJOY never came (2026-09-08). Firing `brew_done` here rather
+            # than rewriting the announcement blueprint keeps a brew started
+            # *at the machine* working too — that path runs no HA brew task, so
+            # it never emits `xbloom_brew_completed` and still relies on ENJOY.
+            #
+            # The latch is what stops a `confirmed` completion from announcing
+            # the same coffee a second time, ENJOY having already fired it.
+            if event.data.get("outcome") not in ("confirmed", "presumed"):
+                return
+            if self._brew_done_fired:
+                return
+            self._brew_done_fired = True
+            self._trigger_event(
+                "brew_done",
+                {"recipe_name": event.data.get("recipe_name")
+                 or self._last_recipe_name or ""},
+            )
+            self._last_recipe_name = None
+            self._brew_started_fired = False
+            self.async_write_ha_state()
+
+        @callback
         def _on_lifecycle(phase: str) -> None:
-            # Reset the "started fired" latch at the start of each brew
+            # Reset both latches at the start of each brew
             if phase == "started":
                 self._brew_started_fired = False
+                self._brew_done_fired = False
 
         @callback
         def _on_brew_started_bus(event) -> None:
@@ -527,4 +578,7 @@ class XBloomBrewEventBleEntity(EventEntity):
         )
         self.async_on_remove(
             self.hass.bus.async_listen("xbloom_brew_started", _on_brew_started_bus)
+        )
+        self.async_on_remove(
+            self.hass.bus.async_listen("xbloom_brew_completed", _on_completed)
         )
