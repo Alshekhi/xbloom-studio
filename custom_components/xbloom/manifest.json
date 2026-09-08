@@ -6,12 +6,18 @@
       "local_name": "XBLOOM *"
     }
   ],
-  "codeowners": ["@Alshekhi"],
+  "codeowners": [
+    "@Alshekhi"
+  ],
   "config_flow": true,
-  "dependencies": ["bluetooth"],
+  "dependencies": [
+    "bluetooth"
+  ],
   "documentation": "https://github.com/Alshekhi/xbloom-studio",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/Alshekhi/xbloom-studio/issues",
-  "requirements": ["xbloom-py==0.2.0"],
-  "version": "4.1.0"
+  "requirements": [
+    "xbloom-py==0.2.0"
+  ],
+  "version": "4.2.0"
 }

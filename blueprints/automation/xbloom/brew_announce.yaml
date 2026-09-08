@@ -103,6 +103,13 @@ variables:
   announce_recipe: !input announce_recipe
   method: !input delivery_method
   notify_service: !input notify_service
+  # Carried as a variable, not used as `!input` directly in `target:`. Home
+  # Assistant validates every `choose` branch at config load, including ones
+  # this delivery method will never take — and the empty-string default of an
+  # unused tts_engine fails that validation ("expected 'all' or 'none'"),
+  # rejecting the whole automation. A template is validated as a string and
+  # resolved at runtime, so the unused branch stays inert.
+  tts_engine: !input tts_engine
   recipe_name: >-
     {%- if trigger.id == 'done_recipe' -%}
       {{ trigger.to_state.attributes.get('recipe_name', '') }}
@@ -169,7 +176,7 @@ action:
         sequence:
           - action: tts.speak
             target:
-              entity_id: !input tts_engine
+              entity_id: "{{ tts_engine }}"
             data:
               media_player_entity_id: !input speakers
               message: "{{ message }}"

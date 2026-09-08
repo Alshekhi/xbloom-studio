@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import json
 
@@ -54,6 +56,50 @@ PLATFORMS = ["select", "button", "number", "sensor", "event", "switch", "update"
 # treated as a duplicate (e.g. a voice-agent HTTP retry) and ignored. A call
 # after the window preempts the earlier session instead — see handle_start_brew.
 BREW_DUP_WINDOW_S = 20.0
+
+# How long RD_ENJOY has to follow CMD_BREW_END before the brew is called
+# complete without it. On every healthy brew in the recorder, ENJOY lands
+# 37-70 s behind BREW_END (08-31 through 09-04), so this clears the observed
+# window with margin. See docs/superpowers/specs/2026-09-08-brew-completion-contract-design.md.
+BREW_END_GRACE_S = 120.0
+
+
+async def _await_brew_outcome(ble_client, brew_end_seen: asyncio.Event) -> str | None:
+    """Wait for the brew to end, and report which signal said so.
+
+    RD_ENJOY is the machine's own "your coffee is ready" and is what every
+    consumer wants — but it is **not guaranteed**. On 2026-09-08 a brew ground,
+    poured three times, emitted CMD_BREW_END and never emitted ENJOY. It made
+    coffee; the announcement never fired and the watcher read the resulting
+    `idle` as "cancelled".
+
+    So BREW_END opens a grace window rather than ending the wait outright: ENJOY
+    landing inside it means `confirmed`, and the window closing first means
+    `presumed` — complete, but on the weaker signal. Returns ``None`` when
+    neither arrived, which is the genuinely-unknown case and must not be
+    reported as a completion.
+    """
+    enjoy = asyncio.ensure_future(ble_client.wait_for_completion(timeout=600.0))
+    ended = asyncio.ensure_future(brew_end_seen.wait())
+    try:
+        done, _pending = await asyncio.wait(
+            {enjoy, ended}, return_when=asyncio.FIRST_COMPLETED
+        )
+        if enjoy in done:
+            # ENJOY (or the 600 s safety net) resolved first.
+            return "confirmed" if enjoy.result() else None
+        # BREW_END came first — give ENJOY its usual head start before
+        # deciding the machine is not going to send it.
+        try:
+            return "confirmed" if await asyncio.wait_for(
+                enjoy, timeout=BREW_END_GRACE_S
+            ) else "presumed"
+        except asyncio.TimeoutError:
+            return "presumed"
+    finally:
+        for task in (enjoy, ended):
+            if not task.done():
+                task.cancel()
 
 
 @dataclass
@@ -262,7 +308,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         """
         from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-        from .ble_entities import signal_brew_lifecycle, signal_event
+        from .ble_entities import CMD_BREW_END, signal_brew_lifecycle, signal_event
         from xbloom.ble import XBloomBleClient
 
         active = brew_session["task"]
@@ -333,12 +379,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 _ovr_dose, _ovr_ratio, _ovr_grind,
             )
 
+        # Set when the machine reports it has stopped brewing. This is the
+        # signal that survives when RD_ENJOY does not.
+        brew_end_seen = asyncio.Event()
+
         async def _on_event(decoded: dict) -> None:
+            if decoded.get("cmd") == CMD_BREW_END:
+                brew_end_seen.set()
             async_dispatcher_send(hass, signal_event(entry.entry_id), decoded)
 
         total_pours = len(recipe.get("pours", []) or [])
 
         async def _run_brew() -> None:
+            # The machine issues no brew identifier, but consumers need one to
+            # make completion processing idempotent — a duplicate completion
+            # must not deduct the same dose twice. So mint one per run.
+            run_id = uuid.uuid4().hex
+            started_at = datetime.now(timezone.utc).isoformat()
+
             # Fire the brew_started bus event so the event entity captures the
             # recipe name to attach to the eventual brew_done event, and the
             # current-recipe/current-pour sensors can show progress.
@@ -370,16 +428,44 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     _LOGGER.info(
                         "xbloom.start_brew: ✓ frames sent, waiting for RD_ENJOY (≤10min) …"
                     )
-                    completed = await ble_client.wait_for_completion(timeout=600.0)
+                    outcome = await _await_brew_outcome(ble_client, brew_end_seen)
+                completed = outcome == "confirmed"
                 _LOGGER.info(
                     "xbloom.start_brew: '%s' over BLE '%s' (%s)",
                     recipe_name, ble_name,
-                    "completed" if completed else "timeout — disconnected anyway",
+                    {
+                        "confirmed": "completed — RD_ENJOY",
+                        "presumed": "completed — BREW_END, no RD_ENJOY",
+                    }.get(outcome, "timeout — disconnected anyway"),
                 )
                 hass.bus.async_fire(
                     "xbloom_brew_done_ble" if completed else "xbloom_brew_timeout",
                     {"recipe_name": recipe_name},
                 )
+                if outcome is not None:
+                    # The contract downstream builds on: announcements and
+                    # inventory both key on this rather than on brew_done,
+                    # which a healthy brew can legitimately never send.
+                    hass.bus.async_fire(
+                        "xbloom_brew_completed",
+                        {
+                            "run_id": run_id,
+                            "recipe_id": str(recipe.get("id")) if recipe.get("id") else None,
+                            "recipe_name": recipe_name,
+                            # Effective dose: `recipe` has already been rescaled
+                            # by the customizer overrides above, so this is what
+                            # the machine was actually told to grind. It is the
+                            # intended dose — the scale reads the cup, not the beans.
+                            "dose_g": recipe.get("dose_g"),
+                            # 1 = xPod: a sealed pod, so that coffee did not come
+                            # out of a bag. Inventory consumers need this to know
+                            # not to deduct it.
+                            "cup_type": recipe.get("cup_type"),
+                            "outcome": outcome,
+                            "started_at": started_at,
+                            "ended_at": datetime.now(timezone.utc).isoformat(),
+                        },
+                    )
             except Exception as err:  # noqa: BLE001
                 _LOGGER.error(
                     "xbloom.start_brew: BLE dispatch failed for '%s': %s",
