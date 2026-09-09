@@ -5,6 +5,11 @@ blueprint:
     coffee ready. Optionally names the recipe at both ends. Bilingual
     (English / Arabic).
 
+    "Coffee ready" fires on whichever terminal frame the machine sends first —
+    `brew_ended` (it stopped pouring) or `brew_done` (RD_ENJOY). Neither frame
+    is guaranteed, so waiting for one specific one is wrong in both directions:
+    it either announces late or not at all.
+
     Speaks through Alexa, any TTS engine and speaker, or any notify service —
     pick one under "How to announce".
 
@@ -35,6 +40,18 @@ blueprint:
       selector:
         entity:
           domain: event
+    recipe_entity:
+      name: xBloom Current Recipe Sensor
+      description: >
+        Optional — typically sensor.xbloom_studio_current_recipe. The machine's
+        `brew_ended` frame carries no recipe name, so this is what lets the
+        completion announcement name the coffee at the moment brewing stops
+        instead of waiting for `brew_done`. Leave empty to announce the generic
+        "your coffee is ready" at that point.
+      default: ""
+      selector:
+        entity:
+          domain: sensor
     delivery_method:
       name: How to announce
       description: >
@@ -83,8 +100,11 @@ blueprint:
       name: Announce recipe name
       description: >
         When on, the announcements name the recipe — at the start (from the
-        xbloom_brew_started event) and on completion (from brew_done) — instead
-        of the generic "starting your coffee" / "coffee is ready".
+        xbloom_brew_started event) and on completion — instead of the generic
+        "starting your coffee" / "coffee is ready". At completion the name comes
+        from the `brew_done` event when that is what fired; when the earlier
+        `brew_ended` fires first it carries no name, so the Current Recipe
+        sensor supplies it.
       default: false
       selector:
         boolean: {}
@@ -100,6 +120,21 @@ blueprint:
 
 variables:
   lang: !input language
+  recipe_entity: !input recipe_entity
+  # The machine has two terminal frames and NEITHER is guaranteed: `brew_ended`
+  # (it stopped pouring) and `brew_done` (RD_ENJOY — "your coffee is ready").
+  # 09-02/03/04 sent both, ENJOY 37-70 s after brew_ended; 09-07 sent only
+  # ENJOY; 09-09 sent only brew_ended and this automation waited 122 s for an
+  # ENJOY that never came. Waiting for one specific frame is therefore wrong in
+  # both directions. Announce on whichever arrives FIRST and drop the second:
+  # a `brew_done` whose preceding event was `brew_ended` is the same coffee,
+  # already announced.
+  completed: >-
+    {{ trigger.id == 'done_recipe'
+       and (trigger.to_state.attributes.get('event_type') == 'brew_ended'
+            or (trigger.to_state.attributes.get('event_type') == 'brew_done'
+                and (trigger.from_state.attributes.get('event_type')
+                     if trigger.from_state else none) != 'brew_ended')) }}
   announce_recipe: !input announce_recipe
   method: !input delivery_method
   notify_service: !input notify_service
@@ -112,7 +147,13 @@ variables:
   tts_engine: !input tts_engine
   recipe_name: >-
     {%- if trigger.id == 'done_recipe' -%}
-      {{ trigger.to_state.attributes.get('recipe_name', '') }}
+      {%- set carried = trigger.to_state.attributes.get('recipe_name', '') -%}
+      {%- if carried -%}
+        {{ carried }}
+      {%- elif recipe_entity and states(recipe_entity) not in
+               ['unknown', 'unavailable', ''] -%}
+        {{ states(recipe_entity) }}
+      {%- endif -%}
     {%- elif trigger.id == 'started' -%}
       {{ trigger.event.data.get('recipe_name', '') }}
     {%- else -%}
@@ -129,11 +170,10 @@ variables:
       {%- endif -%}
     {%- elif trigger.id == 'pouring' -%}
       {%- if lang == 'ar' %}بدأ صب القهوة{% else %}Pouring started{% endif -%}
-    {%- elif trigger.id == 'done_simple' and not announce_recipe -%}
-      {%- if lang == 'ar' %}قهوتك في انتظارك{% else %}Your coffee is ready{% endif -%}
-    {%- elif trigger.id == 'done_recipe' and announce_recipe
-            and trigger.to_state.attributes.get('event_type') == 'brew_done' -%}
-      {%- if lang == 'ar' -%}
+    {%- elif completed -%}
+      {%- if not announce_recipe -%}
+        {%- if lang == 'ar' %}قهوتك في انتظارك{% else %}Your coffee is ready{% endif -%}
+      {%- elif lang == 'ar' -%}
         {%- if recipe_name %}انتهى تحضير {{ recipe_name }}{% else %}انتهى تحضير قهوتك{% endif -%}
       {%- else -%}
         {%- if recipe_name %}Finished preparing {{ recipe_name }}{% else %}Your coffee is ready{% endif -%}
@@ -150,10 +190,6 @@ trigger:
     entity_id: !input xbloom_status_entity
     to: "brewing"
     id: pouring
-  - platform: state
-    entity_id: !input xbloom_status_entity
-    to: "done"
-    id: done_simple
   - platform: state
     entity_id: !input brew_event_entity
     id: done_recipe
