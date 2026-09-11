@@ -329,11 +329,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 "%.0fs — preempting it", elapsed,
             )
 
+        def _fire_failed(reason: str, recipe_name: str | None, **extra) -> None:
+            # A brew that cannot run must say so on the bus, not only in the
+            # log: a caller waiting on the outcome otherwise cannot tell
+            # "failed" from "still going". A reason code, not prose — wording
+            # belongs to the consumer.
+            hass.bus.async_fire(
+                "xbloom_brew_failed",
+                {"reason": reason, "recipe_name": recipe_name, **extra},
+            )
+
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
             _LOGGER.error(
                 "xbloom.start_brew: BLE name unknown — set ble_name or product_id"
             )
+            _fire_failed("not_configured", call.data.get("recipe_name"))
             return
 
         recipe, recipe_name = await _resolve_recipe(
@@ -343,6 +354,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             log_label="xbloom.start_brew",
         )
         if recipe is None:
+            _fire_failed("recipe_not_found", call.data.get("recipe_name"))
             return
 
         # Per-brew grinder override — does NOT modify the stored recipe.
@@ -415,6 +427,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     "make sure the machine is on and within range",
                     ble_name,
                 )
+                _fire_failed("machine_not_found", recipe_name, run_id=run_id)
                 async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "ended")
                 return
             _LOGGER.info("xbloom.start_brew: ✓ found device %s", ble_device.address)
@@ -471,6 +484,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     "xbloom.start_brew: BLE dispatch failed for '%s': %s",
                     recipe_name, err,
                 )
+                _fire_failed("bluetooth_error", recipe_name, run_id=run_id, error=str(err))
             finally:
                 async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "ended")
 
