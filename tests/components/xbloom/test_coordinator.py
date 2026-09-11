@@ -65,6 +65,7 @@ def _make(*, creds: dict | None = None, stored: list[dict] | None = None):
     coord._cloud = cloud
     coord.data = []
     coord.async_request_refresh = AsyncMock()
+    coord.async_refresh = AsyncMock()
 
     store = MagicMock()
     store.async_load = AsyncMock(return_value=list(stored or []))
@@ -204,7 +205,7 @@ async def test_add_writes_locally_when_logged_out() -> None:
     coord = _make()
     await coord.async_add_recipe(LOCAL_RECIPE)
     coord.store.async_add.assert_awaited_once_with(LOCAL_RECIPE)
-    coord.async_request_refresh.assert_awaited_once()
+    coord.async_refresh.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -237,6 +238,7 @@ async def test_local_delete_that_removed_nothing_skips_the_refresh() -> None:
     coord = _make()
     coord.store.async_delete = AsyncMock(return_value=False)
     assert await coord.async_delete_recipe("nope") is False
+    coord.async_refresh.assert_not_called()
     coord.async_request_refresh.assert_not_called()
 
 
@@ -287,6 +289,47 @@ async def test_saving_an_id_less_recipe_while_logged_in_creates_it() -> None:
         await coord.async_replace_recipe({"name": "No id"})
     create.assert_awaited_once()
     update.assert_not_called()
+
+
+# Every recipe write refreshes at once. `async_request_refresh` is debounced,
+# so a second write inside its cooldown stayed invisible to the next read for
+# up to ten seconds (measured 2026-09-11) — a successful edit read back as the
+# old recipe. Each case below must use the immediate path and never the
+# debounced one.
+_WRITES = {
+    "add, logged out": (None, "async_add_recipe", (LOCAL_RECIPE,), None),
+    "add, logged in": (CREDS, "async_add_recipe", (CLOUD_RECIPE,), "create_recipe"),
+    "edit, logged out": (None, "async_replace_recipe", (LOCAL_RECIPE,), None),
+    "edit, logged in": (CREDS, "async_replace_recipe", (CLOUD_RECIPE,), "update_recipe"),
+    "delete, logged out": (None, "async_delete_recipe", ("local-1",), None),
+    "delete, logged in": (CREDS, "async_delete_recipe", ("9001",), "delete_recipe"),
+    "remove by name": (CREDS, "async_remove_recipe", ("Cloud Blend",), "delete_recipe"),
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("creds,method,args,cloud_call", _WRITES.values(), ids=_WRITES)
+async def test_a_recipe_write_refreshes_immediately_not_debounced(
+    creds, method, args, cloud_call
+) -> None:
+    coord = _make(creds=creds)
+    coord.data = [CLOUD_RECIPE]
+    if cloud_call:
+        with patch.object(type(coord._session()), cloud_call, AsyncMock()):
+            await getattr(coord, method)(*args)
+    else:
+        await getattr(coord, method)(*args)
+    coord.async_refresh.assert_awaited_once()
+    coord.async_request_refresh.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_logout_keeps_the_debounced_refresh() -> None:
+    """Only recipe writes are made immediate; a logout is one-off and rare."""
+    coord = _make(creds=CREDS)
+    await coord.async_cloud_logout()
+    coord.async_request_refresh.assert_awaited_once()
+    coord.async_refresh.assert_not_called()
 
 
 @pytest.mark.asyncio

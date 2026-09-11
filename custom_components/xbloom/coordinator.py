@@ -179,6 +179,22 @@ class XBloomCoordinator(DataUpdateCoordinator):
             self._start_reauth()
             raise
 
+    async def _refresh_after_recipe_write(self) -> None:
+        """Refresh the recipe list now, not after the debounce.
+
+        `async_request_refresh()` is debounced: the first call runs at once and
+        any further call inside the cooldown waits for it to close. Every recipe
+        service reads `self.data`, so a write made within that window stayed
+        invisible to the next read for up to ten seconds. Measured on
+        2026-09-11: a delete one second after an edit took 10.0 s to show. The
+        write had landed; only the cache was late, which made a successful
+        edit look like a failed one.
+
+        A write is followed by a read often enough for that to matter, and
+        writes are rare enough that one undebounced fetch each costs nothing.
+        """
+        await self.async_refresh()
+
     async def async_add_recipe(self, recipe: dict) -> None:
         """Add a recipe and refresh subscribers."""
         session = self._session()
@@ -186,7 +202,7 @@ class XBloomCoordinator(DataUpdateCoordinator):
             await self._cloud_op(session.create_recipe(recipe))
         else:
             await self.store.async_add(recipe)
-        await self.async_request_refresh()
+        await self._refresh_after_recipe_write()
 
     async def async_remove_recipe(self, name: str) -> bool:
         """Remove a recipe by name and refresh subscribers."""
@@ -199,11 +215,11 @@ class XBloomCoordinator(DataUpdateCoordinator):
             if table_id is None:
                 return False
             await self._cloud_op(session.delete_recipe(table_id))
-            await self.async_request_refresh()
+            await self._refresh_after_recipe_write()
             return True
         removed = await self.store.async_remove(name)
         if removed:
-            await self.async_request_refresh()
+            await self._refresh_after_recipe_write()
         return removed
 
     async def async_replace_recipe(self, recipe: dict) -> None:
@@ -217,21 +233,21 @@ class XBloomCoordinator(DataUpdateCoordinator):
                 # A locally-created recipe saved while logged in — create it in
                 # the cloud so it gets a real tableId.
                 await self._cloud_op(session.create_recipe(recipe))
-            await self.async_request_refresh()
+            await self._refresh_after_recipe_write()
             return
         await self.store.async_replace(recipe)
-        await self.async_request_refresh()
+        await self._refresh_after_recipe_write()
 
     async def async_delete_recipe(self, table_id: str) -> bool:
         """Delete a recipe by id and refresh subscribers."""
         session = self._session()
         if session is not None:
             await self._cloud_op(session.delete_recipe(table_id))
-            await self.async_request_refresh()
+            await self._refresh_after_recipe_write()
             return True
         deleted = await self.store.async_delete(table_id)
         if deleted:
-            await self.async_request_refresh()
+            await self._refresh_after_recipe_write()
         return deleted
 
     # ------------------------------------------------------------------ #
