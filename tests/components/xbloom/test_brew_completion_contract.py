@@ -227,3 +227,54 @@ async def test_cancelled_brew_fires_no_completion():
             await entry.tasks[0]
 
     assert _completed_events(hass) == []
+
+
+def _fired(hass, name):
+    """Every payload fired on the bus under `name`."""
+    return [
+        c.args[1]
+        for c in hass.bus.async_fire.call_args_list
+        if c.args and c.args[0] == name
+    ]
+
+
+async def test_a_presumed_completion_is_not_also_called_a_timeout():
+    """`xbloom_brew_timeout` means the ending was never heard. BREW_END is one.
+
+    A consumer waiting on the brew takes a timeout as final — it is one — so
+    firing it alongside a presumed completion tells the caller the brew timed
+    out and then never reaches them with the completion that follows. That is
+    precisely the brew this contract exists for: the coffee was made and
+    RD_ENJOY was lost.
+    """
+    _FakeBle.enjoy = False
+    hass = _make_hass()
+    entry = _Entry()
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", _FakeBle), \
+         patch("custom_components.xbloom.BREW_END_GRACE_S", 0.05):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        await handlers["start_brew"](MagicMock(data={}))
+        await asyncio.sleep(0)
+        await _FakeBle.instances[0].on_event({"cmd": CMD_BREW_END})
+        await asyncio.wait_for(entry.tasks[0], timeout=2.0)
+
+    assert _completed_events(hass)[0]["outcome"] == "presumed"
+    assert _fired(hass, "xbloom_brew_timeout") == []
+
+
+async def test_an_ending_nobody_heard_is_still_a_timeout():
+    """No BREW_END and no ENJOY: the 600 s safety net, and genuinely unknown."""
+    hass = _make_hass()
+    entry = _Entry()
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", _FakeBle), \
+         patch.object(_FakeBle, "wait_for_completion", AsyncMock(return_value=False)):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        await handlers["start_brew"](MagicMock(data={}))
+        await asyncio.wait_for(entry.tasks[0], timeout=2.0)
+
+    assert _completed_events(hass) == []
+    assert len(_fired(hass, "xbloom_brew_timeout")) == 1

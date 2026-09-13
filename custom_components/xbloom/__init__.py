@@ -60,7 +60,7 @@ BREW_DUP_WINDOW_S = 20.0
 # How long RD_ENJOY has to follow CMD_BREW_END before the brew is called
 # complete without it. On every healthy brew in the recorder, ENJOY lands
 # 37-70 s behind BREW_END (08-31 through 09-04), so this clears the observed
-# window with margin. See docs/superpowers/specs/2026-09-08-brew-completion-contract-design.md.
+# window with margin.
 BREW_END_GRACE_S = 120.0
 
 
@@ -451,10 +451,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                         "presumed": "completed — BREW_END, no RD_ENJOY",
                     }.get(outcome, "timeout — disconnected anyway"),
                 )
-                hass.bus.async_fire(
-                    "xbloom_brew_done_ble" if completed else "xbloom_brew_timeout",
-                    {"recipe_name": recipe_name},
-                )
+                if completed:
+                    hass.bus.async_fire(
+                        "xbloom_brew_done_ble", {"recipe_name": recipe_name}
+                    )
+                elif outcome is None:
+                    # `timeout` means no ending was heard at all. A `presumed`
+                    # outcome heard CMD_BREW_END — the coffee was made — so
+                    # firing a timeout for it tells a consumer waiting on this
+                    # brew that it failed, and a timeout is final: the
+                    # completion that follows an instant later never reaches
+                    # them. That is exactly the brew this contract exists for.
+                    hass.bus.async_fire(
+                        "xbloom_brew_timeout", {"recipe_name": recipe_name}
+                    )
                 if outcome is not None:
                     # The contract downstream builds on: announcements and
                     # inventory both key on this rather than on brew_done,
