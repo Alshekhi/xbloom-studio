@@ -179,7 +179,8 @@ wording belongs to whatever announces it.
 **Low water is a live reading.** The machine reports the level continuously, but
 only while Home Assistant holds the Bluetooth link — which it releases when a
 brew ends. So `sensor.xbloom_studio_machine_status` drops a water fault at that
-point rather than asserting a level nobody is still reading; an empty tank
+point, and does not restore one across a restart, rather than asserting a level
+nobody is still reading; an empty tank
 reports itself again on the next connection, and immediately at the next brew.
 The other faults are reported once and stay until a brew starts.
 

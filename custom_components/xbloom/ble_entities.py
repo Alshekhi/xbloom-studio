@@ -323,6 +323,13 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
         await super().async_added_to_hass()
         if (last := await self.async_get_last_sensor_data()) is not None:
             value = last.native_value
+            # A restored water reading is stale by definition: nothing is
+            # connected at boot, so nobody is reading the level. Restoring it
+            # is how a tank refilled hours ago still showed empty after a
+            # restart. The rest are reported once and nothing re-reports them,
+            # so they survive — `no_beans` is what says to fill the hopper.
+            if value == WATER_STATUS:
+                value = MACHINE_OK
             self._attr_native_value = (
                 value if value in self._attr_options else "ok"
             )

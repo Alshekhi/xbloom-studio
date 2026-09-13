@@ -116,3 +116,50 @@ async def test_a_brew_ending_with_nothing_wrong_changes_nothing():
     sensor, _on_event, on_lifecycle, _bus = await _sensor()
     on_lifecycle("ended")
     assert sensor._attr_native_value == "ok"
+
+
+# --- and it does not survive a restart either --------------------------------
+
+
+async def _restored_as(value):
+    """A sensor coming back from the recorder holding `value`."""
+    entry = MagicMock()
+    entry.entry_id = "test_entry"
+    sensor = XBloomMachineStatusBleSensor(entry)
+    sensor.async_get_last_sensor_data = AsyncMock(
+        return_value=MagicMock(native_value=value)
+    )
+    hass = MagicMock()
+    hass.bus.async_listen = lambda event_type, handler: (lambda: None)
+    sensor.hass = hass
+    sensor.async_write_ha_state = MagicMock()
+    sensor.async_on_remove = MagicMock()
+    with patch("custom_components.xbloom.ble_entities.async_dispatcher_connect",
+               lambda *_a: (lambda: None)):
+        await sensor.async_added_to_hass()
+    return sensor
+
+
+@pytest.mark.asyncio
+async def test_a_restart_does_not_bring_a_water_fault_back():
+    """Nothing is connected at boot, so nobody is reading the level.
+
+    Home Assistant restored `no_water` at 2026-09-13 23:51 from a brew that had
+    finished eleven hours earlier — the same stale assertion the live path had
+    just been taught not to make.
+    """
+    sensor = await _restored_as(WATER_STATUS)
+    assert sensor._attr_native_value == "ok"
+
+
+@pytest.mark.asyncio
+async def test_a_restart_keeps_a_fault_nothing_re_reports():
+    """No beans is still true after a restart, and still worth saying."""
+    sensor = await _restored_as("no_beans")
+    assert sensor._attr_native_value == "no_beans"
+
+
+@pytest.mark.asyncio
+async def test_a_restored_value_outside_the_options_is_still_ignored():
+    sensor = await _restored_as("something else")
+    assert sensor._attr_native_value == "ok"
