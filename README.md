@@ -145,6 +145,43 @@ All three are **bilingual, English or Arabic**, chosen per automation. You can
 import a blueprint more than once — for example, English on the kitchen speaker
 and Arabic on another.
 
+### Events the integration fires
+
+Automations can trigger on these. They are the integration's contract with
+anything that wants to know how a brew went — the blueprints use them, and so
+can your own automations or a service outside Home Assistant.
+
+| Event | When | Payload |
+|---|---|---|
+| `xbloom_brew_started` | Home Assistant has begun a brew | `recipe_name`, `total_pours` |
+| `xbloom_brew_completed` | **The brew finished.** Key on this one. | `run_id`, `recipe_id`, `recipe_name`, `dose_g`, `cup_type`, `outcome`, `started_at`, `ended_at` |
+| `xbloom_brew_failed` | The brew could not be started at all | `reason`, `recipe_name`, sometimes `run_id` / `error` |
+| `xbloom_brew_timeout` | Ten minutes passed with no ending heard from the machine | `recipe_name` |
+
+**`outcome` is the part worth understanding.** The machine's own "your coffee
+is ready" (`RD_ENJOY`) is **not guaranteed** — a brew can grind, pour, announce
+that it has stopped pouring, and never send it. So:
+
+- **`confirmed`** — `RD_ENJOY` arrived. The machine said so itself.
+- **`presumed`** — it did not, but the machine's end-of-pouring frame did, and
+  nothing followed within two minutes. The coffee was made; the final signal
+  was lost.
+
+Both mean the brew finished, and a consumer should treat them the same unless
+it has a reason not to. When neither signal arrives, no completion is fired at
+all — that case is genuinely unknown, and becomes `xbloom_brew_timeout` rather
+than a completion nobody can stand behind.
+
+`reason` on a failure is a code, not a sentence — `machine_not_found`,
+`bluetooth_error`, `recipe_not_found`, `not_configured` — so the wording
+belongs to whatever announces it.
+
+**A brew started on the machine itself fires none of these.** It runs no Home
+Assistant brew task, so there is nothing to report it; `sensor.xbloom_studio_brew_status`
+still follows it to `done`, as long as Home Assistant is holding the Bluetooth
+link at the time. Key on the sensor when you want every brew, and on the events
+when you want the ones Home Assistant started and everything they carry.
+
 ### Write your own
 
 The blueprints cover the common jobs. Write your own if you want different
