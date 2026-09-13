@@ -10,9 +10,10 @@ __pycache__/
 # Claude Code session state
 .claude/
 
-# Personal cleanup notes (host-specific)
+# Personal notes and local tooling (host-specific)
 CLEANUP.md
 CLAUDE.md
+.graphifyignore
 
 # Generated graph output
 graphify-out/
