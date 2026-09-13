@@ -106,6 +106,7 @@ CMD_BYPASS           = 40520  # RD_BYPASS — bypass/dilution pour
 # heartbeat is what re-arms the fault event; resolved out of spec rather than
 # restated beside it.
 WATER_STATUS = "no_water"
+MACHINE_OK = spec.MACHINE_OK
 
 # Faults that end the brew rather than interrupt it. Only what has been seen on
 # a real brew belongs here, because treating a passing condition as fatal would
@@ -355,13 +356,35 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
                 self.async_write_ha_state()
 
         @callback
+        def _release_water_reading() -> None:
+            # Low water is a level the machine reports continuously, and only
+            # while Home Assistant holds the link. Once it stops arriving,
+            # holding the last one asserts a condition nobody can still see —
+            # for nine hours, after the 2026-09-13 brew. Dropping it claims no
+            # more than that we stopped looking: an empty tank says so again on
+            # the very next heartbeat, and at the next brew.
+            if self._attr_native_value == WATER_STATUS:
+                self._attr_native_value = MACHINE_OK
+                self.async_write_ha_state()
+
+        @callback
         def _on_lifecycle(phase: str) -> None:
             # A new brew clears any prior fault.
             if phase == "started" and self._attr_native_value != "ok":
                 self._attr_native_value = "ok"
                 self.async_write_ha_state()
+            elif phase == "ended":
+                _release_water_reading()
+
+        @callback
+        def _on_connect_stopped(_event) -> None:
+            # The Connect switch let the link go; the readings stop with it.
+            _release_water_reading()
 
         eid = self._entry.entry_id
+        self.async_on_remove(
+            self.hass.bus.async_listen("xbloom_connect_stopped", _on_connect_stopped)
+        )
         self.async_on_remove(
             async_dispatcher_connect(self.hass, signal_event(eid), _on_event)
         )
@@ -599,7 +622,20 @@ class XBloomBrewEventBleEntity(EventEntity):
             self.async_write_ha_state()
 
         @callback
+        def _release_water_latch(*_args) -> None:
+            # Water is only asserted while the link carries the readings. When
+            # that stops, the next report is news again — and the status sensor
+            # drops its own reading at the same moment, so the two agree.
+            self._active_faults.discard(WATER_FAULT_EVENT)
+
+        self.async_on_remove(
+            self.hass.bus.async_listen("xbloom_connect_stopped", _release_water_latch)
+        )
+
+        @callback
         def _on_lifecycle(phase: str) -> None:
+            if phase == "ended":
+                _release_water_latch()
             # Reset both latches at the start of each brew
             if phase == "started":
                 self._brew_started_fired = False

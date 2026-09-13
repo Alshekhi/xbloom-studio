@@ -176,6 +176,13 @@ than a completion nobody can stand behind.
 `bluetooth_error`, `recipe_not_found`, `not_configured`, `no_beans` — so the
 wording belongs to whatever announces it.
 
+**Low water is a live reading.** The machine reports the level continuously, but
+only while Home Assistant holds the Bluetooth link — which it releases when a
+brew ends. So `sensor.xbloom_studio_machine_status` drops a water fault at that
+point rather than asserting a level nobody is still reading; an empty tank
+reports itself again on the next connection, and immediately at the next brew.
+The other faults are reported once and stay until a brew starts.
+
 **A fault the machine cannot brew through ends the brew.** With no beans in the
 hopper it stops the grinder and does nothing further, so waiting for an ending
 would leave a brew showing as in progress until it was cancelled by hand: that

@@ -131,3 +131,28 @@ async def test_repeats_are_only_suppressed_for_faults():
         on_event({"cmd": CMD_BLOOM, "pour_index": 0})
         on_event({"cmd": CMD_BLOOM, "pour_index": 1})
         assert fired(ent, "pour_started") == ["pour_started", "pour_started"]
+
+
+@pytest.mark.asyncio
+async def test_water_is_news_again_once_the_brew_that_reported_it_has_ended():
+    """The sensor releases its water reading when the link goes; this follows it.
+
+    Otherwise the pair disagrees in the worst direction: the sensor shows `ok`
+    while the event entity still holds water latched, so a tank that is empty
+    on the next connection is neither displayed nor announced.
+    """
+    async with _entity() as (ent, on_event, lifecycle):
+        on_event({"cmd": CMD_NO_WATER})
+        lifecycle("ended")
+        on_event({"cmd": CMD_NO_WATER})
+        assert fired(ent, EVENT_NO_WATER) == [EVENT_NO_WATER, EVENT_NO_WATER]
+
+
+@pytest.mark.asyncio
+async def test_a_bean_fault_stays_latched_across_the_end_of_a_brew():
+    """Nothing re-reports it, so repeating it is repetition, not news."""
+    async with _entity() as (ent, on_event, lifecycle):
+        on_event({"cmd": CMD_NO_BEANS})
+        lifecycle("ended")
+        on_event({"cmd": CMD_NO_BEANS})
+        assert fired(ent, EVENT_NO_BEANS) == [EVENT_NO_BEANS]
