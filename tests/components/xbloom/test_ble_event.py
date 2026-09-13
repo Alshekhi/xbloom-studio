@@ -32,7 +32,7 @@ CMD_ERR_GEAR = _CMD_BY_STATUS["gear_position_error"]
 
 
 def test_bypass_cmd_constant_is_40520() -> None:
-    """RD_BYPASS notification code, per discovery/notes/ble-protocol.md."""
+    """RD_BYPASS, as the machine numbers its notifications."""
     assert CMD_BYPASS == 40520
 
 
@@ -47,7 +47,7 @@ def test_bypass_cmd_maps_to_bypass_started() -> None:
 
 
 def test_no_water_cmd_constant_is_40522() -> None:
-    """RD_ErrorLackOfWater notification code, per discovery/notes/ble-protocol.md."""
+    """RD_ErrorLackOfWater, as the machine numbers its notifications."""
     assert CMD_ERR_NO_WATER == 40522
 
 

@@ -35,12 +35,9 @@ import pytest
 # Inject minimal homeassistant stubs.
 #
 # `recipe_validate.py` itself depends only on stdlib + `re`, but importing it
-# through `xbloom.*` triggers the parent
-# package's `__init__.py`, which imports `homeassistant`. HA is not installed
-# in this dev environment, so we mirror the stub pattern from
-# tests/components/xbloom/test_client.py to make the import path reachable.
-# When `recipe_validate.py` lands in plan 09-03, this test will go GREEN; until
-# then it MUST fail with ModuleNotFoundError on `recipe_validate` (RED).
+# through `xbloom.*` triggers the parent package's `__init__.py`, which imports
+# `homeassistant`. The suite does not install HA — conftest.py stubs it — so
+# the same stub pattern is applied here to make the import path reachable.
 # ---------------------------------------------------------------------------
 
 

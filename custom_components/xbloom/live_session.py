@@ -54,7 +54,7 @@ TARE_DEDUP_SEC = 0.5
 
 
 def _ble_size_to_ui(ble_value: int) -> int:
-    """Per brAzzi64 PROTOCOL.md: UI = max(1, BLE − 30)."""
+    """Per PROTOCOL.md in brAzzi64/xbloom-ble: UI = max(1, BLE − 30)."""
     return max(1, int(ble_value) - 30)
 
 
