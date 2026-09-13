@@ -5,8 +5,8 @@
 # the integration to one HA release. What is listed here is only what the
 # component's own imports genuinely need at import time.
 #
-# This file exists because pyproject.toml is gitignored, so it cannot carry
-# the dev extras.
+# This file carries them because the repo is a Home Assistant integration, not
+# a Python package: there is no pyproject.toml to hold dev extras.
 pytest>=8
 pytest-asyncio>=0.23
 

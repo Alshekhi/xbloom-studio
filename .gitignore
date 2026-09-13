@@ -1,6 +1,3 @@
-# Bridge runtime credentials — .env.example is committed; .env is not
-bridge/.env
-
 # Python generated files
 __pycache__/
 *.pyc
@@ -17,37 +14,15 @@ __pycache__/
 CLEANUP.md
 CLAUDE.md
 
-# GSD planning artifacts
-.planning/
-
 # Generated graph output
 graphify-out/
-
-# Superseded — BLE replaced the cloud API bridge
-bridge/
 
 # Personal reference
 docs/
 
-# Standalone library build files (superseded — vendor copy lives in
-# custom_components). tests/ is intentionally NOT ignored: it holds the
-# spec/validation guards that keep the single source of truth honest.
-pyproject.toml
-uv.lock
-
-# Virtual environment and dist
+# Virtual environment
 .venv/
-dist/
 
 # Local-only development artifacts (kept out of the repo)
 discovery/*
 !discovery/.gitkeep
-
-# Local tooling
-tools/
-
-# Local-only deploy helper (contains Pi host/paths; kept out of git by request)
-scripts/deploy-to-pi.sh
-
-# Local-only deploy reference (contains Pi host/paths; kept out of git by request)
-DEPLOY.md
