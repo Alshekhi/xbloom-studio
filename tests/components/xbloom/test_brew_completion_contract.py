@@ -278,3 +278,69 @@ async def test_an_ending_nobody_heard_is_still_a_timeout():
 
     assert _completed_events(hass) == []
     assert len(_fired(hass, "xbloom_brew_timeout")) == 1
+
+
+# --- the window ends on evidence, not only on the clock ---------------------
+
+CMD_MACHINE_ACTIVITY = 8023
+ACTIVITY_HOME = 1
+ACTIVITY_BREWING = 34
+
+
+async def test_going_home_after_brew_end_completes_without_waiting_out_the_window():
+    """When ENJOY is lost the machine returns to its home screen.
+
+    That is positive evidence no ENJOY is coming, so the brew can be called
+    complete then — rather than leaving the caller in silence for two minutes
+    waiting for a frame that has already been overtaken.
+    """
+    _FakeBle.enjoy = False
+    hass = _make_hass()
+    entry = _Entry()
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", _FakeBle), \
+         patch("custom_components.xbloom.BREW_END_GRACE_S", 30.0):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        await handlers["start_brew"](MagicMock(data={}))
+        await asyncio.sleep(0)
+
+        ble = _FakeBle.instances[0]
+        await ble.on_event({"cmd": CMD_BREW_END})
+        await ble.on_event({"cmd": CMD_MACHINE_ACTIVITY, "activity": ACTIVITY_HOME})
+
+        # Finishes on the frame, not on the 30 s window.
+        await asyncio.wait_for(entry.tasks[0], timeout=2.0)
+
+    events = _completed_events(hass)
+    assert len(events) == 1
+    assert events[0]["outcome"] == "presumed"
+    assert _fired(hass, "xbloom_brew_timeout") == []
+
+
+async def test_a_home_frame_before_the_brew_ends_decides_nothing():
+    """Idle machines emit their home activity on connect, mid-brew they do not.
+
+    Taking that as an ending would complete a brew that has not started pouring.
+    """
+    _FakeBle.enjoy = False
+    hass = _make_hass()
+    entry = _Entry()
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", _FakeBle), \
+         patch("custom_components.xbloom.BREW_END_GRACE_S", 0.05):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        await handlers["start_brew"](MagicMock(data={}))
+        await asyncio.sleep(0)
+
+        ble = _FakeBle.instances[0]
+        await ble.on_event({"cmd": CMD_MACHINE_ACTIVITY, "activity": ACTIVITY_HOME})
+        await ble.on_event({"cmd": CMD_MACHINE_ACTIVITY, "activity": ACTIVITY_BREWING})
+        await asyncio.sleep(0)
+        assert not entry.tasks[0].done(), "a home frame before BREW_END ended the wait"
+
+        await ble.on_event({"cmd": CMD_BREW_END})
+        await asyncio.wait_for(entry.tasks[0], timeout=2.0)
+
+    assert _completed_events(hass)[0]["outcome"] == "presumed"

@@ -58,13 +58,18 @@ PLATFORMS = ["select", "button", "number", "sensor", "event", "switch", "update"
 BREW_DUP_WINDOW_S = 20.0
 
 # How long RD_ENJOY has to follow CMD_BREW_END before the brew is called
-# complete without it. On every healthy brew in the recorder, ENJOY lands
-# 37-70 s behind BREW_END (08-31 through 09-04), so this clears the observed
-# window with margin.
+# complete without it. Measured across healthy brews, ENJOY lands 24-70 s
+# behind BREW_END, so this clears the observed spread with margin.
+#
+# It is the backstop, not the decision: a machine that returns to its home
+# screen after BREW_END has said ENJOY is not coming, and ends the wait there.
+# Only a brew that sends neither runs this clock out.
 BREW_END_GRACE_S = 120.0
 
 
-async def _await_brew_outcome(ble_client, brew_end_seen: asyncio.Event) -> str | None:
+async def _await_brew_outcome(
+    ble_client, brew_end_seen: asyncio.Event, went_home: asyncio.Event
+) -> str | None:
     """Wait for the brew to end, and report which signal said so.
 
     RD_ENJOY is the machine's own "your coffee is ready" and is what every
@@ -89,13 +94,23 @@ async def _await_brew_outcome(ble_client, brew_end_seen: asyncio.Event) -> str |
             # ENJOY (or the 600 s safety net) resolved first.
             return "confirmed" if enjoy.result() else None
         # BREW_END came first — give ENJOY its usual head start before
-        # deciding the machine is not going to send it.
+        # deciding the machine is not going to send it. The machine returning
+        # to its home screen ends that wait early: it cannot be about to
+        # announce a brew it has already walked away from, and waiting out the
+        # whole window leaves the caller in silence meanwhile.
+        home = asyncio.ensure_future(went_home.wait())
         try:
-            return "confirmed" if await asyncio.wait_for(
-                enjoy, timeout=BREW_END_GRACE_S
-            ) else "presumed"
-        except asyncio.TimeoutError:
+            done, _pending = await asyncio.wait(
+                {enjoy, home},
+                timeout=BREW_END_GRACE_S,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if enjoy in done:
+                return "confirmed" if enjoy.result() else "presumed"
             return "presumed"
+        finally:
+            if not home.done():
+                home.cancel()
     finally:
         for task in (enjoy, ended):
             if not task.done():
@@ -308,7 +323,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         """
         from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-        from .ble_entities import CMD_BREW_END, signal_brew_lifecycle, signal_event
+        from .ble_entities import (
+            ACTIVITY_HOME_STATES,
+            CMD_BREW_END,
+            CMD_MACHINE_ACTIVITY,
+            signal_brew_lifecycle,
+            signal_event,
+        )
         from xbloom.ble import XBloomBleClient
 
         active = brew_session["task"]
@@ -394,10 +415,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         # Set when the machine reports it has stopped brewing. This is the
         # signal that survives when RD_ENJOY does not.
         brew_end_seen = asyncio.Event()
+        # Set only after BREW_END: an idle machine emits its home activity on
+        # connect, and that says nothing about a brew that has not ended.
+        went_home = asyncio.Event()
 
         async def _on_event(decoded: dict) -> None:
             if decoded.get("cmd") == CMD_BREW_END:
                 brew_end_seen.set()
+            elif (
+                brew_end_seen.is_set()
+                and decoded.get("cmd") == CMD_MACHINE_ACTIVITY
+                and decoded.get("activity") in ACTIVITY_HOME_STATES
+            ):
+                went_home.set()
             async_dispatcher_send(hass, signal_event(entry.entry_id), decoded)
 
         total_pours = len(recipe.get("pours", []) or [])
@@ -441,7 +471,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     _LOGGER.info(
                         "xbloom.start_brew: ✓ frames sent, waiting for RD_ENJOY (≤10min) …"
                     )
-                    outcome = await _await_brew_outcome(ble_client, brew_end_seen)
+                    outcome = await _await_brew_outcome(
+                        ble_client, brew_end_seen, went_home
+                    )
                 completed = outcome == "confirmed"
                 _LOGGER.info(
                     "xbloom.start_brew: '%s' over BLE '%s' (%s)",
