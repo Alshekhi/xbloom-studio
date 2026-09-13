@@ -101,6 +101,16 @@ CMD_BYPASS           = 40520  # RD_BYPASS — bypass/dilution pour
 # The machine's fault vocabulary (cmd -> status, event type) lives in
 # spec.FAULTS, the portable single source of truth.
 
+# Water is the one fault the machine also reports continuously, through the
+# MachineInfo heartbeat's `water_enough`. Both describe one condition, so the
+# heartbeat is what re-arms the fault event; resolved out of spec rather than
+# restated beside it.
+WATER_STATUS = "no_water"
+FAULT_EVENTS = {event for (_status, event) in spec.FAULTS.values()}
+WATER_FAULT_EVENT = next(
+    event for (status, event) in spec.FAULTS.values() if status == WATER_STATUS
+)
+
 # Machine activity values (cmd 8023 payload as LE uint32)
 # These reflect the machine's overall state, NOT individual steps.
 # The machine has TWO home/idle screens — one per mode — and the firmware
@@ -311,8 +321,8 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
                 # Self-clearing water status: only toggles ok <-> no_water so it
                 # never clobbers a distinct active fault (e.g. no_beans).
                 if decoded["water_enough"] == 0 and self._attr_native_value == "ok":
-                    self._attr_native_value = "no_water"
-                elif decoded["water_enough"] == 1 and self._attr_native_value == "no_water":
+                    self._attr_native_value = WATER_STATUS
+                elif decoded["water_enough"] == 1 and self._attr_native_value == WATER_STATUS:
                     self._attr_native_value = "ok"
                 self.async_write_ha_state()
                 return
@@ -483,6 +493,12 @@ class XBloomBrewEventBleEntity(EventEntity):
         self._brew_started_fired = False
         self._brew_done_fired = False
         self._last_recipe_name: str | None = None
+        # Faults currently asserted. The machine reports a fault for as long as
+        # it holds, the way a low-fuel light stays lit, so the frames after the
+        # first carry no news — relaying each one made one dry tank announce
+        # itself three times (2026-09-13). Every other frame is a real event and
+        # is never suppressed.
+        self._active_faults: set[str] = set()
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -493,9 +509,17 @@ class XBloomBrewEventBleEntity(EventEntity):
         def _on_event(decoded: dict) -> None:
             cmd = decoded.get("cmd")
 
+            # Water again: the condition is over, so the next dry tank is news.
+            if decoded.get("water_enough") == 1:
+                self._active_faults.discard(WATER_FAULT_EVENT)
+
             # Fire granular event if applicable
             granular = self._CMD_TO_GRANULAR.get(cmd)
             if granular:
+                if granular in FAULT_EVENTS:
+                    if granular in self._active_faults:
+                        return
+                    self._active_faults.add(granular)
                 attrs: dict[str, Any] = {}
                 if "pour_index" in decoded:
                     attrs["pour_index"] = decoded["pour_index"]
@@ -509,6 +533,7 @@ class XBloomBrewEventBleEntity(EventEntity):
             # then stay silent for every brew after it.
             if cmd in (CMD_GRINDER_START, CMD_BREWER_START):
                 self._brew_done_fired = False
+                self._active_faults.clear()
 
             # Aggregate `brew_started` — first pour after the brew started
             if cmd == CMD_BLOOM and not self._brew_started_fired:
