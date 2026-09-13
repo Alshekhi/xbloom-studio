@@ -54,7 +54,7 @@ TARE_DEDUP_SEC = 0.5
 
 
 def _ble_size_to_ui(ble_value: int) -> int:
-    """Per PROTOCOL.md in brAzzi64/xbloom-ble: UI = max(1, BLE − 30)."""
+    """Grind size on the wire runs 30 above the UI: UI = max(1, BLE − 30)."""
     return max(1, int(ble_value) - 30)
 
 

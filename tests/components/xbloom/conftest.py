@@ -287,7 +287,7 @@ MOCK_CONFIG_ENTRY_DATA = {
 
 @pytest.fixture
 def mock_config_entry():
-    """Return a mock ConfigEntry with Phase 4 token + MQTT + Phase 7 device data."""
+    """Return a mock ConfigEntry with token, MQTT and device data."""
     entry = MagicMock(spec=_CONFIG_ENTRY_SPEC) if _CONFIG_ENTRY_SPEC else MagicMock()
     entry.data = MOCK_CONFIG_ENTRY_DATA.copy()
     entry.entry_id = "test_entry_id_001"

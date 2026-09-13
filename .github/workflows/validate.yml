@@ -75,7 +75,7 @@ jobs:
             exit 1
           fi
           if [ "$manifest" != "$tests" ]; then
-            echo "::error::xbloom-py pin mismatch — manifest.json says $manifest, requirements-test.txt says $tests. See docs/releasing.md in the xbloom-py repository."
+            echo "::error::xbloom-py pin mismatch — manifest.json says $manifest, requirements-test.txt says $tests."
             exit 1
           fi
           echo "Both pin xbloom-py $manifest."

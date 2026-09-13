@@ -1,6 +1,6 @@
 """Tests for button.py — XBloomStartBrewButton and XBloomCancelBrewButton.
 
-Covers CTL-01 (start brew) and CTL-02 (cancel brew) behaviors.
+Covers the start-brew and cancel-brew behaviours.
 Tests are in RED state — XBloomStartBrewButton and XBloomCancelBrewButton do
 not yet exist in button.py.
 
@@ -125,7 +125,7 @@ from custom_components.xbloom.button import XBloomStartBrewButton, XBloomCancelB
 
 
 async def test_start_brew_button_press(mock_config_entry) -> None:
-    """CTL-01: async_press delegates to xbloom.start_brew (BLE-only path).
+    """async_press delegates to xbloom.start_brew (BLE-only path).
 
     The button sends an empty payload — grinder use is governed by
     ``switch.xbloom_studio_use_grinder``, which ``start_brew`` reads itself.
@@ -152,7 +152,7 @@ async def test_start_brew_button_press(mock_config_entry) -> None:
 
 @pytest.mark.asyncio
 async def test_cancel_brew_sends_stop_command(mock_config_entry) -> None:
-    """CTL-02: Cancel button delegates to xbloom.stop_brew."""
+    """Cancel button delegates to xbloom.stop_brew."""
     entry = mock_config_entry
     button = XBloomCancelBrewButton(entry)
     button.hass = MagicMock()
@@ -164,7 +164,7 @@ async def test_cancel_brew_sends_stop_command(mock_config_entry) -> None:
 
 
 async def test_start_brew_unavailable_without_recipe(mock_config_entry) -> None:
-    """CTL-01/D-02: Start Brew button is unavailable when no recipe selected."""
+    """Start Brew button is unavailable when no recipe selected."""
     coordinator = MagicMock()
     entry = mock_config_entry
     button = XBloomStartBrewButton(coordinator, entry)
@@ -179,7 +179,7 @@ async def test_start_brew_unavailable_without_recipe(mock_config_entry) -> None:
 
 
 async def test_start_brew_available_with_recipe(mock_config_entry) -> None:
-    """CTL-01/D-02: Start Brew button is available when a recipe is selected."""
+    """Start Brew button is available when a recipe is selected."""
     coordinator = MagicMock()
     entry = mock_config_entry
     button = XBloomStartBrewButton(coordinator, entry)

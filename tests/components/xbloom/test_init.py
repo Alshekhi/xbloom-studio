@@ -1,6 +1,6 @@
 """Tests for __init__.py — xBloom integration setup and service registration.
 
-Covers CTL-03: xbloom.start_brew service registration and deregistration.
+Covers xbloom.start_brew service registration and deregistration.
 Tests are in RED state — async_setup_entry does not yet register start_brew service.
 
 homeassistant is not installed in this dev environment; we inject minimal mock
@@ -93,7 +93,7 @@ def _inject_stubs():
     select_comp = _mod("homeassistant.components.select")
 
 
-    # voluptuous (used in some Phase 7 service schemas)
+    # voluptuous (used in some service schemas)
     vol_mod = _mod("voluptuous")
     vol_mod.Schema = MagicMock()
     vol_mod.Optional = MagicMock()
@@ -113,7 +113,7 @@ from custom_components.xbloom.const import DOMAIN  # noqa: E402
 
 
 async def test_service_registration(mock_config_entry) -> None:
-    """CTL-03: after async_setup_entry, hass.services.async_register is called with start_brew."""
+    """After async_setup_entry, hass.services.async_register is called with start_brew."""
     hass = MagicMock()
     hass.services = MagicMock()
     hass.services.async_register = MagicMock()
@@ -137,7 +137,7 @@ async def test_service_registration(mock_config_entry) -> None:
 
 
 async def test_service_deregistration_on_unload(mock_config_entry) -> None:
-    """CTL-03: the unload callback registered via entry.async_on_unload calls hass.services.async_remove."""
+    """The unload callback registered via entry.async_on_unload calls hass.services.async_remove."""
     hass = MagicMock()
     hass.services = MagicMock()
     hass.services.async_register = MagicMock()

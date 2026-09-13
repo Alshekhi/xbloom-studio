@@ -1,6 +1,6 @@
 """Tests for the id-based mutation methods on XBloomRecipeStore.
 
-Plan 09-02 adds:
+The methods:
     - async_replace(recipe)   -> upsert by recipe['id'] (tableId)
     - async_delete(table_id)  -> remove by recipe['id']
 
@@ -142,7 +142,7 @@ async def test_async_replace_overwrites_when_id_exists(
 async def test_async_replace_preserves_meta_subobject(
     store: XBloomRecipeStore,
 ) -> None:
-    """D-60: unknown keys (incl. `meta` sub-object) survive a round-trip."""
+    """Unknown keys (incl. `meta` sub-object) survive a round-trip."""
     original = _recipe(
         "local-meta",
         "WithMeta",

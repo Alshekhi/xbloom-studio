@@ -1,11 +1,11 @@
 """Tests for XBloomOptionsFlow — create / edit / delete / write-to-slot.
 
-Plan 09-05. Covers:
+Covers:
   - Create flow (recipe-level + pours step)
   - Edit flow (pick + pre-filled pours + replace path)
   - Delete flow (pick + confirm)
   - Write-to-slot sub-step (skip + service call)
-  - Round-trip _build_recipe → validate_recipe (D-31 bypass int contract)
+  - Round-trip _build_recipe → validate_recipe (bypass int contract)
 
 homeassistant is not installed in the dev environment; we inject minimal
 sys.modules stubs (matching test_config_flow.py / test_storage_id_methods.py)
@@ -406,7 +406,7 @@ async def test_edit_recipe_pre_fills_pours_and_save_uses_replace():
     coord.async_replace_recipe.assert_called_once()
     coord.async_add_recipe.assert_not_called()
     replaced = coord.async_replace_recipe.call_args[0][0]
-    assert replaced["id"] == "local-test-1"  # tableId preserved (D-61)
+    assert replaced["id"] == "local-test-1"  # tableId preserved
 
 
 # ---------------------------------------------------------------------------
@@ -476,7 +476,7 @@ async def test_write_to_slot_calls_xbloom_service():
 
 
 # ---------------------------------------------------------------------------
-# Round-trip _build_recipe → validate_recipe (D-31 bypass int contract)
+# Round-trip _build_recipe → validate_recipe (bypass int contract)
 # ---------------------------------------------------------------------------
 
 

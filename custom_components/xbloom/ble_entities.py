@@ -96,7 +96,7 @@ CMD_GRINDER_STOP     = 40507
 CMD_BLOOM            = 40510
 CMD_BREW_END         = 40511
 CMD_ENJOY            = 40512
-CMD_BYPASS           = 40520  # RD_BYPASS — bypass/dilution pour (see discovery ble-protocol.md)
+CMD_BYPASS           = 40520  # RD_BYPASS — bypass/dilution pour
 
 # The machine's fault vocabulary (cmd -> status, event type) lives in
 # spec.FAULTS, the portable single source of truth.

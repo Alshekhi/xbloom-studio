@@ -76,7 +76,7 @@ def _serial_suffix(ble_name: str) -> str:
 class XBloomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Bluetooth-first setup. No MQTT, no account, no serial entry required."""
 
-    VERSION = 3  # bumped from v2; Phase 9 dropped MQTT + status_source
+    VERSION = 3  # bumped from v2 when MQTT + status_source were dropped
 
     def __init__(self) -> None:
         self._discovered_ble_name: str | None = None
@@ -521,7 +521,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         )
 
     # ------------------------------------------------------------------ #
-    # Create flow — Phase 9 plan 04                                       #
+    # Create flow                                                        #
     # ------------------------------------------------------------------ #
     async def async_step_create_recipe(
         self, user_input: dict[str, Any] | None = None
@@ -640,13 +640,13 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         )
 
     def _auto_fill_pours(self, draft: dict) -> list[dict]:
-        """xbloom-app heuristic — D-20 verbatim."""
+        """xbloom-app heuristic, verbatim."""
         return recipe_build.auto_fill_pours(draft)
 
     async def async_step_create_recipe_pours(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Tweak the auto-filled pours, validate, save (D-21)."""
+        """Tweak the auto-filled pours, validate, save."""
         assert self._draft is not None, "Draft missing — restart create flow"
         errors: dict[str, str] = {}
         pours_now = self._draft["pours"]
@@ -671,7 +671,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             if not errors:
                 coordinator = self.config_entry.runtime_data.coordinator
                 if self._draft.get("edit_existing"):
-                    candidate["id"] = self._draft["id"]   # preserve original tableId (D-61)
+                    candidate["id"] = self._draft["id"]   # preserve original tableId
                     await coordinator.async_replace_recipe(candidate)
                     result_key = "_last_edited"
                 else:
@@ -679,7 +679,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                     result_key = "_last_created"
                 saved_name = candidate["name"]
                 self._draft = None
-                # D-52: optional write-to-slot sub-step. Stash saved name so
+                # Optional write-to-slot sub-step. Stash saved name so
                 # async_step_write_to_slot can read it.
                 self._post_save = {"action": result_key, "name": saved_name}
                 return await self.async_step_write_to_slot()
@@ -792,7 +792,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         return labels
 
     # ------------------------------------------------------------------ #
-    # Edit flow — Phase 9 plan 05                                         #
+    # Edit flow                                                          #
     # ------------------------------------------------------------------ #
     async def async_step_edit_recipe(
         self, user_input: dict[str, Any] | None = None
@@ -824,7 +824,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
 
     def _draft_from_recipe(self, recipe: dict) -> dict:
         """Inverse of `_build_recipe` — produce the draft shape used by the
-        pours step, pre-filled from a stored recipe (D-40)."""
+        pours step, pre-filled from a stored recipe."""
         cup_int = int(recipe.get("cup_type", 3))
         cup_label = spec.CUP_API_TO_LABEL.get(cup_int, "Other")
         return {
@@ -861,12 +861,12 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         }
 
     # ------------------------------------------------------------------ #
-    # Delete flow — Phase 9 plan 05                                       #
+    # Delete flow                                                        #
     # ------------------------------------------------------------------ #
     async def async_step_delete_recipe(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Pick a recipe to delete (id-keyed for D-61 rename safety)."""
+        """Pick a recipe to delete (id-keyed for rename safety)."""
         coordinator = self.config_entry.runtime_data.coordinator
         # Pull the latest list on entry (see edit_recipe) so the dropdown is fresh.
         await coordinator.async_refresh()
@@ -891,7 +891,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
     async def async_step_delete_recipe_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Two-step confirm before calling async_delete_recipe (D-41)."""
+        """Two-step confirm before calling async_delete_recipe."""
         assert self._delete_target is not None
         if user_input is not None:
             if user_input.get("confirm"):
@@ -915,7 +915,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         )
 
     # ------------------------------------------------------------------ #
-    # Optional Write-to-slot sub-step (D-52)                              #
+    # Optional Write-to-slot sub-step                                     #
     # ------------------------------------------------------------------ #
     async def async_step_write_to_slot(
         self, user_input: dict[str, Any] | None = None

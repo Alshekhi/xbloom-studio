@@ -10,8 +10,8 @@ API:
     await store.async_load()                 # -> list[dict]
     await store.async_add(recipe)            # name-keyed insert/replace
     await store.async_remove(name)           # name-keyed delete
-    await store.async_replace(recipe)        # id-keyed upsert (Phase 9 edit)
-    await store.async_delete(table_id)       # id-keyed delete (Phase 9)
+    await store.async_replace(recipe)        # id-keyed upsert (edit flow)
+    await store.async_delete(table_id)       # id-keyed delete
     await store.async_replace_all(recipes)   # bulk overwrite
     await store.async_clear()                # wipe (entry uninstall)
 """
@@ -98,9 +98,9 @@ class XBloomRecipeStore:
     async def async_replace(self, recipe: dict) -> None:
         """Insert or overwrite a recipe by its 'id' (tableId).
 
-        Used by the Phase 9 edit flow where the user re-saves a recipe
+        Used by the edit flow where the user re-saves a recipe
         under the same tableId. Preserves all keys including the `meta`
-        sub-object (D-60) — this is a full-dict overwrite with no key
+        sub-object — this is a full-dict overwrite with no key
         filtering, matching `async_replace_all` semantics on a single slot.
         """
         table_id = (recipe.get("id") or "").strip()

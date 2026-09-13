@@ -115,8 +115,8 @@ class XBloomRuntimeData:
     # BLE decode that fills this is a follow-up; the cloud-side "latest version"
     # check works today regardless.
     installed_fw_version: str | None = None
-    # BLE device resolver — set in async_setup_entry. Phase 8 mode
-    # listeners (08-04+) re-resolve on every start so adapter routing
+    # BLE device resolver — set in async_setup_entry. The mode
+    # listeners re-resolve on every start so adapter routing
     # stays correct after rediscovery.
     ble_device_resolver: object = None
     # Long-lived live-session listener — created by switch.py during platform
@@ -199,7 +199,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # ------------------------------------------------------------------ #
     # Shared recipe-resolution helper                                    #
     # Source priority: share_url → share_id → recipe_name → select state #
-    # Used by start_brew (Phase 7) and write_slot (08-03).               #
+    # Used by start_brew and write_slot.                                       #
     # ------------------------------------------------------------------ #
     async def _resolve_recipe(
         *,
@@ -612,7 +612,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _LOGGER.error("xbloom.ble_connect: connection failed: %s", err)
 
     # ------------------------------------------------------------------ #
-    # Simple-command services (08-01)                                    #
+    # Simple-command services                                    #
     # tare / back_to_home / brew_pause / brew_resume — every one is a    #
     # single-frame BLE write with no parameters. Factor through one      #
     # helper so the connect-on-demand boilerplate isn't repeated.        #
@@ -698,7 +698,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         )
 
     # ------------------------------------------------------------------ #
-    # 08-02 — Standalone grinder + mode/source/unit set-* services       #
+    # Standalone grinder + mode/source/unit set-* services       #
     # ------------------------------------------------------------------ #
     async def handle_grind(call) -> None:
         """xbloom.grind {size, speed, seconds} — 3-frame standalone grind.
@@ -848,7 +848,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         )
 
     # ------------------------------------------------------------------ #
-    # 08-03 — Easy Mode slot writer                                      #
+    # Easy Mode slot writer                                              #
     # Push any locally-stored recipe (or a freshly-fetched share URL) to #
     # one of the machine's 3 on-device slots A/B/C.                      #
     # ------------------------------------------------------------------ #
@@ -992,7 +992,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     hass.services.async_register(DOMAIN, "brew_pause", handle_brew_pause)
     hass.services.async_register(DOMAIN, "brew_resume", handle_brew_resume)
 
-    # 08-02 — standalone grind + mode/source/unit setters
+    # Standalone grind + mode/source/unit setters
     hass.services.async_register(
         DOMAIN, "grind", handle_grind,
         schema=vol.Schema({
@@ -1033,7 +1033,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         schema=vol.Schema({vol.Required("unit"): vol.In(list(spec.WEIGHT_UNIT_CODES))}),
     )
 
-    # 08-03 — Easy Mode slot writer
+    # Easy Mode slot writer
     hass.services.async_register(
         DOMAIN, "write_slot", handle_write_slot,
         schema=vol.Schema({

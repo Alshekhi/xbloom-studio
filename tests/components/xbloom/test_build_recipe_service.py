@@ -1,6 +1,6 @@
 """Tests for the `xbloom.build_recipe` service.
 
-The builder itself is covered in xbloom-py, where it lives; what matters
+The builder itself is not tested here; what matters
 here is the service wrapper — that it is registered, that it translates the
 service-call fields into the builder's, that it reports adjustments and
 errors rather than raising, and that `save` reaches the coordinator by the

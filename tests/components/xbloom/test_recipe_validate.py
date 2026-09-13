@@ -1,10 +1,10 @@
-"""RED-state tests for the shared xBloom recipe validator.
+"""The shared xBloom recipe validator.
 
-This test file is intentionally written before `recipe_validate.py` exists.
-Running the suite today MUST fail with ModuleNotFoundError on import — that
-is the RED gate for plan 09-01. Plan 09-03 implements the validator (GREEN).
+One validator serves the config flow, the services and the recipe builder, so
+a value the machine will not accept is refused in the same words wherever it
+is entered.
 
-Validator contract (target — does NOT yet exist):
+Validator contract:
 
     def validate_recipe(recipe: dict) -> dict[str, str]:
         '''Return {field_path: error_key}. Empty dict means valid.'''
@@ -18,7 +18,7 @@ Field paths use HA flow conventions:
     "pours.<i>.pattern"
 
 Bypass convention: `bypass_water_enabled` is an int — `1` means ON,
-`2` means OFF (matches BLE/share-URL data path; see D-31).
+`2` means OFF (matches the BLE/share-URL data path).
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ import pytest
 # ---------------------------------------------------------------------------
 # Inject minimal homeassistant stubs.
 #
-# `recipe_validate.py` itself depends only on stdlib + `re`, but importing it
+# `xbloom.recipe_validate` itself depends only on stdlib + `re`, but importing it
 # through `xbloom.*` triggers the parent package's `__init__.py`, which imports
 # `homeassistant`. The suite does not install HA — conftest.py stubs it — so
 # the same stub pattern is applied here to make the import path reachable.
@@ -97,7 +97,7 @@ def _valid_recipe() -> dict:
         "grinder_speed_rpm": 90,
         "pour_count": 3,
         "cup_type": 2,                    # Omni
-        "bypass_water_enabled": 2,        # 2 = OFF (canonical int convention; D-31)
+        "bypass_water_enabled": 2,        # 2 = OFF (canonical int convention)
         "pours": [
             {"volume_ml": 96.0, "temperature_c": 92, "pattern": 3,
              "flow_rate": 3.0, "pause_s": 0,

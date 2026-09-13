@@ -26,17 +26,17 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     coordinator = entry.runtime_data.coordinator
     async_add_entities([
         XBloomRefreshButton(coordinator),
-        XBloomStartBrewButton(coordinator, entry),   # Phase 7 — D-01
-        XBloomCancelBrewButton(entry),               # Phase 7 — D-03
-        # Phase 8 — 08-01: simple-command primitives
+        XBloomStartBrewButton(coordinator, entry),
+        XBloomCancelBrewButton(entry),
+        # Simple-command primitives
         XBloomTareButton(entry),
         XBloomBackToHomeButton(entry),
         XBloomBrewPauseButton(entry),
         XBloomBrewResumeButton(entry),
-        # Phase 8 — 08-02: standalone grind shortcut
+        # Standalone grind shortcut
         XBloomGrindButton(entry),
         XBloomBrewStandaloneButton(entry),
-        # Phase 8 — 08-04: BLE link probes (also reachable as services)
+        # BLE link probes (also reachable as services)
         XBloomBleConnectButton(entry),
         XBloomBleDisconnectButton(entry),
         XBloomRefreshStatusButton(entry),
@@ -80,10 +80,10 @@ class XBloomRefreshButton(CoordinatorEntity, ButtonEntity):
 class XBloomStartBrewButton(CoordinatorEntity, ButtonEntity):
     """Triggers a cloud brew for the currently selected recipe.
 
-    D-01: Phase 7 brew control button on device card.
-    D-02: available returns False when no recipe is selected (HA greys out automatically).
-    Reads recipe from select.xbloom_studio_recipe extra_state_attributes (Phase 7 contract).
-    Fires 'xbloom_brew_started' bus event so event.py can capture the recipe name (D-09).
+    Brew control button on the device card.
+    `available` returns False when no recipe is selected (HA greys out automatically).
+    Reads recipe from select.xbloom_studio_recipe extra_state_attributes.
+    Fires 'xbloom_brew_started' bus event so event.py can capture the recipe name.
     """
 
     _attr_has_entity_name = True
@@ -107,7 +107,7 @@ class XBloomStartBrewButton(CoordinatorEntity, ButtonEntity):
 
     @property
     def available(self) -> bool:
-        """Return False when no recipe is selected (D-02)."""
+        """Return False when no recipe is selected."""
         select_state = self.hass.states.get("select.xbloom_studio_recipe")
         if select_state is None or select_state.state in ("unknown", "unavailable", ""):
             return False
@@ -169,7 +169,7 @@ class XBloomStartBrewButton(CoordinatorEntity, ButtonEntity):
 class XBloomCancelBrewButton(ButtonEntity):
     """Sends stop command (FFFF11) to cancel an in-progress brew.
 
-    D-03: bruw_curve "FFFF11" is the confirmed stop command.
+    bruw_curve "FFFF11" is the confirmed stop command.
     Does NOT require CoordinatorEntity — no coordinator dependency.
     """
 
@@ -197,13 +197,13 @@ class XBloomCancelBrewButton(ButtonEntity):
 
 
 # ---------------------------------------------------------------------------
-# Phase 8 — 08-01: simple-command primitives
+# Simple-command primitives
 # Each button is a thin shim over its corresponding xbloom.* service. They are
 # always available — pressing has no precondition. Same device-card grouping
 # as the existing buttons so VoiceOver reads them under "xBloom Studio".
 # ---------------------------------------------------------------------------
 class _XBloomSimpleCommandButton(ButtonEntity):
-    """Shared base for the 08-01 single-frame command buttons."""
+    """Shared base for the single-frame command buttons."""
 
     _attr_has_entity_name = True
     _service: str = ""  # subclass overrides

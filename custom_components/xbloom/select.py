@@ -1,10 +1,10 @@
 """Select entities for the xBloom Studio integration.
 
-  * XBloomRecipeSelect — recipe library (Phase 6)
+  * XBloomRecipeSelect — recipe library
   * XBloomModeSelect / XBloomWaterSourceSelect / XBloomTempUnitSelect /
-    XBloomWeightUnitSelect — machine settings (Phase 8 — 08-02). Each calls
+    XBloomWeightUnitSelect — machine settings. Each calls
     the matching `xbloom.set_*` service and remembers the user's last value
-    via RestoreEntity (per CONTEXT D-11 we don't read state back from the
+    via RestoreEntity (we deliberately don't read state back from the
     machine).
 """
 import logging
@@ -40,7 +40,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     coordinator = entry.runtime_data.coordinator
     async_add_entities([
         XBloomRecipeSelect(coordinator),
-        # 08-02: machine setting selects — pass entry so they can sync their
+        # Machine setting selects — pass entry so they can sync their
         # current value from the machine's heartbeat (signal_event).
         XBloomModeSelect(entry),
         XBloomWaterSourceSelect(entry),
@@ -54,10 +54,10 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity):
     """Select entity that lists all recipes from the xBloom library.
 
     Selecting a recipe stores its name as state. The full recipe dict
-    (all 20+ fields) is exposed via extra_state_attributes so Phase 7
+    (all 20+ fields) is exposed via extra_state_attributes so the brew path
     can read grinder_size, pours, dose_g, etc. without an extra API call.
 
-    Phase 7 contract: Phase 7 reads extra_state_attributes['id'] (not the
+    Contract: the brew path reads extra_state_attributes['id'] (not the
     entity state string) to determine which recipe to brew. The entity state
     is the recipe name for human display only.
     """
@@ -123,14 +123,14 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity):
 
 
 # ---------------------------------------------------------------------------
-# Phase 8 — 08-02: machine setting selects
+# Machine setting selects
 #
 # Each calls a single xbloom.set_* service on change. It now ALSO syncs its
 # current value from the machine's RD_MachineInfo heartbeat (cmd 40521, via
 # signal_event) whenever a connection delivers one — so the select reflects the
 # machine's ACTUAL state, not just "what HA last asked for". Selecting an option
 # updates optimistically and sends the command; the next heartbeat confirms.
-# (This supersedes the old CONTEXT D-11 "no read-back" stance now that the
+# (This supersedes the old "no read-back" stance now that the
 # heartbeat field map is app-confirmed — see ble.decode_notification.)
 # ---------------------------------------------------------------------------
 class _XBloomSettingSelect(SelectEntity, RestoreEntity):
