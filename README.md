@@ -155,7 +155,7 @@ can your own automations or a service outside Home Assistant.
 |---|---|---|
 | `xbloom_brew_started` | Home Assistant has begun a brew | `recipe_name`, `total_pours` |
 | `xbloom_brew_completed` | **The brew finished.** Key on this one. | `run_id`, `recipe_id`, `recipe_name`, `dose_g`, `cup_type`, `outcome`, `started_at`, `ended_at` |
-| `xbloom_brew_failed` | The brew could not be started at all | `reason`, `recipe_name`, sometimes `run_id` / `error` |
+| `xbloom_brew_failed` | The brew could not start, or the machine gave up on it | `reason`, `recipe_name`, sometimes `run_id` / `error` |
 | `xbloom_brew_timeout` | Ten minutes passed with no ending heard from the machine | `recipe_name` |
 
 **`outcome` is the part worth understanding.** The machine's own "your coffee
@@ -173,8 +173,15 @@ all — that case is genuinely unknown, and becomes `xbloom_brew_timeout` rather
 than a completion nobody can stand behind.
 
 `reason` on a failure is a code, not a sentence — `machine_not_found`,
-`bluetooth_error`, `recipe_not_found`, `not_configured` — so the wording
-belongs to whatever announces it.
+`bluetooth_error`, `recipe_not_found`, `not_configured`, `no_beans` — so the
+wording belongs to whatever announces it.
+
+**A fault the machine cannot brew through ends the brew.** With no beans in the
+hopper it stops the grinder and does nothing further, so waiting for an ending
+would leave a brew showing as in progress until it was cancelled by hand: that
+fires `xbloom_brew_failed` with the fault as its reason, and `brew_status`
+returns to `idle`. A fault it *does* brew through — low water, which the machine
+reports mid-pour and carries on — changes nothing.
 
 **A brew started on the machine itself fires none of these.** It runs no Home
 Assistant brew task, so there is nothing to report it; `sensor.xbloom_studio_brew_status`

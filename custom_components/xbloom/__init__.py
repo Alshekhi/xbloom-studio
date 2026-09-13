@@ -68,7 +68,10 @@ BREW_END_GRACE_S = 120.0
 
 
 async def _await_brew_outcome(
-    ble_client, brew_end_seen: asyncio.Event, went_home: asyncio.Event
+    ble_client,
+    brew_end_seen: asyncio.Event,
+    went_home: asyncio.Event,
+    fault_stopped: asyncio.Event,
 ) -> str | None:
     """Wait for the brew to end, and report which signal said so.
 
@@ -86,10 +89,16 @@ async def _await_brew_outcome(
     """
     enjoy = asyncio.ensure_future(ble_client.wait_for_completion(timeout=600.0))
     ended = asyncio.ensure_future(brew_end_seen.wait())
+    stopped = asyncio.ensure_future(fault_stopped.wait())
     try:
         done, _pending = await asyncio.wait(
-            {enjoy, ended}, return_when=asyncio.FIRST_COMPLETED
+            {enjoy, ended, stopped}, return_when=asyncio.FIRST_COMPLETED
         )
+        if stopped in done and enjoy not in done and ended not in done:
+            # The machine reported a fault it does not brew through. Waiting
+            # for an ending it will never send leaves the caller, and the
+            # dashboard, believing a brew is running.
+            return "stopped"
         if enjoy in done:
             # ENJOY (or the 600 s safety net) resolved first.
             return "confirmed" if enjoy.result() else None
@@ -112,7 +121,7 @@ async def _await_brew_outcome(
             if not home.done():
                 home.cancel()
     finally:
-        for task in (enjoy, ended):
+        for task in (enjoy, ended, stopped):
             if not task.done():
                 task.cancel()
 
@@ -325,6 +334,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
         from .ble_entities import (
             ACTIVITY_HOME_STATES,
+            BREW_STOPPING_FAULTS,
             CMD_BREW_END,
             CMD_MACHINE_ACTIVITY,
             signal_brew_lifecycle,
@@ -418,8 +428,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         # Set only after BREW_END: an idle machine emits its home activity on
         # connect, and that says nothing about a brew that has not ended.
         went_home = asyncio.Event()
+        # Which fault ended it, for the failure the caller is told about.
+        fault_stopped = asyncio.Event()
+        stopped_by: dict[str, str] = {}
 
         async def _on_event(decoded: dict) -> None:
+            fault = spec.FAULTS.get(decoded.get("cmd"))
+            if fault and fault[0] in BREW_STOPPING_FAULTS:
+                stopped_by.setdefault("status", fault[0])
+                fault_stopped.set()
             if decoded.get("cmd") == CMD_BREW_END:
                 brew_end_seen.set()
             elif (
@@ -472,7 +489,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                         "xbloom.start_brew: ✓ frames sent, waiting for RD_ENJOY (≤10min) …"
                     )
                     outcome = await _await_brew_outcome(
-                        ble_client, brew_end_seen, went_home
+                        ble_client, brew_end_seen, went_home, fault_stopped
                     )
                 completed = outcome == "confirmed"
                 _LOGGER.info(
@@ -481,9 +498,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     {
                         "confirmed": "completed — RD_ENJOY",
                         "presumed": "completed — BREW_END, no RD_ENJOY",
+                        "stopped": f"stopped by the machine — {stopped_by.get('status')}",
                     }.get(outcome, "timeout — disconnected anyway"),
                 )
-                if completed:
+                if outcome == "stopped":
+                    _fire_failed(
+                        stopped_by.get("status", "machine_fault"),
+                        recipe_name,
+                        run_id=run_id,
+                    )
+                elif completed:
                     hass.bus.async_fire(
                         "xbloom_brew_done_ble", {"recipe_name": recipe_name}
                     )
@@ -497,7 +521,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     hass.bus.async_fire(
                         "xbloom_brew_timeout", {"recipe_name": recipe_name}
                     )
-                if outcome is not None:
+                if outcome is not None and outcome != "stopped":
                     # The contract downstream builds on: announcements and
                     # inventory both key on this rather than on brew_done,
                     # which a healthy brew can legitimately never send.

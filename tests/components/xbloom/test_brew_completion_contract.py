@@ -21,6 +21,7 @@ import pytest
 
 from custom_components.xbloom import async_setup_entry
 from custom_components.xbloom.const import CONF_BLE_NAME, CONF_PRODUCT_ID
+from xbloom import spec as _spec
 
 CMD_BREW_END = 40511
 
@@ -344,3 +345,51 @@ async def test_a_home_frame_before_the_brew_ends_decides_nothing():
         await asyncio.wait_for(entry.tasks[0], timeout=2.0)
 
     assert _completed_events(hass)[0]["outcome"] == "presumed"
+
+
+# --- a fault that stops the machine stops the brew ---------------------------
+
+_CMD_BY_STATUS = {status: cmd for cmd, (status, _event) in _spec.FAULTS.items()}
+CMD_NO_BEANS = _CMD_BY_STATUS["no_beans"]
+CMD_NO_WATER = _CMD_BY_STATUS["no_water"]
+
+
+async def test_no_beans_ends_the_brew_rather_than_waiting_for_an_ending():
+    """2026-09-07: the machine gave up, and the brew task waited regardless."""
+    _FakeBle.enjoy = False
+    hass = _make_hass()
+    entry = _Entry()
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", _FakeBle), \
+         patch("custom_components.xbloom.BREW_END_GRACE_S", 30.0):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        await handlers["start_brew"](MagicMock(data={}))
+        await asyncio.sleep(0)
+
+        await _FakeBle.instances[0].on_event({"cmd": CMD_NO_BEANS})
+        await asyncio.wait_for(entry.tasks[0], timeout=2.0)
+
+    failed = _fired(hass, "xbloom_brew_failed")
+    assert len(failed) == 1
+    assert failed[0]["reason"] == "no_beans"
+    assert failed[0]["recipe_name"] == "Kenya Iced"
+    assert _completed_events(hass) == [], "a brew that never ran did not complete"
+
+
+async def test_a_water_fault_does_not_end_the_brew():
+    """It reports low water mid-pour and carries on; two brews prove it."""
+    hass = _make_hass()
+    entry = _Entry()
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", _FakeBle), \
+         patch("custom_components.xbloom.BREW_END_GRACE_S", 30.0):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        await handlers["start_brew"](MagicMock(data={}))
+        await asyncio.sleep(0)
+        await _FakeBle.instances[0].on_event({"cmd": CMD_NO_WATER})
+        await asyncio.wait_for(entry.tasks[0], timeout=2.0)
+
+    assert _fired(hass, "xbloom_brew_failed") == []
+    assert _completed_events(hass)[0]["outcome"] == "confirmed"

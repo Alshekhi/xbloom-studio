@@ -106,6 +106,16 @@ CMD_BYPASS           = 40520  # RD_BYPASS — bypass/dilution pour
 # heartbeat is what re-arms the fault event; resolved out of spec rather than
 # restated beside it.
 WATER_STATUS = "no_water"
+
+# Faults that end the brew rather than interrupt it. Only what has been seen on
+# a real brew belongs here, because treating a passing condition as fatal would
+# cancel coffee that was going to be made:
+#   no_beans  — 2026-09-07, the machine stopped its grinder 0.1 s later and did
+#               nothing further.
+#   no_water  — deliberately absent: the 09-10 and 09-13 brews both reported it
+#               mid-pour and finished normally.
+# Nothing is known about the other two, so they are left alone.
+BREW_STOPPING_FAULTS = {"no_beans"}
 FAULT_EVENTS = {event for (_status, event) in spec.FAULTS.values()}
 WATER_FAULT_EVENT = next(
     event for (status, event) in spec.FAULTS.values() if status == WATER_STATUS
@@ -211,6 +221,14 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
                     new_state = "grinding"
             elif cmd == CMD_GRINDER_START:
                 new_state = "grinding"
+            elif (fault := spec.FAULTS.get(cmd)) and fault[0] in BREW_STOPPING_FAULTS:
+                # The machine has given up on this brew. Saying so here is what
+                # keeps the grinder stopping half a second later from reading
+                # as "the grind finished, pours next" — which announced a brew
+                # that had already failed, and left the dashboard showing one
+                # in progress (2026-09-07).
+                if self._attr_native_value in ("grinding", "brewing"):
+                    new_state = "idle"
             elif cmd == CMD_GRINDER_STOP:
                 # Grinder finished — transition to brewing (pours next)
                 if self._attr_native_value == "grinding":
