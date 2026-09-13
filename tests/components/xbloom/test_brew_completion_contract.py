@@ -1,8 +1,8 @@
 """The brew completion contract — `xbloom_brew_completed`.
 
-Root cause these lock in (2026-09-08): RD_ENJOY is not guaranteed. The 16:55
-brew of "Kenya Iced" ground, poured three times, emitted
-`brew_ended` at 16:58:02 and never emitted `brew_done`. It made coffee, moved
+Root cause these lock in: RD_ENJOY is not guaranteed. An observed brew ground,
+poured three times, emitted `brew_ended` and never emitted `brew_done`. It made
+coffee, moved
 `brew_status` to idle via the home-activity reconciliation, and told nobody —
 the announcement blueprint requires `event_type == 'brew_done'`, and the
 watcher read `idle` as "cancelled".
@@ -27,7 +27,7 @@ CMD_BREW_END = 40511
 
 _RECIPE = {
     "id": "1419717",
-    "name": "Kenya Iced",
+    "name": "Test Recipe One",
     "pours": [{"volume_ml": 60, "temperature_c": 93}],
     "dose_g": 20,
     "grinder_size": 55,
@@ -98,7 +98,7 @@ def _make_hass():
     def _get_state(entity_id):
         state = MagicMock()
         if entity_id == "select.xbloom_studio_recipe":
-            state.state = "Kenya Iced"
+            state.state = "Test Recipe One"
         elif entity_id == "switch.xbloom_studio_use_grinder":
             state.state = "on"
         else:
@@ -155,7 +155,7 @@ async def test_enjoy_fires_confirmed_completion():
     events = _completed_events(hass)
     assert len(events) == 1, "one completion per brew"
     assert events[0]["outcome"] == "confirmed"
-    assert events[0]["recipe_name"] == "Kenya Iced"
+    assert events[0]["recipe_name"] == "Test Recipe One"
     assert events[0]["recipe_id"] == "1419717"
     assert events[0]["dose_g"] == 20
     assert events[0]["cup_type"] == 3
@@ -163,7 +163,7 @@ async def test_enjoy_fires_confirmed_completion():
 
 
 async def test_brew_end_without_enjoy_fires_presumed_completion():
-    """The 2026-09-08 brew: BREW_END arrives, ENJOY never does.
+    """The observed case: BREW_END arrives, ENJOY never does.
 
     This must still complete — the coffee was made — but tagged `presumed`.
     """
@@ -185,7 +185,7 @@ async def test_brew_end_without_enjoy_fires_presumed_completion():
     events = _completed_events(hass)
     assert len(events) == 1, "a brew that ends without ENJOY must still complete"
     assert events[0]["outcome"] == "presumed"
-    assert events[0]["recipe_name"] == "Kenya Iced"
+    assert events[0]["recipe_name"] == "Test Recipe One"
     assert events[0]["dose_g"] == 20
 
 
@@ -355,7 +355,7 @@ CMD_NO_WATER = _CMD_BY_STATUS["no_water"]
 
 
 async def test_no_beans_ends_the_brew_rather_than_waiting_for_an_ending():
-    """2026-09-07: the machine gave up, and the brew task waited regardless."""
+    """The machine gave up, and the brew task waited regardless."""
     _FakeBle.enjoy = False
     hass = _make_hass()
     entry = _Entry()
@@ -373,7 +373,7 @@ async def test_no_beans_ends_the_brew_rather_than_waiting_for_an_ending():
     failed = _fired(hass, "xbloom_brew_failed")
     assert len(failed) == 1
     assert failed[0]["reason"] == "no_beans"
-    assert failed[0]["recipe_name"] == "Kenya Iced"
+    assert failed[0]["recipe_name"] == "Test Recipe One"
     assert _completed_events(hass) == [], "a brew that never ran did not complete"
 
 

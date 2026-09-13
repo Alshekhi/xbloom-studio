@@ -208,8 +208,8 @@ class _XBloomGrinderNumber(_XBloomNumberBase):
         if ok:
             # The grind value is a digital screen number (the knobs are infinite
             # encoders, no motor move) and a *commanded* set makes the machine
-            # echo 8006 but emit NO knob event — so a screen-reader user would
-            # get zero feedback. Synthesize the same event a physical twist
+            # echo 8006 but emit NO knob event — so nothing would be
+            # announced at all. Synthesize the same event a physical twist
             # fires, so the announcement blueprint speaks "Grind size N" and the
             # user knows the machine received it.
             self.hass.bus.async_fire(
@@ -349,7 +349,7 @@ class XBloomBrewTemperatureNumber(_XBloomNumberBase):
         ok = await send_brewer_temp_live(self._entry, wire_temp)
         if ok:
             # Speak it (parity with a knob turn; a commanded set emits no
-            # machine knob-event, so a screen-reader user gets no feedback).
+            # machine knob-event, so nothing would be announced).
             self.hass.bus.async_fire(
                 EV_BREWER_SETTING,
                 {"setting": "temperature", "value": int(self._current_value)},

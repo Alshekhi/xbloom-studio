@@ -1,7 +1,7 @@
 """`brew_status` must reach `done` on a presumed completion, not just on ENJOY.
 
 Only CMD_ENJOY moved the sensor to `done`. When ENJOY never arrives — the
-2026-09-08 brew — the home-activity reconciliation instead pushed `brewing`
+observed brew — the home-activity reconciliation instead pushed `brewing`
 back to `idle`, so the machine that had just made coffee looked like one that
 had never started. Anything reading `brew_status` to decide whether coffee is
 ready got the wrong answer.

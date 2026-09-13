@@ -40,7 +40,7 @@ async def test_a_machine_bluetooth_cannot_see_fails_the_brew():
     failed = _failed(hass)
     assert len(failed) == 1
     assert failed[0]["reason"] == "machine_not_found"
-    assert failed[0]["recipe_name"] == "Kenya Iced"
+    assert failed[0]["recipe_name"] == "Test Recipe One"
     assert failed[0]["run_id"]
     # After the dispatch, so a consumer has already seen which brew failed.
     assert _fired(hass).index("xbloom_brew_started") < _fired(hass).index("xbloom_brew_failed")

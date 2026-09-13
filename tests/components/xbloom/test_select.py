@@ -1,7 +1,7 @@
 """Tests for select.py — the machine-setting selects added by PR #2.
 
-These selects are the accessible surface for settings that otherwise only exist
-as an on-machine indicator a VoiceOver user cannot read, so two things matter:
+These selects expose settings that otherwise exist only as an indicator on the
+machine's own screen, so two things matter:
 the option lists must stay derived from the shared spec (never re-typed), and
 the machine heartbeat must be able to move them without that looking like a
 user edit.

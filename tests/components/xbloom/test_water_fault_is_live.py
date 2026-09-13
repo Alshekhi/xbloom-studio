@@ -1,7 +1,7 @@
 """Low water is a live reading, and must not outlive the link that took it.
 
 `sensor.xbloom_studio_machine_status` sat on `no_water` for nine hours after the
-2026-09-13 brew — a brew that finished normally. The machine reports the water
+brew that finished normally. The machine reports the water
 level continuously in its MachineInfo heartbeat, but heartbeats only arrive
 while Home Assistant is holding the Bluetooth link, which it releases when the
 brew ends. So the last reading froze, and the dashboard went on asserting a
@@ -144,9 +144,9 @@ async def _restored_as(value):
 async def test_a_restart_does_not_bring_a_water_fault_back():
     """Nothing is connected at boot, so nobody is reading the level.
 
-    Home Assistant restored `no_water` at 2026-09-13 23:51 from a brew that had
-    finished eleven hours earlier — the same stale assertion the live path had
-    just been taught not to make.
+    Home Assistant restored `no_water` from a brew that had finished hours
+    earlier — the same stale assertion the live path had just been taught not
+    to make.
     """
     sensor = await _restored_as(WATER_STATUS)
     assert sensor._attr_native_value == "ok"

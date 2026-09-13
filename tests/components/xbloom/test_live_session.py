@@ -1,6 +1,6 @@
 """Tests for live_session.py — the held BLE session behind switch.xbloom_studio_connect.
 
-This is the accessibility core: every event fired here becomes speech via the
+Every event fired here becomes speech via the
 announce blueprint, so the failure modes are *noise* (announcing a weight while
 the user is grinding, repeating the same knob value three times) and *silence*
 (dropping a Fahrenheit machine's temperature because it fell outside the

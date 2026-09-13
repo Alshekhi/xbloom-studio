@@ -2,8 +2,8 @@
 
 These modules are thin — they just hand entity classes to async_add_entities.
 But an entity dropped from one of those lists doesn't fail anywhere; it simply
-never appears in Home Assistant, which for a VoiceOver user reads as a feature
-that silently vanished. So the lists themselves are worth pinning.
+never appears in Home Assistant, which reads as a feature that silently
+vanished. So the lists themselves are worth pinning.
 """
 from __future__ import annotations
 

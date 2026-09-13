@@ -62,7 +62,7 @@ reveals the per-pour table inside the editor.
 
 ## Conventions to keep if you edit it
 
-These are deliberate, and changing them degrades the dashboard for screen-reader users:
+These are deliberate, and changing them degrades the dashboard:
 
 - **Section titles are `markdown` cards with `text_only: true` and `## …`**, not `heading`
   cards. Only the markdown form emits a real `<h2>`, so heading navigation works.

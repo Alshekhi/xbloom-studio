@@ -200,7 +200,7 @@ class XBloomCancelBrewButton(ButtonEntity):
 # Simple-command primitives
 # Each button is a thin shim over its corresponding xbloom.* service. They are
 # always available — pressing has no precondition. Same device-card grouping
-# as the existing buttons so VoiceOver reads them under "xBloom Studio".
+# as the existing buttons so they group under "xBloom Studio".
 # ---------------------------------------------------------------------------
 class _XBloomSimpleCommandButton(ButtonEntity):
     """Shared base for the single-frame command buttons."""

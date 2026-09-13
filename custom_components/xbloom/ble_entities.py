@@ -111,7 +111,7 @@ MACHINE_OK = spec.MACHINE_OK
 # Faults that end the brew rather than interrupt it. Only what has been seen on
 # a real brew belongs here, because treating a passing condition as fatal would
 # cancel coffee that was going to be made:
-#   no_beans  — 2026-09-07, the machine stopped its grinder 0.1 s later and did
+#   no_beans  — observed: the machine stopped its grinder 0.1 s later and did
 #               nothing further.
 #   no_water  — deliberately absent: the 09-10 and 09-13 brews both reported it
 #               mid-pour and finished normally.
@@ -227,7 +227,7 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
                 # keeps the grinder stopping half a second later from reading
                 # as "the grind finished, pours next" — which announced a brew
                 # that had already failed, and left the dashboard showing one
-                # in progress (2026-09-07).
+                # in progress.
                 if self._attr_native_value in ("grinding", "brewing"):
                     new_state = "idle"
             elif cmd == CMD_GRINDER_STOP:
@@ -237,7 +237,7 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
             elif cmd == CMD_BREWER_START:
                 # 40506 fires ~3 s after grind start — it's the water heater
                 # spinning up in parallel with the grind, NOT the pours
-                # (verified 2026-06-11: brewer_started at +3 s, grinder ran
+                # (verified on live frames: brewer_started at +3 s, grinder ran
                 # 41 s, first pour at +52 s). Ignore it mid-grind so the
                 # "pouring" announcement doesn't fire while grinding; the
                 # grinding → brewing transition comes from CMD_GRINDER_STOP.
@@ -296,7 +296,7 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
 # --------------------------------------------------------------------- #
 class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
     """Latest machine fault/condition — mirrors what the machine shows on its
-    screen, so a VoiceOver user can query or be announced the machine state.
+    screen, so its state can be queried or announced without reading it there.
 
     Driven by the discrete fault notifications (RD_Error*) in spec.FAULTS. Stays
     at the reported fault until a new brew starts, which clears it back to "ok".
@@ -367,7 +367,7 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
             # Low water is a level the machine reports continuously, and only
             # while Home Assistant holds the link. Once it stops arriving,
             # holding the last one asserts a condition nobody can still see —
-            # for nine hours, after the 2026-09-13 brew. Dropping it claims no
+            # for hours after a brew ended. Dropping it claims no
             # more than that we stopped looking: an empty tank says so again on
             # the very next heartbeat, and at the next brew.
             if self._attr_native_value == WATER_STATUS:
@@ -453,7 +453,7 @@ class XBloomLastUpdatedSensor(RestoreSensor, SensorEntity):
 
     Stamps ``now`` whenever any connection delivers an RD_MachineInfo heartbeat
     (a brew, a Connect session, a command's piggyback, or an explicit
-    ``xbloom.refresh_status``). A dashboard/screen-reader shows it as
+    ``xbloom.refresh_status``). A dashboard shows it as
     "updated N minutes ago" so a reading's age is always visible — the honest
     alternative to a value that silently goes stale.
     """
@@ -544,7 +544,7 @@ class XBloomBrewEventBleEntity(EventEntity):
         # Faults currently asserted. The machine reports a fault for as long as
         # it holds, the way a low-fuel light stays lit, so the frames after the
         # first carry no news — relaying each one made one dry tank announce
-        # itself three times (2026-09-13). Every other frame is a real event and
+        # itself three times over one dry tank. Every other frame is real and
         # is never suppressed.
         self._active_faults: set[str] = set()
 
@@ -607,7 +607,7 @@ class XBloomBrewEventBleEntity(EventEntity):
         @callback
         def _on_completed(event) -> None:
             # The completion contract decides that a brew finished even when
-            # RD_ENJOY never came (2026-09-08). Firing `brew_done` here rather
+            # RD_ENJOY never came. Firing `brew_done` here rather
             # than rewriting the announcement blueprint keeps a brew started
             # *at the machine* working too — that path runs no HA brew task, so
             # it never emits `xbloom_brew_completed` and still relies on ENJOY.

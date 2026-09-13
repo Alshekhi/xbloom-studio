@@ -76,7 +76,7 @@ async def _await_brew_outcome(
     """Wait for the brew to end, and report which signal said so.
 
     RD_ENJOY is the machine's own "your coffee is ready" and is what every
-    consumer wants — but it is **not guaranteed**. On 2026-09-08 a brew ground,
+    consumer wants — but it is **not guaranteed**. A brew has been seen to grind,
     poured three times, emitted CMD_BREW_END and never emitted ENJOY. It made
     coffee; the announcement never fired and the watcher read the resulting
     `idle` as "cancelled".

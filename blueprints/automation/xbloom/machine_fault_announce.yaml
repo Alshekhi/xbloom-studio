@@ -10,9 +10,8 @@ blueprint:
 
     Triggers on the xBloom Brew Event entity firing one of the fault event
     types (error_no_water, error_no_beans, error_dose_water,
-    error_gear_position). Pair it with the brew-announcements blueprint so a
-    VoiceOver user hears both successes and problems without looking at the
-    machine.
+    error_gear_position). Pair it with the brew-announcements blueprint to
+    hear both successes and problems without watching the machine.
   domain: automation
   author: xbloom-studio-controler
   input:

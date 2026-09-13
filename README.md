@@ -5,7 +5,7 @@ A community-built, local-first [Home Assistant](https://www.home-assistant.io/) 
 Two ideas drove it, equally:
 
 - **Local control.** Brewing and machine control run entirely over BLE, on your own hardware. No cloud account is required, and nothing depends on xBloom's servers to make coffee. Home Assistant contacts the machine only when it needs to and releases it again afterwards, so the official iOS app keeps working alongside it.
-- **Accessibility.** The machine is driven by three physical knobs and gives no spoken feedback, and the official app isn't accessible to screen readers, so a blind or low-vision owner can't really tell what the machine is doing or drive it independently. Exposing it as Home Assistant entities, with spoken announcements for brew progress, live feedback, and faults through any TTS or notify service, makes the xBloom legible and operable by keyboard, screen reader, and voice.
+- **Spoken feedback.** The machine is driven by three physical knobs and says nothing aloud, so following a brew means standing over it and watching. Exposing it as Home Assistant entities, with spoken announcements for brew progress, live feedback, and faults through any TTS or notify service, means it can be followed and driven from anywhere in the house, by voice or from a phone.
 
 An **optional** xBloom account adds cloud recipe sync and a firmware-update check on top. Everything else works without it.
 
@@ -20,7 +20,7 @@ An **optional** xBloom account adds cloud recipe sync and a firmware-update chec
 - **Firmware update** *(cloud + Bluetooth)* — when signed in, a Firmware entity compares the machine's installed firmware (read over Bluetooth) against the latest version xBloom publishes, with release notes. Pressing **Install** downloads the firmware from xBloom, verifies its MD5, and flashes it over Bluetooth, acknowledged block by block and verified byte-for-byte against a real captured update. It's off until you enable it in the Configure menu. **⚠️ See [Firmware updates](#firmware-updates) before turning it on.**
 - **One-tap brewing** — start, pause, resume, or cancel a brew; brew with pre-ground coffee; write a recipe to one of the machine's on-device slots.
 - **Standalone control** — run the grinder or brewer on their own, tare the scale, switch water source, and change the machine's on-screen units.
-- **Ready-made dashboard** — a context-aware, screen-reader-first dashboard built from stock Home Assistant cards. It follows the machine from screen to screen and hides controls that can't work right now.
+- **Ready-made dashboard** — a context-aware dashboard built from stock Home Assistant cards, every control clearly labelled. It follows the machine from screen to screen and hides controls that can't work right now.
 - **Announcement blueprints** — ready-made, one-click blueprints that speak brew progress, live machine feedback, and faults. Bilingual (English / Arabic), and they work with Alexa, any TTS engine and speaker, or any notify service.
 
 ## Getting started
@@ -97,7 +97,7 @@ Each service, its fields, and examples appear in **Developer Tools → Actions**
 A ready-made dashboard lives in [`dashboard/`](dashboard/), built from stock Home Assistant
 cards — nothing custom to install. It follows the machine from screen to screen, showing the
 grinder's controls when you're at the grinder and the brew panel while a recipe runs, and
-it's laid out for screen-reader navigation throughout.
+it's laid out so every control is clearly labelled and reachable in order.
 
 1. Create the helpers and script from
    [`dashboard/dashboard-dependencies.yaml`](dashboard/dashboard-dependencies.yaml).

@@ -2,8 +2,8 @@
 
 The switch is the user-visible handle on a BLE session that can end without the
 user touching anything — an idle timeout, or the machine going out of range. A
-switch stuck ON after the session died is worse than no switch: it tells a
-VoiceOver user the machine is connected when it isn't.
+switch stuck ON after the session died is worse than no switch: it reports the
+machine as connected when it isn't.
 
 Note the unique_id assertion. PR #2 renamed this entity from
 `xbloom_live_control_switch`, which orphans the old entity and breaks any

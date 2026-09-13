@@ -69,7 +69,7 @@ def _fired(entity):
 async def test_presumed_completion_fires_brew_done():
     async with _entity() as (ent, bus, _on_event, _on_lifecycle):
         bus["xbloom_brew_completed"](
-            MagicMock(data={"outcome": "presumed", "recipe_name": "Kenya"})
+            MagicMock(data={"outcome": "presumed", "recipe_name": "Test Recipe One"})
         )
         assert "brew_done" in _fired(ent)
 
@@ -78,10 +78,10 @@ async def test_presumed_completion_fires_brew_done():
 async def test_brew_done_carries_the_recipe_name():
     async with _entity() as (ent, bus, _on_event, _on_lifecycle):
         bus["xbloom_brew_completed"](
-            MagicMock(data={"outcome": "presumed", "recipe_name": "Kenya"})
+            MagicMock(data={"outcome": "presumed", "recipe_name": "Test Recipe One"})
         )
         payload = ent._trigger_event.call_args_list[-1].args[1]
-        assert payload["recipe_name"] == "Kenya"
+        assert payload["recipe_name"] == "Test Recipe One"
 
 
 @pytest.mark.asyncio
@@ -90,7 +90,7 @@ async def test_enjoy_then_confirmed_completion_fires_brew_done_once():
     async with _entity() as (ent, bus, on_event, _on_lifecycle):
         on_event({"cmd": CMD_ENJOY})
         bus["xbloom_brew_completed"](
-            MagicMock(data={"outcome": "confirmed", "recipe_name": "Kenya"})
+            MagicMock(data={"outcome": "confirmed", "recipe_name": "Test Recipe One"})
         )
         assert _fired(ent).count("brew_done") == 1
 

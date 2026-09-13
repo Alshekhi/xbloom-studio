@@ -3,7 +3,7 @@
 The machine reports a fault the way a low-fuel light works: it keeps saying
 "there is no water" while that stays true, rather than saying it once. Relaying
 every one of those frames as an event made the announcement blueprint speak the
-same dry tank three times — 2026-09-13 12:44:19, 12:45:30 and 12:45:31, while
+same dry tank three times — over about seventy seconds — while
 `sensor.xbloom_studio_machine_status` recorded a single `ok → no_water`.
 
 So the event entity fires a fault on the edge into it, and stays quiet while it
@@ -69,7 +69,7 @@ def fired(entity, event_type=None):
 
 @pytest.mark.asyncio
 async def test_a_fault_that_keeps_being_reported_is_announced_once():
-    """The 2026-09-13 brew: one dry tank, three frames, three announcements."""
+    """One dry tank, three frames, three announcements."""
     async with _entity() as (ent, on_event, _lifecycle):
         on_event({"cmd": CMD_NO_WATER})
         on_event({"cmd": CMD_NO_WATER})

@@ -293,7 +293,7 @@ async def test_saving_an_id_less_recipe_while_logged_in_creates_it() -> None:
 
 # Every recipe write refreshes at once. `async_request_refresh` is debounced,
 # so a second write inside its cooldown stayed invisible to the next read for
-# up to ten seconds (measured 2026-09-11) — a successful edit read back as the
+# up to ten seconds (measured) — a successful edit read back as the
 # old recipe. Each case below must use the immediate path and never the
 # debounced one.
 _WRITES = {

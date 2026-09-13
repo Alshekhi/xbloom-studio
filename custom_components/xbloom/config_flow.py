@@ -768,7 +768,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
 
         Two recipes can carry the same name — most often a downloaded (shared)
         recipe sitting next to your own copy of it. A bare name is ambiguous,
-        and with a screen reader two identical option labels are impossible to
+        and two identical option labels are impossible to
         tell apart. So we make every label distinct and audible:
 
         * shared/downloaded recipes get a trailing ``(shared)`` tag, and

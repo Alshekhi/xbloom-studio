@@ -119,7 +119,7 @@ def session_event_filter(decoded: dict) -> dict | None:
     if cmd == NOTIFY_TARE:
         return {"kind": "tare"}
 
-    # Module / activity detection (confirmed against live frames 2026-07-24):
+    # Module / activity detection (confirmed against live frames):
     #   cmd 8023 activity=1   → home / idle screen
     #   cmd 8023 activity=2   → Grinder screen. Fires on BOTH physical left-knob
     #                           entry (right after the 9000 below) AND HA/app

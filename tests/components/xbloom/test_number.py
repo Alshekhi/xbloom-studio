@@ -201,7 +201,7 @@ def test_display_wire_display_round_trips(display: int) -> None:
 
 
 def test_sentinels_are_named_for_speech() -> None:
-    """A screen reader should say 'room temperature', not '39'."""
+    """This should read as 'room temperature', not '39'."""
     assert spec.brew_temp_sentinel_name(39) == "RT"
     assert spec.brew_temp_sentinel_name(96) == "BP"
     assert spec.brew_temp_sentinel_name(93) is None

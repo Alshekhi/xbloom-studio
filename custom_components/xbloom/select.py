@@ -140,7 +140,7 @@ class _XBloomSettingSelect(SelectEntity, RestoreEntity):
     _service: str = ""           # xbloom.<name>
     _service_arg: str = ""       # name of the call.data key
     _attr_options: list[str] = []
-    _attr_entity_category = None  # default — show in main UI for accessibility
+    _attr_entity_category = None  # default — show in the main UI
     # Heartbeat field (from ble.decode_notification) this select mirrors. None
     # for pure-storage selects (e.g. brew pattern) that never read the machine.
     _heartbeat_key: str | None = None
@@ -242,8 +242,8 @@ class XBloomModeSelect(_XBloomSettingSelect):
     async def async_select_option(self, option: str) -> None:
         await super().async_select_option(option)   # sends 11511 + optimistic set
         # ANNOUNCE (HA/dashboard path only): a commanded mode switch produces no
-        # machine screen-event, so a screen-reader user would otherwise hear
-        # nothing. Fire a dedicated event the announce blueprint speaks. A
+        # machine screen-event, so nothing would otherwise be announced.
+        # Fire a dedicated event the announce blueprint speaks. A
         # machine-side switch is voiced via the module path instead, so this
         # fires ONLY here — no double announce.
         if option in self._attr_options:
@@ -353,7 +353,7 @@ class XBloomBrewPatternSelect(_XBloomSettingSelect):
         ok = await send_brewer_pattern_live(self._entry, pattern_byte)
         if ok:
             # Speak it (parity with a knob turn — a commanded set emits no
-            # machine knob-event, so a screen-reader user gets no feedback).
+            # machine knob-event, so nothing would be announced).
             self.hass.bus.async_fire(
                 EV_BREWER_SETTING,
                 {"setting": "pattern", "value": pattern_byte, "value_name": option},

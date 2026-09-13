@@ -1,12 +1,11 @@
 """A fault that stops the machine must stop the brew in Home Assistant too.
 
-2026-09-07 11:38, from the recorder — a brew started with no beans in the
-grinder:
+Observed on a brew started with no beans in the grinder:
 
-    11:38:42.559  grinder_started
-    11:38:45.623  brewer_started
-    11:38:49.879  error_no_beans     the machine gives up
-    11:38:49.986  grinder_stopped    0.1 s later
+    +0.0 s   grinder_started
+    +3.1 s   brewer_started
+    +7.3 s   error_no_beans     the machine gives up
+    +7.4 s   grinder_stopped    0.1 s later
 
 Nothing followed. `grinder_stopped` was read as "the grind finished, pours
 next", so `brew_status` moved to `brewing` and the announcement said the brew
@@ -15,8 +14,8 @@ waiting for an RD_ENJOY that was never coming, and the dashboard showed a brew
 in progress until it was stopped by hand.
 
 Not every fault ends a brew, and guessing would be worse than the bug. Water
-does not: the 09-10 and 09-13 brews both reported `error_no_water` mid-pour and
-went on to finish normally.
+does not: brews have reported `error_no_water` mid-pour and gone on to finish
+normally.
 """
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch

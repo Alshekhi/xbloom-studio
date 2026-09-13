@@ -11,7 +11,7 @@ Only values that stay TRUE when read are kept as sensors. On-change-only knob
 readings (grinder speed, pour pattern, brew temperature, brew ratio) were
 removed: they are not in the machine's heartbeat, so a sensor could never
 reflect the current setting — it would show a stale value forever, which is
-worse than absent for a screen-reader user. Voice announcements (the
+worse than absent. Voice announcements (the
 live-session blueprint) still report those knob turns correctly, as events —
 the honest medium for on-change-only data.
 

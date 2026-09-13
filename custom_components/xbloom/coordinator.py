@@ -186,7 +186,7 @@ class XBloomCoordinator(DataUpdateCoordinator):
         any further call inside the cooldown waits for it to close. Every recipe
         service reads `self.data`, so a write made within that window stayed
         invisible to the next read for up to ten seconds. Measured on
-        2026-09-11: a delete one second after an edit took 10.0 s to show. The
+        Measured: a delete one second after an edit took 10.0 s to show. The
         write had landed; only the cache was late, which made a successful
         edit look like a failed one.
 
