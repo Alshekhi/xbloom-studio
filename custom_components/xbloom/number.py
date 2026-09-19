@@ -275,7 +275,9 @@ class XBloomGrindSpeedNumber(_XBloomGrinderNumber):
 class XBloomBrewVolumeNumber(_XBloomNumberBase):
     _attr_name = "Brew Volume"
     _attr_unique_id = "xbloom_brew_volume"
-    _attr_native_min_value, _attr_native_max_value, _attr_native_step = _range("pour_volume_ml")
+    # The standalone brewer's own range, not a recipe pour's: the pour stops
+    # at this volume, so it can never be zero.
+    _attr_native_min_value, _attr_native_max_value, _attr_native_step = _range("brewer_volume_ml")
     _attr_native_unit_of_measurement = "ml"
     _attr_icon = "mdi:cup-water"
     _default_value = 120.0

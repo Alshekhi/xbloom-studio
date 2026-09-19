@@ -71,7 +71,7 @@ def _make(cls, *, recipe_attrs: dict | None = None):
     [
         (XBloomGrindSizeNumber, "grind_size"),
         (XBloomGrindSpeedNumber, "grinder_speed_rpm"),
-        (XBloomBrewVolumeNumber, "pour_volume_ml"),
+        (XBloomBrewVolumeNumber, "brewer_volume_ml"),
         (XBloomBrewFlowRateNumber, "pour_flow_rate"),
         (XBloomBrewGrindNumber, "grind_size"),
     ],

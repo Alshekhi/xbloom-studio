@@ -820,41 +820,48 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     async def handle_brew_standalone(call) -> None:
         """xbloom.brew_standalone — brew using standalone brewer mode (CMD 4506).
 
-        Reads flow rate, volume, temperature, and pattern from their respective
-        number/select entities. Reads water source from XBloomWaterSourceSelect.
+        Pours what the brewer entities hold: volume, flow rate, temperature,
+        pattern and water source. A setting that cannot be read stops the pour
+        rather than falling back to a default — this service once read ids no
+        entity had, and poured 120 ml for every request without a word.
         """
         from xbloom.ble import (
             XBloomBleClient, build_brewer_standalone_frame,
         )
 
-        def _state_float(entity_id: str, default: float) -> float:
+        settings = {
+            "flow_rate": "number.xbloom_studio_brew_flow_rate",
+            "volume": "number.xbloom_studio_brew_volume",
+            "temperature": "number.xbloom_studio_brew_temperature",
+            "pattern": "select.xbloom_studio_brew_pattern",
+            "water_source": "select.xbloom_studio_water_source",
+        }
+        values: dict[str, str] = {}
+        for key, entity_id in settings.items():
             s = hass.states.get(entity_id)
             if s is None or s.state in ("unknown", "unavailable"):
-                return default
-            try:
-                return float(s.state)
-            except ValueError:
-                return default
+                _LOGGER.error(
+                    "xbloom.brew_standalone: %s has no value — not pouring", entity_id,
+                )
+                return
+            values[key] = s.state
 
-        def _state_str(entity_id: str, default: str) -> str:
-            s = hass.states.get(entity_id)
-            if s is None or s.state in ("unknown", "unavailable"):
-                return default
-            return s.state
+        flow_rate = float(values["flow_rate"])
+        volume_ml = float(values["volume"])
+        # The slider is the display scale (39 = RT … 96 = BP); 4506 takes wire °C.
+        temp_c = spec.brew_temp_display_to_wire(float(values["temperature"]))
+        pattern_name = values["pattern"]
+        pattern_code = spec.PATTERN_NAME_TO_BYTE[pattern_name]
+        water_source = values["water_source"]
+        water_feed = spec.WATER_SOURCE_CODES[water_source]
 
-        flow_rate = _state_float("number.brew_flow_rate", 3.0)
-        volume_ml = _state_float("number.brew_volume", 120.0)
-        temp_c    = _state_float("number.brew_temperature", 93.0)
-
-        pattern_name = _state_str("select.brew_pattern", spec.DEFAULT_PATTERN)
-        pattern_code = spec.PATTERN_NAME_TO_BYTE.get(
-            pattern_name, spec.PATTERN_NAME_TO_BYTE["spiral"]
-        )
-
-        water_source = _state_str("select.water_source", spec.DEFAULT_WATER_SOURCE)
-        water_feed = spec.WATER_SOURCE_CODES.get(
-            water_source, spec.WATER_SOURCE_CODES["tank"]
-        )
+        try:
+            frame = build_brewer_standalone_frame(
+                flow_rate, volume_ml, temp_c, water_feed, pattern_code,
+            )
+        except ValueError as err:
+            _LOGGER.error("xbloom.brew_standalone: not pouring — %s", err)
+            return
 
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
@@ -867,7 +874,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             )
             return
 
-        frame = build_brewer_standalone_frame(flow_rate, volume_ml, temp_c, water_feed, pattern_code)
         try:
             ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
             async with ble_client:
