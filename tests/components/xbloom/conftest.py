@@ -165,7 +165,17 @@ def _inject_global_stubs() -> None:
     exc_mod = _stub_mod("homeassistant.exceptions")
     exc_mod.ConfigEntryAuthFailed = type("ConfigEntryAuthFailed", (Exception,), {})
     exc_mod.ConfigEntryNotReady = type("ConfigEntryNotReady", (Exception,), {})
-    exc_mod.HomeAssistantError = type("HomeAssistantError", (Exception,), {})
+    class HomeAssistantError(Exception):
+        """Carries HA's translation arguments, as the real one does."""
+
+        def __init__(self, *args, translation_domain=None, translation_key=None,
+                     translation_placeholders=None):
+            super().__init__(*(args or (translation_key,)))
+            self.translation_domain = translation_domain
+            self.translation_key = translation_key
+            self.translation_placeholders = translation_placeholders
+
+    exc_mod.HomeAssistantError = HomeAssistantError
 
     def_mod = _stub_mod("homeassistant.data_entry_flow")
     def_mod.FlowResult = dict

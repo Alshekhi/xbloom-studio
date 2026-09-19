@@ -418,5 +418,19 @@
         "name": "Firmware"
       }
     }
+  },
+  "exceptions": {
+    "refused_machine_busy": {
+      "message": "The xBloom refused the command: it is busy, or was just switched on. Try again."
+    },
+    "refused_not_on_home_screen": {
+      "message": "The xBloom refused the command: it is not on its home screen. Return it to the home screen and try again."
+    },
+    "refused_no_water": {
+      "message": "The xBloom refused the command: it needs water. Fill the tank and try again."
+    },
+    "refused_recipe_rejected": {
+      "message": "The xBloom refused the settings it was sent. Check the water amount and pour settings."
+    }
   }
 }

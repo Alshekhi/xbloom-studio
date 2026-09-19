@@ -283,7 +283,9 @@ class XBloomGrindButton(_XBloomSimpleCommandButton):
         await self.hass.services.async_call(
             DOMAIN, "grind",
             {"size": size, "speed": speed, "seconds": 5},
-            blocking=False,
+            # Blocking, so a grind the machine refuses shows as an error on
+            # the press rather than only in the log.
+            blocking=True,
         )
 
 
@@ -296,7 +298,9 @@ class XBloomBrewStandaloneButton(_XBloomSimpleCommandButton):
     _service = "brew_standalone"
 
     async def async_press(self) -> None:
-        await self.hass.services.async_call(DOMAIN, "brew_standalone", {}, blocking=False)
+        # Blocking, so a pour the machine refuses shows as an error on the
+        # press rather than only in the log.
+        await self.hass.services.async_call(DOMAIN, "brew_standalone", {}, blocking=True)
 
 
 class XBloomBleConnectButton(_XBloomSimpleCommandButton):

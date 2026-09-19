@@ -116,7 +116,7 @@ def _inject_stubs():
 _inject_stubs()
 
 # Now safe to import from custom_components
-from custom_components.xbloom.button import XBloomStartBrewButton, XBloomCancelBrewButton, XBloomGrindButton  # noqa: E402
+from custom_components.xbloom.button import XBloomStartBrewButton, XBloomCancelBrewButton, XBloomGrindButton, XBloomBrewStandaloneButton  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +216,7 @@ async def test_grind_button_grinds_at_the_slider_settings(mock_config_entry) -> 
     })
     await button.async_press()
     button.hass.services.async_call.assert_awaited_once_with(
-        "xbloom", "grind", {"size": 50, "speed": 80, "seconds": 5}, blocking=False,
+        "xbloom", "grind", {"size": 50, "speed": 80, "seconds": 5}, blocking=True,
     )
 
 
@@ -225,3 +225,16 @@ async def test_grind_button_does_nothing_when_a_setting_cannot_be_read(mock_conf
     button = _grind_button(mock_config_entry, {"number.xbloom_studio_grind_size": "50.0"})
     await button.async_press()
     button.hass.services.async_call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_brew_standalone_button_waits_for_the_outcome(mock_config_entry) -> None:
+    """Blocking, so a pour the machine refuses shows as an error on the press
+    rather than only in the log."""
+    button = XBloomBrewStandaloneButton(mock_config_entry)
+    button.hass = MagicMock()
+    button.hass.services.async_call = AsyncMock()
+    await button.async_press()
+    button.hass.services.async_call.assert_awaited_once_with(
+        "xbloom", "brew_standalone", {}, blocking=True,
+    )

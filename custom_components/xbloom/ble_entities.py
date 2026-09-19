@@ -63,10 +63,36 @@ async def send_live_frame(entry, frame: bytes) -> bool:
     for actions that only make sense while Connected (e.g. the module-enter
     navigation buttons). Fire-and-forget; the machine echoes but we don't gate.
     """
-    listener = getattr(getattr(entry, "runtime_data", None), "live_session_listener", None)
-    if listener is None or not getattr(listener, "is_running", False):
+    listener = held_session(entry)
+    if listener is None:
         return False
     return await listener.send_live(frame)
+
+
+def held_session(entry):
+    """The Connect session holding the BLE link, or None.
+
+    The machine takes one connection at a time, so while this holds it every
+    command has to travel over it: opening a second link tears it down.
+    """
+    listener = getattr(getattr(entry, "runtime_data", None), "live_session_listener", None)
+    if listener is None or not getattr(listener, "is_running", False):
+        return None
+    return listener
+
+
+async def end_held_session(hass, entry, reason: str) -> None:
+    """Close the Connect session, if one is held, and say so on the bus.
+
+    For an action that needs a link of its own — a recipe brew waits on every
+    step being accepted, which a session cannot carry. `xbloom_connect_stopped`
+    is what the Connect switch and the live-only sensors key their reset on.
+    """
+    listener = held_session(entry)
+    if listener is None:
+        return
+    await listener.stop()
+    hass.bus.async_fire("xbloom_connect_stopped", {"reason": reason})
 
 
 async def send_brewer_temp_live(entry, temp_c_wire: float) -> bool:

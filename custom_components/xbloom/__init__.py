@@ -28,6 +28,7 @@ import json
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, SupportsResponse
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
@@ -48,6 +49,18 @@ def _describe_errors(errors: dict[str, str]) -> str:
     or REST callers that only surface a single message.
     """
     return "; ".join(f"{field}: {key}" for field, key in sorted(errors.items()))
+
+
+def _refused(err) -> HomeAssistantError:
+    """The error a caller sees when the machine refuses a command.
+
+    `err` is xbloom's CommandRefused; its reason is one of
+    spec.REPLY_REFUSALS, and each has a translated message under
+    `exceptions` in strings.json.
+    """
+    return HomeAssistantError(
+        translation_domain=DOMAIN, translation_key=f"refused_{err.reason}",
+    )
 
 
 PLATFORMS = ["select", "button", "number", "sensor", "event", "switch", "update", "text"]
@@ -343,6 +356,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         )
         from xbloom.ble import CommandRefused, CommandUnanswered, XBloomBleClient
 
+        from .ble_entities import end_held_session
+
         active = brew_session["task"]
         if active is not None and not active.done():
             elapsed = hass.loop.time() - brew_session["started_at"]
@@ -466,6 +481,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             )
 
             async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "started")
+
+            # A recipe brew needs a link of its own — it waits on every step
+            # being accepted, which a Connect session cannot carry — and the
+            # machine takes one connection at a time. So a held session is
+            # closed first, rather than torn down underneath by this one.
+            await end_held_session(hass, entry, reason="brew")
 
             _LOGGER.info("xbloom.start_brew: looking up %r in HA bluetooth …", ble_name)
             ble_device = await _resolve_ble_device(hass, ble_name)
@@ -775,45 +796,62 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         import asyncio as _asyncio
 
         from xbloom.ble import (
-            XBloomBleClient, packets_grind,
+            CommandRefused, XBloomBleClient, packets_grind,
         )
+
+        from .ble_entities import held_session
 
         size = int(call.data.get("size", 63))
         speed = int(call.data.get("speed", 100))
         seconds = float(call.data.get("seconds", 5))
 
-        ble_name = _resolve_ble_name(entry)
-        if not ble_name:
-            _LOGGER.error("xbloom.grind: BLE name unknown")
-            return
-        ble_device = await _resolve_ble_device(hass, ble_name)
-        if ble_device is None:
-            _LOGGER.error(
-                "xbloom.grind: HA bluetooth has not seen %r", ble_name,
-            )
-            return
+        # While Connect holds the link the grind goes over it: a second link
+        # would tear the session down and leave the dashboard on the grinder.
+        session = held_session(entry)
+        ble_device = None
+        if session is None:
+            ble_name = _resolve_ble_name(entry)
+            if not ble_name:
+                _LOGGER.error("xbloom.grind: BLE name unknown")
+                return
+            ble_device = await _resolve_ble_device(hass, ble_name)
+            if ble_device is None:
+                _LOGGER.error(
+                    "xbloom.grind: HA bluetooth has not seen %r", ble_name,
+                )
+                return
 
         enter, start, stop = packets_grind(size, speed)
+
+        async def _grind(send) -> None:
+            # enter → start are confirmed; the grind DURATION between start and
+            # stop is caller-controlled. Both routes re-send only while the
+            # machine sleeps — safe for a motion command like grind_start: it
+            # never re-sends while the machine is awake, so it can't
+            # double-start a grind.
+            await send("grind_enter", enter)
+            await send("grind_start", start)
+            _LOGGER.info(
+                "xbloom.grind: grinding for %.1fs (size=%d, speed=%d)",
+                seconds, size, speed,
+            )
+            await _asyncio.sleep(seconds)
+            await send("grind_stop", stop)
+
         try:
-            ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
-            async with ble_client:
-                # enter → start are echo-gated (send_command); the grind
-                # DURATION between start and stop is caller-controlled, and a
-                # short settle follows the stop. send_command uses the
-                # app-exact policy (retry only while sleeping) — safe for a
-                # motion command like grind_start: it never re-sends while the
-                # machine is awake, so it can't double-start a grind.
-                await ble_client.send_command("grind_enter", enter)
-                await ble_client.send_command("grind_start", start)
-                _LOGGER.info(
-                    "xbloom.grind: grinding for %.1fs (size=%d, speed=%d)",
-                    seconds, size, speed,
-                )
-                await _asyncio.sleep(seconds)
-                await ble_client.send_command("grind_stop", stop)
-                # Small post-stop hold so the machine settles.
-                await _asyncio.sleep(1.5)
+            if session is not None:
+                await _grind(session.send_confirmed)
+            else:
+                ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
+                async with ble_client:
+                    await _grind(ble_client.send_command)
+                    # Small post-stop hold so the machine settles before the
+                    # link is dropped.
+                    await _asyncio.sleep(1.5)
             _LOGGER.info("xbloom.grind: ✓ done")
+        except CommandRefused as err:
+            _LOGGER.error("xbloom.grind: %s", err)
+            raise _refused(err) from err
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("xbloom.grind: BLE dispatch failed: %s", err)
 
@@ -826,8 +864,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         entity had, and poured 120 ml for every request without a word.
         """
         from xbloom.ble import (
-            XBloomBleClient, build_brewer_standalone_frame,
+            CommandRefused, XBloomBleClient, build_brewer_standalone_frame,
         )
+
+        from .ble_entities import held_session
 
         settings = {
             "flow_rate": "number.xbloom_studio_brew_flow_rate",
@@ -863,31 +903,45 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _LOGGER.error("xbloom.brew_standalone: not pouring — %s", err)
             return
 
-        ble_name = _resolve_ble_name(entry)
-        if not ble_name:
-            _LOGGER.error("xbloom.brew_standalone: BLE name unknown")
-            return
-        ble_device = await _resolve_ble_device(hass, ble_name)
-        if ble_device is None:
-            _LOGGER.error(
-                "xbloom.brew_standalone: HA bluetooth has not seen %r", ble_name,
-            )
-            return
+        # While Connect holds the link the pour goes over it: a second link
+        # would tear the session down and leave the dashboard on the brewer.
+        session = held_session(entry)
+        ble_device = None
+        if session is None:
+            ble_name = _resolve_ble_name(entry)
+            if not ble_name:
+                _LOGGER.error("xbloom.brew_standalone: BLE name unknown")
+                return
+            ble_device = await _resolve_ble_device(hass, ble_name)
+            if ble_device is None:
+                _LOGGER.error(
+                    "xbloom.brew_standalone: HA bluetooth has not seen %r", ble_name,
+                )
+                return
 
+        # brew_standalone (4506) is a motion command: both routes re-send only
+        # while the machine sleeps, never while it is awake, so a pour cannot
+        # be started twice.
         try:
-            ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
-            async with ble_client:
-                # brew_standalone (4506) is a motion command; the app-exact
-                # send_command policy (retry only while sleeping) never re-sends
-                # it while the machine is awake, so it can't restart a pour.
-                await ble_client.send_command("brew_standalone", frame)
-            _LOGGER.info(
-                "xbloom.brew_standalone: ✓ sent (flow=%.1f, vol=%.0fml, temp=%.0f°C, "
-                "pattern=%s, water=%s)",
-                flow_rate, volume_ml, temp_c, pattern_name, water_source,
-            )
+            if session is not None:
+                confirmed = await session.send_confirmed("brew_standalone", frame)
+            else:
+                ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
+                async with ble_client:
+                    confirmed = await ble_client.send_command("brew_standalone", frame)
+        except CommandRefused as err:
+            _LOGGER.error("xbloom.brew_standalone: %s", err)
+            raise _refused(err) from err
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("xbloom.brew_standalone: BLE dispatch failed: %s", err)
+            return
+        _LOGGER.info(
+            "xbloom.brew_standalone: ✓ sent %s (flow=%.1f, vol=%.0fml, temp=%.0f°C, "
+            "pattern=%s, water=%s, echo %s)",
+            "over the held Connect session" if session is not None else "over its own link",
+            flow_rate, volume_ml, temp_c, pattern_name, water_source,
+            "confirmed" if confirmed else "unconfirmed",
+        )
 
     async def handle_set_mode(call) -> None:
         from xbloom.ble import packet_mode

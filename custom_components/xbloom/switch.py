@@ -135,10 +135,23 @@ class XBloomConnectSwitch(SwitchEntity):
         self.async_on_remove(
             self.hass.bus.async_listen("xbloom_connect_failed", _on_failed)
         )
+        @callback
+        def _on_stopped(_event) -> None:
+            # Ended by something other than this switch — a recipe brew closes
+            # the session before it connects. Turning it off here already
+            # flipped the state, so this is then a no-op.
+            if self._attr_is_on:
+                _LOGGER.info("[connect] session ended — flipping switch OFF")
+                self._attr_is_on = False
+                self.async_write_ha_state()
+
         self.async_on_remove(
             self.hass.bus.async_listen(
                 "xbloom_connect_auto_stopped", _on_auto_stopped,
             )
+        )
+        self.async_on_remove(
+            self.hass.bus.async_listen("xbloom_connect_stopped", _on_stopped)
         )
 
     async def async_will_remove_from_hass(self) -> None:

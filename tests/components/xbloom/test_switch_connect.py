@@ -126,3 +126,14 @@ async def test_both_lifecycle_events_are_subscribed() -> None:
     handlers = await _added(entity)
     assert "xbloom_connect_failed" in handlers
     assert "xbloom_connect_auto_stopped" in handlers
+
+
+@pytest.mark.asyncio
+async def test_a_session_ended_elsewhere_flips_the_switch_off() -> None:
+    """A recipe brew ends the Connect session itself before it starts; the
+    switch must follow, or it shows Connected over a session that is gone."""
+    entity, _ = _make()
+    await entity.async_turn_on()
+    handlers = await _added(entity)
+    handlers["xbloom_connect_stopped"](MagicMock())
+    assert entity._attr_is_on is False
