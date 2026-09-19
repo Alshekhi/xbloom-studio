@@ -613,10 +613,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         the next start_brew — can get their own connection.
         """
         from xbloom.ble import (
-            CMD_BREW_STOP, FFE1_UUID, XBloomBleClient, _build_frame,
+            CMD_BREW_STOP, CommandRefused, XBloomBleClient, _build_frame,
         )
 
+        from .ble_entities import held_session
+
         await _cancel_active_brew("stop_brew requested")
+        stop_frame = _build_frame(CMD_BREW_STOP)  # 40519 full-process stop
+
+        # While Connect holds the link the stop goes over it: a second link
+        # would tear the session down.
+        session = held_session(entry)
+        if session is not None:
+            try:
+                await session.send_confirmed("stop_brew", stop_frame)
+            except CommandRefused as err:
+                _LOGGER.error("xbloom.stop_brew: %s", err)
+                raise _refused(err) from err
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.error("xbloom.stop_brew: BLE dispatch failed: %s", err)
+                return
+            _LOGGER.info("xbloom.stop_brew: stop command sent over the held Connect session")
+            return
 
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
@@ -631,9 +649,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         try:
             ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
             async with ble_client:
-                stop_frame = _build_frame(CMD_BREW_STOP)  # 40519 full-process stop
                 await ble_client.send_command("stop_brew", stop_frame)
             _LOGGER.info("xbloom.stop_brew: stop command sent via BLE '%s'", ble_name)
+        except CommandRefused as err:
+            _LOGGER.error("xbloom.stop_brew: %s", err)
+            raise _refused(err) from err
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("xbloom.stop_brew: BLE dispatch failed: %s", err)
 
@@ -657,6 +677,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             XBloomBleClient,
             _build_frame,
         )
+
+        from .ble_entities import held_session
+
+        # The probe exists to open a connection of its own, which would tear
+        # a held Connect session down — and a held session already proves the
+        # link works.
+        if held_session(entry) is not None:
+            _LOGGER.warning(
+                "xbloom.ble_connect: the Connect session holds the link — "
+                "not probing, it would tear the session down",
+            )
+            return
 
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
@@ -979,8 +1011,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # ------------------------------------------------------------------ #
     async def handle_write_slot(call) -> None:
         from xbloom.ble import (
-            SLOT_INDEX, XBloomBleClient, packet_slot_write,
+            SLOT_INDEX, CommandRefused, XBloomBleClient, packet_slot_write,
         )
+
+        from .ble_entities import held_session
 
         slot_letter = call.data["slot"].upper()
         slot_index = SLOT_INDEX[slot_letter]
@@ -1015,15 +1049,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             )
             return
 
+        # While Connect holds the link the write goes over it: a second link
+        # would tear the session down.
+        session = held_session(entry)
         try:
-            ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
-            async with ble_client:
-                await ble_client.send_command("write_slot", packet)
+            if session is not None:
+                await session.send_confirmed("write_slot", packet)
+            else:
+                ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
+                async with ble_client:
+                    await ble_client.send_command("write_slot", packet)
             _LOGGER.info(
                 "xbloom.write_slot: ✓ '%s' written to slot %s on %s "
                 "(%d bytes, scale=%s)",
                 recipe_name, slot_letter, ble_name, len(packet), scale_on,
             )
+        except CommandRefused as err:
+            _LOGGER.error("xbloom.write_slot: %s", err)
+            raise _refused(err) from err
         except Exception as err:  # noqa: BLE001
             _LOGGER.error(
                 "xbloom.write_slot: BLE dispatch failed for '%s' → slot %s: %s",
@@ -1064,10 +1107,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         refreshes the machine's status sensors (water, grind size, mode, water
         source, units, voltage, …) on demand — no persistent session required.
         Awaitable, so an automation can call this and *then* act on fresh data.
-        If a brew or a Connect session already holds the link, the readings are
-        streaming anyway and this connect will just no-op/fail harmlessly.
+        While a Connect session holds the link the readings are streaming over
+        it already, and a second connection would tear it down, so this does
+        nothing then.
         """
         from xbloom.ble import XBloomBleClient
+
+        from .ble_entities import held_session
+
+        if held_session(entry) is not None:
+            _LOGGER.info(
+                "xbloom.refresh_status: the Connect session is streaming the "
+                "readings already — not opening a second link",
+            )
+            return
 
         ble_name = _resolve_ble_name(entry)
         if not ble_name:

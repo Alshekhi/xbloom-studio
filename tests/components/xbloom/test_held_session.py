@@ -39,11 +39,28 @@ class _Session:
 
 
 class _NoSecondLink:
+    """Records every attempt to open a link: the handlers catch and log errors,
+    so raising alone would not fail a test."""
+
+    opened: list = []
+
     def __init__(self, *_a, **_kw):
+        _NoSecondLink.opened.append(True)
         raise AssertionError("opened a second Bluetooth link while Connect held one")
 
 
+def _machine_in_range():
+    """The machine found, and any second link recorded, for the whole call."""
+    from contextlib import ExitStack
+    stack = ExitStack()
+    stack.enter_context(patch("custom_components.xbloom._resolve_ble_device",
+                              AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))))
+    stack.enter_context(patch("xbloom.ble.XBloomBleClient", _NoSecondLink))
+    return stack
+
+
 async def _handlers_with(session, hass=None, client=_NoSecondLink):
+    _NoSecondLink.opened = []
     hass = hass or _with_brewer_states(_make_hass(), _BREWER)
     entry = _Entry()
     with patch("custom_components.xbloom._resolve_ble_device",
@@ -60,6 +77,7 @@ async def test_a_standalone_pour_goes_over_the_held_session():
     with patch("xbloom.ble.XBloomBleClient", _NoSecondLink):
         await handlers["brew_standalone"](MagicMock(data={}))
     assert session.sent == ["brew_standalone"]
+    assert _NoSecondLink.opened == []
 
 
 async def test_a_pour_the_machine_refuses_is_an_error():
@@ -100,6 +118,7 @@ async def test_a_grind_goes_over_the_held_session():
     with patch("xbloom.ble.XBloomBleClient", _NoSecondLink):
         await handlers["grind"](MagicMock(data={"size": 50, "speed": 80, "seconds": 0}))
     assert session.sent == ["grind_enter", "grind_start", "grind_stop"]
+    assert _NoSecondLink.opened == []
 
 
 async def test_a_grind_the_machine_refuses_is_an_error():
@@ -151,3 +170,41 @@ def test_every_refusal_has_a_message_in_each_language():
         messages = json.loads((root / name).read_text())["exceptions"]
         for reason in set(spec.REPLY_REFUSALS.values()):
             assert messages[f"refused_{reason}"]["message"], (name, reason)
+
+
+async def test_cancel_brew_goes_over_the_held_session():
+    # Cancel Brew pressed with Connect on opened its own link, and the session
+    # it tore down ended itself as a lost connection.
+    session = _Session()
+    _, _, handlers = await _handlers_with(session)
+    with _machine_in_range():
+        await handlers["stop_brew"](MagicMock(data={}))
+    assert session.sent == ["stop_brew"]
+    assert _NoSecondLink.opened == []
+
+
+async def test_writing_a_slot_goes_over_the_held_session():
+    session = _Session()
+    hass, _, handlers = await _handlers_with(session, hass=_make_hass())
+    with _machine_in_range():
+        await handlers["write_slot"](MagicMock(data={"slot": "A", "recipe_name": "Test Recipe One"}))
+    assert session.sent == ["write_slot"]
+    assert _NoSecondLink.opened == []
+
+
+async def test_a_status_refresh_leaves_a_held_session_alone():
+    # The readings already stream over the session; a second link would only
+    # tear it down.
+    session = _Session()
+    _, _, handlers = await _handlers_with(session)
+    with _machine_in_range():
+        await handlers["refresh_status"](MagicMock(data={}))
+    assert _NoSecondLink.opened == []
+
+
+async def test_the_link_probe_leaves_a_held_session_alone():
+    session = _Session()
+    _, _, handlers = await _handlers_with(session)
+    with _machine_in_range():
+        await handlers["ble_connect"](MagicMock(data={}))
+    assert _NoSecondLink.opened == []
