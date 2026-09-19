@@ -594,7 +594,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 if outcome is not None and outcome != "stopped":
                     # The contract downstream builds on: announcements and
                     # inventory both key on this rather than on brew_done,
-                    # which a healthy brew can legitimately never send.
+                    # which can fail to be heard even though the machine
+                    # sent it.
                     hass.bus.async_fire(
                         "xbloom_brew_completed",
                         {

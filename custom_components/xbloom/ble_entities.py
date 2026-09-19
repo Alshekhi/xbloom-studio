@@ -336,8 +336,8 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
         def _on_completed(event) -> None:
             # The brew-completion contract is the arbiter of "the coffee is
             # ready", because CMD_ENJOY — the only thing this sensor used to
-            # accept — is not guaranteed to arrive. A `presumed` completion
-            # means BREW_END came and ENJOY never did; the coffee still got
+            # accept — can fail to be heard. A `presumed` completion means
+            # BREW_END came and ENJOY was not heard; the coffee still got
             # made, so the sensor must say `done` rather than leave the
             # home-activity reconciliation's `idle` standing.
             if event.data.get("outcome") in ("confirmed", "presumed"):
