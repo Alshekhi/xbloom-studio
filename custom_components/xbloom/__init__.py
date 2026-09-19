@@ -1181,19 +1181,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 "xbloom.refresh_status: HA bluetooth has not seen %r", ble_name,
             )
             raise _not_found(ble_name)
+        # Both failures are errors to the caller: returned as success, they
+        # left the status sensors at their last value, which a caller then read
+        # as the machine's state now.
         try:
             ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
             async with ble_client:
                 snap = await ble_client.read_status_snapshot(timeout=4.0)
-            if snap is not None:
-                _LOGGER.info("xbloom.refresh_status: ✓ refreshed from heartbeat")
-            else:
-                _LOGGER.warning(
-                    "xbloom.refresh_status: connected but no heartbeat captured "
-                    "(FFE2 notify may be unavailable)"
-                )
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("xbloom.refresh_status: BLE dispatch failed: %s", err)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="connection_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+        if snap is None:
+            _LOGGER.warning(
+                "xbloom.refresh_status: connected but no heartbeat captured "
+                "(FFE2 notify may be unavailable)"
+            )
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="no_status",
+            )
+        _LOGGER.info("xbloom.refresh_status: ✓ refreshed from heartbeat")
 
     hass.services.async_register(
         DOMAIN,

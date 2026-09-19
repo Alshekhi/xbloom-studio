@@ -446,6 +446,12 @@
     },
     "not_configured": {
       "message": "This xBloom entry doesn't name a machine. Remove the integration and add the machine again."
+    },
+    "no_status": {
+      "message": "The xBloom connected but sent no status, so nothing was refreshed. Try again."
+    },
+    "connection_failed": {
+      "message": "The Bluetooth connection to the xBloom failed: {error}"
     }
   }
 }
