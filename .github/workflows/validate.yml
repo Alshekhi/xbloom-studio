@@ -64,14 +64,17 @@ jobs:
           fetch-depth: 0
       - name: Fail if a file or a new commit message names a user or a private setup
         # This repository is public. Comments that explain a behaviour by who
-        # uses the software, and anything naming the maintainer's own machine,
-        # account or network, have reached it before and had to be removed
-        # afterwards — which does not remove them from the history. Every
-        # sentence here can be written about what the software does instead.
+        # uses the software, anything naming the maintainer's own machine,
+        # account or network, and explanations written in terms of a private
+        # setup rather than the repository, have all reached it before and had
+        # to be removed afterwards — which does not remove them from the
+        # history. Every sentence here can be written about what the software
+        # does, or what the change does, instead.
         # LICENSE and the codeowner are deliberate credits and are exempt.
         run: |
           set -u
           PAT='voiceover|screen.reader|blind (user|person)|/Users/|[0-9A-F]{2}:79:C4:[0-9A-F]{2}|59A022|J15A01G'
+          PAT="$PAT"'|personal|my (machine|setup|install|own|house)|local tooling|\bindexer\b|household'
           fail=0
           if git grep -n -i -E "$PAT" -- . ':!LICENSE' ':!.github/workflows/validate.yml'; then
             echo "::error::A tracked file describes a user or a private setup. Say what the software does instead."

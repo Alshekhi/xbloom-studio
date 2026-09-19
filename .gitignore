@@ -10,7 +10,7 @@ __pycache__/
 # Claude Code session state
 .claude/
 
-# Personal notes and local tooling (host-specific)
+# Working notes and tooling that are not part of the integration
 CLEANUP.md
 CLAUDE.md
 .graphifyignore
@@ -18,7 +18,7 @@ CLAUDE.md
 # Generated graph output
 graphify-out/
 
-# Personal reference
+# Reference material kept outside the repo
 docs/
 
 # Virtual environment
