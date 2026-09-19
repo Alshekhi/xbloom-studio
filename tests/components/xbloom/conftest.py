@@ -78,6 +78,8 @@ def _base_class(name: str) -> type:
         "async_added_to_hass": _async_added_to_hass,
         "async_will_remove_from_hass": _async_will_remove_from_hass,
         "async_get_last_state": _async_get_last_state,
+        # CoordinatorEntity's hook, which our overrides call up to.
+        "_handle_coordinator_update": lambda self: None,
         # HA's Entity declares these as class attributes, and several of our
         # entities read them before ever assigning (e.g. the dedup check
         # `value != self._attr_native_value` on the first event).

@@ -50,7 +50,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     ])
 
 
-class XBloomRecipeSelect(CoordinatorEntity, SelectEntity):
+class XBloomRecipeSelect(CoordinatorEntity, SelectEntity, RestoreEntity):
     """Select entity that lists all recipes from the xBloom library.
 
     Selecting a recipe stores its name as state. The full recipe dict
@@ -60,6 +60,10 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity):
     Contract: the brew path reads extra_state_attributes['id'] (not the
     entity state string) to determine which recipe to brew. The entity state
     is the recipe name for human display only.
+
+    The pick survives a restart. It is held by recipe id — two recipes can
+    share a name — and restored from the last state's `id` attribute, never
+    guessed: a recipe no longer in the library leaves nothing picked.
     """
 
     _attr_has_entity_name = True
@@ -68,7 +72,7 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity):
 
     def __init__(self, coordinator: XBloomCoordinator) -> None:
         super().__init__(coordinator)
-        self._current_option: str | None = None
+        self._current_id: str | None = None
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -80,6 +84,15 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity):
             model="Studio",
         )
 
+    def _selected(self) -> dict | None:
+        """The picked recipe, if the library holds it."""
+        if self._current_id is None:
+            return None
+        for recipe in self.coordinator.data or []:
+            if str(recipe.get("id")) == self._current_id:
+                return recipe
+        return None
+
     @property
     def options(self) -> list[str]:
         """Return recipe names as select options."""
@@ -88,7 +101,8 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity):
     @property
     def current_option(self) -> str | None:
         """Return the currently selected recipe name."""
-        return self._current_option
+        recipe = self._selected()
+        return recipe["name"] if recipe else None
 
     @property
     def extra_state_attributes(self) -> dict | None:
@@ -96,29 +110,41 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity):
 
         All Recipe TypedDict fields are JSON-safe primitives and lists of dicts.
         """
-        if not self._current_option or not self.coordinator.data:
-            return None
-        for recipe in self.coordinator.data:
-            if recipe["name"] == self._current_option:
-                return dict(recipe)
-        return None
+        recipe = self._selected()
+        return dict(recipe) if recipe else None
+
+    async def async_added_to_hass(self) -> None:
+        """Pick the recipe that was picked before the restart."""
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        recipe_id = last.attributes.get("id") if last is not None else None
+        if recipe_id is not None:
+            self._current_id = str(recipe_id)
 
     async def async_select_option(self, option: str) -> None:
-        """Handle recipe selection from the HA UI or service call."""
-        self._current_option = option
+        """Handle recipe selection from the HA UI or service call.
+
+        A select speaks in names, so a name two recipes share picks the first.
+        """
+        for recipe in self.coordinator.data or []:
+            if recipe["name"] == option:
+                self._current_id = str(recipe.get("id"))
+                break
         self.async_write_ha_state()
 
     def _handle_coordinator_update(self) -> None:
-        """Reset selected recipe if it was removed from the library after a refresh.
+        """Let go of the pick if a refresh removed it from the library.
 
-        Prevents HA warning: 'current_option X is not in options [...]'
+        Prevents HA warning: 'current_option X is not in options [...]'. A
+        library that has not loaded yet removes nothing — a restored pick
+        waits for it.
         """
-        if self._current_option and self._current_option not in self.options:
+        if self._current_id and self.coordinator.data and self._selected() is None:
             _LOGGER.debug(
-                "Selected recipe %r no longer in library after refresh; resetting",
-                self._current_option,
+                "Selected recipe id %s no longer in library after refresh; resetting",
+                self._current_id,
             )
-            self._current_option = None
+            self._current_id = None
         super()._handle_coordinator_update()
 
 

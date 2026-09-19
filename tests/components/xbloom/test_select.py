@@ -208,3 +208,86 @@ def test_every_select_option_is_a_valid_translation_key() -> None:
                 f"{cls.__name__}: option {option!r} is not a valid HA "
                 "translation key — hassfest will reject it"
             )
+
+
+# --------------------------------------------------------------------------- #
+# The recipe picker survives a restart                                        #
+# --------------------------------------------------------------------------- #
+# It was the one control that did not: every restart left it empty, which
+# greyed out Start Brew and Save as New Recipe until a recipe was picked again.
+# It is remembered by id, not name — two recipes can share a name, and the id
+# is what the brew path treats as the recipe's identity.
+from custom_components.xbloom.select import XBloomRecipeSelect  # noqa: E402
+
+_LIBRARY = [
+    {"id": "11", "name": "Iced Recipe", "dose_g": 15},
+    {"id": "12", "name": "Kenya Hot", "dose_g": 18},
+    {"id": "13", "name": "Iced Recipe", "dose_g": 20},
+]
+
+
+def _recipe_select(data, last_attributes=None):
+    coordinator = MagicMock()
+    coordinator.data = data
+    entity = XBloomRecipeSelect(coordinator)
+    entity.coordinator = coordinator
+    entity.async_write_ha_state = MagicMock()
+
+    async def _last_state():
+        if last_attributes is None:
+            return None
+        state = MagicMock()
+        state.attributes = last_attributes
+        return state
+
+    entity.async_get_last_state = _last_state
+    return entity
+
+
+@pytest.mark.asyncio
+async def test_the_last_recipe_is_picked_again_after_a_restart() -> None:
+    entity = _recipe_select(list(_LIBRARY), {"id": "12", "name": "Kenya Hot"})
+    await entity.async_added_to_hass()
+    assert entity.current_option == "Kenya Hot"
+
+
+@pytest.mark.asyncio
+async def test_a_restored_recipe_is_the_same_one_even_when_names_repeat() -> None:
+    entity = _recipe_select(list(_LIBRARY), {"id": "13", "name": "Iced Recipe"})
+    await entity.async_added_to_hass()
+    assert entity.current_option == "Iced Recipe"
+    assert entity.extra_state_attributes["dose_g"] == 20
+
+
+@pytest.mark.asyncio
+async def test_a_recipe_gone_from_the_library_is_not_guessed_at() -> None:
+    entity = _recipe_select(list(_LIBRARY), {"id": "99", "name": "Kenya Hot"})
+    await entity.async_added_to_hass()
+    assert entity.current_option is None
+    assert entity.extra_state_attributes is None
+
+
+@pytest.mark.asyncio
+async def test_a_restore_waits_for_a_library_that_has_not_loaded() -> None:
+    entity = _recipe_select(None, {"id": "12", "name": "Kenya Hot"})
+    await entity.async_added_to_hass()
+    assert entity.current_option is None
+    entity.coordinator.data = list(_LIBRARY)
+    entity._handle_coordinator_update()
+    assert entity.current_option == "Kenya Hot"
+
+
+@pytest.mark.asyncio
+async def test_nothing_is_picked_when_nothing_was() -> None:
+    entity = _recipe_select(list(_LIBRARY), {})
+    await entity.async_added_to_hass()
+    assert entity.current_option is None
+
+
+@pytest.mark.asyncio
+async def test_a_recipe_removed_by_a_refresh_is_let_go() -> None:
+    entity = _recipe_select(list(_LIBRARY))
+    await entity.async_select_option("Kenya Hot")
+    entity.coordinator.data = [r for r in _LIBRARY if r["id"] != "12"]
+    entity._handle_coordinator_update()
+    assert entity.current_option is None
