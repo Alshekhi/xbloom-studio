@@ -76,10 +76,11 @@ async def _await_brew_outcome(
     """Wait for the brew to end, and report which signal said so.
 
     RD_ENJOY is the machine's own "your coffee is ready" and is what every
-    consumer wants — but it is **not guaranteed**. A brew has been seen to grind,
-    poured three times, emitted CMD_BREW_END and never emitted ENJOY. It made
-    coffee; the announcement never fired and the watcher read the resulting
-    `idle` as "cancelled".
+    consumer wants — but it can go unheard. A brew was seen to grind, pour,
+    emit CMD_BREW_END and never emit ENJOY; the machine had sent it, packed into
+    one notification behind other frames, which xbloom-py before 0.2.1 dropped.
+    It made coffee; the announcement never fired and the watcher read the
+    resulting `idle` as "cancelled".
 
     So BREW_END opens a grace window rather than ending the wait outright: ENJOY
     landing inside it means `confirmed`, and the window closing first means
@@ -340,7 +341,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             signal_brew_lifecycle,
             signal_event,
         )
-        from xbloom.ble import XBloomBleClient
+        from xbloom.ble import CommandRefused, CommandUnanswered, XBloomBleClient
 
         active = brew_session["task"]
         if active is not None and not active.done():
@@ -545,6 +546,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                             "ended_at": datetime.now(timezone.utc).isoformat(),
                         },
                     )
+            except (CommandRefused, CommandUnanswered) as err:
+                # The machine refused a step, or never answered one, so the
+                # brew stopped before EXECUTE: executing on top of a recipe it
+                # did not take grinds at whatever size it last held.
+                _LOGGER.error(
+                    "xbloom.start_brew: '%s' not started — %s", recipe_name, err,
+                )
+                _fire_failed(err.reason, recipe_name, run_id=run_id, step=err.step)
             except Exception as err:  # noqa: BLE001
                 _LOGGER.error(
                     "xbloom.start_brew: BLE dispatch failed for '%s': %s",

@@ -159,8 +159,9 @@ can your own automations or a service outside Home Assistant.
 | `xbloom_brew_timeout` | Ten minutes passed with no ending heard from the machine | `recipe_name` |
 
 **`outcome` is the part worth understanding.** The machine's own "your coffee
-is ready" (`RD_ENJOY`) is **not guaranteed** — a brew can grind, pour, announce
-that it has stopped pouring, and never send it. So:
+is ready" (`RD_ENJOY`) is what a completion rests on, but it can fail to be
+heard: until xbloom-py 0.2.1 it was dropped whenever the machine packed it into
+one Bluetooth notification behind other frames. So:
 
 - **`confirmed`** — `RD_ENJOY` arrived. The machine said so itself.
 - **`presumed`** — it did not, but the machine's end-of-pouring frame did, and
@@ -175,6 +176,22 @@ than a completion nobody can stand behind.
 `reason` on a failure is a code, not a sentence — `machine_not_found`,
 `bluetooth_error`, `recipe_not_found`, `not_configured`, `no_beans` — so the
 wording belongs to whatever announces it.
+
+**A brew only starts once the machine has accepted every step.** A refused step
+is answered with the step's own code, like an accepted one, so the refusal has
+to be read out of the reply; when one arrives, or a step gets no reply at all,
+the brew stops before the machine is told to execute, and the failure carries
+the step as `step`:
+
+- `machine_busy` — the machine is doing something else, or has just been
+  powered on: after a power cut it refuses the first command it is sent.
+- `not_on_home_screen` — the machine is not on its standby screen.
+- `no_water` — the tank is short of water.
+- `recipe_rejected` — the machine did not accept the recipe.
+- `no_reply` — the machine never answered the step, or its replies could not
+  be read.
+
+Executing anyway would grind at whatever size the machine last held.
 
 **Low water is a live reading.** The machine reports the level continuously, but
 only while Home Assistant holds the Bluetooth link — which it releases when a

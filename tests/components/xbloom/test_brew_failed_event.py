@@ -9,6 +9,8 @@ business, in its own language.
 """
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from xbloom import ble
+
 from .test_brew_completion_contract import (
     _Entry,
     _FakeBle,
@@ -64,6 +66,41 @@ async def test_a_bluetooth_error_mid_brew_fails_the_brew_with_the_error():
     assert failed[0]["reason"] == "bluetooth_error"
     assert "GATT write failed" in failed[0]["error"]
     assert "xbloom_brew_completed" not in _fired(hass)
+
+
+async def _brew_with(fake):
+    hass, entry = _make_hass(), _Entry()
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", fake):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        await handlers["start_brew"](MagicMock(data={}))
+        await entry.tasks[0]
+    return hass
+
+
+async def test_a_step_the_machine_refuses_fails_the_brew_with_its_reason():
+    # After a power cut the machine refuses the first command it is sent; the
+    # brew must stop there, not execute on top of a recipe it never took.
+    class _Refused(_FakeBle):
+        async def brew(self, recipe):
+            raise ble.CommandRefused("bypass+dose", "machine_busy")
+
+    hass = await _brew_with(_Refused)
+    failed = _failed(hass)
+    assert len(failed) == 1
+    assert failed[0]["reason"] == "machine_busy"
+    assert failed[0]["step"] == "bypass+dose"
+    assert "xbloom_brew_completed" not in _fired(hass)
+
+
+async def test_a_step_the_machine_never_answers_fails_the_brew():
+    class _Silent(_FakeBle):
+        async def brew(self, recipe):
+            raise ble.CommandUnanswered("recipe")
+
+    failed = _failed(await _brew_with(_Silent))
+    assert [(f["reason"], f["step"]) for f in failed] == [("no_reply", "recipe")]
 
 
 async def test_a_recipe_that_cannot_be_found_fails_before_any_dispatch():
