@@ -63,6 +63,26 @@ def _refused(err) -> HomeAssistantError:
     )
 
 
+def _not_found(ble_name: str) -> HomeAssistantError:
+    """The error a caller sees when HA's bluetooth has not seen the machine.
+
+    Returning quietly instead answered the caller with success, and a status
+    read afterwards got the sensor's last value — "ok" for a machine that was
+    off.
+    """
+    return HomeAssistantError(
+        translation_domain=DOMAIN, translation_key="machine_not_found",
+        translation_placeholders={"name": ble_name},
+    )
+
+
+def _not_configured() -> HomeAssistantError:
+    """The error a caller sees when the entry names no machine."""
+    return HomeAssistantError(
+        translation_domain=DOMAIN, translation_key="not_configured",
+    )
+
+
 PLATFORMS = ["select", "button", "number", "sensor", "event", "switch", "update", "text"]
 
 # A start_brew call within this many seconds of the previous dispatch is
@@ -654,12 +674,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
             _LOGGER.error("xbloom.stop_brew: BLE name unknown")
-            return
+            raise _not_configured()
 
         ble_device = await _resolve_ble_device(hass, entry, ble_name)
         if ble_device is None:
             _LOGGER.error("xbloom.stop_brew: HA bluetooth has not seen %r", ble_name)
-            return
+            raise _not_found(ble_name)
 
         try:
             ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
@@ -708,12 +728,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
             _LOGGER.error("xbloom.ble_connect: BLE name unknown")
-            return
+            raise _not_configured()
 
         ble_device = await _resolve_ble_device(hass, entry, ble_name)
         if ble_device is None:
             _LOGGER.error("xbloom.ble_connect: HA bluetooth has not seen %r", ble_name)
-            return
+            raise _not_found(ble_name)
 
         _LOGGER.info("xbloom.ble_connect: opening connection to %s …", ble_name)
         try:
@@ -771,14 +791,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
             _LOGGER.error("xbloom.%s: BLE name unknown", label)
-            return
+            raise _not_configured()
 
         ble_device = await _resolve_ble_device(hass, entry, ble_name)
         if ble_device is None:
             _LOGGER.error(
                 "xbloom.%s: HA bluetooth has not seen %r", label, ble_name,
             )
-            return
+            raise _not_found(ble_name)
 
         try:
             ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
@@ -860,13 +880,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             ble_name = _resolve_ble_name(entry)
             if not ble_name:
                 _LOGGER.error("xbloom.grind: BLE name unknown")
-                return
+                raise _not_configured()
             ble_device = await _resolve_ble_device(hass, entry, ble_name)
             if ble_device is None:
                 _LOGGER.error(
                     "xbloom.grind: HA bluetooth has not seen %r", ble_name,
                 )
-                return
+                raise _not_found(ble_name)
 
         enter, start, stop = packets_grind(size, speed)
 
@@ -958,13 +978,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             ble_name = _resolve_ble_name(entry)
             if not ble_name:
                 _LOGGER.error("xbloom.brew_standalone: BLE name unknown")
-                return
+                raise _not_configured()
             ble_device = await _resolve_ble_device(hass, entry, ble_name)
             if ble_device is None:
                 _LOGGER.error(
                     "xbloom.brew_standalone: HA bluetooth has not seen %r", ble_name,
                 )
-                return
+                raise _not_found(ble_name)
 
         # brew_standalone (4506) is a motion command: both routes re-send only
         # while the machine sleeps, never while it is awake, so a pour cannot
@@ -1047,13 +1067,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
             _LOGGER.error("xbloom.write_slot: BLE name unknown")
-            return
+            raise _not_configured()
         ble_device = await _resolve_ble_device(hass, entry, ble_name)
         if ble_device is None:
             _LOGGER.error(
                 "xbloom.write_slot: HA bluetooth has not seen %r", ble_name,
             )
-            return
+            raise _not_found(ble_name)
 
         try:
             packet = packet_slot_write(slot_index, recipe, scale_on=scale_on)
@@ -1097,7 +1117,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
             _LOGGER.error("xbloom.ble_disconnect: BLE name unknown")
-            return
+            raise _not_configured()
 
         ble_device = await _resolve_ble_device(hass, entry, ble_name)
         if ble_device is None:
@@ -1140,13 +1160,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
             _LOGGER.error("xbloom.refresh_status: BLE name unknown")
-            return
+            raise _not_configured()
         ble_device = await _resolve_ble_device(hass, entry, ble_name)
         if ble_device is None:
             _LOGGER.error(
                 "xbloom.refresh_status: HA bluetooth has not seen %r", ble_name,
             )
-            return
+            raise _not_found(ble_name)
         try:
             ble_client = XBloomBleClient(ble_device, on_event=_dispatch_ble_event)
             async with ble_client:

@@ -431,6 +431,12 @@
     },
     "refused_recipe_rejected": {
       "message": "The xBloom refused the settings it was sent. Check the water amount and pour settings."
+    },
+    "machine_not_found": {
+      "message": "Home Assistant can't find the xBloom ({name}) over Bluetooth. Make sure it is switched on and in range, then try again."
+    },
+    "not_configured": {
+      "message": "This xBloom entry doesn't name a machine. Remove the integration and add the machine again."
     }
   }
 }

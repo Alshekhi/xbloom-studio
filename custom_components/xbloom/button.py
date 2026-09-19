@@ -193,7 +193,9 @@ class XBloomCancelBrewButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Delegate to xbloom.stop_brew (sends BLE APP_BREWER_STOP)."""
-        await self.hass.services.async_call(DOMAIN, "stop_brew", {}, blocking=False)
+        # Blocking, so a stop that cannot reach the machine shows as an error
+        # on the press rather than only in the log.
+        await self.hass.services.async_call(DOMAIN, "stop_brew", {}, blocking=True)
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +223,8 @@ class _XBloomSimpleCommandButton(ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        await self.hass.services.async_call(DOMAIN, self._service, {}, blocking=False)
+        # Blocking, for the same reason as Cancel Brew.
+        await self.hass.services.async_call(DOMAIN, self._service, {}, blocking=True)
 
 
 class XBloomTareButton(_XBloomSimpleCommandButton):

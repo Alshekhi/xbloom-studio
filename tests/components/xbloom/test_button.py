@@ -152,14 +152,15 @@ async def test_start_brew_button_press(mock_config_entry) -> None:
 
 @pytest.mark.asyncio
 async def test_cancel_brew_sends_stop_command(mock_config_entry) -> None:
-    """Cancel button delegates to xbloom.stop_brew."""
+    """Cancel button delegates to xbloom.stop_brew, and waits for it, so a stop
+    that cannot reach the machine is an error on the press."""
     entry = mock_config_entry
     button = XBloomCancelBrewButton(entry)
     button.hass = MagicMock()
     button.hass.services.async_call = AsyncMock()
     await button.async_press()
     button.hass.services.async_call.assert_awaited_once_with(
-        "xbloom", "stop_brew", {}, blocking=False
+        "xbloom", "stop_brew", {}, blocking=True
     )
 
 
