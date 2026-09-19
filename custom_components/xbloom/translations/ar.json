@@ -320,6 +320,15 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "in_range": {
+        "name": "في النطاق",
+        "state": {
+          "on": "في النطاق",
+          "off": "خارج النطاق"
+        }
+      }
+    },
     "select": {
       "mode": {
         "name": "الوضع",

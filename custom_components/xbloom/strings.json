@@ -320,6 +320,15 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "in_range": {
+        "name": "In Range",
+        "state": {
+          "on": "In range",
+          "off": "Out of range"
+        }
+      }
+    },
     "select": {
       "mode": {
         "name": "Mode",

@@ -83,7 +83,10 @@ def _not_configured() -> HomeAssistantError:
     )
 
 
-PLATFORMS = ["select", "button", "number", "sensor", "event", "switch", "update", "text"]
+PLATFORMS = [
+    "select", "button", "number", "sensor", "binary_sensor", "event", "switch",
+    "update", "text",
+]
 
 # A start_brew call within this many seconds of the previous dispatch is
 # treated as a duplicate (e.g. a voice-agent HTTP retry) and ignored. A call
@@ -217,12 +220,22 @@ async def _resolve_ble_device(hass: HomeAssistant, entry: ConfigEntry, ble_name:
         return bluetooth.async_ble_device_from_address(hass, address, connectable=True)
     for info in bluetooth.async_discovered_service_info(hass, connectable=True):
         if info.name == ble_name:
-            _LOGGER.info("xbloom: %r is at %s — saved for later lookups", ble_name, info.address)
-            hass.config_entries.async_update_entry(
-                entry, data={**entry.data, CONF_BLE_ADDRESS: info.address},
-            )
+            remember_address(hass, entry, info.address)
             return info.device
     return None
+
+
+def remember_address(hass: HomeAssistant, entry: ConfigEntry, address: str) -> None:
+    """Keep the machine's Bluetooth address on its entry (see above)."""
+    if entry.data.get(CONF_BLE_ADDRESS) == address:
+        return
+    _LOGGER.info(
+        "xbloom: %r is at %s — saved for later lookups",
+        entry.data.get(CONF_BLE_NAME), address,
+    )
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, CONF_BLE_ADDRESS: address},
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bool:

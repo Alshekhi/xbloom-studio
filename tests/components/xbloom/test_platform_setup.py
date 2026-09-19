@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.xbloom import (
+    binary_sensor as binary_sensor_platform,
     button as button_platform,
     event as event_platform,
     number as number_platform,
@@ -30,6 +31,7 @@ PLATFORMS = {
     "text": text_platform,
     "update": update_platform,
     "button": button_platform,
+    "binary_sensor": binary_sensor_platform,
 }
 
 

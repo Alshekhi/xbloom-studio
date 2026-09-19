@@ -220,6 +220,10 @@ def _inject_global_stubs() -> None:
     bt.BluetoothServiceInfoBleak = MagicMock
     bt.async_discovered_service_info = MagicMock(return_value=[])
     bt.async_ble_device_from_address = MagicMock(return_value=None)
+    bt.async_address_present = MagicMock(return_value=False)
+    bt.async_register_callback = MagicMock(return_value=lambda: None)
+    bt.async_track_unavailable = MagicMock(return_value=lambda: None)
+    bt.BluetoothScanningMode = MagicMock(name="BluetoothScanningMode")
     components.bluetooth = bt
 
     entity_bases = {
