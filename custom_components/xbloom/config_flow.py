@@ -26,6 +26,7 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
 from .const import (
+    CONF_BLE_ADDRESS,
     CONF_BLE_NAME,
     CONF_CLOUD,
     CONF_ENABLE_FLASHING,
@@ -80,6 +81,7 @@ class XBloomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._discovered_ble_name: str | None = None
+        self._discovered_address: str | None = None
 
     # ------------------------------------------------------------------ #
     # Bluetooth auto-discovery entry                                      #
@@ -94,9 +96,13 @@ class XBloomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="not_supported")
 
         await self.async_set_unique_id(f"xbloom-{suffix}")
-        self._abort_if_unique_id_configured()
+        # A machine already set up keeps its address current from here.
+        self._abort_if_unique_id_configured(
+            updates={CONF_BLE_ADDRESS: discovery_info.address},
+        )
 
         self._discovered_ble_name = ble_name
+        self._discovered_address = discovery_info.address
         self.context["title_placeholders"] = {"name": ble_name}
         return await self.async_step_confirm()
 
@@ -106,7 +112,9 @@ class XBloomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """One-click confirm of a discovered machine."""
         ble_name = self._discovered_ble_name or ""
         if user_input is not None:
-            return self._create_entry(ble_name=ble_name)
+            return self._create_entry(
+                ble_name=ble_name, address=self._discovered_address,
+            )
 
         return self.async_show_form(
             step_id="confirm",
@@ -226,11 +234,14 @@ class XBloomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------ #
-    def _create_entry(self, *, ble_name: str) -> FlowResult:
+    def _create_entry(self, *, ble_name: str, address: str | None = None) -> FlowResult:
         suffix = _serial_suffix(ble_name)
         data: dict[str, Any] = {CONF_BLE_NAME: ble_name}
         if suffix:
             data[CONF_PRODUCT_ID] = suffix
+        # A machine picked by name learns its address on first use instead.
+        if address:
+            data[CONF_BLE_ADDRESS] = address
         return self.async_create_entry(title=ble_name, data=data)
 
     @staticmethod

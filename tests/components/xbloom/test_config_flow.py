@@ -22,6 +22,7 @@ from custom_components.xbloom.config_flow import (
     _serial_suffix,
 )
 from custom_components.xbloom.const import (
+    CONF_BLE_ADDRESS,
     CONF_BLE_NAME,
     CONF_CLOUD,
     CONF_CLOUD_EMAIL,
@@ -54,9 +55,10 @@ def _make_flow(*, discovered: list[str] | None = None, entries: list | None = No
     return flow
 
 
-def _discovery(name: str):
+def _discovery(name: str, address: str = "68:79:C4:00:00:01"):
     info = MagicMock()
     info.name = name
+    info.address = address
     return info
 
 
@@ -122,6 +124,24 @@ async def test_confirming_a_discovery_creates_the_entry() -> None:
     assert result["type"] == "create_entry"
     assert result["data"][CONF_BLE_NAME] == BLE_NAME
     assert result["data"][CONF_PRODUCT_ID] == "ABC123"
+
+
+@pytest.mark.asyncio
+async def test_a_discovered_machine_is_saved_with_its_address() -> None:
+    # Discovery already carries it, so the entry never depends on the name.
+    flow = _make_flow()
+    await flow.async_step_bluetooth(_discovery(BLE_NAME))
+    result = await flow.async_step_confirm(user_input={})
+    assert result["data"][CONF_BLE_ADDRESS] == "68:79:C4:00:00:01"
+
+
+@pytest.mark.asyncio
+async def test_rediscovery_of_a_configured_machine_updates_its_address() -> None:
+    flow = _make_flow()
+    await flow.async_step_bluetooth(_discovery(BLE_NAME))
+    flow._abort_if_unique_id_configured.assert_called_once_with(
+        updates={CONF_BLE_ADDRESS: "68:79:C4:00:00:01"},
+    )
 
 
 # --------------------------------------------------------------------------- #

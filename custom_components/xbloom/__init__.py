@@ -31,7 +31,7 @@ from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
+from .const import CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
 from .coordinator import XBloomCoordinator
 from xbloom.client import XBloomClient
 from xbloom.cloud import XBloomCloudClient, language_type_for
@@ -174,9 +174,17 @@ def _resolve_ble_name(entry: ConfigEntry) -> str | None:
     return f"XBLOOM {serial[-6:]}" if serial else None
 
 
-async def _resolve_ble_device(hass: HomeAssistant, ble_name: str):
-    """Look up a connectable BLEDevice for this advertiser name through HA's
+async def _resolve_ble_device(hass: HomeAssistant, entry: ConfigEntry, ble_name: str):
+    """Look up a connectable BLEDevice for this machine through HA's
     bluetooth integration.
+
+    By address once it is known, by advertiser name until then. The name
+    comes in the scan response, which HA's bluetooth may not have for minutes
+    after a restart, and every action failed as "not seen" meanwhile. The
+    address is in every advertisement, and the machine's is public, so it is
+    saved the first time the name finds it. An entry is one machine — its
+    name comes from the serial and cannot be changed — so a saved address is
+    never traded back for the name.
 
     Going through HA's bluetooth coordination (instead of a direct
     `BleakScanner.find_device_by_name`) routes the connection via the
@@ -184,8 +192,15 @@ async def _resolve_ble_device(hass: HomeAssistant, ble_name: str):
     network) and lets `bleak_retry_connector` clean up stale handles.
     """
     from homeassistant.components import bluetooth
+    address = entry.data.get(CONF_BLE_ADDRESS)
+    if address:
+        return bluetooth.async_ble_device_from_address(hass, address, connectable=True)
     for info in bluetooth.async_discovered_service_info(hass, connectable=True):
         if info.name == ble_name:
+            _LOGGER.info("xbloom: %r is at %s — saved for later lookups", ble_name, info.address)
+            hass.config_entries.async_update_entry(
+                entry, data={**entry.data, CONF_BLE_ADDRESS: info.address},
+            )
             return info.device
     return None
 
@@ -209,7 +224,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         ble_name = _resolve_ble_name(entry)
         if not ble_name:
             return None
-        return await _resolve_ble_device(hass, ble_name)
+        return await _resolve_ble_device(hass, entry, ble_name)
 
     entry.runtime_data = XBloomRuntimeData(
         coordinator=coordinator,
@@ -489,7 +504,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             await end_held_session(hass, entry, reason="brew")
 
             _LOGGER.info("xbloom.start_brew: looking up %r in HA bluetooth …", ble_name)
-            ble_device = await _resolve_ble_device(hass, ble_name)
+            ble_device = await _resolve_ble_device(hass, entry, ble_name)
             if ble_device is None:
                 _LOGGER.error(
                     "xbloom.start_brew: HA bluetooth has not seen %r — "
@@ -641,7 +656,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _LOGGER.error("xbloom.stop_brew: BLE name unknown")
             return
 
-        ble_device = await _resolve_ble_device(hass, ble_name)
+        ble_device = await _resolve_ble_device(hass, entry, ble_name)
         if ble_device is None:
             _LOGGER.error("xbloom.stop_brew: HA bluetooth has not seen %r", ble_name)
             return
@@ -695,7 +710,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _LOGGER.error("xbloom.ble_connect: BLE name unknown")
             return
 
-        ble_device = await _resolve_ble_device(hass, ble_name)
+        ble_device = await _resolve_ble_device(hass, entry, ble_name)
         if ble_device is None:
             _LOGGER.error("xbloom.ble_connect: HA bluetooth has not seen %r", ble_name)
             return
@@ -758,7 +773,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _LOGGER.error("xbloom.%s: BLE name unknown", label)
             return
 
-        ble_device = await _resolve_ble_device(hass, ble_name)
+        ble_device = await _resolve_ble_device(hass, entry, ble_name)
         if ble_device is None:
             _LOGGER.error(
                 "xbloom.%s: HA bluetooth has not seen %r", label, ble_name,
@@ -846,7 +861,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             if not ble_name:
                 _LOGGER.error("xbloom.grind: BLE name unknown")
                 return
-            ble_device = await _resolve_ble_device(hass, ble_name)
+            ble_device = await _resolve_ble_device(hass, entry, ble_name)
             if ble_device is None:
                 _LOGGER.error(
                     "xbloom.grind: HA bluetooth has not seen %r", ble_name,
@@ -944,7 +959,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             if not ble_name:
                 _LOGGER.error("xbloom.brew_standalone: BLE name unknown")
                 return
-            ble_device = await _resolve_ble_device(hass, ble_name)
+            ble_device = await _resolve_ble_device(hass, entry, ble_name)
             if ble_device is None:
                 _LOGGER.error(
                     "xbloom.brew_standalone: HA bluetooth has not seen %r", ble_name,
@@ -1033,7 +1048,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         if not ble_name:
             _LOGGER.error("xbloom.write_slot: BLE name unknown")
             return
-        ble_device = await _resolve_ble_device(hass, ble_name)
+        ble_device = await _resolve_ble_device(hass, entry, ble_name)
         if ble_device is None:
             _LOGGER.error(
                 "xbloom.write_slot: HA bluetooth has not seen %r", ble_name,
@@ -1084,7 +1099,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _LOGGER.error("xbloom.ble_disconnect: BLE name unknown")
             return
 
-        ble_device = await _resolve_ble_device(hass, ble_name)
+        ble_device = await _resolve_ble_device(hass, entry, ble_name)
         if ble_device is None:
             _LOGGER.warning("xbloom.ble_disconnect: HA bluetooth has not seen %r", ble_name)
             return
@@ -1126,7 +1141,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         if not ble_name:
             _LOGGER.error("xbloom.refresh_status: BLE name unknown")
             return
-        ble_device = await _resolve_ble_device(hass, ble_name)
+        ble_device = await _resolve_ble_device(hass, entry, ble_name)
         if ble_device is None:
             _LOGGER.error(
                 "xbloom.refresh_status: HA bluetooth has not seen %r", ble_name,

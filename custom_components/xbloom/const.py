@@ -9,6 +9,7 @@ DOMAIN = "xbloom"
 # Config entry data keys — machine (BLE)
 CONF_PRODUCT_ID = "product_id"  # serial number tail (e.g. "ABC123")
 CONF_BLE_NAME = "ble_name"      # advertised BLE name (e.g. "XBLOOM ABC123")
+CONF_BLE_ADDRESS = "ble_address"  # Bluetooth address, learned from the name once
 
 # Config entry data keys — optional cloud account. Stored under a single
 # `cloud` sub-dict in entry.data so a logged-out entry has no cloud key at all.
