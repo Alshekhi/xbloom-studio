@@ -12,7 +12,7 @@ from custom_components.xbloom.binary_sensor import XBloomInRangeSensor
 from custom_components.xbloom.const import CONF_BLE_ADDRESS, CONF_BLE_NAME
 
 BLE_NAME = "XBLOOM ABC123"
-ADDRESS = "68:79:C4:00:00:01"
+ADDRESS = "AA:BB:CC:00:00:01"
 
 
 class _Bluetooth:
