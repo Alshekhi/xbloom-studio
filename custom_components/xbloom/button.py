@@ -269,10 +269,17 @@ class XBloomGrindButton(_XBloomSimpleCommandButton):
     _service = "grind"
 
     async def async_press(self) -> None:
-        size_state = self.hass.states.get("number.grind_size")
-        speed_state = self.hass.states.get("number.grind_speed")
-        size = int(float(size_state.state)) if size_state and size_state.state not in ("unknown", "unavailable") else 65
-        speed = int(float(speed_state.state)) if speed_state and speed_state.state not in ("unknown", "unavailable") else 60
+        # A setting that cannot be read stops the grind rather than falling
+        # back to a default: this once read ids no entity had, and ground every
+        # press at size 65 whatever the sliders held.
+        values = []
+        for entity_id in ("number.xbloom_studio_grind_size", "number.xbloom_studio_grind_speed"):
+            st = self.hass.states.get(entity_id)
+            if st is None or st.state in ("unknown", "unavailable"):
+                _LOGGER.error("Grind pressed but %s has no value — not grinding", entity_id)
+                return
+            values.append(int(float(st.state)))
+        size, speed = values
         await self.hass.services.async_call(
             DOMAIN, "grind",
             {"size": size, "speed": speed, "seconds": 5},

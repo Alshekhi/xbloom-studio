@@ -116,7 +116,7 @@ def _inject_stubs():
 _inject_stubs()
 
 # Now safe to import from custom_components
-from custom_components.xbloom.button import XBloomStartBrewButton, XBloomCancelBrewButton  # noqa: E402
+from custom_components.xbloom.button import XBloomStartBrewButton, XBloomCancelBrewButton, XBloomGrindButton  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -188,3 +188,40 @@ async def test_start_brew_available_with_recipe(mock_config_entry) -> None:
     state.state = "Ethiopia Yirgacheffe"
     button.hass.states.get = MagicMock(return_value=state)
     assert button.available is True
+
+
+def _grind_button(mock_config_entry, states: dict[str, str]):
+    button = XBloomGrindButton(mock_config_entry)
+    button.hass = MagicMock()
+    button.hass.services.async_call = AsyncMock()
+
+    def _get(entity_id):
+        if entity_id not in states:
+            return None
+        st = MagicMock()
+        st.state = states[entity_id]
+        return st
+
+    button.hass.states.get = MagicMock(side_effect=_get)
+    return button
+
+
+@pytest.mark.asyncio
+async def test_grind_button_grinds_at_the_slider_settings(mock_config_entry) -> None:
+    """It read `number.grind_size` / `number.grind_speed`, which no entity has
+    ever been called, and ground every press at the fallback size 65."""
+    button = _grind_button(mock_config_entry, {
+        "number.xbloom_studio_grind_size": "50.0",
+        "number.xbloom_studio_grind_speed": "80.0",
+    })
+    await button.async_press()
+    button.hass.services.async_call.assert_awaited_once_with(
+        "xbloom", "grind", {"size": 50, "speed": 80, "seconds": 5}, blocking=False,
+    )
+
+
+@pytest.mark.asyncio
+async def test_grind_button_does_nothing_when_a_setting_cannot_be_read(mock_config_entry) -> None:
+    button = _grind_button(mock_config_entry, {"number.xbloom_studio_grind_size": "50.0"})
+    await button.async_press()
+    button.hass.services.async_call.assert_not_awaited()

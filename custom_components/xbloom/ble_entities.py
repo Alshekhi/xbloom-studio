@@ -446,7 +446,7 @@ class XBloomScaleWeightBleSensor(RestoreSensor, SensorEntity):
 
 
 # --------------------------------------------------------------------- #
-# sensor.xbloom_studio_last_updated                                     #
+# sensor.xbloom_studio_status_updated                                   #
 # --------------------------------------------------------------------- #
 class XBloomLastUpdatedSensor(RestoreSensor, SensorEntity):
     """Timestamp of the last status heartbeat — the freshness signal.
