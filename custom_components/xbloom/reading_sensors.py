@@ -41,6 +41,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from .ble_entities import (
     CMD_BLOOM,
     _device_info,
+    module_screen_after,
     signal_brew_lifecycle,
     signal_event,
 )
@@ -245,6 +246,9 @@ class XBloomCurrentPourSensor(SensorEntity):
         self._entry = entry
         self._attr_native_value = 0
         self._total_pours: int | None = None
+        # On a grinder, brewer or scale screen, a bloom frame is a standalone
+        # pour's, not a recipe's: see module_screen_after.
+        self._on_module_screen = False
 
     @property
     def device_info(self):
@@ -261,10 +265,14 @@ class XBloomCurrentPourSensor(SensorEntity):
         def _on_started(event) -> None:
             self._total_pours = event.data.get("total_pours")
             self._attr_native_value = 0
+            self._on_module_screen = False
             self.async_write_ha_state()
 
         @callback
         def _on_signal(decoded: dict) -> None:
+            self._on_module_screen = module_screen_after(decoded, self._on_module_screen)
+            if self._on_module_screen:
+                return
             if decoded.get("cmd") == CMD_BLOOM and "pour_index" in decoded:
                 self._attr_native_value = int(decoded["pour_index"]) + 1
                 self.async_write_ha_state()

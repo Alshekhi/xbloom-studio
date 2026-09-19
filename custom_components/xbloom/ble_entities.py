@@ -161,6 +161,26 @@ WATER_FAULT_EVENT = next(
 # (16 = grinding complete — reported but not acted on; brew_status uses the
 #  40502/40507 grinder cmds for the grinding->brewing transition instead.)
 ACTIVITY_HOME_STATES = (1, 65)   # Pro home, Auto/Easy home
+ACTIVITY_MODULE_SCREENS = (2, 3, 4, 5)   # grinder, brewer, scale (4/5)
+
+
+def module_screen_after(decoded: dict, on_module_screen: bool) -> bool:
+    """Whether the machine is on its grinder, brewer or scale screen after
+    this frame.
+
+    A standalone grind or pour sends frames a recipe brew sends too — a grind
+    the "brewer started" frame, a pour its bloom and ENJOY — so anything
+    tracking a brew must set them aside while the machine is on a module
+    screen. Only the home screen ends that: a pour shows the same "pouring"
+    activity (35) as a recipe brew, so no other activity can.
+    """
+    if decoded.get("cmd") == CMD_MACHINE_ACTIVITY:
+        activity = decoded.get("activity")
+        if activity in ACTIVITY_MODULE_SCREENS:
+            return True
+        if activity in ACTIVITY_HOME_STATES:
+            return False
+    return on_module_screen
 ACTIVITY_BREWING    = 34
 ACTIVITY_BREW_DONE  = 36
 
@@ -195,6 +215,13 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
     def __init__(self, entry) -> None:
         self._entry = entry
         self._attr_native_value = "idle"
+        # The machine is on its grinder, brewer or scale screen. The frames a
+        # standalone grind or pour sends overlap a recipe brew's — a grind
+        # sends the "brewer started" frame, a pour ends in ENJOY — so while it
+        # is there they describe the module, not a brew. Only the home screen
+        # (or a brew Home Assistant starts) ends it: a pour shows the same
+        # "pouring" activity (35) as a recipe brew does.
+        self._on_module_screen = False
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -218,6 +245,14 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
         def _on_event(decoded: dict) -> None:
             cmd = decoded.get("cmd")
             new_state: str | None = None
+            self._on_module_screen = module_screen_after(decoded, self._on_module_screen)
+            if self._on_module_screen:
+                # No recipe brew runs on a module screen, so an in-progress
+                # state here is stale.
+                if self._attr_native_value in ("grinding", "brewing"):
+                    self._attr_native_value = "idle"
+                    self.async_write_ha_state()
+                return
             if cmd == CMD_MACHINE_ACTIVITY:
                 act = decoded.get("activity")
                 # Activity codes reflect the machine's *overall* state, not
@@ -280,6 +315,10 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
 
         @callback
         def _on_lifecycle(phase: str) -> None:
+            if phase == "started":
+                # A brew Home Assistant starts is a recipe brew wherever the
+                # machine was last seen — it closes any Connect session first.
+                self._on_module_screen = False
             if phase == "started" and self._attr_native_value != "idle":
                 # Reset to idle at the start of a new brew so subscribers see
                 # the transition — covers a prior "done" as well as a stale
@@ -567,6 +606,8 @@ class XBloomBrewEventBleEntity(EventEntity):
         self._brew_started_fired = False
         self._brew_done_fired = False
         self._last_recipe_name: str | None = None
+        # On a grinder, brewer or scale screen: see module_screen_after.
+        self._on_module_screen = False
         # Faults currently asserted. The machine reports a fault for as long as
         # it holds, the way a low-fuel light stays lit, so the frames after the
         # first carry no news — relaying each one made one dry tank announce
@@ -599,6 +640,13 @@ class XBloomBrewEventBleEntity(EventEntity):
                     attrs["pour_index"] = decoded["pour_index"]
                 self._trigger_event(granular, attrs)
                 self.async_write_ha_state()
+
+            # The brew-level events below speak for a brew; a standalone
+            # grind or pour is not one, and its "brewer started", bloom and
+            # ENJOY would otherwise announce plain water as a finished recipe.
+            self._on_module_screen = module_screen_after(decoded, self._on_module_screen)
+            if self._on_module_screen:
+                return
 
             # A new brew is beginning. Reset the done-latch here, from the
             # machine's own frames, rather than only on the HA brew task's
@@ -673,6 +721,9 @@ class XBloomBrewEventBleEntity(EventEntity):
             if phase == "started":
                 self._brew_started_fired = False
                 self._brew_done_fired = False
+                # A brew Home Assistant starts is a recipe brew wherever the
+                # machine was last seen.
+                self._on_module_screen = False
 
         @callback
         def _on_brew_started_bus(event) -> None:
