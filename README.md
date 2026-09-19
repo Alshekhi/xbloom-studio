@@ -161,7 +161,7 @@ can your own automations or a service outside Home Assistant.
 
 **`outcome` is the part worth understanding.** The machine's own "your coffee
 is ready" (`RD_ENJOY`) is what a completion rests on, but it can fail to be
-heard: until xbloom-py 0.2.1 it was dropped whenever the machine packed it into
+heard: until xbloom-py 0.3.0 it was dropped whenever the machine packed it into
 one Bluetooth notification behind other frames. So:
 
 - **`confirmed`** — `RD_ENJOY` arrived. The machine said so itself.

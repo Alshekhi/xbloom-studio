@@ -2,7 +2,7 @@
 
 Root cause these lock in: RD_ENJOY can fail to be heard. An observed brew
 ground, poured three times, emitted `brew_ended`, and no `brew_done` reached
-Home Assistant — until xbloom-py 0.2.1 the library dropped ENJOY whenever the
+Home Assistant — until xbloom-py 0.3.0 the library dropped ENJOY whenever the
 machine packed it into one notification behind other frames. It made coffee,
 moved `brew_status` to idle via the home-activity reconciliation, and told
 nobody —

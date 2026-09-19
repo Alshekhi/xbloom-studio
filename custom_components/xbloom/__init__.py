@@ -114,7 +114,7 @@ async def _await_brew_outcome(
     RD_ENJOY is the machine's own "your coffee is ready" and is what every
     consumer wants — but it can go unheard. A brew was seen to grind, pour,
     emit CMD_BREW_END and never emit ENJOY; the machine had sent it, packed into
-    one notification behind other frames, which xbloom-py before 0.2.1 dropped.
+    one notification behind other frames, which xbloom-py before 0.3.0 dropped.
     It made coffee; the announcement never fired and the watcher read the
     resulting `idle` as "cancelled".
 
