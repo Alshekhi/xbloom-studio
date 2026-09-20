@@ -186,9 +186,10 @@ the step as `step`:
 
 - `machine_busy` — the machine is doing something else, or has just been
   powered on: after a power cut it refuses the first command it is sent.
-- `needs_calibration` — the machine will not brew until its grinder is
-  calibrated, which is what it wants after a power cut. Calibrate it with the
-  right knob on the machine, then start again.
+- `not_ready` — the machine is still recovering from a power interruption and
+  refuses every command until it is back on its standby screen. Running
+  calibration with the right knob gets it there.
+- `restore_incomplete` — the same recovery, one step further on.
 - `not_on_home_screen` — the machine is not on its standby screen.
 - `no_water` — the tank is short of water.
 - `recipe_rejected` — the machine did not accept the recipe.

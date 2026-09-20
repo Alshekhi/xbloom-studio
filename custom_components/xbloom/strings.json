@@ -453,8 +453,11 @@
     "connection_failed": {
       "message": "The Bluetooth connection to the xBloom failed: {error}"
     },
-    "refused_needs_calibration": {
-      "message": "The xBloom needs calibration before it can brew, so it refused. Calibrate it with the right knob on the machine, then start again."
+    "refused_not_ready": {
+      "message": "The xBloom is still recovering from a power interruption and refused. Bring it back to its standby screen — running calibration with the right knob does that — then start again."
+    },
+    "refused_restore_incomplete": {
+      "message": "The xBloom has not finished recovering from a power interruption and refused. Return it to its standby screen, then start again."
     }
   }
 }
