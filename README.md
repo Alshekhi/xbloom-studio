@@ -154,7 +154,7 @@ can your own automations or a service outside Home Assistant.
 
 | Event | When | Payload |
 |---|---|---|
-| `xbloom_brew_started` | Home Assistant has begun a brew | `recipe_name`, `total_pours` |
+| `xbloom_brew_started` | the machine has accepted the brew — every step, including execute | `recipe_name`, `total_pours` |
 | `xbloom_brew_completed` | **The brew finished.** Key on this one. | `run_id`, `recipe_id`, `recipe_name`, `dose_g`, `cup_type`, `outcome`, `started_at`, `ended_at` |
 | `xbloom_brew_failed` | The brew could not start, or the machine gave up on it | `reason`, `recipe_name`, sometimes `run_id` / `error` |
 | `xbloom_brew_timeout` | Ten minutes passed with no ending heard from the machine | `recipe_name` |
@@ -186,6 +186,9 @@ the step as `step`:
 
 - `machine_busy` — the machine is doing something else, or has just been
   powered on: after a power cut it refuses the first command it is sent.
+- `needs_calibration` — the machine will not brew until its grinder is
+  calibrated, which is what it wants after a power cut. Calibrate it with the
+  right knob on the machine, then start again.
 - `not_on_home_screen` — the machine is not on its standby screen.
 - `no_water` — the tank is short of water.
 - `recipe_rejected` — the machine did not accept the recipe.
@@ -355,7 +358,7 @@ change and test `trigger.to_state.attributes.event_type`:
 
 | Event | Fired when | Data |
 |---|---|---|
-| `xbloom_brew_started` | `xbloom.start_brew` dispatches (also fires with Connect off) | `recipe_name`, `total_pours` |
+| `xbloom_brew_started` | the machine accepts the brew (also fires with Connect off); a refused brew fires `xbloom_brew_failed` instead | `recipe_name`, `total_pours` |
 | `xbloom_connect_ready` / `_connecting` / `_failed` / `_stopped` / `_auto_stopped` | the live session changes state | `reason` on failures and stops |
 | `xbloom_scale_weight_stable` | the weight settles while you're on the scale | `weight_g`, `unit` |
 | `xbloom_grinder_knob_changed` | a grinder knob is turned | `parameter`, `value` |

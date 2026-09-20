@@ -452,6 +452,9 @@
     },
     "connection_failed": {
       "message": "The Bluetooth connection to the xBloom failed: {error}"
+    },
+    "refused_needs_calibration": {
+      "message": "The xBloom needs calibration before it can brew, so it refused. Calibrate it with the right knob on the machine, then start again."
     }
   }
 }
