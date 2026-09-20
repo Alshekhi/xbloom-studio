@@ -520,14 +520,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             run_id = uuid.uuid4().hex
             started_at = datetime.now(timezone.utc).isoformat()
 
-            # Fire the brew_started bus event so the event entity captures the
-            # recipe name to attach to the eventual brew_done event, and the
-            # current-recipe/current-pour sensors can show progress.
-            hass.bus.async_fire(
-                "xbloom_brew_started",
-                {"recipe_name": recipe_name, "total_pours": total_pours},
-            )
-
+            # The lifecycle signal arms the entities now — it is internal, and a
+            # brew frame can arrive in the same instant the machine accepts the
+            # last step. The public `xbloom_brew_started` waits until the
+            # machine has taken the brew: see where it is fired below.
             async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "started")
 
             # A recipe brew needs a link of its own — it waits on every step
@@ -557,6 +553,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     await ble_client.brew(recipe)
                     _LOGGER.info(
                         "xbloom.start_brew: ✓ frames sent, waiting for RD_ENJOY (≤10min) …"
+                    )
+                    # Only now has the machine taken the brew — every step
+                    # accepted, execute included. Fired at dispatch instead,
+                    # this had the house announce "started preparing X" for
+                    # three brews the machine refused outright (2026-09-20),
+                    # and it is what the announcement blueprint speaks on. The
+                    # event entity caches the recipe name from it for the
+                    # eventual brew_done, and the current-recipe sensor reads
+                    # it — both are wanted before the first pour, which is
+                    # later than this.
+                    hass.bus.async_fire(
+                        "xbloom_brew_started",
+                        {"recipe_name": recipe_name, "total_pours": total_pours},
                     )
                     outcome = await _await_brew_outcome(
                         ble_client, brew_end_seen, went_home, fault_stopped

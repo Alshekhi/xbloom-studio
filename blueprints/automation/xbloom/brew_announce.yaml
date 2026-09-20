@@ -9,9 +9,11 @@ blueprint:
     pick one under "How to announce".
 
     The start announcement fires on the `xbloom_brew_started` bus event, which
-    the xbloom.start_brew service emits the instant it dispatches — before any
-    BLE traffic. That gives immediate confirmation that the intended recipe
-    launched, which matters when you cannot see the machine. A brew started
+    the xbloom.start_brew service emits once the machine has accepted the brew
+    — every step taken, including execute. That is the first moment the coffee
+    is really coming: a machine that refuses, as it does until it is calibrated
+    after a power cut, says nothing instead of announcing a brew that never
+    ran. The failure is announced by the fault blueprint. A brew started
     physically at the machine emits no such event, so it announces from
     "pouring" onward rather than at the start.
   domain: automation
@@ -141,8 +143,9 @@ variables:
     {%- endif -%}
 
 trigger:
-  # Fired by xbloom.start_brew the moment it dispatches, carrying the recipe
-  # name — earlier and more informative than waiting for the burrs to move.
+  # Fired by xbloom.start_brew once the machine has accepted every step,
+  # carrying the recipe name — before the burrs move, but never for a brew the
+  # machine refused.
   - platform: event
     event_type: xbloom_brew_started
     id: started

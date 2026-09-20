@@ -44,8 +44,10 @@ async def test_a_machine_bluetooth_cannot_see_fails_the_brew():
     assert failed[0]["reason"] == "machine_not_found"
     assert failed[0]["recipe_name"] == "Test Recipe One"
     assert failed[0]["run_id"]
-    # After the dispatch, so a consumer has already seen which brew failed.
-    assert _fired(hass).index("xbloom_brew_started") < _fired(hass).index("xbloom_brew_failed")
+    # And no start: nothing reached the machine, so nothing began. The event
+    # announcements key on used to fire at dispatch, which had the house say
+    # "started preparing X" for brews the machine then refused outright.
+    assert "xbloom_brew_started" not in _fired(hass)
 
 
 async def test_a_bluetooth_error_mid_brew_fails_the_brew_with_the_error():
@@ -137,3 +139,47 @@ async def test_a_healthy_brew_fires_no_failure():
         await entry.tasks[0]
 
     assert _failed(hass) == []
+
+
+async def test_a_brew_the_machine_refuses_never_says_it_started():
+    # 2026-09-20, after a power cut: the machine refused every command of three
+    # brews, and each was announced as started while nothing was ground.
+    class _Refusing(_FakeBle):
+        async def brew(self, recipe):
+            raise ble.CommandRefused("bypass+dose", "needs_calibration")
+
+    hass, entry = _make_hass(), _Entry()
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", _Refusing):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        await handlers["start_brew"](MagicMock(data={}))
+        await entry.tasks[0]
+
+    assert "xbloom_brew_started" not in _fired(hass)
+    assert _failed(hass)[0]["reason"] == "needs_calibration"
+
+
+async def test_an_accepted_brew_says_it_started_once_the_machine_has_taken_it():
+    order = []
+
+    class _Slow(_FakeBle):
+        async def brew(self, recipe):
+            order.append("frames accepted")
+            await super().brew(recipe)
+
+    hass, entry = _make_hass(), _Entry()
+    hass.bus.async_fire.side_effect = lambda name, *a, **k: (
+        order.append(name) if name == "xbloom_brew_started" else None
+    )
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", _Slow):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        await handlers["start_brew"](MagicMock(data={}))
+        await entry.tasks[0]
+
+    assert order[:2] == ["frames accepted", "xbloom_brew_started"]
+    started = [c.args[1] for c in hass.bus.async_fire.call_args_list
+               if c.args and c.args[0] == "xbloom_brew_started"]
+    assert started[0]["recipe_name"] == "Test Recipe One"
