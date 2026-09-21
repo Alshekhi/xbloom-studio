@@ -329,6 +329,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     log_label,
                 )
                 return None, ""
+            # By id, not by the label on screen: two recipes can share a name,
+            # so the select offers the second as "<name> (2)" — which is no
+            # recipe's name — and matching the plain name would pick the first.
+            recipes = entry.runtime_data.coordinator.data or []
+            selected_id = select_state.attributes.get("id")
+            if selected_id is not None:
+                picked = next(
+                    (r for r in recipes if str(r.get("id")) == str(selected_id)), None
+                )
+                if picked is not None:
+                    return picked, picked.get("name", "")
             recipe_name = select_state.state
 
         recipes: list[dict] = entry.runtime_data.coordinator.data or []

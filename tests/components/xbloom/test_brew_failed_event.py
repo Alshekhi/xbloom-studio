@@ -183,3 +183,46 @@ async def test_an_accepted_brew_says_it_started_once_the_machine_has_taken_it():
     started = [c.args[1] for c in hass.bus.async_fire.call_args_list
                if c.args and c.args[0] == "xbloom_brew_started"]
     assert started[0]["recipe_name"] == "Test Recipe One"
+
+
+async def test_a_brew_follows_the_selected_recipes_id_not_its_label():
+    # The select offers the second of a shared name as "… (2)", which is no
+    # recipe's name. Resolving the selection by name would find nothing — and
+    # before the labels, it found the *first* recipe of that name instead.
+    hass, entry = _make_hass(), _Entry()
+    library = [
+        {"id": "11", "name": "Iced Recipe", "dose_g": 15, "pours": [], "cup_type": 3},
+        {"id": "13", "name": "Iced Recipe", "dose_g": 20, "pours": [], "cup_type": 3},
+    ]
+
+    def _state(entity_id):
+        state = MagicMock()
+        if entity_id == "select.xbloom_studio_recipe":
+            state.state = "Iced Recipe (2)"
+            state.attributes = {"id": "13", "name": "Iced Recipe"}
+        else:
+            state.state = "unknown"
+            state.attributes = {}
+        return state
+
+    brewed = {}
+
+    class _Recording(_FakeBle):
+        async def brew(self, recipe):
+            brewed.update(recipe)
+            await super().brew(recipe)
+
+    hass.states.get = _state
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", _Recording):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        entry.runtime_data.coordinator.data = library
+        await handlers["start_brew"](MagicMock(data={}))
+        await entry.tasks[0]
+
+    assert _failed(hass) == []
+    started = [c.args[1] for c in hass.bus.async_fire.call_args_list
+               if c.args and c.args[0] == "xbloom_brew_started"]
+    assert started and started[0]["recipe_name"] == "Iced Recipe"
+    assert brewed["dose_g"] == 20

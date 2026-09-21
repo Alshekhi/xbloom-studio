@@ -255,7 +255,8 @@ async def test_the_last_recipe_is_picked_again_after_a_restart() -> None:
 async def test_a_restored_recipe_is_the_same_one_even_when_names_repeat() -> None:
     entity = _recipe_select(list(_LIBRARY), {"id": "13", "name": "Iced Recipe"})
     await entity.async_added_to_hass()
-    assert entity.current_option == "Iced Recipe"
+    # The second of that name, and offered as such — the restore is by id.
+    assert entity.current_option == "Iced Recipe (2)"
     assert entity.extra_state_attributes["dose_g"] == 20
 
 
@@ -291,3 +292,38 @@ async def test_a_recipe_removed_by_a_refresh_is_let_go() -> None:
     entity.coordinator.data = [r for r in _LIBRARY if r["id"] != "12"]
     entity._handle_coordinator_update()
     assert entity.current_option is None
+
+
+# --------------------------------------------------------------------------- #
+# Two recipes can share a name, and a select speaks in names                  #
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_a_shared_name_is_offered_twice_distinguishably() -> None:
+    # Picking the second "Iced Recipe" selected the first, silently, because both
+    # options read the same and the first match won.
+    entity = _recipe_select(list(_LIBRARY))
+    assert entity.options == ["Iced Recipe", "Kenya Hot", "Iced Recipe (2)"]
+
+
+@pytest.mark.asyncio
+async def test_picking_the_second_of_a_shared_name_picks_the_second() -> None:
+    entity = _recipe_select(list(_LIBRARY))
+    await entity.async_select_option("Iced Recipe (2)")
+    assert entity._current_id == "13"
+    assert entity.current_option == "Iced Recipe (2)"
+    assert entity.extra_state_attributes["dose_g"] == 20
+
+
+@pytest.mark.asyncio
+async def test_a_plain_name_still_picks_the_first_of_that_name() -> None:
+    # What a script or an agent passes: the recipe's own name, no suffix.
+    entity = _recipe_select(list(_LIBRARY))
+    await entity.async_select_option("Iced Recipe")
+    assert entity._current_id == "11"
+
+
+@pytest.mark.asyncio
+async def test_a_unique_name_is_offered_unchanged() -> None:
+    entity = _recipe_select(list(_LIBRARY))
+    await entity.async_select_option("Kenya Hot")
+    assert (entity._current_id, entity.current_option) == ("12", "Kenya Hot")

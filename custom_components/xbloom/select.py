@@ -93,16 +93,36 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity, RestoreEntity):
                 return recipe
         return None
 
+    def _labels(self) -> list[tuple[str, dict]]:
+        """Each recipe with the label it is offered under.
+
+        A select speaks in names and two recipes can share one — `Iced Recipe`
+        bought twice is two recipes on purpose. The second and later of a
+        shared name carry a counter, or picking one of them silently picked
+        the first. The recipe's identity is still its id; this is only how it
+        is spoken about.
+        """
+        seen: dict[str, int] = {}
+        labels: list[tuple[str, dict]] = []
+        for recipe in self.coordinator.data or []:
+            name = recipe["name"]
+            seen[name] = seen.get(name, 0) + 1
+            labels.append((name if seen[name] == 1 else f"{name} ({seen[name]})", recipe))
+        return labels
+
     @property
     def options(self) -> list[str]:
-        """Return recipe names as select options."""
-        return [r["name"] for r in (self.coordinator.data or [])]
+        """Return the recipes as select options."""
+        return [label for label, _ in self._labels()]
 
     @property
     def current_option(self) -> str | None:
-        """Return the currently selected recipe name."""
-        recipe = self._selected()
-        return recipe["name"] if recipe else None
+        """Return the label the selected recipe is offered under."""
+        current = self._current_id
+        for label, recipe in self._labels():
+            if str(recipe.get("id")) == current:
+                return label
+        return None
 
     @property
     def extra_state_attributes(self) -> dict | None:
@@ -124,12 +144,18 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity, RestoreEntity):
     async def async_select_option(self, option: str) -> None:
         """Handle recipe selection from the HA UI or service call.
 
-        A select speaks in names, so a name two recipes share picks the first.
+        By label first, so the second of a shared name is reachable; then by
+        plain name, which is what a script or an agent passes.
         """
-        for recipe in self.coordinator.data or []:
-            if recipe["name"] == option:
+        for label, recipe in self._labels():
+            if label == option:
                 self._current_id = str(recipe.get("id"))
                 break
+        else:
+            for recipe in self.coordinator.data or []:
+                if recipe["name"] == option:
+                    self._current_id = str(recipe.get("id"))
+                    break
         self.async_write_ha_state()
 
     def _handle_coordinator_update(self) -> None:
