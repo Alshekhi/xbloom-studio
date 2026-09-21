@@ -188,6 +188,37 @@ class XBloomRuntimeData:
 type XBloomConfigEntry = ConfigEntry[XBloomRuntimeData]
 
 
+def _brew_settings(recipe: dict) -> dict:
+    """What this brew was made with, from the recipe as the machine got it.
+
+    The recipe it names can be edited or deleted afterwards, so a record that
+    keeps only a name and a dose cannot say what was in the cup. Everything
+    here is the instruction the machine was given, known before the first pour
+    — not a measurement of what happened.
+
+    A value the pours disagree on is left out rather than picked from the first
+    one: a brew with a 93 °C bloom and an 80 °C finish has no single
+    temperature, and inventing one is worse than an empty column.
+    """
+    pours = recipe.get("pours") or []
+    water = sum(float(p.get("volume_ml") or 0) for p in pours)
+    if recipe.get("bypass_water_enabled"):
+        water += float(recipe.get("bypass_volume_ml") or 0)
+    dose = recipe.get("dose_g")
+
+    def _shared(field: str) -> float | None:
+        values = {p.get(field) for p in pours if p.get(field) is not None}
+        return float(values.pop()) if len(values) == 1 else None
+
+    return {
+        "grind": recipe.get("grinder_size"),
+        "water_ml": round(water, 1) if water else None,
+        "ratio": round(water / float(dose), 2) if water and dose else None,
+        "temperature_c": _shared("temperature_c"),
+        "flow_rate": _shared("flow_rate"),
+    }
+
+
 def _resolve_ble_name(entry: ConfigEntry) -> str | None:
     """Pick a BLE advertiser name from entry data — explicit or derived."""
     name = entry.data.get(CONF_BLE_NAME)
@@ -611,6 +642,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     hass.bus.async_fire(
                         "xbloom_brew_timeout", {"recipe_name": recipe_name}
                     )
+                ended_at = datetime.now(timezone.utc).isoformat()
                 if outcome is not None and outcome != "stopped":
                     # The contract downstream builds on: announcements and
                     # inventory both key on this rather than on brew_done,
@@ -633,7 +665,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                             "cup_type": recipe.get("cup_type"),
                             "outcome": outcome,
                             "started_at": started_at,
-                            "ended_at": datetime.now(timezone.utc).isoformat(),
+                            "ended_at": ended_at,
+                            "duration_s": round(
+                                (
+                                    datetime.fromisoformat(ended_at)
+                                    - datetime.fromisoformat(started_at)
+                                ).total_seconds(),
+                                1,
+                            ),
+                            **_brew_settings(recipe),
                         },
                     )
             except (CommandRefused, CommandUnanswered) as err:
