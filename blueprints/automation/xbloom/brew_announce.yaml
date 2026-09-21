@@ -13,7 +13,9 @@ blueprint:
     — every step taken, including execute. That is the first moment the coffee
     is really coming: a machine that refuses, as it does until it is calibrated
     after a power cut, says nothing instead of announcing a brew that never
-    ran. The failure is announced by the fault blueprint. A brew started
+    ran. Nothing here speaks the refusal itself — this blueprint has no
+    trigger for a failed brew; `xbloom_brew_failed` carries the reason for
+    whoever started it. A brew started
     physically at the machine emits no such event, so it announces from
     "pouring" onward rather than at the start.
   domain: automation
