@@ -13,9 +13,9 @@ blueprint:
     — every step taken, including execute. That is the first moment the coffee
     is really coming: a machine that refuses, as it does until it is calibrated
     after a power cut, says nothing instead of announcing a brew that never
-    ran. Nothing here speaks the refusal itself — this blueprint has no
-    trigger for a failed brew; `xbloom_brew_failed` carries the reason for
-    whoever started it. A brew started
+    ran. The failure is announced instead, with its reason in your language —
+    "the machine is not ready after a power cut", "the tank needs water" — so
+    a brew that goes quiet is never a mystery. A brew started
     physically at the machine emits no such event, so it announces from
     "pouring" onward rather than at the start.
   domain: automation
@@ -117,9 +117,35 @@ variables:
   recipe_name: >-
     {%- if trigger.id == 'done_recipe' -%}
       {{ trigger.to_state.attributes.get('recipe_name', '') }}
-    {%- elif trigger.id == 'started' -%}
+    {%- elif trigger.id in ['started', 'failed'] -%}
       {{ trigger.event.data.get('recipe_name', '') }}
     {%- else -%}
+    {%- endif -%}
+  # Why a brew did not run, in one short phrase. The event carries a code and
+  # no prose, deliberately — the wording is the consumer's, in its own
+  # language. A code not listed here still announces, generically.
+  failure: >-
+    {%- set reasons = {
+      'machine_not_found': ('the machine could not be found', 'تعذر العثور على الماكينة'),
+      'bluetooth_error': ('the Bluetooth connection failed', 'فشل الاتصال عبر البلوتوث'),
+      'recipe_not_found': ('the recipe could not be found', 'تعذر العثور على الوصفة'),
+      'not_configured': ('no machine is set up', 'لا توجد ماكينة معدة'),
+      'machine_busy': ('the machine is busy', 'الماكينة مشغولة'),
+      'not_ready': ('the machine is not ready after a power cut — put it back on its standby screen',
+                    'الماكينة غير جاهزة بعد انقطاع الكهرباء، أعدها إلى شاشة الانتظار'),
+      'restore_incomplete': ('the machine has not finished recovering — put it back on its standby screen',
+                             'لم تكمل الماكينة استعادة حالتها، أعدها إلى شاشة الانتظار'),
+      'not_on_home_screen': ('the machine is not on its standby screen', 'الماكينة ليست على شاشة الانتظار'),
+      'no_water': ('the tank needs water', 'الخزان يحتاج ماء'),
+      'recipe_rejected': ('the machine did not accept the recipe', 'لم تقبل الماكينة الوصفة'),
+      'no_reply': ('the machine did not answer', 'لم ترد الماكينة'),
+      'no_beans': ('the grinder found no beans', 'لا توجد حبوب في المطحنة'),
+    } -%}
+    {%- set reason = trigger.event.data.get('reason', '') if trigger.id == 'failed' else '' -%}
+    {%- if reason in reasons -%}
+      {{ reasons[reason][1] if lang == 'ar' else reasons[reason][0] }}
+    {%- elif reason -%}
+      {%- if lang == 'ar' %}توقف التحضير{% else %}the brew stopped{% endif -%}
     {%- endif -%}
   # Everything the automation might say, resolved to one line. An empty result
   # means "this trigger should not announce" and the condition below drops it —
@@ -142,6 +168,12 @@ variables:
       {%- else -%}
         {%- if recipe_name %}Finished preparing {{ recipe_name }}{% else %}Your coffee is ready{% endif -%}
       {%- endif -%}
+    {%- elif trigger.id == 'failed' -%}
+      {%- if lang == 'ar' -%}
+        {%- if announce_recipe and recipe_name %}تعذر تحضير {{ recipe_name }}: {{ failure }}{% else %}تعذر تحضير قهوتك: {{ failure }}{% endif -%}
+      {%- else -%}
+        {%- if announce_recipe and recipe_name %}Could not brew {{ recipe_name }}: {{ failure }}{% else %}Could not brew your coffee: {{ failure }}{% endif -%}
+      {%- endif -%}
     {%- endif -%}
 
 trigger:
@@ -162,6 +194,12 @@ trigger:
   - platform: state
     entity_id: !input brew_event_entity
     id: done_recipe
+  # A brew that never ran: the machine refused a step, or Home Assistant could
+  # not reach it. Nothing else speaks this — the fault blueprint announces the
+  # machine's own fault frames, and a refusal produces none.
+  - platform: event
+    event_type: xbloom_brew_failed
+    id: failed
 
 condition:
   - condition: template
