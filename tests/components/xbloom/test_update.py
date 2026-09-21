@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -358,3 +358,30 @@ async def test_pause_live_session_swallows_stop_failure() -> None:
     listener.stop = AsyncMock(side_effect=RuntimeError("link already gone"))
     entity = _make_entity(listener=listener)
     await entity._pause_live_session()  # must not raise
+
+
+# --------------------------------------------------------------------------- #
+# The first cloud check                                                       #
+# --------------------------------------------------------------------------- #
+async def _add(entity) -> None:
+    entity.async_get_last_state = AsyncMock(return_value=None)
+    with patch("custom_components.xbloom.update.async_dispatcher_connect",
+               MagicMock(return_value=lambda: None)):
+        await entity.async_added_to_hass()
+
+
+@pytest.mark.asyncio
+async def test_the_latest_version_is_asked_for_at_startup() -> None:
+    # It was asked for on the 6-hour poll and on a login transition, neither of
+    # which happens at startup — so the entity read `unavailable` for up to six
+    # hours after every restart, with no latest version to compare against.
+    entity = _make_entity(logged_in=True)
+    await _add(entity)
+    entity.async_schedule_update_ha_state.assert_called_once_with(force_refresh=True)
+
+
+@pytest.mark.asyncio
+async def test_no_cloud_call_at_startup_when_logged_out() -> None:
+    entity = _make_entity(logged_in=False)
+    await _add(entity)
+    entity.async_schedule_update_ha_state.assert_not_called()

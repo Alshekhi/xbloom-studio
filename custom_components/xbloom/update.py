@@ -148,6 +148,13 @@ class XBloomFirmwareUpdate(UpdateEntity, RestoreEntity):
             coordinator.async_add_listener(self._on_coordinator_update)
         )
 
+        # And ask once now. Polling is every six hours and the listener above
+        # only fires on a login *transition*, so an entity that starts up
+        # already logged in had no latest version to compare against — it read
+        # `unavailable` until the first poll, after every restart.
+        if coordinator.cloud_logged_in:
+            self.async_schedule_update_ha_state(force_refresh=True)
+
     def _on_coordinator_update(self) -> None:
         coordinator = self._entry.runtime_data.coordinator
         logged_in = coordinator.cloud_logged_in
