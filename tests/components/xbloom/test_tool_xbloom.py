@@ -355,7 +355,7 @@ async def test_the_tool_refuses_before_touching_the_machine():
 
 
 async def test_without_coffee_lab_there_is_only_the_machine():
-    entry = SimpleNamespace(runtime_data=SimpleNamespace(coffee_lab=None))
+    entry = SimpleNamespace(runtime_data=SimpleNamespace(coffee_lab=None, callbacks=None))
     api = llm_api.XBloomAPI(MagicMock(), entry)
     instance = await api.async_get_api_instance(MagicMock())
     assert [tool.name for tool in instance.tools] == ["xbloom"]

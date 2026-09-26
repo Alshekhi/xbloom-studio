@@ -33,13 +33,16 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import (
-    CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_BREWERS, CONF_COFFEE_LAB, CONF_PRODUCT_ID,
+    CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_BREWERS, CONF_CALLBACK_TARGETS, CONF_COFFEE_LAB,
+    CONF_PRODUCT_ID,
     DEFAULT_BREWERS, DOMAIN,
     SIGNAL_COFFEE_LAB_UPDATED,
 )
+from .callbacks import Callbacks, targets_from
 from .coffee_lab.lab import CoffeeLab
 from .coffee_lab.listener import async_count_completed_brews
 from .coffee_lab.store import UnknownBean
+from .tool_common import refuse
 from .coffee_lab.services import async_register_lab_services
 from .coordinator import XBloomCoordinator
 from . import llm_api
@@ -213,6 +216,8 @@ class XBloomRuntimeData:
     live_session_listener: object = None
     # Set only while Coffee Lab is switched on for this entry.
     coffee_lab: CoffeeLab | None = None
+    # Set only while callback targets are configured.
+    callbacks: Callbacks | None = None
 
 
 type XBloomConfigEntry = ConfigEntry[XBloomRuntimeData]
@@ -517,6 +522,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         meta: dict = {"run_id": uuid.uuid4().hex}
         if call.data.get("context") is not None:
             meta["context"] = call.data["context"]
+
+        # A callback is checked and armed before anything can fire, so a brew
+        # refused at once still reaches its caller.
+        if target := call.data.get("notify_target"):
+            callbacks = entry.runtime_data.callbacks
+            if callbacks is None:
+                raise refuse("callback_targets_none")
+            if target not in callbacks.targets:
+                raise refuse(
+                    "callback_target_unknown", target=target,
+                    targets=", ".join(sorted(callbacks.targets)),
+                )
+            callbacks.arm(
+                meta["run_id"], target, meta.get("context"),
+                bool(call.data.get("notify_progress")),
+            )
 
         # Coffee Lab: the bag is fixed now, as the brew starts. Choosing another
         # bag while it runs must not recharge this brew to it.
@@ -1382,6 +1403,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             vol.Optional("unattributed"): bool,
             # Anything; returned unchanged in every event of this brew.
             vol.Optional("context"): object,
+            # A configured callback target, told how this brew goes.
+            vol.Optional("notify_target"): str,
+            vol.Optional("notify_progress"): bool,
         }),
     )
     hass.services.async_register(DOMAIN, "stop_brew", handle_stop_brew)
@@ -1672,6 +1696,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
     _LOGGER.debug("xbloom: loading platforms %s", PLATFORMS)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # After the platforms: callbacks follow the brew's entities by id.
+    if targets := targets_from(entry.data.get(CONF_CALLBACK_TARGETS, {})):
+        callbacks = Callbacks(hass, targets)
+        entry.runtime_data.callbacks = callbacks
+        entry.async_on_unload(callbacks.async_listen())
+        entry.async_create_background_task(hass, callbacks.async_run(), "xbloom callbacks")
     return True
 
 

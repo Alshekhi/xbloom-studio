@@ -35,6 +35,10 @@ CONF_COFFEE_LAB = "coffee_lab"
 CONF_BREWERS = "coffee_lab_brewers"
 DEFAULT_BREWERS = ("V60", "Chemex", "AeroPress", "Kalita Wave", "Clever")
 
+# Where brew callbacks may be sent, by name: {name: {"url", "secret"}}. A caller
+# names one; it never gives a URL. entry.data.
+CONF_CALLBACK_TARGETS = "callback_targets"
+
 # Sent when anything Coffee Lab shows has changed; its entities re-read.
 SIGNAL_COFFEE_LAB_UPDATED = f"{DOMAIN}_coffee_lab_updated"
 

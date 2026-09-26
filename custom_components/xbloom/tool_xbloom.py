@@ -445,8 +445,13 @@ async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
         data["recipe_name"] = await _resolve_recipe_name(machine, args["name"])
     if args.get("use_preground") is not None:
         data["use_preground"] = args["use_preground"]
-    if args.get("context") is not None:
-        data["context"] = args["context"]
+    # notify_context is the name callers already use for the same thing.
+    context = args.get("context") if args.get("context") is not None else args.get("notify_context")
+    if context is not None:
+        data["context"] = context
+    if args.get("notify_target"):
+        data["notify_target"] = args["notify_target"]
+        data["notify_progress"] = bool(args.get("notify_progress"))
     overrides = {k: args[k] for k in ("dose", "ratio", "grind_size") if args.get(k) is not None}
     data.update(overrides)
     bag = None
@@ -786,10 +791,17 @@ BAG_RULE = (
 )
 
 
-def describe(lab_on: bool = False) -> str:
+def describe(lab_on: bool = False, targets: tuple[str, ...] = ()) -> str:
     """The tool's description: every action, with what it needs."""
     text = _describe(INTRO, ACTIONS)
-    return f"{text}\n{BAG_RULE}" if lab_on else text
+    if lab_on:
+        text = f"{text}\n{BAG_RULE}"
+    if targets:
+        text = (
+            f"{text}\nCallback targets for start_brew's notify_target: {', '.join(targets)}. "
+            "With one, do not poll brew_status; the ending will arrive."
+        )
+    return text
 
 
 def check_arguments(action: str, args: dict[str, Any]) -> None:
@@ -858,6 +870,17 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
         vol.Schema({}, extra=vol.ALLOW_EXTRA),
         "For start_brew: any object, returned unchanged in every event of this brew.",
     ),
+    "notify_target": (
+        str,
+        "For start_brew: a callback target's name, told this brew's faults and "
+        "exactly one ending. A name, never a URL.",
+    ),
+    "notify_context": (
+        vol.Schema({}, extra=vol.ALLOW_EXTRA),
+        "For start_brew, with notify_target: any object, returned unchanged in "
+        "every callback so the receiver knows where the news belongs.",
+    ),
+    "notify_progress": (bool, "For start_brew, with notify_target: also send grinding and each pour."),
     "pour_count": (
         vol.All(vol.Coerce(int), vol.Range(
             min=int(spec.field("pour_count").min), max=int(spec.field("pour_count").max),

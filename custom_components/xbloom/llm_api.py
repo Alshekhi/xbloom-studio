@@ -33,9 +33,9 @@ class XBloomTool(llm.Tool):
 
     name = "xbloom"
 
-    def __init__(self, lab: CoffeeLab | None = None) -> None:
+    def __init__(self, lab: CoffeeLab | None = None, targets: tuple[str, ...] = ()) -> None:
         self._lab = lab
-        self.description = tool_xbloom.describe(lab_on=lab is not None)
+        self.description = tool_xbloom.describe(lab_on=lab is not None, targets=targets)
         self.parameters = tool_xbloom.parameters(lab_on=lab is not None)
 
     async def async_call(
@@ -78,7 +78,9 @@ class XBloomAPI(llm.API):
 
     async def async_get_api_instance(self, llm_context: llm.LLMContext) -> llm.APIInstance:
         lab: CoffeeLab | None = self._entry.runtime_data.coffee_lab
-        tools: list[llm.Tool] = [XBloomTool(lab)]
+        callbacks = self._entry.runtime_data.callbacks
+        targets = tuple(sorted(callbacks.targets)) if callbacks is not None else ()
+        tools: list[llm.Tool] = [XBloomTool(lab, targets)]
         if lab is not None:
             beans = await lab.store.async_list_beans()
             tools.append(CoffeeLabTool(lab, tool_coffee_lab.describe(beans)))

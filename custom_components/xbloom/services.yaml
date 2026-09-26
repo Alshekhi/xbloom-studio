@@ -55,6 +55,14 @@ start_brew:
       required: false
       selector:
         object:
+    notify_target:
+      required: false
+      selector:
+        text:
+    notify_progress:
+      required: false
+      selector:
+        boolean:
 
 stop_brew:
 brew_standalone:

@@ -232,6 +232,22 @@ still follows it to `done`, as long as Home Assistant is holding the Bluetooth
 link at the time. Key on the sensor when you want every brew, and on the events
 when you want the ones Home Assistant started and everything they carry.
 
+#### Callbacks
+
+A service outside Home Assistant can be told how a brew it started went,
+without watching the event stream. Add a callback target in **Settings →
+Devices & services → xBloom Studio → Configure → Add a callback target**: a
+name, the URL to post to, and a [Standard Webhooks](https://www.standardwebhooks.com)
+secret (`whsec_…`). Then start the brew with `notify_target` set to that name.
+
+The target receives that brew's faults and exactly one ending — `completed`,
+`failed`, `stopped` or `timeout` — and, with `notify_progress`, grinding and
+each pour. Each is a signed POST, retried if the receiver is briefly away, of
+the form `{"type": "xbloom.brew.<event>", "timestamp", "data": {"event",
+"final", "run_id", "recipe", …}, "context"}`, where `data` holds the same facts
+as the event and `context` is what `start_brew` was given. A caller names a
+target; it can never supply a URL.
+
 ### Write your own
 
 The blueprints cover the common jobs. Write your own if you want different

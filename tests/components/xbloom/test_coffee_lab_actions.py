@@ -176,7 +176,7 @@ async def test_the_tool_marks_what_it_records_as_its_own():
 
 async def test_with_coffee_lab_on_there_are_two_tools_and_the_bag_rule():
     lab = await _lab()
-    entry = SimpleNamespace(runtime_data=SimpleNamespace(coffee_lab=lab))
+    entry = SimpleNamespace(runtime_data=SimpleNamespace(coffee_lab=lab, callbacks=None))
     instance = await llm_api.XBloomAPI(MagicMock(), entry).async_get_api_instance(MagicMock())
     assert [t.name for t in instance.tools] == ["xbloom", "coffee_lab"]
     assert "bean" in instance.tools[0].description

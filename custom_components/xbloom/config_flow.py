@@ -25,6 +25,7 @@ from homeassistant.components.bluetooth import (
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
+from .callbacks import target_problem
 from .coffee_lab import actions as coffee_lab_actions
 from .coffee_lab.entities import bag_labels
 from .coffee_lab.models import STATUSES
@@ -33,6 +34,7 @@ from .const import (
     CONF_BLE_NAME,
     CONF_CLOUD,
     CONF_BREWERS,
+    CONF_CALLBACK_TARGETS,
     CONF_COFFEE_LAB,
     CONF_ENABLE_FLASHING,
     CONF_CLOUD_EMAIL,
@@ -318,6 +320,10 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             if self.config_entry.runtime_data.coffee_lab is not None
             else []
         )
+        callback_options = ["add_callback_target"] + (
+            ["remove_callback_target"]
+            if self.config_entry.data.get(CONF_CALLBACK_TARGETS) else []
+        )
         return self.async_show_menu(
             step_id="init",
             menu_options=[
@@ -329,6 +335,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                 cloud_option,
                 "connection",
                 "coffee_lab",
+                *callback_options,
                 "firmware_flashing",
                 "done",
             ],
@@ -506,6 +513,57 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             data_schema=self._bag_schema(user_input or current, list(STATUSES)),
             errors=errors,
             description_placeholders={"name": bean.name},
+        )
+
+    # ------------------------------------------------------------------ #
+    # Callback targets                                                   #
+    # ------------------------------------------------------------------ #
+    def _save_targets(self, targets: dict[str, Any], marker: dict[str, Any]) -> FlowResult:
+        entry = self.config_entry
+        self.hass.config_entries.async_update_entry(
+            entry, data={**entry.data, CONF_CALLBACK_TARGETS: targets}
+        )
+        # Reload so the callbacks, and the tool's list of targets, follow.
+        self.hass.async_create_task(self.hass.config_entries.async_reload(entry.entry_id))
+        return self.async_create_entry(title="", data=marker)
+
+    async def async_step_add_callback_target(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """A receiver for brew callbacks: a name callers use, its URL, its secret."""
+        targets = dict(self.config_entry.data.get(CONF_CALLBACK_TARGETS, {}))
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            name = user_input["name"].strip().lower()
+            url, secret = user_input["url"].strip(), user_input["secret"].strip()
+            errors = target_problem(name, url, secret)
+            if not errors:
+                targets[name] = {"url": url, "secret": secret}
+                return self._save_targets(targets, {"_callback_added": name})
+        return self.async_show_form(
+            step_id="add_callback_target",
+            data_schema=vol.Schema({
+                vol.Required("name"): selector.TextSelector(),
+                vol.Required("url"): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.URL)
+                ),
+                vol.Required("secret"): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                ),
+            }),
+            errors=errors,
+        )
+
+    async def async_step_remove_callback_target(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        targets = dict(self.config_entry.data.get(CONF_CALLBACK_TARGETS, {}))
+        if user_input is not None:
+            targets.pop(user_input["name"], None)
+            return self._save_targets(targets, {"_callback_removed": user_input["name"]})
+        return self.async_show_form(
+            step_id="remove_callback_target",
+            data_schema=vol.Schema({vol.Required("name"): vol.In(sorted(targets))}),
         )
 
     async def async_step_firmware_flashing(

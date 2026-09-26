@@ -50,6 +50,8 @@
           "cloud_logout": "Sign out of xBloom cloud",
           "connection": "Connection (live-session timeout)",
           "coffee_lab": "Coffee Lab",
+          "add_callback_target": "Add a callback target",
+          "remove_callback_target": "Remove a callback target",
           "firmware_flashing": "Firmware flashing (advanced)",
           "done": "Done"
         }
@@ -345,6 +347,24 @@
         "data_description": {
           "remaining_g": "Weighed. Leave blank to record brews without counting the bag down."
         }
+      },
+      "add_callback_target": {
+        "title": "Add a callback target",
+        "data": {
+          "name": "Name",
+          "url": "URL",
+          "secret": "Secret"
+        },
+        "data_description": {
+          "name": "Lowercase letters, digits and _.",
+          "secret": "A Standard Webhooks secret, starting whsec_."
+        }
+      },
+      "remove_callback_target": {
+        "title": "Remove a callback target",
+        "data": {
+          "name": "Target"
+        }
       }
     },
     "error": {
@@ -367,7 +387,10 @@
       "dose_out_of_range_for_cup": "That dose is outside the cup's range. The Omni dripper takes 5–18 g, Other takes 5–25 g, xPod is fixed at 15 g, and Tea takes 1–5 g.",
       "volume_out_of_range": "Each pour volume must be between 0 and 240 ml.",
       "credentials_required": "Enter both your email and password.",
-      "cloud_login_failed": "Sign-in failed. Check your xBloom email and password, then try again."
+      "cloud_login_failed": "Sign-in failed. Check your xBloom email and password, then try again.",
+      "callback_name_invalid": "Use lowercase letters, digits and _.",
+      "callback_url_invalid": "Enter an http or https URL.",
+      "callback_secret_invalid": "Enter a Standard Webhooks secret: whsec_ followed by at least 24 bytes in base64."
     },
     "abort": {
       "no_recipes": "No recipes saved yet.",
@@ -613,6 +636,12 @@
     },
     "manual_dose_required": {
       "message": "Set the dose first."
+    },
+    "callback_targets_none": {
+      "message": "No callback targets are set up."
+    },
+    "callback_target_unknown": {
+      "message": "There is no callback target called {target}. Set up: {targets}."
     }
   },
   "services": {
@@ -815,6 +844,14 @@
         "context": {
           "name": "Context",
           "description": "Any value, returned unchanged in every event of this brew."
+        },
+        "notify_target": {
+          "name": "Callback target",
+          "description": "A configured target told how this brew goes."
+        },
+        "notify_progress": {
+          "name": "Send progress",
+          "description": "Also send grinding and each pour to the callback target."
         }
       }
     },

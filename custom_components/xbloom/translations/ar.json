@@ -50,6 +50,8 @@
           "cloud_logout": "تسجيل الخروج من سحابة xBloom",
           "connection": "الاتصال (مهلة الجلسة المباشرة)",
           "coffee_lab": "مختبر القهوة",
+          "add_callback_target": "إضافة وجهة إشعار",
+          "remove_callback_target": "حذف وجهة إشعار",
           "firmware_flashing": "تحديث البرنامج الثابت (متقدّم)",
           "done": "تم"
         }
@@ -345,6 +347,24 @@
         "data_description": {
           "remaining_g": "بعد الوزن. اتركه فارغا لتسجيل التحضيرات دون خصمها من الكيس."
         }
+      },
+      "add_callback_target": {
+        "title": "إضافة وجهة إشعار",
+        "data": {
+          "name": "الاسم",
+          "url": "الرابط",
+          "secret": "المفتاح السري"
+        },
+        "data_description": {
+          "name": "أحرف لاتينية صغيرة وأرقام و_.",
+          "secret": "مفتاح Standard Webhooks يبدأ بـ whsec_."
+        }
+      },
+      "remove_callback_target": {
+        "title": "حذف وجهة إشعار",
+        "data": {
+          "name": "الوجهة"
+        }
       }
     },
     "error": {
@@ -367,7 +387,10 @@
       "dose_out_of_range_for_cup": "الجرعة خارج نطاق القمع. Omni dripper يقبل 5–18 g، وOther يقبل 5–25 g، وxPod مثبّت على 15 g، وTea يقبل 1–5 g.",
       "volume_out_of_range": "يجب أن يكون حجم كل صبّة بين 0 و240 ml.",
       "credentials_required": "أدخل بريدك الإلكتروني وكلمة المرور معاً.",
-      "cloud_login_failed": "تعذّر تسجيل الدخول. تحقّق من بريدك الإلكتروني وكلمة المرور، ثم حاول من جديد."
+      "cloud_login_failed": "تعذّر تسجيل الدخول. تحقّق من بريدك الإلكتروني وكلمة المرور، ثم حاول من جديد.",
+      "callback_name_invalid": "استخدم أحرفا لاتينية صغيرة وأرقاما و_.",
+      "callback_url_invalid": "أدخل رابطا يبدأ بـ http أو https.",
+      "callback_secret_invalid": "أدخل مفتاح Standard Webhooks: whsec_ متبوعا بـ 24 بايت على الأقل بترميز base64."
     },
     "abort": {
       "no_recipes": "لا توجد وصفات محفوظة بعد.",
@@ -613,6 +636,12 @@
     },
     "manual_dose_required": {
       "message": "حدد الجرعة أولا."
+    },
+    "callback_targets_none": {
+      "message": "لا توجد وجهات إشعار مهيأة."
+    },
+    "callback_target_unknown": {
+      "message": "لا توجد وجهة إشعار باسم {target}. المهيأة: {targets}."
     }
   },
   "services": {
@@ -815,6 +844,14 @@
         "context": {
           "name": "السياق",
           "description": "أي قيمة، تعاد كما هي في كل حدث لهذا التحضير."
+        },
+        "notify_target": {
+          "name": "وجهة الإشعار",
+          "description": "وجهة مهيأة تبلغ بسير هذا التحضير."
+        },
+        "notify_progress": {
+          "name": "إرسال التقدم",
+          "description": "أرسل أيضا الطحن وكل صبة إلى وجهة الإشعار."
         }
       }
     },
