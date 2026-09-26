@@ -29,6 +29,12 @@ CONF_ENABLE_FLASHING = "enable_firmware_flashing"  # entry.data flag
 # an install that only wants the machine sees none of it. entry.data flag.
 CONF_COFFEE_LAB = "coffee_lab"
 
+# The brewers offered when recording a brew made without the machine; the
+# person edits the list. Seeded with brand names only, which read the same in
+# any language. entry.data.
+CONF_BREWERS = "coffee_lab_brewers"
+DEFAULT_BREWERS = ("V60", "Chemex", "AeroPress", "Kalita Wave", "Clever")
+
 # Sent when anything Coffee Lab shows has changed; its entities re-read.
 SIGNAL_COFFEE_LAB_UPDATED = f"{DOMAIN}_coffee_lab_updated"
 

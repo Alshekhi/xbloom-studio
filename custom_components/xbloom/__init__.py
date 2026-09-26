@@ -33,7 +33,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import (
-    CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_COFFEE_LAB, CONF_PRODUCT_ID, DOMAIN,
+    CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_BREWERS, CONF_COFFEE_LAB, CONF_PRODUCT_ID,
+    DEFAULT_BREWERS, DOMAIN,
     SIGNAL_COFFEE_LAB_UPDATED,
 )
 from .coffee_lab.lab import CoffeeLab
@@ -308,7 +309,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         ble_device_resolver=_ble_device_for_listener,
     )
     if entry.data.get(CONF_COFFEE_LAB):
-        lab = await CoffeeLab.async_create(hass)
+        lab = await CoffeeLab.async_create(
+            hass, tuple(entry.data.get(CONF_BREWERS, DEFAULT_BREWERS))
+        )
         lab.on_change = lambda: async_dispatcher_send(hass, SIGNAL_COFFEE_LAB_UPDATED)
         entry.runtime_data.coffee_lab = lab
         entry.async_on_unload(async_count_completed_brews(hass, lab))

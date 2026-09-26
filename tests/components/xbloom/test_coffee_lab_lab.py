@@ -9,7 +9,7 @@ from xbloom import spec
 
 from custom_components.xbloom.coffee_lab.lab import CoffeeLab
 from custom_components.xbloom.coffee_lab.store import LocalStore, ProcessedRuns, UnknownBean
-from custom_components.xbloom.const import CONF_COFFEE_LAB
+from custom_components.xbloom.const import CONF_BREWERS, CONF_COFFEE_LAB
 
 from .test_coffee_lab_store import FakeStorage
 
@@ -177,7 +177,10 @@ async def test_the_switch_is_in_the_options_menu_and_off_by_default():
     form = await flow.async_step_coffee_lab()
     assert form["step_id"] == "coffee_lab"
 
-    await flow.async_step_coffee_lab({"enable": True})
+    await flow.async_step_coffee_lab(
+        {"enable": True, "brewers": ["V60", " ", "Hario Switch", "V60 "]}
+    )
+    # Blank and repeated brewers dropped, the order kept.
     flow.hass.config_entries.async_update_entry.assert_called_once_with(
-        entry, data={CONF_COFFEE_LAB: True}
+        entry, data={CONF_COFFEE_LAB: True, CONF_BREWERS: ["V60", "Hario Switch"]}
     )

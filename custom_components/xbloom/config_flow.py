@@ -32,6 +32,7 @@ from .const import (
     CONF_BLE_ADDRESS,
     CONF_BLE_NAME,
     CONF_CLOUD,
+    CONF_BREWERS,
     CONF_COFFEE_LAB,
     CONF_ENABLE_FLASHING,
     CONF_CLOUD_EMAIL,
@@ -41,6 +42,7 @@ from .const import (
     CONF_CLOUD_TOKEN,
     CONF_IDLE_TIMEOUT,
     CONF_PRODUCT_ID,
+    DEFAULT_BREWERS,
     DOMAIN,
 )
 from xbloom.mode_listener import IDLE_TIMEOUT_SEC
@@ -381,10 +383,15 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         """
         entry = self.config_entry
         current = bool(entry.data.get(CONF_COFFEE_LAB))
+        brewers = list(entry.data.get(CONF_BREWERS, DEFAULT_BREWERS))
         if user_input is not None:
             enabled = bool(user_input.get("enable"))
+            # Blank lines and repeats dropped, the order kept.
+            chosen = list(dict.fromkeys(
+                b.strip() for b in user_input.get("brewers", brewers) if b.strip()
+            ))
             self.hass.config_entries.async_update_entry(
-                entry, data={**entry.data, CONF_COFFEE_LAB: enabled}
+                entry, data={**entry.data, CONF_COFFEE_LAB: enabled, CONF_BREWERS: chosen}
             )
             # Reload so the entities and the tool follow the switch.
             self.hass.async_create_task(
@@ -396,6 +403,9 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             step_id="coffee_lab",
             data_schema=vol.Schema({
                 vol.Required("enable", default=current): selector.BooleanSelector(),
+                vol.Optional("brewers", default=brewers): selector.TextSelector(
+                    selector.TextSelectorConfig(multiple=True)
+                ),
             }),
         )
 

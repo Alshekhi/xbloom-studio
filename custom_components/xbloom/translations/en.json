@@ -299,7 +299,11 @@
         "title": "Coffee Lab",
         "description": "Track bags of coffee and what each brew uses.",
         "data": {
-          "enable": "Track coffee bags"
+          "enable": "Track coffee bags",
+          "brewers": "Brewers"
+        },
+        "data_description": {
+          "brewers": "Offered when recording a brew made without the xBloom."
         }
       },
       "add_bag": {
@@ -431,6 +435,12 @@
           "this_month": "This month",
           "last_month": "Last month",
           "this_year": "This year"
+        }
+      },
+      "coffee_lab_manual_brewer": {
+        "name": "Manual brewer",
+        "state": {
+          "other": "Other"
         }
       }
     },

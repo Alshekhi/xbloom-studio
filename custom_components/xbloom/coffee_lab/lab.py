@@ -77,8 +77,11 @@ class CoffeeLab:
     def __init__(
         self, store: CoffeeLabStore, runs: ProcessedRuns, state: Storage,
         on_change: Callable[[], None] = lambda: None,
+        brewers: tuple[str, ...] = (),
     ) -> None:
         self.store = store
+        # What the manual-brew picker offers besides `other`.
+        self.brewers = brewers
         self._runs = runs
         self._state_storage = state
         self._state: dict[str, Any] = {}
@@ -90,11 +93,12 @@ class CoffeeLab:
         self._counting = asyncio.Lock()
 
     @classmethod
-    async def async_create(cls, hass: HomeAssistant) -> CoffeeLab:
+    async def async_create(cls, hass: HomeAssistant, brewers: tuple[str, ...] = ()) -> CoffeeLab:
         lab = cls(
             await async_local_store(hass),
             await async_processed_runs(hass),
             Store(hass, STORAGE_VERSION, STATE_KEY),
+            brewers=brewers,
         )
         await lab.async_load_state()
         return lab

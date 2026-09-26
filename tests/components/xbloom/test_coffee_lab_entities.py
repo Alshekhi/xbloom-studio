@@ -9,9 +9,11 @@ from pathlib import Path
 import pytest
 
 from custom_components.xbloom.coffee_lab.entities import (
-    COUNT_RESULTS, ActiveBagSelect, LastCountSensor, RemainingSensor, StatsPeriodSelect,
+    COUNT_RESULTS, ActiveBagSelect, LastCountSensor, ManualBrewerSelect, RemainingSensor,
+    StatsPeriodSelect,
     bag_labels, entities_for,
 )
+from custom_components.xbloom.coffee_lab import actions
 from custom_components.xbloom.coffee_lab.models import Bean
 from custom_components.xbloom.coffee_lab.stats import PERIODS
 
@@ -78,3 +80,28 @@ async def test_every_entity_and_state_is_translated(path):
             assert entry["name"]
     assert set(table["select"]["coffee_lab_stats_period"]["state"]) == set(PERIODS)
     assert set(table["sensor"]["coffee_lab_last_count"]["state"]) == set(COUNT_RESULTS)
+    assert set(table["select"]["coffee_lab_manual_brewer"]["state"]) == {"other"}
+
+
+async def test_the_brewer_picker_offers_the_configured_brewers_and_other():
+    lab = await _lab()
+    lab.brewers = ("V60", "Hario Switch")
+    select = ManualBrewerSelect(lab)
+    assert select._attr_options == ["V60", "Hario Switch", "other"]
+    await select.async_select_option("Hario Switch")
+    await select.async_read()
+    assert select._attr_current_option == "Hario Switch"
+
+
+async def test_a_brew_made_with_other_is_counted_as_other():
+    lab = await _lab()
+    bag = await _bag(lab)
+    await lab.async_select(bag.id)
+    await lab.async_set_manual_dose(15.0)
+    await lab.async_set_manual_brewer("other")
+    await actions.record_manual_brew(lab, {})
+    [brew] = await lab.store.async_list_brews()
+    assert brew.brewer is None
+    report = await lab.async_stats("today")
+    assert dict(report.now.by_brewer) == {"other": 1}
+

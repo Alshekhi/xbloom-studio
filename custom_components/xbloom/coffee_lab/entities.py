@@ -22,7 +22,7 @@ from ..const import DOMAIN, SIGNAL_COFFEE_LAB_UPDATED
 from . import actions
 from .lab import CoffeeLab
 from .models import Bean
-from .stats import PERIODS
+from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
 
 # The results a count can have, as the last-count sensor's states.
 COUNT_RESULTS = ["counted", "recorded", "skipped", "flagged"]
@@ -203,6 +203,24 @@ class ManualDoseNumber(CoffeeLabEntity, NumberEntity):
         await self.lab.async_set_manual_dose(value)
 
 
+class ManualBrewerSelect(CoffeeLabEntity, SelectEntity):
+    """What made a brew recorded without the xBloom: the person's own brewers,
+    as set in Configure, and `other`."""
+
+    _attr_icon = "mdi:coffee-maker-outline"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "manual_brewer")
+        self._attr_options = [*lab.brewers, OTHER_BREWER]
+
+    async def async_read(self) -> None:
+        brewer = self.lab.manual_brewer
+        self._attr_current_option = brewer if brewer in self._attr_options else None
+
+    async def async_select_option(self, option: str) -> None:
+        await self.lab.async_set_manual_brewer(option)
+
+
 class RecordManualBrewButton(CoffeeLabEntity, ButtonEntity):
     """Record the manual dose and brewer against the active bag."""
 
@@ -221,7 +239,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
     if lab is None:
         return []
     makers: dict[str, list[Callable[[CoffeeLab], Entity]]] = {
-        "select": [ActiveBagSelect, StatsPeriodSelect],
+        "select": [ActiveBagSelect, StatsPeriodSelect, ManualBrewerSelect],
         "sensor": [RemainingSensor, BagsSensor, StatsSensor, LastCountSensor],
         "number": [ManualDoseNumber],
         "button": [RecordManualBrewButton],

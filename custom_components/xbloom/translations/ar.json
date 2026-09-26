@@ -299,7 +299,11 @@
         "title": "مختبر القهوة",
         "description": "تتبع أكياس القهوة وما يستهلكه كل تحضير.",
         "data": {
-          "enable": "تتبع أكياس القهوة"
+          "enable": "تتبع أكياس القهوة",
+          "brewers": "أدوات التحضير"
+        },
+        "data_description": {
+          "brewers": "تعرض عند تسجيل تحضير دون ماكينة xBloom."
         }
       },
       "add_bag": {
@@ -431,6 +435,12 @@
           "this_month": "هذا الشهر",
           "last_month": "الشهر الماضي",
           "this_year": "هذا العام"
+        }
+      },
+      "coffee_lab_manual_brewer": {
+        "name": "أداة التحضير اليدوي",
+        "state": {
+          "other": "أخرى"
         }
       }
     },

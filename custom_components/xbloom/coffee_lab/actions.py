@@ -20,7 +20,7 @@ from homeassistant.util import dt as dt_util
 from ..tool_common import refuse
 from .lab import CoffeeLab, Consumption
 from .models import Bean, Brew
-from .stats import PERIODS, Totals
+from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER, Totals
 from .store import UnknownBean
 
 DEFAULT_BREW_HISTORY = 10
@@ -220,6 +220,8 @@ async def record_manual_brew(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, 
         raise refuse("bag_required")
     result = await lab.async_consume(
         bean_id=bean.id, grams=lab.manual_dose_g, run_id=f"manual-{uuid.uuid4().hex}",
-        brewer=lab.manual_brewer, recipe_source="dashboard",
+        # `other` is recorded as no brewer, which the stats count as other.
+        brewer=lab.manual_brewer if lab.manual_brewer != OTHER_BREWER else None,
+        recipe_source="dashboard",
     )
     return _consumption_facts(result, bean)
