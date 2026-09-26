@@ -30,8 +30,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
+from .const import (
+    CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_COFFEE_LAB, CONF_PRODUCT_ID, DOMAIN,
+    SIGNAL_COFFEE_LAB_UPDATED,
+)
+from .coffee_lab.lab import CoffeeLab
 from .coordinator import XBloomCoordinator
 from . import llm_api
 from xbloom.client import XBloomClient
@@ -184,6 +189,8 @@ class XBloomRuntimeData:
     # Long-lived live-session listener — created by switch.py during platform
     # setup. Kept here so it's stoppable from async_unload_entry.
     live_session_listener: object = None
+    # Set only while Coffee Lab is switched on for this entry.
+    coffee_lab: CoffeeLab | None = None
 
 
 type XBloomConfigEntry = ConfigEntry[XBloomRuntimeData]
@@ -297,6 +304,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         cloud=cloud,
         ble_device_resolver=_ble_device_for_listener,
     )
+    if entry.data.get(CONF_COFFEE_LAB):
+        lab = await CoffeeLab.async_create(hass)
+        lab.on_change = lambda: async_dispatcher_send(hass, SIGNAL_COFFEE_LAB_UPDATED)
+        entry.runtime_data.coffee_lab = lab
 
     # ------------------------------------------------------------------ #
     # Shared BLE-event dispatcher (piggyback refresh)                     #

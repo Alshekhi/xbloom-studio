@@ -47,6 +47,7 @@
           "cloud_login": "Sign in to xBloom cloud",
           "cloud_logout": "Sign out of xBloom cloud",
           "connection": "Connection (live-session timeout)",
+          "coffee_lab": "Coffee Lab",
           "firmware_flashing": "Firmware flashing (advanced)",
           "done": "Done"
         }
@@ -290,6 +291,13 @@
           "enable_bypass_water": "Add bypass water",
           "bypass_volume_ml": "Bypass water volume (ml)",
           "bypass_temp_c": "Bypass water temperature (°C)"
+        }
+      },
+      "coffee_lab": {
+        "title": "Coffee Lab",
+        "description": "Track bags of coffee and what each brew uses.",
+        "data": {
+          "enable": "Track coffee bags"
         }
       }
     },

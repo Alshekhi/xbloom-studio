@@ -47,6 +47,7 @@
           "cloud_login": "تسجيل الدخول إلى سحابة xBloom",
           "cloud_logout": "تسجيل الخروج من سحابة xBloom",
           "connection": "الاتصال (مهلة الجلسة المباشرة)",
+          "coffee_lab": "مختبر القهوة",
           "firmware_flashing": "تحديث البرنامج الثابت (متقدّم)",
           "done": "تم"
         }
@@ -290,6 +291,13 @@
           "enable_bypass_water": "إضافة ماء التخفيف",
           "bypass_volume_ml": "حجم ماء التخفيف (ml)",
           "bypass_temp_c": "حرارة ماء التخفيف (°C)"
+        }
+      },
+      "coffee_lab": {
+        "title": "مختبر القهوة",
+        "description": "تتبع أكياس القهوة وما يستهلكه كل تحضير.",
+        "data": {
+          "enable": "تتبع أكياس القهوة"
         }
       }
     },

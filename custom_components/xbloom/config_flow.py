@@ -29,6 +29,7 @@ from .const import (
     CONF_BLE_ADDRESS,
     CONF_BLE_NAME,
     CONF_CLOUD,
+    CONF_COFFEE_LAB,
     CONF_ENABLE_FLASHING,
     CONF_CLOUD_EMAIL,
     CONF_CLOUD_MEMBER_ID,
@@ -314,6 +315,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                 "add_recipe",
                 cloud_option,
                 "connection",
+                "coffee_lab",
                 "firmware_flashing",
                 "done",
             ],
@@ -355,6 +357,34 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                         unit_of_measurement="s",
                     )
                 ),
+            }),
+        )
+
+    async def async_step_coffee_lab(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Switch Coffee Lab on or off; off by default.
+
+        Turning it off hides its tool and entities but keeps what was stored,
+        so turning it back on picks up where it was.
+        """
+        entry = self.config_entry
+        current = bool(entry.data.get(CONF_COFFEE_LAB))
+        if user_input is not None:
+            enabled = bool(user_input.get("enable"))
+            self.hass.config_entries.async_update_entry(
+                entry, data={**entry.data, CONF_COFFEE_LAB: enabled}
+            )
+            # Reload so the entities and the tool follow the switch.
+            self.hass.async_create_task(
+                self.hass.config_entries.async_reload(entry.entry_id)
+            )
+            return self.async_create_entry(title="", data={"_coffee_lab": enabled})
+
+        return self.async_show_form(
+            step_id="coffee_lab",
+            data_schema=vol.Schema({
+                vol.Required("enable", default=current): selector.BooleanSelector(),
             }),
         )
 

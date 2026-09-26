@@ -25,6 +25,13 @@ CONF_CLOUD_REMEMBER = "remember"    # whether the password is stored for auto-re
 # brick the machine. The Install button appears only once the user arms this.
 CONF_ENABLE_FLASHING = "enable_firmware_flashing"  # entry.data flag
 
+# Coffee Lab — bag inventory and brew records — is off unless switched on, so
+# an install that only wants the machine sees none of it. entry.data flag.
+CONF_COFFEE_LAB = "coffee_lab"
+
+# Sent when anything Coffee Lab shows has changed; its entities re-read.
+SIGNAL_COFFEE_LAB_UPDATED = f"{DOMAIN}_coffee_lab_updated"
+
 # How long a Connect (live) session may sit idle before HA auto-disconnects,
 # handing the machine back to the iOS app. There is no upstream value to mirror
 # (the app leans on the phone OS killing the link when it backgrounds; HA's link
