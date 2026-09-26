@@ -438,3 +438,22 @@ async def test_a_temperature_the_pours_disagree_on_is_not_invented():
             if c.args and c.args[0] == "xbloom_brew_completed"][0]
     assert done["temperature_c"] is None
     assert done["water_ml"] == 150
+
+
+@pytest.mark.parametrize("bypass", [1, 2])
+async def test_bypass_water_is_not_counted_since_none_is_sent(bypass):
+    # 2 is "off", and was read as on. Either way the brew sends no bypass.
+    hass, entry = _make_hass(), _Entry()
+    recipe = dict(_RECIPE, bypass_water_enabled=bypass, bypass_volume_ml=30)
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", _FakeBle):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        entry.runtime_data.coordinator.data = [recipe]
+        await handlers["start_brew"](MagicMock(data={}))
+        await entry.tasks[0]
+
+    done = [c.args[1] for c in hass.bus.async_fire.call_args_list
+            if c.args and c.args[0] == "xbloom_brew_completed"][0]
+    assert done["water_ml"] == 60
+
