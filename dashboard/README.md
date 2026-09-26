@@ -39,11 +39,16 @@ Coffee Bags** appears only when Coffee Lab is kept in Notion.
 
 - **Brew** — what is happening now, the bag in use, brewing a recipe, one-off
   adjustments, saving a new recipe, and manual brews.
-- **Stats** — brews and coffee over a chosen period, and brews per brewer.
-- **Bags** — every open or unopened bag, and choosing the one in use.
+- **Stats** — brews and coffee over a chosen period, brews per brewer, and
+  charts of the brew history: brews per day and per month, coffee used and
+  water brewed per week. The charts read statistics the integration keeps
+  from the brew record, so they cover every brew in it.
+- **Bags** — every open or unopened bag, choosing the one in use, and a link
+  to where bags are added and edited.
 - **xBloom** — connection and status, the grinder, brewer and scale modules,
-  the recipe library, settings, tools, announcements, updates, and a 24-hour
-  log of machine events.
+  the recipe library with its actions (archive, delete) and the archived
+  recipes, settings, tools, announcements, updates, and a 24-hour log of
+  machine events.
 
 Every view uses `max_columns: 2`: two-up on a wide screen, one column on a
 phone.
@@ -82,7 +87,7 @@ unavailable, so the card is hidden rather than shown broken.
   `hide_state: true`.
 - **Names come from the entities.** Tiles do not override them, so they are
   translated.
-- **Destructive actions ask first** — Stop brew, Delete selected recipe,
+- **Destructive actions ask first** — Stop brew, Run recipe action,
   Record manual brew.
 
 ## Editing it

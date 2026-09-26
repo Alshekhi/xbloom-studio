@@ -30,12 +30,16 @@ TEXT = {
         "show_advanced": "Show brew adjustments", "show_per_pour": "Show each pour",
         "show_manual": "Show manual brew",
         "confirm_stop": "Stop the brew in progress?", "confirm_record": "Record this manual brew?",
-        "confirm_delete": "Delete the selected recipe? This cannot be undone.",
-        "add_recipes": "Add or edit recipes",
+        "confirm_run": "Run the chosen action on the selected recipe?",
+        "add_recipes": "Add or edit recipes", "add_bags": "Add or edit bags",
+        "h_archive": "Archived recipes",
         "this_brew": "This brew", "coffee": "Coffee", "water": "Water", "ratio": "Ratio",
         "pour": "Pour", "temp": "Temp", "pick_recipe": "Pick a recipe to see its pours.",
         "coffee_used": "Coffee used", "water_brewed": "Water brewed",
         "previous": "Brews in the period before", "other": "Other",
+        "h_charts": "Brew history", "brews_daily": "Brews per day", "brews_monthly": "Brews per month",
+        "coffee_weekly": "Coffee used per week", "water_weekly": "Water brewed per week",
+        "xbloom_brews": "xBloom", "manual_brews": "Manual",
         "sep": ", ", "g": "g", "ml": "ml",
         "in_use": "in use", "unopened": "unopened", "open": "open", "g_left": "g left",
         "not_tracked": "not tracked", "no_bags": "No open or unopened bags.",
@@ -55,12 +59,16 @@ TEXT = {
         "show_advanced": "إظهار تعديلات التحضير", "show_per_pour": "إظهار كل صبة",
         "show_manual": "إظهار التحضير اليدوي",
         "confirm_stop": "إيقاف التحضير الجاري؟", "confirm_record": "تسجيل هذا التحضير اليدوي؟",
-        "confirm_delete": "حذف الوصفة المختارة؟ لا يمكن التراجع عن ذلك.",
-        "add_recipes": "إضافة الوصفات أو تعديلها",
+        "confirm_run": "تنفيذ الإجراء المختار على الوصفة المختارة؟",
+        "add_recipes": "إضافة الوصفات أو تعديلها", "add_bags": "إضافة الأكياس أو تعديلها",
+        "h_archive": "الوصفات المؤرشفة",
         "this_brew": "هذا التحضير", "coffee": "القهوة", "water": "الماء", "ratio": "النسبة",
         "pour": "الصبة", "temp": "الحرارة", "pick_recipe": "اختر وصفة لعرض صباتها.",
         "coffee_used": "القهوة المستخدمة", "water_brewed": "الماء المستخدم",
         "previous": "التحضيرات في الفترة السابقة", "other": "أخرى",
+        "h_charts": "سجل التحضير", "brews_daily": "التحضيرات يوميا", "brews_monthly": "التحضيرات شهريا",
+        "coffee_weekly": "القهوة المستخدمة أسبوعيا", "water_weekly": "الماء المستخدم أسبوعيا",
+        "xbloom_brews": "xBloom", "manual_brews": "يدوي",
         "sep": "، ", "g": "غ", "ml": "مل",
         "in_use": "قيد الاستخدام", "unopened": "غير مفتوح", "open": "مفتوح", "g_left": "غ متبقية",
         "not_tracked": "غير متتبع", "no_bags": "لا توجد أكياس مفتوحة أو غير مفتوحة.",
@@ -70,6 +78,8 @@ TEXT = {
 }
 
 E = "xbloom_studio"
+# Bags and recipes are added and edited in the integration's Configure.
+INTEGRATION = "/config/integrations/integration/xbloom"
 BUSY = ("grinding", "brewing")
 MODULES = ("grinder", "brewer", "scale")
 
@@ -250,7 +260,28 @@ def stats_view(t: dict) -> dict:
                 f"- **{{{{ '{t['other']}' if name == 'other' else name }}}}**: {{{{ n }}}}\n{{% endfor %}}"
             )},
         ], [{"condition": "numeric_state", "entity": stats, "above": 0}]),
+        section(t["h_charts"], [
+            chart(t["brews_daily"], "day", 30, [
+                ("xbloom:brews_xbloom", t["xbloom_brews"]), ("xbloom:brews_manual", t["manual_brews"])]),
+            chart(t["brews_monthly"], "month", 365, [
+                ("xbloom:brews_xbloom", t["xbloom_brews"]), ("xbloom:brews_manual", t["manual_brews"])]),
+            chart(t["coffee_weekly"], "week", 90, [("xbloom:coffee_used", t["coffee_used"])]),
+            chart(t["water_weekly"], "week", 90, [("xbloom:water_brewed", t["water_brewed"])]),
+        ], present(stats)[:1]),
     ]}
+
+
+def chart(title: str, period: str, days: int, series: list[tuple[str, str]]) -> dict:
+    """A bar chart of what the brew record adds up to per period.
+
+    The integration keeps these statistics from the record itself, so the
+    chart covers every brew recorded, not only those since it was added.
+    """
+    return {
+        "type": "statistics-graph", "title": title, "chart_type": "bar",
+        "period": period, "days_to_show": days, "stat_types": ["change"],
+        "entities": [{"entity": sid, "name": name} for sid, name in series],
+    }
 
 
 def bags_view(t: dict) -> dict:
@@ -270,6 +301,7 @@ def bags_view(t: dict) -> dict:
             press(f"button.{E}_refresh_coffee_bags", visibility=[
                 {"condition": "state", "entity": f"button.{E}_refresh_coffee_bags", "state_not": "unavailable"},
             ]),
+            {"type": "markdown", "text_only": True, "content": f"[{t['add_bags']}]({INTEGRATION})"},
         ], present(bags)[:1]),
     ]}
 
@@ -318,9 +350,15 @@ def xbloom_view(t: dict) -> dict:
             press(f"button.{E}_tare_scale"),
         ], on("scale")),
         section(t["h_library"], [
-            press(f"button.{E}_delete_selected_recipe", t["confirm_delete"]),
-            {"type": "markdown", "text_only": True, "content": f"[{t['add_recipes']}](/config/integrations/integration/xbloom)"},
+            select(f"select.{E}_recipe"),
+            select(f"select.{E}_recipe_action"),
+            press(f"button.{E}_run_recipe_action", t["confirm_run"]),
+            {"type": "markdown", "text_only": True, "content": f"[{t['add_recipes']}]({INTEGRATION})"},
         ]),
+        section(t["h_archive"], [
+            select(f"select.{E}_archived_recipe"),
+            press(f"button.{E}_restore_archived_recipe"),
+        ], present(f"select.{E}_archived_recipe")),
         section(t["h_settings"], [
             select(f"select.{E}_mode"),
             select(f"select.{E}_temperature_unit"),

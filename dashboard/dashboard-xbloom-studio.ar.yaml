@@ -517,6 +517,59 @@ views:
     - condition: numeric_state
       entity: sensor.xbloom_studio_brews
       above: 0
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## سجل التحضير'
+    - type: statistics-graph
+      title: التحضيرات يوميا
+      chart_type: bar
+      period: day
+      days_to_show: 30
+      stat_types:
+      - change
+      entities:
+      - entity: xbloom:brews_xbloom
+        name: xBloom
+      - entity: xbloom:brews_manual
+        name: يدوي
+    - type: statistics-graph
+      title: التحضيرات شهريا
+      chart_type: bar
+      period: month
+      days_to_show: 365
+      stat_types:
+      - change
+      entities:
+      - entity: xbloom:brews_xbloom
+        name: xBloom
+      - entity: xbloom:brews_manual
+        name: يدوي
+    - type: statistics-graph
+      title: القهوة المستخدمة أسبوعيا
+      chart_type: bar
+      period: week
+      days_to_show: 90
+      stat_types:
+      - change
+      entities:
+      - entity: xbloom:coffee_used
+        name: القهوة المستخدمة
+    - type: statistics-graph
+      title: الماء المستخدم أسبوعيا
+      chart_type: bar
+      period: week
+      days_to_show: 90
+      stat_types:
+      - change
+      entities:
+      - entity: xbloom:water_brewed
+        name: الماء المستخدم
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_brews
+      state_not: unavailable
 - title: الأكياس
   path: bags
   icon: mdi:shopping
@@ -556,6 +609,9 @@ views:
       - condition: state
         entity: button.xbloom_studio_refresh_coffee_bags
         state_not: unavailable
+    - type: markdown
+      text_only: true
+      content: '[إضافة الأكياس أو تعديلها](/config/integrations/integration/xbloom)'
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_coffee_bags
@@ -836,7 +892,19 @@ views:
       text_only: true
       content: '## مكتبة الوصفات'
     - type: tile
-      entity: button.xbloom_studio_delete_selected_recipe
+      entity: select.xbloom_studio_recipe
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: tile
+      entity: select.xbloom_studio_recipe_action
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: tile
+      entity: button.xbloom_studio_run_recipe_action
       icon_tap_action:
         action: none
       hide_state: true
@@ -844,12 +912,40 @@ views:
         action: perform-action
         perform_action: button.press
         target:
-          entity_id: button.xbloom_studio_delete_selected_recipe
+          entity_id: button.xbloom_studio_run_recipe_action
         confirmation:
-          text: حذف الوصفة المختارة؟ لا يمكن التراجع عن ذلك.
+          text: تنفيذ الإجراء المختار على الوصفة المختارة؟
     - type: markdown
       text_only: true
       content: '[إضافة الوصفات أو تعديلها](/config/integrations/integration/xbloom)'
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## الوصفات المؤرشفة'
+    - type: tile
+      entity: select.xbloom_studio_archived_recipe
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: tile
+      entity: button.xbloom_studio_restore_archived_recipe
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_restore_archived_recipe
+    visibility:
+    - condition: state
+      entity: select.xbloom_studio_archived_recipe
+      state_not: unavailable
+    - condition: state
+      entity: select.xbloom_studio_archived_recipe
+      state_not: unknown
   - type: grid
     cards:
     - type: markdown
