@@ -17,11 +17,12 @@ homeassistant/voluptuous are stubbed by conftest.py; we drive the actual
 handlers registered by async_setup_entry.
 """
 import asyncio
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.xbloom import async_setup_entry
+from custom_components.xbloom import async_setup_entry, pour_time_s
 from custom_components.xbloom.const import CONF_BLE_NAME, CONF_PRODUCT_ID
 from xbloom import spec as _spec
 
@@ -419,7 +420,42 @@ async def test_the_completion_carries_what_the_brew_was_made_with():
     assert done["water_ml"] == 60          # the pours, as sent
     assert done["ratio"] == 3.0            # 60 ml over a 20 g dose
     assert done["temperature_c"] == 93     # one temperature across the pours
-    assert isinstance(done["duration_s"], (int, float)) and done["duration_s"] >= 0
+    # The fake sends no pour frame, so the brew's time is not known.
+    assert done["duration_s"] is None and done["first_pour_at"] is None
+
+
+class _PouringBle(_FakeBle):
+    """A machine that pours, then says the coffee is ready."""
+
+    async def brew(self, recipe):
+        await self.on_event({"cmd": 40510})   # CMD_BLOOM, the first pour
+
+    async def wait_for_completion(self, timeout=600.0):
+        await self.on_event({"cmd": 40512})   # CMD_ENJOY
+        return True
+
+
+async def test_the_brew_is_timed_from_the_first_pour_to_enjoy():
+    hass, entry = _make_hass(), _Entry()
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", _PouringBle):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        await handlers["start_brew"](MagicMock(data={}))
+        await entry.tasks[0]
+
+    done = _completed_events(hass)[0]
+    first, end = (datetime.fromisoformat(done[k]) for k in ("first_pour_at", "ended_at"))
+    assert done["duration_s"] == round((end - first).total_seconds(), 1)
+    # Timed from the pour, not from when the brew was sent.
+    assert first >= datetime.fromisoformat(done["started_at"])
+
+
+def test_pour_time_needs_both_ends():
+    t = datetime(2026, 9, 26, 13, 44, 29, tzinfo=timezone.utc)
+    assert pour_time_s(t, t + timedelta(seconds=196.4)) == 196.4
+    assert pour_time_s(None, t) is None
+    assert pour_time_s(t, None) is None
 
 
 async def test_a_temperature_the_pours_disagree_on_is_not_invented():

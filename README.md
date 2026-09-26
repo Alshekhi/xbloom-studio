@@ -293,7 +293,7 @@ can your own automations or a service outside Home Assistant.
 | Event | When | Payload |
 |---|---|---|
 | `xbloom_brew_started` | the machine has accepted the brew — every step, including execute | `recipe_name`, `total_pours` |
-| `xbloom_brew_completed` | **The brew finished.** Key on this one. | `recipe_id`, `recipe_name`, `dose_g`, `cup_type`, `outcome`, `started_at`, `ended_at`, `duration_s`, and what it was made with: `grind`, `water_ml`, `ratio`, `temperature_c`, `flow_rate` (a value the pours disagree on is omitted rather than guessed) |
+| `xbloom_brew_completed` | **The brew finished.** Key on this one. | `recipe_id`, `recipe_name`, `dose_g`, `cup_type`, `outcome`, `started_at`, `first_pour_at`, `ended_at`, `duration_s` (first pour to the machine's end signal; empty when either went unheard), and what it was made with: `grind`, `water_ml`, `ratio`, `temperature_c`, `flow_rate` (a value the pours disagree on is omitted rather than guessed) |
 | `xbloom_brew_failed` | The brew could not start, or the machine gave up on it | `reason`, `recipe_name`, sometimes `step` / `error` |
 | `xbloom_brew_stopped` | Someone stopped the brew | `by`, `recipe_name`, `ground` (whether the grinder had run), `dose_g` |
 | `xbloom_brew_timeout` | Ten minutes passed with no ending heard from the machine | `recipe_name` |

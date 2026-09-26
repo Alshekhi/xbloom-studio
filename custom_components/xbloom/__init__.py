@@ -129,6 +129,13 @@ BREW_STOP_GRACE_S = 10.0
 NOTION_REFRESH = timedelta(minutes=10)
 
 
+def pour_time_s(first_pour: datetime | None, end: datetime | None) -> float | None:
+    """Seconds from the first pour to the brew's end, when both were heard."""
+    if first_pour is None or end is None:
+        return None
+    return round((end - first_pour).total_seconds(), 1)
+
+
 async def _await_brew_outcome(
     ble_client,
     brew_end_seen: asyncio.Event,
@@ -516,7 +523,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             ACTIVITY_BREWING,
             ACTIVITY_HOME_STATES,
             BREW_STOPPING_FAULTS,
+            CMD_BLOOM,
             CMD_BREW_END,
+            CMD_ENJOY,
             CMD_GRINDER_START,
             CMD_MACHINE_ACTIVITY,
             signal_brew_lifecycle,
@@ -659,6 +668,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         # The grinder ran: a brew stopped after this has used its coffee.
         ground = asyncio.Event()
         stopped_by: dict[str, str] = {}
+        # When the first pour, BREW_END and ENJOY arrived. A brew's time is
+        # its pours: first pour to ENJOY, or to BREW_END when ENJOY never
+        # comes — not the connecting, sending and grinding before them.
+        heard: dict[str, datetime] = {}
 
         async def _on_event(decoded: dict) -> None:
             fault = spec.FAULTS.get(decoded.get("cmd"))
@@ -668,6 +681,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             activity = decoded.get("activity")
             if decoded.get("cmd") == CMD_GRINDER_START:
                 ground.set()
+            moment = {CMD_BLOOM: "first_pour", CMD_BREW_END: "brew_end", CMD_ENJOY: "enjoy"}.get(
+                decoded.get("cmd"))
+            if moment is not None:
+                heard.setdefault(moment, datetime.now(timezone.utc))
             if decoded.get("cmd") == CMD_GRINDER_START or (
                 decoded.get("cmd") == CMD_MACHINE_ACTIVITY and activity == ACTIVITY_BREWING
             ):
@@ -788,7 +805,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     hass.bus.async_fire(
                         "xbloom_brew_timeout", {"recipe_name": recipe_name, **meta}
                     )
-                ended_at = datetime.now(timezone.utc).isoformat()
+                # The end is the machine's own signal when it was heard, not
+                # when this task got round to deciding.
+                end = heard.get("enjoy" if outcome == "confirmed" else "brew_end")
+                ended_at = (end or datetime.now(timezone.utc)).isoformat()
                 if outcome in ("confirmed", "presumed"):
                     # The contract downstream builds on: announcements and
                     # inventory both key on this rather than on brew_done,
@@ -810,14 +830,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                             "cup_type": recipe.get("cup_type"),
                             "outcome": outcome,
                             "started_at": started_at,
-                            "ended_at": ended_at,
-                            "duration_s": round(
-                                (
-                                    datetime.fromisoformat(ended_at)
-                                    - datetime.fromisoformat(started_at)
-                                ).total_seconds(),
-                                1,
+                            "first_pour_at": (
+                                heard["first_pour"].isoformat() if "first_pour" in heard else None
                             ),
+                            "ended_at": ended_at,
+                            # First pour to the end. Unknown, not guessed, when
+                            # either frame went unheard.
+                            "duration_s": pour_time_s(heard.get("first_pour"), end),
                             **_brew_settings(recipe),
                             **meta,
                         },
