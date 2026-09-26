@@ -82,13 +82,20 @@ def _when(record: Brew, zone: tzinfo) -> datetime | None:
     return moment(record.brewed_at or record.recorded_at, zone)
 
 
+def made_coffee(record: Brew) -> bool:
+    """False for a brew stopped once its coffee was ground: used, not made."""
+    return record.review is None or record.review.reason != "stopped_after_grinding"
+
+
 def totals(records: list[Brew], start: datetime, end: datetime) -> Totals:
     zone = start.tzinfo
     inside = [r for r in records if (m := _when(r, zone)) is not None and start <= m < end]
+    # Brews count what made coffee; grams count all the coffee used.
+    made = [r for r in inside if made_coffee(r)]
     watered = [r.water_ml for r in inside if r.water_ml is not None]
-    tools = Counter(r.brewer or UNKNOWN_BREWER for r in inside)
+    tools = Counter(r.brewer or UNKNOWN_BREWER for r in made)
     return Totals(
-        brews=len(inside),
+        brews=len(made),
         coffee_g=float(sum(r.dose_g or 0 for r in inside)),
         water_ml=float(sum(watered)),
         brews_with_water=len(watered),

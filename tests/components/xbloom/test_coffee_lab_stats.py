@@ -2,7 +2,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from custom_components.xbloom.coffee_lab.models import Brew
+from custom_components.xbloom.coffee_lab.models import Brew, Review
 from custom_components.xbloom.coffee_lab.stats import (
     PERIODS, period_report, totals, window,
 )
@@ -97,3 +97,18 @@ def test_a_report_counts_the_window_and_the_one_before():
     ], "last_7_days", NOW)
     assert (r.now.brews, r.now.coffee_g, r.now.water_ml) == (2, 31.0, 256.0)
     assert r.before.brews == 1 and r.change_in_brews == 1
+
+
+def test_a_brew_stopped_after_grinding_counts_its_coffee_but_not_as_a_brew():
+    stopped = Brew(id="s", brewed_at="2026-09-10", recorded_at="", dose_g=17.0,
+                   brewer="xBloom Studio", review=Review("stopped_after_grinding"))
+    t = totals([brew("2026-09-11", 16), stopped], *SEPTEMBER)
+    assert (t.brews, t.coffee_g) == (1, 33.0)
+    assert t.by_brewer == (("xBloom Studio", 1),)
+
+
+def test_a_brew_flagged_for_another_reason_still_counts():
+    flagged = Brew(id="f", brewed_at="2026-09-10", recorded_at="", dose_g=18.0,
+                   review=Review("no_bag"))
+    assert totals([flagged], *SEPTEMBER).brews == 1
+
