@@ -761,19 +761,7 @@
           "description": "The roaster's tasting notes."
         }
       }
-    }
-  },
-  "selector": {
-    "bag_status": {
-      "options": {
-        "unopened": "Unopened",
-        "open": "Open",
-        "finished": "Finished",
-        "archived": "Archived"
-      }
-    }
-  },
-  "services": {
+    },
     "start_brew": {
       "name": "Start Brew",
       "description": "Brew a recipe on the xBloom Studio. Uses the recipe selected in select.xbloom_studio_recipe unless you pass recipe_name. The dose, ratio, and grind_size fields are optional one-off overrides for this brew only — the saved recipe is left untouched.",
@@ -805,6 +793,14 @@
         "grind_size": {
           "name": "Grind size override",
           "description": "One-off grind size for this brew only (1–80, lower is finer). Leave blank to use the recipe's own grind size."
+        },
+        "bean_id": {
+          "name": "Bag",
+          "description": "Coffee Lab only: the id of the bag this brew's coffee comes from. Leave blank to use the selected bag."
+        },
+        "unattributed": {
+          "name": "From no bag",
+          "description": "Coffee Lab only: the coffee comes from no bag, as with an xPod."
         }
       }
     },
@@ -1043,6 +1039,16 @@
           "name": "Source recipe name",
           "description": "The recipe to scale from. Leave blank to use the currently selected recipe (select.xbloom_studio_recipe)."
         }
+      }
+    }
+  },
+  "selector": {
+    "bag_status": {
+      "options": {
+        "unopened": "Unopened",
+        "open": "Open",
+        "finished": "Finished",
+        "archived": "Archived"
       }
     }
   }

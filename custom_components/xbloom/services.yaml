@@ -44,17 +44,10 @@ start_brew:
           max: 80
           step: 1
     bean_id:
-      name: Bag
-      description: >
-        Coffee Lab only: the id of the bag this brew's coffee comes from.
-        Leave blank to use the selected bag.
       required: false
       selector:
         text:
     unattributed:
-      name: From no bag
-      description: >
-        Coffee Lab only: the coffee comes from no bag, as with an xPod.
       required: false
       selector:
         boolean:

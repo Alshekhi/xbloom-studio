@@ -93,4 +93,21 @@ def test_the_arabic_describes_the_same_fields() -> None:
 
 def test_services_yaml_leaves_names_to_the_translations() -> None:
     source = (_COMPONENT / "services.yaml").read_text()
-    assert not re.search(r"^  (name|description):", source, re.M)
+    assert not re.search(r"^(  |      )(name|description):", source, re.M)
+
+
+def test_no_translation_file_repeats_a_key() -> None:
+    """A repeated key is valid JSON, and all but the last copy is ignored.
+
+    A merge that adds the same block on two branches produces exactly that.
+    """
+    import json
+
+    def refuse_repeats(pairs):
+        keys = [k for k, _ in pairs]
+        repeated = {k for k in keys if keys.count(k) > 1}
+        assert not repeated, f"repeated keys: {sorted(repeated)}"
+        return dict(pairs)
+
+    for path in ("strings.json", "translations/en.json", "translations/ar.json"):
+        json.loads((_COMPONENT / path).read_text(), object_pairs_hook=refuse_repeats)
