@@ -164,6 +164,7 @@ _inject_stubs()
 
 
 from custom_components.xbloom.config_flow import XBloomOptionsFlow  # noqa: E402
+from xbloom import spec  # noqa: E402
 from xbloom.recipe_validate import (  # noqa: E402
     validate_recipe,
 )
@@ -284,7 +285,9 @@ def _stored_recipe():
 def _pours_input(pours):
     """Build the form input dict create_recipe_pours expects."""
     out = {}
-    pat_label = {1: "centered", 2: "circular", 3: "spiral"}
+    # The form's own vocabulary, from spec: spiral is 2 and circular 3, which
+    # a table typed out here had the wrong way round.
+    pat_label = spec.PATTERN_API_TO_NAME
     for i, p in enumerate(pours):
         out[f"pour_{i}_volume_ml"] = p["volume_ml"]
         out[f"pour_{i}_temperature_c"] = p["temperature_c"]
@@ -407,6 +410,9 @@ async def test_edit_recipe_pre_fills_pours_and_save_uses_replace():
     coord.async_add_recipe.assert_not_called()
     replaced = coord.async_replace_recipe.call_args[0][0]
     assert replaced["id"] == "local-test-1"  # tableId preserved
+    # Each pour keeps its pattern through the form. The stored recipe pours
+    # circular (3); a table with spiral and circular swapped turns it into 2.
+    assert [p["pattern"] for p in replaced["pours"]] == [3, 3, 3]
 
 
 # ---------------------------------------------------------------------------
