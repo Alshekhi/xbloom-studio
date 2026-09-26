@@ -458,6 +458,39 @@
     },
     "refused_restore_incomplete": {
       "message": "لم تنته الماكينة من استعادة حالتها بعد انقطاع الكهرباء، لذلك رفضت الأمر. أعدها إلى شاشة الانتظار ثم ابدأ من جديد."
+    },
+    "missing_arguments": {
+      "message": "{action} يحتاج: {arguments}."
+    },
+    "recipe_not_found": {
+      "message": "لا توجد وصفة باسم {name}. الوصفات الموجودة: {available}."
+    },
+    "value_not_accepted": {
+      "message": "قيمة {argument} يجب أن تكون إحدى: {accepted}."
+    },
+    "per_pour_only": {
+      "message": "الحرارة ونمط الصب يضبطان لكل صبة، لا للوصفة كلها."
+    },
+    "rescale_not_edit": {
+      "message": "تغيير الجرعة أو النسبة ينشئ وصفة جديدة، وتبقى الأصلية كما هي."
+    },
+    "machine_unreachable": {
+      "message": "لا يرى Home Assistant الماكينة عبر البلوتوث. تأكد أنها تعمل وفي النطاق، ثم حاول مرة أخرى."
+    },
+    "brew_not_started": {
+      "message": "لم يبدأ التحضير ({reason})."
+    },
+    "history_unavailable": {
+      "message": "سجل التحضير يتطلب تكامل Recorder."
+    },
+    "entity_missing": {
+      "message": "أحد كيانات xBloom مفقود ({entity}). أعد تحميل التكامل."
+    },
+    "no_recipe_selected": {
+      "message": "لا توجد وصفة مختارة. حدد وصفة للتحضير."
+    },
+    "no_recipes": {
+      "message": "لا توجد وصفات في المكتبة."
     }
   }
 }

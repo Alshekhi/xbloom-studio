@@ -458,6 +458,39 @@
     },
     "refused_restore_incomplete": {
       "message": "The xBloom has not finished recovering from a power interruption and refused. Return it to its standby screen, then start again."
+    },
+    "missing_arguments": {
+      "message": "{action} needs: {arguments}."
+    },
+    "recipe_not_found": {
+      "message": "There is no recipe called {name}. The library has: {available}."
+    },
+    "value_not_accepted": {
+      "message": "{argument} must be one of: {accepted}."
+    },
+    "per_pour_only": {
+      "message": "Temperature and pattern are set on each pour, not on the whole recipe."
+    },
+    "rescale_not_edit": {
+      "message": "Changing the dose or ratio makes a new recipe; the original stays as it is."
+    },
+    "machine_unreachable": {
+      "message": "Home Assistant can't see the xBloom over Bluetooth. Make sure it is switched on and in range, then try again."
+    },
+    "brew_not_started": {
+      "message": "The brew did not start ({reason})."
+    },
+    "history_unavailable": {
+      "message": "Brew history needs the Recorder integration."
+    },
+    "entity_missing": {
+      "message": "An xBloom entity is missing ({entity}). Reload the integration."
+    },
+    "no_recipe_selected": {
+      "message": "No recipe is selected. Name one to brew."
+    },
+    "no_recipes": {
+      "message": "There are no recipes in the library."
     }
   }
 }

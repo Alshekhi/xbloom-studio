@@ -14,6 +14,7 @@ Store, …) are defined explicitly because MagicMock cannot serve as a base
 class in multiple-inheritance combinations.
 """
 import enum
+from dataclasses import dataclass
 import sys
 import types
 from datetime import datetime, timezone
@@ -207,6 +208,43 @@ def _inject_global_stubs() -> None:
     storage = _stub_mod("homeassistant.helpers.storage")
     storage.Store = _base_class("Store")
 
+    # The LLM API: real classes, because the integration subclasses them and a
+    # MagicMock base turns the subclass into a mock.
+    llm = _stub_mod("homeassistant.helpers.llm")
+
+    class _Tool:
+        name = ""
+        description = None
+        parameters = None
+
+    class _API:
+        def __init__(self, *, hass, id, name):
+            self.hass, self.id, self.name = hass, id, name
+
+    @dataclass
+    class _APIInstance:
+        api: object
+        api_prompt: str
+        llm_context: object
+        tools: list
+
+    @dataclass
+    class _ToolInput:
+        tool_name: str
+        tool_args: dict
+
+    llm.Tool = _Tool
+    llm.API = _API
+    llm.APIInstance = _APIInstance
+    llm.ToolInput = _ToolInput
+    llm.LLMContext = MagicMock
+    llm.async_register_api = MagicMock(return_value=MagicMock(name="unregister_api"))
+    helpers.llm = llm
+
+    ent_reg = _stub_mod("homeassistant.helpers.entity_registry")
+    ent_reg.async_get = MagicMock()
+    helpers.entity_registry = ent_reg
+
     uc = _stub_mod("homeassistant.helpers.update_coordinator")
     uc.DataUpdateCoordinator = _base_class("DataUpdateCoordinator")
     uc.CoordinatorEntity = _base_class("CoordinatorEntity")
@@ -271,7 +309,12 @@ def _inject_global_stubs() -> None:
     dt_stub.as_local = lambda value: value
     dt_stub.UTC = timezone.utc
     util.dt = dt_stub
+    util.json = _stub_mod("homeassistant.util.json")
     ha.util = util
+
+    recorder = _stub_mod("homeassistant.components.recorder")
+    recorder.history = _stub_mod("homeassistant.components.recorder.history")
+    components.recorder = recorder
 
     # -- voluptuous ------------------------------------------------------------
     vol = _stub_mod("voluptuous")

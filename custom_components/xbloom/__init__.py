@@ -33,6 +33,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_PRODUCT_ID, DOMAIN
 from .coordinator import XBloomCoordinator
+from . import llm_api
 from xbloom.client import XBloomClient
 from xbloom.cloud import XBloomCloudClient, language_type_for
 from xbloom import recipe_build, spec
@@ -1561,6 +1562,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         entry.async_on_unload(
             lambda s=svc: hass.services.async_remove(DOMAIN, s)
         )
+
+    # The AI tools call the services above, so they come and go with them.
+    entry.async_on_unload(llm_api.async_register(hass))
 
     _LOGGER.debug("xbloom: loading platforms %s", PLATFORMS)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
