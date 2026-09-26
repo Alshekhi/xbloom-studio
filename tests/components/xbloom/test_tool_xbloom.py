@@ -170,13 +170,15 @@ def _machine(hass):
 
 async def test_start_brew_reports_started_when_the_machine_takes_it():
     hass = FakeHass(
-        responses={"list_recipes": {"recipes": [{"name": "Kenya"}]}},
+        responses={"list_recipes": {"recipes": [{"name": "Kenya"}]},
+                   "start_brew": {"run_id": "r1"}},
         on_call=lambda h, svc: svc == "start_brew" and h.fire(
-            "xbloom_brew_started", {"recipe_name": "Kenya", "total_pours": 3}
+            "xbloom_brew_started", {"recipe_name": "Kenya", "total_pours": 3, "run_id": "r1"}
         ),
     )
     facts = await ACTIONS["start_brew"].run(_machine(hass), {"name": "kenya", "dose": 18.0})
     assert facts == {
+        "run_id": "r1",
         "outcome": "started",
         "recipe": "Kenya",
         "overrides_this_brew_only": {"dose": 18.0},
@@ -186,16 +188,31 @@ async def test_start_brew_reports_started_when_the_machine_takes_it():
 
 
 async def test_start_brew_refused_by_the_machine_raises_its_reason():
-    hass = FakeHass(on_call=lambda h, svc: svc == "start_brew" and h.fire(
-        "xbloom_brew_failed", {"reason": "no_water", "recipe_name": None}
-    ))
+    hass = FakeHass(
+        responses={"start_brew": {"run_id": "r1"}},
+        on_call=lambda h, svc: svc == "start_brew" and h.fire(
+            "xbloom_brew_failed", {"reason": "no_water", "recipe_name": None, "run_id": "r1"}
+        ),
+    )
     with pytest.raises(HomeAssistantError) as caught:
         await ACTIONS["start_brew"].run(_machine(hass), {})
     assert caught.value.translation_key == "refused_no_water"
 
 
+async def test_start_brew_ignores_another_brew_s_events():
+    hass = FakeHass(
+        responses={"start_brew": {"run_id": "mine"}},
+        on_call=lambda h, svc: svc == "start_brew" and h.fire(
+            "xbloom_brew_failed", {"reason": "no_water", "run_id": "someone-else"}
+        ),
+    )
+    with patch.object(tool_xbloom, "BREW_CONFIRM_TIMEOUT_S", 0.01):
+        facts = await ACTIONS["start_brew"].run(_machine(hass), {})
+    assert facts["outcome"] == "pending" and facts["run_id"] == "mine"
+
+
 async def test_start_brew_without_an_answer_is_pending_not_started():
-    hass = FakeHass()
+    hass = FakeHass(responses={"start_brew": {"run_id": "r1"}})
     with patch.object(tool_xbloom, "BREW_CONFIRM_TIMEOUT_S", 0.01):
         facts = await ACTIONS["start_brew"].run(_machine(hass), {})
     assert facts["outcome"] == "pending"
@@ -292,9 +309,12 @@ async def test_an_empty_library_is_said_as_such():
 
 
 async def test_a_brew_with_no_recipe_selected_says_so():
-    hass = FakeHass(on_call=lambda h, svc: svc == "start_brew" and h.fire(
-        "xbloom_brew_failed", {"reason": "recipe_not_found", "recipe_name": None}
-    ))
+    hass = FakeHass(
+        responses={"start_brew": {"run_id": "r1"}},
+        on_call=lambda h, svc: svc == "start_brew" and h.fire(
+            "xbloom_brew_failed", {"reason": "recipe_not_found", "recipe_name": None, "run_id": "r1"}
+        ),
+    )
     with pytest.raises(HomeAssistantError) as caught:
         await ACTIONS["start_brew"].run(_machine(hass), {})
     assert caught.value.translation_key == "no_recipe_selected"

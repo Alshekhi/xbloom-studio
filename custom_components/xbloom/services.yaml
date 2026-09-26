@@ -51,6 +51,10 @@ start_brew:
       required: false
       selector:
         boolean:
+    context:
+      required: false
+      selector:
+        object:
 
 stop_brew:
 brew_standalone:

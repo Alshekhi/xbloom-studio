@@ -155,9 +155,22 @@ can your own automations or a service outside Home Assistant.
 | Event | When | Payload |
 |---|---|---|
 | `xbloom_brew_started` | the machine has accepted the brew — every step, including execute | `recipe_name`, `total_pours` |
-| `xbloom_brew_completed` | **The brew finished.** Key on this one. | `run_id`, `recipe_id`, `recipe_name`, `dose_g`, `cup_type`, `outcome`, `started_at`, `ended_at`, `duration_s`, and what it was made with: `grind`, `water_ml`, `ratio`, `temperature_c`, `flow_rate` (a value the pours disagree on is omitted rather than guessed) |
-| `xbloom_brew_failed` | The brew could not start, or the machine gave up on it | `reason`, `recipe_name`, sometimes `run_id` / `error` |
+| `xbloom_brew_completed` | **The brew finished.** Key on this one. | `recipe_id`, `recipe_name`, `dose_g`, `cup_type`, `outcome`, `started_at`, `ended_at`, `duration_s`, and what it was made with: `grind`, `water_ml`, `ratio`, `temperature_c`, `flow_rate` (a value the pours disagree on is omitted rather than guessed) |
+| `xbloom_brew_failed` | The brew could not start, or the machine gave up on it | `reason`, `recipe_name`, sometimes `step` / `error` |
+| `xbloom_brew_stopped` | Someone stopped the brew | `by`, `recipe_name` |
 | `xbloom_brew_timeout` | Ten minutes passed with no ending heard from the machine | `recipe_name` |
+
+**Every event of one brew also carries its `run_id`**, the same on each, so a
+consumer can tell brews apart and handle a repeated event once. `start_brew`
+returns it when asked for a response. Give `start_brew` a `context` — any value
+— and every event of that brew carries it back unchanged, so an automation can
+route the outcome to whoever started the brew. Events are kept in Home
+Assistant's history, and so is a `context` sent with one.
+
+`by` on a stop is `machine` (stopped on the machine itself), `home_assistant`
+(Cancel Brew, or the `stop_brew` action) or `superseded` (a new brew replaced
+one still running). A machine that stops over a fault it cannot brew through —
+no beans — reports a failure with that reason instead, not a stop.
 
 **`outcome` is the part worth understanding.** The machine's own "your coffee
 is ready" (`RD_ENJOY`) is what a completion rests on, but it can fail to be

@@ -445,6 +445,8 @@ async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
         data["recipe_name"] = await _resolve_recipe_name(machine, args["name"])
     if args.get("use_preground") is not None:
         data["use_preground"] = args["use_preground"]
+    if args.get("context") is not None:
+        data["context"] = args["context"]
     overrides = {k: args[k] for k in ("dose", "ratio", "grind_size") if args.get(k) is not None}
     data.update(overrides)
     bag = None
@@ -462,25 +464,30 @@ async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
             await machine.lab.async_select(bag.id)
 
     hass = machine.hass
+    heard: list[Event] = []
+    run_id: str | None = None
     answer: asyncio.Future[Event] = hass.loop.create_future()
 
     @callback
-    def _first(event: Event) -> None:
-        if not answer.done():
+    def _heard(event: Event) -> None:
+        heard.append(event)
+        if run_id is not None and event.data.get("run_id") == run_id and not answer.done():
             answer.set_result(event)
 
-    # Listening before the call, so an answer arriving the moment the brew is
-    # dispatched is not missed.
+    # Listening before the call: a brew refused at once fires its failure
+    # before the call returns the run id it can be matched by.
     unsubscribe = [
-        hass.bus.async_listen("xbloom_brew_started", _first),
-        hass.bus.async_listen("xbloom_brew_failed", _first),
+        hass.bus.async_listen("xbloom_brew_started", _heard),
+        hass.bus.async_listen("xbloom_brew_failed", _heard),
     ]
     try:
-        await machine.call("start_brew", data)
-        try:
-            event = await asyncio.wait_for(answer, BREW_CONFIRM_TIMEOUT_S)
-        except TimeoutError:
-            event = None
+        run_id = (await machine.ask("start_brew", data)).get("run_id")
+        event = next((e for e in heard if e.data.get("run_id") == run_id), None)
+        if event is None and run_id is not None:
+            try:
+                event = await asyncio.wait_for(answer, BREW_CONFIRM_TIMEOUT_S)
+            except TimeoutError:
+                event = None
     finally:
         for unsub in unsubscribe:
             unsub()
@@ -490,6 +497,7 @@ async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
             raise await _no_such_recipe(machine, event.data.get("recipe_name"))
         raise _brew_failure(dict(event.data))
     facts: dict[str, Any] = {
+        "run_id": run_id,
         # "pending": dispatched, and the machine has not yet said either way.
         "outcome": "started" if event is not None else "pending",
         "recipe": (event.data.get("recipe_name") if event is not None else None)
@@ -846,6 +854,10 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
     "seconds": (vol.Coerce(float), "How long to run the grinder."),
     "scale_on": (bool, "Whether the slot brews with the scale on."),
     "use_preground": (bool, "For start_brew: skip the grinder, for coffee already ground."),
+    "context": (
+        vol.Schema({}, extra=vol.ALLOW_EXTRA),
+        "For start_brew: any object, returned unchanged in every event of this brew.",
+    ),
     "pour_count": (
         vol.All(vol.Coerce(int), vol.Range(
             min=int(spec.field("pour_count").min), max=int(spec.field("pour_count").max),

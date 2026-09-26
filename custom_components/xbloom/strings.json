@@ -811,6 +811,10 @@
         "unattributed": {
           "name": "From no bag",
           "description": "Coffee Lab only: the coffee comes from no bag, as with an xPod."
+        },
+        "context": {
+          "name": "Context",
+          "description": "Any value, returned unchanged in every event of this brew."
         }
       }
     },

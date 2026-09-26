@@ -27,7 +27,7 @@ import json
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, SupportsResponse
+from homeassistant.core import HomeAssistant, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -39,6 +39,7 @@ from .const import (
 )
 from .coffee_lab.lab import CoffeeLab
 from .coffee_lab.listener import async_count_completed_brews
+from .coffee_lab.store import UnknownBean
 from .coffee_lab.services import async_register_lab_services
 from .coordinator import XBloomCoordinator
 from . import llm_api
@@ -111,12 +112,19 @@ BREW_DUP_WINDOW_S = 20.0
 # Only a brew that sends neither runs this clock out.
 BREW_END_GRACE_S = 120.0
 
+# How long a brew that went home mid-way waits before it is called stopped by
+# a person. A fault the machine gives up on — no beans — sends it home first
+# and reports the fault a moment later; that fault is the real ending, and a
+# stop decided at once would drop it.
+BREW_STOP_GRACE_S = 10.0
+
 
 async def _await_brew_outcome(
     ble_client,
     brew_end_seen: asyncio.Event,
     went_home: asyncio.Event,
     fault_stopped: asyncio.Event,
+    stopped_home: asyncio.Event | None = None,
 ) -> str | None:
     """Wait for the brew to end, and report which signal said so.
 
@@ -132,14 +140,25 @@ async def _await_brew_outcome(
     `presumed` — complete, but on the weaker signal. Returns ``None`` when
     neither arrived, which is the genuinely-unknown case and must not be
     reported as a completion.
+
+    A brew that goes back to the home screen while running, before BREW_END,
+    was stopped at the machine: ``cancelled``, unless a fault it gives up on
+    arrives within BREW_STOP_GRACE_S, which makes it ``stopped``.
     """
     enjoy = asyncio.ensure_future(ble_client.wait_for_completion(timeout=600.0))
     ended = asyncio.ensure_future(brew_end_seen.wait())
     stopped = asyncio.ensure_future(fault_stopped.wait())
+    left = asyncio.ensure_future((stopped_home or asyncio.Event()).wait())
     try:
         done, _pending = await asyncio.wait(
-            {enjoy, ended, stopped}, return_when=asyncio.FIRST_COMPLETED
+            {enjoy, ended, stopped, left}, return_when=asyncio.FIRST_COMPLETED
         )
+        if left in done and not ({enjoy, ended, stopped} & done):
+            try:
+                await asyncio.wait_for(asyncio.shield(stopped), BREW_STOP_GRACE_S)
+            except TimeoutError:
+                return "cancelled"
+            return "stopped"
         if stopped in done and enjoy not in done and ended not in done:
             # The machine reported a fault it does not brew through. Waiting
             # for an ending it will never send leaves the caller, and the
@@ -167,7 +186,7 @@ async def _await_brew_outcome(
             if not home.done():
                 home.cancel()
     finally:
-        for task in (enjoy, ended, stopped):
+        for task in (enjoy, ended, stopped, left):
             if not task.done():
                 task.cancel()
 
@@ -422,7 +441,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # the integration reloaded.
     brew_session: dict = {"task": None, "started_at": 0.0}
 
-    async def _cancel_active_brew(reason: str) -> None:
+    async def _cancel_active_brew(reason: str, by: str | None = None) -> None:
         """Cancel the in-flight brew task (if any) and wait for it to unwind.
 
         Cancelling propagates through ``_run_brew``'s ``async with
@@ -433,6 +452,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         if active is None or active.done():
             return
         _LOGGER.info("xbloom: cancelling active brew session (%s)", reason)
+        # Read by the brew task as it unwinds, for its stopped event.
+        brew_session["cancelled_by"] = by
         active.cancel()
         try:
             await active
@@ -442,8 +463,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _LOGGER.exception("xbloom: active brew task errored during cancel")
         finally:
             brew_session["task"] = None
+            brew_session["cancelled_by"] = None
 
-    async def handle_start_brew(call) -> None:
+    async def handle_start_brew(call) -> ServiceResponse:
         """Validate + resolve the recipe, then brew in a background task:
         open BLE → send the brew frames → stream notifications → disconnect
         when RD_ENJOY arrives (or after 10 min as a safety net).
@@ -457,9 +479,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         from homeassistant.helpers.dispatcher import async_dispatcher_send
 
         from .ble_entities import (
+            ACTIVITY_BREWING,
             ACTIVITY_HOME_STATES,
             BREW_STOPPING_FAULTS,
             CMD_BREW_END,
+            CMD_GRINDER_START,
             CMD_MACHINE_ACTIVITY,
             signal_brew_lifecycle,
             signal_event,
@@ -477,7 +501,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     "ignoring duplicate call (within %.0fs retry window)",
                     elapsed, BREW_DUP_WINDOW_S,
                 )
-                return
+                return {"run_id": None, "duplicate": True}
             # A genuine later press: the previous session is stale or wedged
             # (e.g. stuck waiting on a brew that will never complete). We
             # preempt it below, once the new brew is confirmed dispatchable.
@@ -486,6 +510,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 "%.0fs — preempting it", elapsed,
             )
 
+        # Carried by every event of this brew, so a consumer can tell them
+        # apart and route each back to whoever started it. The machine issues
+        # no brew identifier, and a completion must be counted once, so one is
+        # minted per call — here, so even a failure before the brew runs has it.
+        meta: dict = {"run_id": uuid.uuid4().hex}
+        if call.data.get("context") is not None:
+            meta["context"] = call.data["context"]
+
+        # Coffee Lab: the bag is fixed now, as the brew starts. Choosing another
+        # bag while it runs must not recharge this brew to it.
+        if (lab := entry.runtime_data.coffee_lab) is not None:
+            if call.data.get("unattributed"):
+                meta["unattributed"] = True
+            elif bean_id := call.data.get("bean_id") or lab.active_bean_id:
+                meta["bean_id"] = bean_id
+                try:
+                    meta["bean_name"] = (await lab.store.async_get_bean(bean_id)).name
+                except UnknownBean:
+                    pass
+
         def _fire_failed(reason: str, recipe_name: str | None, **extra) -> None:
             # A brew that cannot run must say so on the bus, not only in the
             # log: a caller waiting on the outcome otherwise cannot tell
@@ -493,7 +537,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             # belongs to the consumer.
             hass.bus.async_fire(
                 "xbloom_brew_failed",
-                {"reason": reason, "recipe_name": recipe_name, **extra},
+                {"reason": reason, "recipe_name": recipe_name, **meta, **extra},
             )
 
         ble_name = _resolve_ble_name(entry)
@@ -502,7 +546,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 "xbloom.start_brew: BLE name unknown — set ble_name or product_id"
             )
             _fire_failed("not_configured", call.data.get("recipe_name"))
-            return
+            return {"run_id": meta["run_id"]}
 
         recipe, recipe_name = await _resolve_recipe(
             share_url=call.data.get("share_url"),
@@ -512,16 +556,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         )
         if recipe is None:
             _fire_failed("recipe_not_found", call.data.get("recipe_name"))
-            return
+            return {"run_id": meta["run_id"]}
 
-        # Coffee Lab: the bag is fixed now, as the brew starts. Choosing another
-        # bag while it runs must not recharge this brew to it.
-        bag: dict = {}
-        if (lab := entry.runtime_data.coffee_lab) is not None:
-            if call.data.get("unattributed"):
-                bag = {"unattributed": True}
-            else:
-                bag = {"bean_id": call.data.get("bean_id") or lab.active_bean_id}
 
         # Per-brew grinder override — does NOT modify the stored recipe.
         # Grinder choice: an explicit use_preground wins; otherwise fall back to
@@ -565,6 +601,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         went_home = asyncio.Event()
         # Which fault ended it, for the failure the caller is told about.
         fault_stopped = asyncio.Event()
+        # The brew under way, then the machine back home before BREW_END: a
+        # stop at the machine. Not before it runs — an idle machine reports
+        # its home screen on connect.
+        brew_running = asyncio.Event()
+        stopped_home = asyncio.Event()
         stopped_by: dict[str, str] = {}
 
         async def _on_event(decoded: dict) -> None:
@@ -572,6 +613,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             if fault and fault[0] in BREW_STOPPING_FAULTS:
                 stopped_by.setdefault("status", fault[0])
                 fault_stopped.set()
+            activity = decoded.get("activity")
+            if decoded.get("cmd") == CMD_GRINDER_START or (
+                decoded.get("cmd") == CMD_MACHINE_ACTIVITY and activity == ACTIVITY_BREWING
+            ):
+                brew_running.set()
+            elif (
+                brew_running.is_set()
+                and not brew_end_seen.is_set()
+                and decoded.get("cmd") == CMD_MACHINE_ACTIVITY
+                and activity in ACTIVITY_HOME_STATES
+            ):
+                stopped_home.set()
             if decoded.get("cmd") == CMD_BREW_END:
                 brew_end_seen.set()
             elif (
@@ -588,8 +641,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             # The machine issues no brew identifier, but consumers need one to
             # make completion processing idempotent — a duplicate completion
             # must not deduct the same dose twice. So mint one per run.
-            run_id = uuid.uuid4().hex
             started_at = datetime.now(timezone.utc).isoformat()
+            started = False
 
             # The lifecycle signal arms the entities now — it is internal, and a
             # brew frame can arrive in the same instant the machine accepts the
@@ -611,7 +664,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     "make sure the machine is on and within range",
                     ble_name,
                 )
-                _fire_failed("machine_not_found", recipe_name, run_id=run_id)
+                _fire_failed("machine_not_found", recipe_name)
                 async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "ended")
                 return
             _LOGGER.info("xbloom.start_brew: ✓ found device %s", ble_device.address)
@@ -636,10 +689,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     # later than this.
                     hass.bus.async_fire(
                         "xbloom_brew_started",
-                        {"recipe_name": recipe_name, "total_pours": total_pours, **bag},
+                        {"recipe_name": recipe_name, "total_pours": total_pours, **meta},
                     )
+                    started = True
                     outcome = await _await_brew_outcome(
-                        ble_client, brew_end_seen, went_home, fault_stopped
+                        ble_client, brew_end_seen, went_home, fault_stopped, stopped_home,
                     )
                 completed = outcome == "confirmed"
                 _LOGGER.info(
@@ -652,10 +706,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     }.get(outcome, "timeout — disconnected anyway"),
                 )
                 if outcome == "stopped":
-                    _fire_failed(
-                        stopped_by.get("status", "machine_fault"),
-                        recipe_name,
-                        run_id=run_id,
+                    _fire_failed(stopped_by.get("status", "machine_fault"), recipe_name)
+                elif outcome == "cancelled":
+                    # Someone stopped it at the machine. Not a failure, and
+                    # not a completion: no coffee is owed.
+                    hass.bus.async_fire(
+                        "xbloom_brew_stopped",
+                        {"recipe_name": recipe_name, "by": "machine", **meta},
                     )
                 elif completed:
                     hass.bus.async_fire(
@@ -669,10 +726,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     # completion that follows an instant later never reaches
                     # them. That is exactly the brew this contract exists for.
                     hass.bus.async_fire(
-                        "xbloom_brew_timeout", {"recipe_name": recipe_name}
+                        "xbloom_brew_timeout", {"recipe_name": recipe_name, **meta}
                     )
                 ended_at = datetime.now(timezone.utc).isoformat()
-                if outcome is not None and outcome != "stopped":
+                if outcome in ("confirmed", "presumed"):
                     # The contract downstream builds on: announcements and
                     # inventory both key on this rather than on brew_done,
                     # which can fail to be heard even though the machine
@@ -680,7 +737,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     hass.bus.async_fire(
                         "xbloom_brew_completed",
                         {
-                            "run_id": run_id,
                             "recipe_id": str(recipe.get("id")) if recipe.get("id") else None,
                             "recipe_name": recipe_name,
                             # Effective dose: `recipe` has already been rescaled
@@ -703,7 +759,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                                 1,
                             ),
                             **_brew_settings(recipe),
-                            **bag,
+                            **meta,
                         },
                     )
             except (CommandRefused, CommandUnanswered) as err:
@@ -713,19 +769,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 _LOGGER.error(
                     "xbloom.start_brew: '%s' not started — %s", recipe_name, err,
                 )
-                _fire_failed(err.reason, recipe_name, run_id=run_id, step=err.step)
+                _fire_failed(err.reason, recipe_name, step=err.step)
             except Exception as err:  # noqa: BLE001
                 _LOGGER.error(
                     "xbloom.start_brew: BLE dispatch failed for '%s': %s",
                     recipe_name, err,
                 )
-                _fire_failed("bluetooth_error", recipe_name, run_id=run_id, error=str(err))
+                _fire_failed("bluetooth_error", recipe_name, error=str(err))
+            except asyncio.CancelledError:
+                # Cancelled by Home Assistant: stop_brew, or a newer brew
+                # taking over. A brew the machine had taken is reported
+                # stopped; one cancelled before that, or on unload, is not.
+                by = brew_session.get("cancelled_by")
+                if started and by:
+                    hass.bus.async_fire(
+                        "xbloom_brew_stopped",
+                        {"recipe_name": recipe_name, "by": by, **meta},
+                    )
+                raise
             finally:
                 async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "ended")
 
         # Preempt any still-running (stale/wedged) session now that we're
         # committed to dispatching a new brew. No-op on the normal path.
-        await _cancel_active_brew("preempted by a new start_brew")
+        await _cancel_active_brew("preempted by a new start_brew", by="superseded")
 
         brew_session["task"] = entry.async_create_background_task(
             hass, _run_brew(), name=f"xbloom_brew_{recipe_name}"
@@ -735,6 +802,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             "xbloom.start_brew: brew '%s' dispatched to background — "
             "service call returning", recipe_name,
         )
+        # Which brew this was, so a caller can pick its events off the bus.
+        return {"run_id": meta["run_id"]}
 
     # ------------------------------------------------------------------ #
     # Service: xbloom.stop_brew                                          #
@@ -757,7 +826,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
         from .ble_entities import held_session
 
-        await _cancel_active_brew("stop_brew requested")
+        await _cancel_active_brew("stop_brew requested", by="home_assistant")
         stop_frame = _build_frame(CMD_BREW_STOP)  # 40519 full-process stop
 
         # While Connect holds the link the stop goes over it: a second link
@@ -1298,6 +1367,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         DOMAIN,
         "start_brew",
         handle_start_brew,
+        supports_response=SupportsResponse.OPTIONAL,
         schema=vol.Schema({
             vol.Optional("recipe_name"): str,
             vol.Optional("share_url"): str,
@@ -1310,6 +1380,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             # Coffee Lab: the bag this brew's coffee comes from, or none.
             vol.Optional("bean_id"): str,
             vol.Optional("unattributed"): bool,
+            # Anything; returned unchanged in every event of this brew.
+            vol.Optional("context"): object,
         }),
     )
     hass.services.async_register(DOMAIN, "stop_brew", handle_stop_brew)
