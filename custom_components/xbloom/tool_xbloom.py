@@ -392,6 +392,20 @@ async def delete_recipe(machine: Machine, args: dict[str, Any]) -> dict[str, Any
     return {"deleted": args["name"]}
 
 
+async def archive_recipe(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
+    return await machine.ask("archive_recipe", {
+        "name": args["name"], "remove_from_cloud": bool(args.get("remove_from_cloud")),
+    })
+
+
+async def restore_recipe(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
+    return await machine.ask("restore_recipe", {"name": args["name"]})
+
+
+async def list_archived_recipes(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
+    return await machine.ask("list_archived_recipes")
+
+
 async def save_scaled_recipe(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
     data: dict[str, Any] = {
         "new_name": args["new_name"],
@@ -727,6 +741,18 @@ ACTIONS: dict[str, Spec] = {
         ("name",),
     ),
     "delete_recipe": Spec(delete_recipe, "remove a recipe", ("name",)),
+    "archive_recipe": Spec(
+        archive_recipe,
+        "take a recipe out of the library and keep it to restore later. It stays "
+        "in the xBloom cloud unless remove_from_cloud",
+        ("name",),
+    ),
+    "restore_recipe": Spec(
+        restore_recipe,
+        "bring an archived recipe back; signed in to the xBloom cloud, it goes back there",
+        ("name",),
+    ),
+    "list_archived_recipes": Spec(list_archived_recipes, "the archived recipes"),
     "save_scaled_recipe": Spec(
         save_scaled_recipe,
         "a rescaled copy under a new name; name picks the source, else the "
@@ -901,6 +927,7 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
     "apply_brew_defaults": (
         bool, "Fill unset pauses with the machine's brewing defaults (on unless false).",
     ),
+    "remove_from_cloud": (bool, "For archive_recipe: also delete it from the xBloom cloud."),
     "bypass_water_enabled": (bool, "Add water after brewing, bypassing the grounds."),
     "bypass_volume_ml": _ranged("bypass_volume_ml", "Bypass water"),
     "bypass_temp_c": _ranged("bypass_temp_c", "Bypass water temperature in Celsius"),

@@ -485,6 +485,17 @@
       },
       "recipe": {
         "name": "Recipe"
+      },
+      "recipe_action": {
+        "name": "Recipe Action",
+        "state": {
+          "archive": "Archive",
+          "archive_remove_from_cloud": "Archive and Remove from xBloom Cloud",
+          "delete": "Delete"
+        }
+      },
+      "archived_recipe": {
+        "name": "Archived Recipe"
       }
     },
     "sensor": {
@@ -653,6 +664,12 @@
       },
       "coffee_lab_refresh_bags": {
         "name": "Refresh Coffee Bags"
+      },
+      "run_recipe_action": {
+        "name": "Run Recipe Action"
+      },
+      "restore_archived_recipe": {
+        "name": "Restore Archived Recipe"
       }
     },
     "text": {
@@ -756,6 +773,21 @@
     },
     "notion_failed": {
       "message": "Notion could not be reached or refused the change: {error}"
+    },
+    "cloud_sign_in_required": {
+      "message": "Sign in to the xBloom cloud to remove a recipe from it."
+    },
+    "archived_recipe_not_found": {
+      "message": "There is no archived recipe called {name}."
+    },
+    "no_recipe_action_selected": {
+      "message": "Choose an action first."
+    },
+    "no_archived_recipe_selected": {
+      "message": "No archived recipe is selected."
+    },
+    "recipe_required": {
+      "message": "Name the recipe, or give its id."
     }
   },
   "services": {
@@ -1205,6 +1237,42 @@
           "description": "The recipe to scale from. Leave blank to use the currently selected recipe (select.xbloom_studio_recipe)."
         }
       }
+    },
+    "archive_recipe": {
+      "name": "Archive Recipe",
+      "description": "Take a recipe out of the library and keep it in the archive, to restore later.",
+      "fields": {
+        "name": {
+          "name": "Recipe name",
+          "description": "Exact name of the recipe to archive."
+        },
+        "id": {
+          "name": "Recipe id",
+          "description": "The recipe's id, when two recipes share a name."
+        },
+        "remove_from_cloud": {
+          "name": "Remove from xBloom cloud",
+          "description": "Also delete it from the xBloom cloud. Off: it stays in the xBloom app. Needs a signed-in cloud account."
+        }
+      }
+    },
+    "restore_recipe": {
+      "name": "Restore Recipe",
+      "description": "Bring an archived recipe back to the library. Signed in to the xBloom cloud, it goes back to the cloud.",
+      "fields": {
+        "name": {
+          "name": "Recipe name",
+          "description": "Exact name of the archived recipe."
+        },
+        "id": {
+          "name": "Recipe id",
+          "description": "The archived recipe's id, when two share a name."
+        }
+      }
+    },
+    "list_archived_recipes": {
+      "name": "List Archived Recipes",
+      "description": "The archived recipes, with when each was archived and whether it stayed in the xBloom cloud."
     }
   },
   "selector": {

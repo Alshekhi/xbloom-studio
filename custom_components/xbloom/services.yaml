@@ -468,3 +468,29 @@ update_bean:
       selector:
         text:
           multiline: true
+
+archive_recipe:
+  fields:
+    name:
+      example: "Ethiopia Yirgacheffe"
+      selector:
+        text:
+    id:
+      selector:
+        text:
+    remove_from_cloud:
+      default: false
+      selector:
+        boolean:
+
+restore_recipe:
+  fields:
+    name:
+      example: "Ethiopia Yirgacheffe"
+      selector:
+        text:
+    id:
+      selector:
+        text:
+
+list_archived_recipes:

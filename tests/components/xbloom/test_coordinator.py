@@ -75,6 +75,10 @@ def _make(*, creds: dict | None = None, stored: list[dict] | None = None):
     store.async_delete = AsyncMock(return_value=True)
     store.async_replace_all = AsyncMock()
     coord.store = store
+    archive = MagicMock()
+    archive.async_load = AsyncMock(return_value=[])
+    archive.ids = MagicMock(return_value=set())
+    coord.archive = archive
     return coord
 
 

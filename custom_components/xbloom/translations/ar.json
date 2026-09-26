@@ -485,6 +485,17 @@
       },
       "recipe": {
         "name": "الوصفة"
+      },
+      "recipe_action": {
+        "name": "إجراء الوصفة",
+        "state": {
+          "archive": "أرشفة",
+          "archive_remove_from_cloud": "أرشفة وحذف من سحابة xBloom",
+          "delete": "حذف"
+        }
+      },
+      "archived_recipe": {
+        "name": "الوصفة المؤرشفة"
       }
     },
     "sensor": {
@@ -653,6 +664,12 @@
       },
       "coffee_lab_refresh_bags": {
         "name": "تحديث أكياس القهوة"
+      },
+      "run_recipe_action": {
+        "name": "تنفيذ إجراء الوصفة"
+      },
+      "restore_archived_recipe": {
+        "name": "استعادة الوصفة المؤرشفة"
       }
     },
     "text": {
@@ -756,6 +773,21 @@
     },
     "notion_failed": {
       "message": "تعذر الوصول إلى Notion أو رفض التغيير: {error}"
+    },
+    "cloud_sign_in_required": {
+      "message": "سجل الدخول إلى سحابة xBloom لحذف الوصفة منها."
+    },
+    "archived_recipe_not_found": {
+      "message": "لا توجد وصفة مؤرشفة باسم {name}."
+    },
+    "no_recipe_action_selected": {
+      "message": "اختر الإجراء أولا."
+    },
+    "no_archived_recipe_selected": {
+      "message": "لا توجد وصفة مؤرشفة مختارة."
+    },
+    "recipe_required": {
+      "message": "حدد اسم الوصفة أو معرفها."
     }
   },
   "services": {
@@ -1205,6 +1237,42 @@
           "description": "الوصفة التي يعاد ضبطها. اتركه فارغا لاستخدام الوصفة المختارة (select.xbloom_studio_recipe)."
         }
       }
+    },
+    "archive_recipe": {
+      "name": "أرشفة وصفة",
+      "description": "أخرج وصفة من المكتبة واحفظها في الأرشيف لاستعادتها لاحقا.",
+      "fields": {
+        "name": {
+          "name": "اسم الوصفة",
+          "description": "اسم الوصفة المراد أرشفتها كما هو."
+        },
+        "id": {
+          "name": "معرف الوصفة",
+          "description": "معرف الوصفة، إذا تشاركت وصفتان الاسم نفسه."
+        },
+        "remove_from_cloud": {
+          "name": "حذف من سحابة xBloom",
+          "description": "احذفها أيضا من سحابة xBloom. عند إيقافه تبقى في تطبيق xBloom. يتطلب تسجيل الدخول إلى السحابة."
+        }
+      }
+    },
+    "restore_recipe": {
+      "name": "استعادة وصفة",
+      "description": "أعد وصفة مؤرشفة إلى المكتبة. عند تسجيل الدخول إلى سحابة xBloom تعود إلى السحابة.",
+      "fields": {
+        "name": {
+          "name": "اسم الوصفة",
+          "description": "اسم الوصفة المؤرشفة كما هو."
+        },
+        "id": {
+          "name": "معرف الوصفة",
+          "description": "معرف الوصفة المؤرشفة، إذا تشاركت وصفتان الاسم نفسه."
+        }
+      }
+    },
+    "list_archived_recipes": {
+      "name": "عرض الوصفات المؤرشفة",
+      "description": "الوصفات المؤرشفة، مع وقت أرشفة كل منها وهل بقيت في سحابة xBloom."
     }
   },
   "selector": {

@@ -1646,6 +1646,61 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _LOGGER.warning("xbloom.delete_recipe: '%s' not found", name)
         return {"ok": removed, "name": name}
 
+    def _recipe_id(recipes: list[dict], call, not_found: str) -> str:
+        """The id a call names, by `id` or by exact name."""
+        if call.data.get("id"):
+            return str(call.data["id"])
+        name = call.data.get("name")
+        if not name:
+            raise refuse("recipe_required")
+        match = next((r for r in recipes if r.get("name") == name), None)
+        if match is None:
+            raise refuse(not_found, name=name,
+                         available=", ".join(r["name"] for r in recipes))
+        return str(match["id"])
+
+    async def handle_archive_recipe(call) -> dict:
+        coordinator = entry.runtime_data.coordinator
+        recipe_id = _recipe_id(coordinator.data or [], call, "recipe_not_found")
+        archived = await coordinator.async_archive_recipe(
+            recipe_id, call.data["remove_from_cloud"]
+        )
+        return {"name": archived["recipe"]["name"], "id": recipe_id, "cloud": archived["cloud"]}
+
+    async def handle_restore_recipe(call) -> dict:
+        coordinator = entry.runtime_data.coordinator
+        archived = [e["recipe"] for e in coordinator.archive.entries]
+        recipe_id = _recipe_id(archived, call, "archived_recipe_not_found")
+        how = await coordinator.async_restore_recipe(recipe_id)
+        return {"id": recipe_id, "restored": how}
+
+    async def handle_list_archived_recipes(call) -> dict:
+        coordinator = entry.runtime_data.coordinator
+        await coordinator.archive.async_load()
+        return {"recipes": [
+            {"id": e["recipe"].get("id"), "name": e["recipe"].get("name"),
+             "archived_at": e["archived_at"], "cloud": e["cloud"]}
+            for e in coordinator.archive.entries
+        ]}
+
+    hass.services.async_register(
+        DOMAIN, "archive_recipe", handle_archive_recipe,
+        schema=vol.Schema({
+            vol.Optional("name"): str,
+            vol.Optional("id"): str,
+            vol.Optional("remove_from_cloud", default=False): bool,
+        }),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN, "restore_recipe", handle_restore_recipe,
+        schema=vol.Schema({vol.Optional("name"): str, vol.Optional("id"): str}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN, "list_archived_recipes", handle_list_archived_recipes,
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
         DOMAIN, "list_recipes", handle_list_recipes,
         supports_response=SupportsResponse.ONLY,
@@ -1712,6 +1767,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         "write_slot",
         "build_recipe",
         "list_recipes", "get_recipe", "add_recipe", "update_recipe", "delete_recipe",
+        "archive_recipe", "restore_recipe", "list_archived_recipes",
         "save_scaled_recipe",
     ):
         entry.async_on_unload(

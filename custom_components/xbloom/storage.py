@@ -136,3 +136,66 @@ class XBloomRecipeStore:
         """Wipe the library. (Used on entry uninstall.)"""
         await self._store.async_remove()
         self._cache = []
+
+
+# Where an archived recipe's cloud copy stands, recorded when it is archived.
+CLOUD_KEPT = "kept"        # still in the xBloom cloud; only hidden here
+CLOUD_REMOVED = "removed"  # deleted from the cloud when archived
+CLOUD_NONE = "none"        # archived while signed out; the cloud was not touched
+
+_ARCHIVE_KEY_FMT = "xbloom.recipe_archive.{entry_id}"
+
+
+class XBloomRecipeArchive:
+    """Recipes put aside, per entry, each held whole so it can come back.
+
+    Persisted under ``<config>/.storage/xbloom.recipe_archive.<entry_id>`` as a
+    list of ``{"recipe": <Recipe dict>, "archived_at": <iso>, "cloud": <CLOUD_*>}``.
+    A recipe is archived by its id; the library hides every archived id,
+    whichever source it comes from.
+    """
+
+    def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
+        self._store: Store[dict[str, Any]] = Store(
+            hass, STORAGE_VERSION, _ARCHIVE_KEY_FMT.format(entry_id=entry_id)
+        )
+        self._cache: list[dict] | None = None
+
+    async def async_load(self) -> list[dict]:
+        if self._cache is None:
+            data = await self._store.async_load()
+            self._cache = list((data or {}).get("recipes", []))
+        return self._cache
+
+    @property
+    def entries(self) -> list[dict]:
+        """What is archived, oldest first; empty until loaded."""
+        return list(self._cache or [])
+
+    def ids(self) -> set[str]:
+        return {str(e["recipe"].get("id")) for e in self._cache or []}
+
+    def get(self, recipe_id: str) -> dict | None:
+        return next(
+            (e for e in self._cache or [] if str(e["recipe"].get("id")) == recipe_id),
+            None,
+        )
+
+    async def async_add(self, recipe: dict, archived_at: str, cloud: str) -> dict:
+        entries = [
+            e for e in await self.async_load()
+            if str(e["recipe"].get("id")) != str(recipe.get("id"))
+        ]
+        entry = {"recipe": dict(recipe), "archived_at": archived_at, "cloud": cloud}
+        entries.append(entry)
+        self._cache = entries
+        await self._store.async_save({"recipes": entries})
+        return entry
+
+    async def async_remove(self, recipe_id: str) -> None:
+        entries = [
+            e for e in await self.async_load()
+            if str(e["recipe"].get("id")) != recipe_id
+        ]
+        self._cache = entries
+        await self._store.async_save({"recipes": entries})

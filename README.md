@@ -68,6 +68,16 @@ The same **Configure** menu has **Sign in to xBloom cloud**. Sign in with your x
 
 Tick **Remember my credentials** to store your password locally (in `.storage`, next to the session token) so the session refreshes itself when the token expires. It's only ever sent to xBloom's sign-in endpoint. Leave it unticked for more privacy: only the token is kept, and you'll be prompted to sign in again when it expires. Use **Sign out of xBloom cloud** to clear everything and return to the local library (your synced recipes stay cached locally). The cloud is entirely optional; leaving it out keeps the integration BLE-only.
 
+#### Archiving a recipe
+
+A recipe you are not using can be archived instead of deleted: it leaves the
+recipe list and is kept whole in Home Assistant, to restore later. Signed in
+to the xBloom cloud, you choose whether it also leaves the cloud — kept there,
+it stays in the xBloom app and is only hidden in Home Assistant. Restoring
+puts it back where the library is: signed in, in the cloud (created again if
+it was removed, under a new cloud id, so an older share link to it no longer
+works); signed out, in the local library.
+
 Recipe sync is event-driven, not polled: changes you make in Home Assistant apply immediately, and the Configure recipe lists pull fresh from the cloud each time you open them. A recipe you added or edited on your phone shows up in the dashboard dropdowns after you press the **Refresh Recipes** button.
 
 ## Entities and services
@@ -77,10 +87,10 @@ Recipe sync is event-driven, not polled: changes you make in Home Assistant appl
 - **Sensors** — Brew Status, Machine Status, Scale Weight, and live readings: Current Recipe, Current Pour, Current Module, Grind Size, Grind Speed, Pour Pattern, Brew Temperature, Brew Ratio, Last Recipe Card, Status Updated.
 - **Binary sensor** — In Range: on while Home Assistant's Bluetooth can see the machine, off once it drops it. The status sensors keep the last thing the machine reported, so this is the one that says a machine switched off is gone.
 - **Event** — Brew Event, fired on brew lifecycle changes (useful as an automation trigger).
-- **Selects** — Recipe, Mode (auto / pro), Water Source (tank / tap), Temperature Unit (°C / °F), Weight Unit (g / oz / ml), Brew Pattern.
+- **Selects** — Recipe, Recipe Action, Archived Recipe, Mode (auto / pro), Water Source (tank / tap), Temperature Unit (°C / °F), Weight Unit (g / oz / ml), Brew Pattern.
 - **Numbers** — Grind Size, Grind Speed, Brew Volume, Brew Temperature, Brew Flow Rate, and the brew-customizer overrides: Brew Dose, Brew Ratio, Brew Grind Size.
 - **Text** — New Recipe Name (used by the brew customizer's Save as New Recipe).
-- **Buttons** — Start Brew, Cancel Brew, Pause Brew, Resume Brew, Tare Scale, Back to Home, Grind, Brew (standalone), Refresh Recipes, Save as New Recipe, plus BLE Connect / BLE Disconnect diagnostics.
+- **Buttons** — Start Brew, Cancel Brew, Pause Brew, Resume Brew, Tare Scale, Back to Home, Grind, Brew (standalone), Refresh Recipes, Save as New Recipe, Run Recipe Action, Restore Archived Recipe, Delete Selected Recipe, plus BLE Connect / BLE Disconnect diagnostics.
 - **Switches** — Use Grinder, Connect (opens a live session that holds the BLE link and streams machine events for sensors, the dashboard, and optional spoken announcements).
 - **Update** — Firmware (installed vs latest, with an Install button; available when signed in to the xBloom cloud).
 
@@ -90,7 +100,7 @@ The integration registers its services under the `xbloom.` domain:
 
 - **Brewing** — `start_brew`, `stop_brew`, `brew_pause`, `brew_resume`, `brew_standalone`, `write_slot`.
 - **Machine control** — `grind`, `tare`, `back_to_home`, `set_mode`, `set_water_source`, `set_temp_unit`, `set_weight_unit`.
-- **Recipe library** — `list_recipes`, `get_recipe`, `add_recipe`, `update_recipe`, `delete_recipe`, `save_scaled_recipe`.
+- **Recipe library** — `list_recipes`, `get_recipe`, `add_recipe`, `update_recipe`, `delete_recipe`, `save_scaled_recipe`, `archive_recipe`, `restore_recipe`, `list_archived_recipes`.
 - **Diagnostics** — `ble_connect`, `ble_disconnect`, `refresh_status`.
 
 Each service, its fields, and examples appear in **Developer Tools → Actions**, and are documented in `custom_components/xbloom/services.yaml`.

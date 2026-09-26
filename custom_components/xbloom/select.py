@@ -1,6 +1,8 @@
 """Select entities for the xBloom Studio integration.
 
   * XBloomRecipeSelect — recipe library
+  * XBloomRecipeActionSelect — what the Run button does to the picked recipe
+  * XBloomArchivedRecipeSelect — the archived recipes, for Restore
   * XBloomModeSelect / XBloomWaterSourceSelect / XBloomTempUnitSelect /
     XBloomWeightUnitSelect — machine settings. Each calls
     the matching `xbloom.set_*` service and remembers the user's last value
@@ -41,6 +43,8 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     coordinator = entry.runtime_data.coordinator
     async_add_entities([
         XBloomRecipeSelect(coordinator),
+        XBloomRecipeActionSelect(coordinator),
+        XBloomArchivedRecipeSelect(coordinator),
         # Machine setting selects — pass entry so they can sync their
         # current value from the machine's heartbeat (signal_event).
         XBloomModeSelect(entry),
@@ -51,6 +55,125 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     ])
     # Coffee Lab's, only while it is switched on.
     async_add_entities(coffee_lab_entities(entry.runtime_data.coffee_lab, "select"))
+
+
+def labelled(recipes: list[dict]) -> list[tuple[str, dict]]:
+    """Each recipe with the label it is offered under.
+
+    A select speaks in names and two recipes can share one — the same
+    recipe saved twice is two recipes on purpose. The second and later of a
+    shared name carry a counter, or picking one of them silently picked
+    the first. The recipe's identity is still its id; this is only how it
+    is spoken about.
+    """
+    seen: dict[str, int] = {}
+    labels: list[tuple[str, dict]] = []
+    for recipe in recipes:
+        name = recipe["name"]
+        seen[name] = seen.get(name, 0) + 1
+        labels.append((name if seen[name] == 1 else f"{name} ({seen[name]})", recipe))
+    return labels
+
+
+def _device() -> DeviceInfo:
+    return DeviceInfo(identifiers={(DOMAIN, "xbloom_studio")})
+
+
+# What the Run button can do to the picked recipe. Removing from the cloud is
+# offered only while signed in, since only then is there a cloud to reach.
+ACTION_ARCHIVE = "archive"
+ACTION_ARCHIVE_REMOVE = "archive_remove_from_cloud"
+ACTION_DELETE = "delete"
+
+
+class XBloomRecipeActionSelect(CoordinatorEntity, SelectEntity):
+    """The action the Run Recipe Action button applies to the picked recipe."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "recipe_action"
+    _attr_unique_id = "xbloom_recipe_action_select"
+    _attr_icon = "mdi:dots-vertical"
+
+    def __init__(self, coordinator: XBloomCoordinator) -> None:
+        super().__init__(coordinator)
+        self._action: str | None = None
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return _device()
+
+    @property
+    def options(self) -> list[str]:
+        if self.coordinator.cloud_logged_in:
+            return [ACTION_ARCHIVE, ACTION_ARCHIVE_REMOVE, ACTION_DELETE]
+        return [ACTION_ARCHIVE, ACTION_DELETE]
+
+    @property
+    def current_option(self) -> str | None:
+        return self._action if self._action in self.options else None
+
+    async def async_select_option(self, option: str) -> None:
+        self._action = option
+        self.async_write_ha_state()
+
+
+class XBloomArchivedRecipeSelect(CoordinatorEntity, SelectEntity):
+    """The archived recipes; the pick is what Restore Archived Recipe brings back.
+
+    Held by id, like the recipe select. The whole archived recipe is its
+    attributes, so a dashboard can show what is being restored.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "archived_recipe"
+    _attr_unique_id = "xbloom_archived_recipe_select"
+    _attr_icon = "mdi:archive"
+
+    def __init__(self, coordinator: XBloomCoordinator) -> None:
+        super().__init__(coordinator)
+        self._current_id: str | None = None
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return _device()
+
+    def _labels(self) -> list[tuple[str, dict]]:
+        return labelled([e["recipe"] for e in self.coordinator.archive.entries])
+
+    def _pick(self) -> tuple[str, dict] | None:
+        """The picked archived recipe, or the first one when none is.
+
+        Never nothing while the archive holds something, so the select reads
+        `unknown` exactly when the archive is empty — which is what a
+        dashboard hides the archive by.
+        """
+        labels = self._labels()
+        picked = next((lr for lr in labels if str(lr[1].get("id")) == self._current_id), None)
+        return picked or (labels[0] if labels else None)
+
+    @property
+    def options(self) -> list[str]:
+        return [label for label, _ in self._labels()]
+
+    @property
+    def current_option(self) -> str | None:
+        picked = self._pick()
+        return picked[0] if picked else None
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        picked = self._pick()
+        if picked is None:
+            return None
+        entry = self.coordinator.archive.get(str(picked[1].get("id")))
+        return {**entry["recipe"], "archived_at": entry["archived_at"], "cloud": entry["cloud"]}
+
+    async def async_select_option(self, option: str) -> None:
+        for label, recipe in self._labels():
+            if label == option:
+                self._current_id = str(recipe.get("id"))
+                break
+        self.async_write_ha_state()
 
 
 class XBloomRecipeSelect(CoordinatorEntity, SelectEntity, RestoreEntity):
@@ -97,21 +220,7 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity, RestoreEntity):
         return None
 
     def _labels(self) -> list[tuple[str, dict]]:
-        """Each recipe with the label it is offered under.
-
-        A select speaks in names and two recipes can share one — `Iced Recipe`
-        bought twice is two recipes on purpose. The second and later of a
-        shared name carry a counter, or picking one of them silently picked
-        the first. The recipe's identity is still its id; this is only how it
-        is spoken about.
-        """
-        seen: dict[str, int] = {}
-        labels: list[tuple[str, dict]] = []
-        for recipe in self.coordinator.data or []:
-            name = recipe["name"]
-            seen[name] = seen.get(name, 0) + 1
-            labels.append((name if seen[name] == 1 else f"{name} ({seen[name]})", recipe))
-        return labels
+        return labelled(self.coordinator.data or [])
 
     @property
     def options(self) -> list[str]:

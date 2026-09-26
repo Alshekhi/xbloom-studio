@@ -36,6 +36,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_CLOUD,
@@ -46,7 +47,14 @@ from .const import (
     CONF_CLOUD_TOKEN,
     DOMAIN,
 )
-from .storage import XBloomRecipeStore
+from .storage import (
+    CLOUD_KEPT,
+    CLOUD_NONE,
+    CLOUD_REMOVED,
+    XBloomRecipeArchive,
+    XBloomRecipeStore,
+)
+from .tool_common import refuse
 from xbloom.cloud import (
     XBloomAuthError,
     XBloomCloudClient,
@@ -74,6 +82,7 @@ class XBloomCoordinator(DataUpdateCoordinator):
         )
         self.config_entry = config_entry
         self.store = XBloomRecipeStore(hass, config_entry.entry_id)
+        self.archive = XBloomRecipeArchive(hass, config_entry.entry_id)
         self._cloud = cloud
 
     # ------------------------------------------------------------------ #
@@ -147,7 +156,17 @@ class XBloomCoordinator(DataUpdateCoordinator):
     # Data source                                                         #
     # ------------------------------------------------------------------ #
     async def _async_update_data(self) -> list[dict]:
-        """Return the current recipe library (cloud when logged in, else local)."""
+        """The recipe library, less what is archived.
+
+        An archived recipe is hidden by id whichever source holds it, so one
+        kept in the cloud does not come back on the next refresh.
+        """
+        await self.archive.async_load()
+        hidden = self.archive.ids()
+        return [r for r in await self._async_library() if str(r.get("id")) not in hidden]
+
+    async def _async_library(self) -> list[dict]:
+        """The whole recipe library (cloud when logged in, else local)."""
         session = self._session()
         if session is None:
             return await self.store.async_load()
@@ -237,6 +256,66 @@ class XBloomCoordinator(DataUpdateCoordinator):
             return
         await self.store.async_replace(recipe)
         await self._refresh_after_recipe_write()
+
+    # ------------------------------------------------------------------ #
+    # Archive                                                             #
+    # ------------------------------------------------------------------ #
+    async def async_archive_recipe(self, recipe_id: str, remove_from_cloud: bool) -> dict:
+        """Put a recipe aside, whole; it leaves the library.
+
+        Signed in, the recipe is in the cloud: it stays there and is only
+        hidden here, unless `remove_from_cloud`. Signed out, it leaves the
+        local library and the cloud is not touched. Archived first, so a
+        failed cloud delete loses nothing.
+        """
+        recipe = next((r for r in self.data or [] if str(r.get("id")) == recipe_id), None)
+        if recipe is None:
+            raise refuse("recipe_not_found", name=recipe_id,
+                         available=", ".join(r["name"] for r in self.data or []))
+        session = self._session()
+        if session is None and remove_from_cloud:
+            raise refuse("cloud_sign_in_required")
+        if session is None:
+            cloud = CLOUD_NONE
+        else:
+            cloud = CLOUD_REMOVED if remove_from_cloud else CLOUD_KEPT
+        entry = await self.archive.async_add(recipe, dt_util.utcnow().isoformat(), cloud)
+        try:
+            if session is None:
+                await self.store.async_delete(recipe_id)
+            elif remove_from_cloud:
+                await self._cloud_op(session.delete_recipe(recipe_id))
+        except Exception:
+            await self.archive.async_remove(recipe_id)
+            raise
+        await self._refresh_after_recipe_write()
+        return entry
+
+    async def async_restore_recipe(self, recipe_id: str) -> str:
+        """Bring an archived recipe back to the library; returns how.
+
+        Signed in, the library is the cloud: a recipe still there is only
+        shown again ("shown"); one gone from it is created again ("added"),
+        under a new cloud id. Signed out, it returns to the local library
+        ("local"). The archive keeps it until the write has landed.
+        """
+        entry = self.archive.get(recipe_id)
+        if entry is None:
+            raise refuse("archived_recipe_not_found", name=recipe_id)
+        session = self._session()
+        if session is None:
+            await self.store.async_replace(entry["recipe"])
+            how = "local"
+        else:
+            in_cloud = {str(r.get("id")) for r in await self._cloud_op(session.list_recipes())}
+            if recipe_id in in_cloud:
+                how = "shown"
+            else:
+                await self._cloud_op(session.create_recipe(entry["recipe"]))
+                how = "added"
+        await self.archive.async_remove(recipe_id)
+        await self._refresh_after_recipe_write()
+        return how
 
     async def async_delete_recipe(self, table_id: str) -> bool:
         """Delete a recipe by id and refresh subscribers."""

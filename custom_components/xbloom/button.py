@@ -30,6 +30,8 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     async_add_entities([
         XBloomRefreshButton(coordinator),
         XBloomDeleteSelectedRecipeButton(coordinator),
+        XBloomRunRecipeActionButton(coordinator),
+        XBloomRestoreArchivedRecipeButton(coordinator),
         XBloomStartBrewButton(coordinator, entry),
         XBloomCancelBrewButton(entry),
         # Simple-command primitives
@@ -108,6 +110,64 @@ class XBloomDeleteSelectedRecipeButton(CoordinatorEntity, ButtonEntity):
         if not recipe_id:
             raise refuse("no_recipe_selected")
         await self.coordinator.async_delete_recipe(str(recipe_id))
+
+
+def _picked(hass, unique_id: str) -> tuple[str | None, str | None]:
+    """A select's state and the `id` attribute of what it holds."""
+    entity_id = er.async_get(hass).async_get_entity_id("select", DOMAIN, unique_id)
+    state = hass.states.get(entity_id) if entity_id else None
+    if state is None:
+        return None, None
+    return state.state, state.attributes.get("id")
+
+
+class XBloomRunRecipeActionButton(CoordinatorEntity, ButtonEntity):
+    """Apply the action chosen in Recipe Action to the recipe picked in Recipe.
+
+    The dashboard asks for confirmation first; the action names what it does.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "run_recipe_action"
+    _attr_unique_id = "xbloom_run_recipe_action_button"
+    _attr_icon = "mdi:play-box-outline"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, "xbloom_studio")})
+
+    async def async_press(self) -> None:
+        action, _ = _picked(self.hass, "xbloom_recipe_action_select")
+        _, recipe_id = _picked(self.hass, "xbloom_recipe_select")
+        if not recipe_id:
+            raise refuse("no_recipe_selected")
+        if action == "delete":
+            await self.coordinator.async_delete_recipe(str(recipe_id))
+        elif action in ("archive", "archive_remove_from_cloud"):
+            await self.coordinator.async_archive_recipe(
+                str(recipe_id), remove_from_cloud=action == "archive_remove_from_cloud"
+            )
+        else:
+            raise refuse("no_recipe_action_selected")
+
+
+class XBloomRestoreArchivedRecipeButton(CoordinatorEntity, ButtonEntity):
+    """Bring back the recipe picked in Archived Recipe."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "restore_archived_recipe"
+    _attr_unique_id = "xbloom_restore_archived_recipe_button"
+    _attr_icon = "mdi:archive-arrow-up"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, "xbloom_studio")})
+
+    async def async_press(self) -> None:
+        _, recipe_id = _picked(self.hass, "xbloom_archived_recipe_select")
+        if not recipe_id:
+            raise refuse("no_archived_recipe_selected")
+        await self.coordinator.async_restore_recipe(str(recipe_id))
 
 
 class XBloomStartBrewButton(CoordinatorEntity, ButtonEntity):
