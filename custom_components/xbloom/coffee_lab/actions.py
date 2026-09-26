@@ -10,6 +10,7 @@ two bags of the same coffee are two physical bags.
 """
 from __future__ import annotations
 
+import uuid
 from dataclasses import asdict
 from datetime import timedelta
 from typing import Any
@@ -205,3 +206,20 @@ async def update_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     updated = await lab.store.async_update_bean(bean.id, **changes)
     lab.on_change()
     return {"updated": bean_facts(updated)}
+
+
+async def record_manual_brew(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
+    """The dashboard's dose and brewer, against the active bag.
+
+    Each press is its own brew, so two presses are two brews.
+    """
+    if lab.manual_dose_g is None:
+        raise refuse("manual_dose_required")
+    bean = await lab.async_active_bean()
+    if bean is None:
+        raise refuse("bag_required")
+    result = await lab.async_consume(
+        bean_id=bean.id, grams=lab.manual_dose_g, run_id=f"manual-{uuid.uuid4().hex}",
+        brewer=lab.manual_brewer, recipe_source="dashboard",
+    )
+    return _consumption_facts(result, bean)

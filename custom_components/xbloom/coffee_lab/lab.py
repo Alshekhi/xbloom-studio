@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -188,12 +188,23 @@ class CoffeeLab:
     ) -> Consumption:
         """Apply one brew to its bag and the record."""
         async with self._counting:
-            return await self._async_consume(
+            result = await self._async_consume(
                 bean_id=bean_id, grams=grams, run_id=run_id, cup_type=cup_type,
                 recipe=recipe, brewer=brewer, brewed_at=brewed_at,
                 recipe_source=recipe_source, outcome=outcome, settings=settings,
                 unattributed=unattributed,
             )
+            # Kept so a flagged brew stays visible after a restart. Also
+            # tells the entities to re-read.
+            await self._async_set_state(last_count={
+                **asdict(result), "at": dt_util.utcnow().isoformat(),
+            })
+            return result
+
+    @property
+    def last_count(self) -> dict[str, Any] | None:
+        """The last brew counted, as `Consumption`'s fields plus when."""
+        return self._state.get("last_count")
 
     async def _async_consume(
         self, *, bean_id: str | None, grams: Any, run_id: str | None,

@@ -19,6 +19,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .ble_entities import send_brewer_pattern_live, signal_event
 from .const import DOMAIN
 from .coordinator import XBloomCoordinator
+from .coffee_lab.entities import entities_for as coffee_lab_entities
 from xbloom import spec
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,6 +49,8 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         XBloomWeightUnitSelect(entry),
         XBloomBrewPatternSelect(entry),
     ])
+    # Coffee Lab's, only while it is switched on.
+    async_add_entities(coffee_lab_entities(entry.runtime_data.coffee_lab, "select"))
 
 
 class XBloomRecipeSelect(CoordinatorEntity, SelectEntity, RestoreEntity):

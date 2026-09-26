@@ -374,6 +374,21 @@
           "circular": "دائري",
           "spiral": "حلزوني"
         }
+      },
+      "coffee_lab_active_bag": {
+        "name": "كيس القهوة"
+      },
+      "coffee_lab_stats_period": {
+        "name": "فترة الإحصاءات",
+        "state": {
+          "today": "اليوم",
+          "yesterday": "أمس",
+          "last_7_days": "آخر 7 أيام",
+          "last_30_days": "آخر 30 يوما",
+          "this_month": "هذا الشهر",
+          "last_month": "الشهر الماضي",
+          "this_year": "هذا العام"
+        }
       }
     },
     "sensor": {
@@ -423,6 +438,24 @@
       },
       "scale_weight": {
         "name": "وزن الميزان"
+      },
+      "coffee_lab_remaining": {
+        "name": "المتبقي من القهوة"
+      },
+      "coffee_lab_bags": {
+        "name": "أكياس القهوة"
+      },
+      "coffee_lab_stats": {
+        "name": "التحضيرات"
+      },
+      "coffee_lab_last_count": {
+        "name": "آخر تحضير محتسب",
+        "state": {
+          "counted": "خصم من الكيس",
+          "recorded": "سجل",
+          "skipped": "لم يحتسب",
+          "flagged": "يحتاج مراجعة"
+        }
       }
     },
     "switch": {
@@ -433,6 +466,16 @@
     "update": {
       "xbloom_firmware": {
         "name": "البرنامج الثابت"
+      }
+    },
+    "number": {
+      "coffee_lab_manual_dose": {
+        "name": "جرعة التحضير اليدوي"
+      }
+    },
+    "button": {
+      "coffee_lab_record_manual_brew": {
+        "name": "تسجيل تحضير يدوي"
       }
     }
   },
@@ -514,6 +557,9 @@
     },
     "bag_not_empty": {
       "message": "لا يزال {name} يظهر {remaining_g} غ متبقية. زن ما تبقى وسجله أولا."
+    },
+    "manual_dose_required": {
+      "message": "حدد الجرعة أولا."
     }
   },
   "services": {

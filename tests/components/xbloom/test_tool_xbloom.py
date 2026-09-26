@@ -79,7 +79,7 @@ def _exceptions(path: Path) -> dict:
 
 def _refusal_keys() -> set[str]:
     source = "".join(p.read_text() for p in COMPONENT.rglob("*.py"))
-    keys = set(re.findall(r'refuse\(\s*"([a-z_]+)"', source))
+    keys = set(re.findall(r'(?:refuse|fail)\(\s*"([a-z_]+)"', source))
     # finish_bag raises the code finish_refusal returns.
     keys |= set(re.findall(r'return "(bag_[a-z_]+)"', source))
     from xbloom import spec

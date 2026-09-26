@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import XBloomCoordinator
+from .coffee_lab.entities import entities_for as coffee_lab_entities
 
 _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 1  # action entity — serialize concurrent button presses
@@ -47,6 +48,8 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         # Brew customizer — save the slider-scaled recipe as a new one
         XBloomSaveAsNewRecipeButton(entry),
     ])
+    # Coffee Lab's, only while it is switched on.
+    async_add_entities(coffee_lab_entities(entry.runtime_data.coffee_lab, "button"))
 
 
 class XBloomRefreshButton(CoordinatorEntity, ButtonEntity):

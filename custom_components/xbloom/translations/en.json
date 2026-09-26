@@ -374,6 +374,21 @@
           "circular": "Circular",
           "spiral": "Spiral"
         }
+      },
+      "coffee_lab_active_bag": {
+        "name": "Coffee bag"
+      },
+      "coffee_lab_stats_period": {
+        "name": "Stats period",
+        "state": {
+          "today": "Today",
+          "yesterday": "Yesterday",
+          "last_7_days": "Last 7 days",
+          "last_30_days": "Last 30 days",
+          "this_month": "This month",
+          "last_month": "Last month",
+          "this_year": "This year"
+        }
       }
     },
     "sensor": {
@@ -423,6 +438,24 @@
       },
       "scale_weight": {
         "name": "Scale Weight"
+      },
+      "coffee_lab_remaining": {
+        "name": "Coffee left"
+      },
+      "coffee_lab_bags": {
+        "name": "Coffee bags"
+      },
+      "coffee_lab_stats": {
+        "name": "Brews"
+      },
+      "coffee_lab_last_count": {
+        "name": "Last brew counted",
+        "state": {
+          "counted": "Taken from the bag",
+          "recorded": "Recorded",
+          "skipped": "Not counted",
+          "flagged": "Needs review"
+        }
       }
     },
     "switch": {
@@ -433,6 +466,16 @@
     "update": {
       "xbloom_firmware": {
         "name": "Firmware"
+      }
+    },
+    "number": {
+      "coffee_lab_manual_dose": {
+        "name": "Manual brew dose"
+      }
+    },
+    "button": {
+      "coffee_lab_record_manual_brew": {
+        "name": "Record manual brew"
       }
     }
   },
@@ -514,6 +557,9 @@
     },
     "bag_not_empty": {
       "message": "{name} still shows {remaining_g} g left. Weigh what is left and record it first."
+    },
+    "manual_dose_required": {
+      "message": "Set the dose first."
     }
   },
   "services": {

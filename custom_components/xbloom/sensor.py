@@ -13,6 +13,7 @@ from .ble_entities import (
     XBloomScaleWeightBleSensor,
 )
 from .reading_sensors import READING_SENSORS
+from .coffee_lab.entities import entities_for as coffee_lab_entities
 
 PARALLEL_UPDATES = 0  # event-driven; no polling
 
@@ -25,3 +26,5 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         XBloomLastUpdatedSensor(entry),
         *[cls(entry) for cls in READING_SENSORS],
     ])
+    # Coffee Lab's, only while it is switched on.
+    async_add_entities(coffee_lab_entities(entry.runtime_data.coffee_lab, "sensor"))

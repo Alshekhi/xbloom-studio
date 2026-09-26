@@ -31,6 +31,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from .ble_entities import send_brewer_temp_live, signal_event
 from .const import DOMAIN
+from .coffee_lab.entities import entities_for as coffee_lab_entities
 from xbloom import spec
 from xbloom.ble import packet_grinder_set
 
@@ -68,6 +69,8 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         XBloomBrewRatioNumber(entry),
         XBloomBrewDoseNumber(entry),
     ])
+    # Coffee Lab's, only while it is switched on.
+    async_add_entities(coffee_lab_entities(entry.runtime_data.coffee_lab, "number"))
 
 
 # Entity the customizer sliders follow (the recipe picker). Its

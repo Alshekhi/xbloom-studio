@@ -41,7 +41,7 @@ from xbloom.recipe_validate import normalize_recipe
 from .coffee_lab.actions import resolve_bean
 from .coffee_lab.lab import CoffeeLab
 from .const import DOMAIN
-from .tool_common import Spec, check_arguments as _check, describe as _describe, refuse
+from .tool_common import Spec, check_arguments as _check, describe as _describe, fail, refuse
 
 DEFAULT_HISTORY_DAYS = 7
 
@@ -86,7 +86,7 @@ class Machine:
     def entity_id(self, platform: str, unique_id: str) -> str:
         entity_id = er.async_get(self.hass).async_get_entity_id(platform, DOMAIN, unique_id)
         if entity_id is None:
-            raise refuse("entity_missing", entity=f"{platform}.{unique_id}")
+            raise fail("entity_missing", entity=f"{platform}.{unique_id}")
         return entity_id
 
     def state(self, platform: str, unique_id: str) -> str | None:
@@ -429,14 +429,14 @@ def _brew_failure(data: dict[str, Any]) -> HomeAssistantError:
     """The translated error for an `xbloom_brew_failed` reason code."""
     reason = str(data.get("reason") or "")
     if reason in set(spec.REPLY_REFUSALS.values()):
-        return _refuse(f"refused_{reason}")
+        return fail(f"refused_{reason}")
     if reason == "bluetooth_error":
-        return _refuse("connection_failed", error=data.get("error") or "")
+        return fail("connection_failed", error=data.get("error") or "")
     if reason == "not_configured":
-        return _refuse("not_configured")
+        return fail("not_configured")
     if reason == "machine_not_found":
-        return _refuse("machine_unreachable")
-    return _refuse("brew_not_started", reason=reason)
+        return fail("machine_unreachable")
+    return fail("brew_not_started", reason=reason)
 
 
 async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
@@ -588,7 +588,7 @@ async def brew_history(machine: Machine, args: dict[str, Any]) -> dict[str, Any]
     """
     hass = machine.hass
     if "recorder" not in hass.config.components:
-        raise _refuse("history_unavailable")
+        raise fail("history_unavailable")
     days = int(args.get("days") or DEFAULT_HISTORY_DAYS)
     entity_id = machine.entity_id("sensor", "xbloom_brew_status")
     changes = await get_instance(hass).async_add_executor_job(

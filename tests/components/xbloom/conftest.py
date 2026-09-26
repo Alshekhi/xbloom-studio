@@ -179,6 +179,7 @@ def _inject_global_stubs() -> None:
             self.translation_placeholders = translation_placeholders
 
     exc_mod.HomeAssistantError = HomeAssistantError
+    exc_mod.ServiceValidationError = type("ServiceValidationError", (HomeAssistantError,), {})
 
     def_mod = _stub_mod("homeassistant.data_entry_flow")
     def_mod.FlowResult = dict
@@ -240,6 +241,10 @@ def _inject_global_stubs() -> None:
     llm.LLMContext = MagicMock
     llm.async_register_api = MagicMock(return_value=MagicMock(name="unregister_api"))
     helpers.llm = llm
+
+    entity = _stub_mod("homeassistant.helpers.entity")
+    entity.Entity = _base_class("Entity")
+    helpers.entity = entity
 
     ent_reg = _stub_mod("homeassistant.helpers.entity_registry")
     ent_reg.async_get = MagicMock()

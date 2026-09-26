@@ -11,13 +11,25 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from .const import DOMAIN
 
 
-def refuse(key: str, **placeholders: Any) -> HomeAssistantError:
-    """A translated refusal, its text under `exceptions` in strings.json."""
+def refuse(key: str, **placeholders: Any) -> ServiceValidationError:
+    """A call the caller got wrong — a missing argument, an unknown bag.
+
+    Translated: its text is under `exceptions` in strings.json.
+    """
+    return ServiceValidationError(
+        translation_domain=DOMAIN, translation_key=key,
+        translation_placeholders={k: str(v) for k, v in placeholders.items()},
+    )
+
+
+def fail(key: str, **placeholders: Any) -> HomeAssistantError:
+    """A call that was right but could not be carried out — the machine
+    refused, or cannot be reached. Translated like a refusal."""
     return HomeAssistantError(
         translation_domain=DOMAIN, translation_key=key,
         translation_placeholders={k: str(v) for k, v in placeholders.items()},
