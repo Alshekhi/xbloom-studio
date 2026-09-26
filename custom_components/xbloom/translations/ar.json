@@ -44,6 +44,8 @@
           "edit_recipe": "تعديل وصفة",
           "delete_recipe": "حذف وصفة",
           "add_recipe": "إضافة وصفة من رابط مشاركة",
+          "add_bag": "إضافة كيس",
+          "edit_bag": "تعديل كيس",
           "cloud_login": "تسجيل الدخول إلى سحابة xBloom",
           "cloud_logout": "تسجيل الخروج من سحابة xBloom",
           "connection": "الاتصال (مهلة الجلسة المباشرة)",
@@ -299,6 +301,46 @@
         "data": {
           "enable": "تتبع أكياس القهوة"
         }
+      },
+      "add_bag": {
+        "title": "إضافة كيس",
+        "data": {
+          "name": "الاسم",
+          "remaining_g": "الكمية في الكيس",
+          "bag_size_g": "حجم الكيس",
+          "status": "المرحلة",
+          "roaster": "المحمصة",
+          "country": "البلد",
+          "region": "المنطقة",
+          "process": "المعالجة",
+          "roaster_notes": "ملاحظات المحمصة"
+        },
+        "data_description": {
+          "remaining_g": "بعد الوزن. اتركه فارغا لتسجيل التحضيرات دون خصمها من الكيس."
+        }
+      },
+      "edit_bag": {
+        "title": "تعديل كيس",
+        "data": {
+          "bag": "الكيس"
+        }
+      },
+      "edit_bag_details": {
+        "title": "{name}",
+        "data": {
+          "name": "الاسم",
+          "remaining_g": "الكمية في الكيس",
+          "bag_size_g": "حجم الكيس",
+          "status": "المرحلة",
+          "roaster": "المحمصة",
+          "country": "البلد",
+          "region": "المنطقة",
+          "process": "المعالجة",
+          "roaster_notes": "ملاحظات المحمصة"
+        },
+        "data_description": {
+          "remaining_g": "بعد الوزن. اتركه فارغا لتسجيل التحضيرات دون خصمها من الكيس."
+        }
       }
     },
     "error": {
@@ -324,7 +366,8 @@
       "cloud_login_failed": "تعذّر تسجيل الدخول. تحقّق من بريدك الإلكتروني وكلمة المرور، ثم حاول من جديد."
     },
     "abort": {
-      "no_recipes": "لا توجد وصفات محفوظة بعد."
+      "no_recipes": "لا توجد وصفات محفوظة بعد.",
+      "no_bags": "لا توجد أكياس."
     }
   },
   "entity": {

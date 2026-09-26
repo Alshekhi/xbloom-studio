@@ -25,6 +25,9 @@ from homeassistant.components.bluetooth import (
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
+from .coffee_lab import actions as coffee_lab_actions
+from .coffee_lab.entities import bag_labels
+from .coffee_lab.models import STATUSES
 from .const import (
     CONF_BLE_ADDRESS,
     CONF_BLE_NAME,
@@ -297,6 +300,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         self._post_save: dict | None = None
         self._pending_login: dict | None = None
         self._reconcile_count: int = 0
+        self._bag_id: str | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -306,6 +310,12 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         # logout when logged in. Everything else (recipe CRUD) is identical —
         # the coordinator routes it to the cloud or local storage transparently.
         cloud_option = "cloud_logout" if coordinator.cloud_logged_in else "cloud_login"
+        # Bags are offered only while Coffee Lab is on.
+        bag_options = (
+            ["add_bag", "edit_bag"]
+            if self.config_entry.runtime_data.coffee_lab is not None
+            else []
+        )
         return self.async_show_menu(
             step_id="init",
             menu_options=[
@@ -313,6 +323,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                 "edit_recipe",
                 "delete_recipe",
                 "add_recipe",
+                *bag_options,
                 cloud_option,
                 "connection",
                 "coffee_lab",
@@ -386,6 +397,105 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             data_schema=vol.Schema({
                 vol.Required("enable", default=current): selector.BooleanSelector(),
             }),
+        )
+
+    # ------------------------------------------------------------------ #
+    # Coffee Lab bags                                                    #
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _bag_schema(bag: dict[str, Any], statuses: list[str]) -> vol.Schema:
+        """The bag form. Blank optional fields stay blank, never zero."""
+        grams = selector.NumberSelector(selector.NumberSelectorConfig(
+            min=0, max=5000, step=0.1, mode="box", unit_of_measurement="g",
+        ))
+
+        def suggested(key: str) -> dict[str, Any]:
+            value = bag.get(key)
+            return {"suggested_value": value} if value not in (None, "") else {}
+
+        return vol.Schema({
+            vol.Required("name", default=bag.get("name", "")): selector.TextSelector(),
+            vol.Optional("remaining_g", description=suggested("remaining_g")): grams,
+            vol.Optional("bag_size_g", description=suggested("bag_size_g")): grams,
+            vol.Required("status", default=bag.get("status", statuses[0])): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=statuses, translation_key="bag_status")
+            ),
+            **{
+                vol.Optional(key, description=suggested(key)): selector.TextSelector()
+                for key in ("roaster", "country", "region", "process")
+            },
+            vol.Optional("roaster_notes", description=suggested("roaster_notes")):
+                selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
+        })
+
+    async def async_step_add_bag(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Add a bag. Given how much is in it, it is counted down from there."""
+        lab = self.config_entry.runtime_data.coffee_lab
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            values = {k: v for k, v in user_input.items() if v not in (None, "")}
+            if not str(values.get("name", "")).strip():
+                errors["name"] = "required"
+            else:
+                facts = await coffee_lab_actions.add_bean(lab, values)
+                return self.async_create_entry(
+                    title="", data={"_bag_added": facts["added"]["id"]}
+                )
+        return self.async_show_form(
+            step_id="add_bag",
+            data_schema=self._bag_schema(user_input or {}, ["unopened", "open"]),
+            errors=errors,
+        )
+
+    async def async_step_edit_bag(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Pick the bag to edit, by id — two bags can share a name."""
+        lab = self.config_entry.runtime_data.coffee_lab
+        beans = await lab.store.async_list_beans(selectable_only=False)
+        if not beans:
+            return self.async_abort(reason="no_bags")
+        if user_input is not None:
+            self._bag_id = user_input["bag"]
+            return await self.async_step_edit_bag_details()
+        return self.async_show_form(
+            step_id="edit_bag",
+            data_schema=vol.Schema({vol.Required("bag"): vol.In(bag_labels(beans))}),
+        )
+
+    async def async_step_edit_bag_details(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Correct a bag. A new amount starts counting it from there."""
+        lab = self.config_entry.runtime_data.coffee_lab
+        bean = await lab.store.async_get_bean(self._bag_id)
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            name = str(user_input.get("name", "")).strip()
+            if not name:
+                errors["name"] = "required"
+            else:
+                # A field emptied in the form is not sent at all, so every
+                # field is set: absent means cleared.
+                await lab.store.async_update_bean(
+                    bean.id, name=name, status=user_input["status"],
+                    bag_size_g=user_input.get("bag_size_g"),
+                    **{k: user_input.get(k, "") for k in coffee_lab_actions.DESCRIPTIVE},
+                )
+                lab.on_change()
+                if user_input.get("remaining_g") not in (None, "") and (
+                    user_input["remaining_g"] != bean.remaining_g or not bean.tracked
+                ):
+                    await lab.async_start_tracking(bean.id, float(user_input["remaining_g"]))
+                return self.async_create_entry(title="", data={"_bag_edited": bean.id})
+        current = coffee_lab_actions.bean_facts(bean)
+        return self.async_show_form(
+            step_id="edit_bag_details",
+            data_schema=self._bag_schema(user_input or current, list(STATUSES)),
+            errors=errors,
+            description_placeholders={"name": bean.name},
         )
 
     async def async_step_firmware_flashing(

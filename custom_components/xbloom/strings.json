@@ -44,6 +44,8 @@
           "edit_recipe": "Edit a recipe",
           "delete_recipe": "Delete a recipe",
           "add_recipe": "Add a recipe from a share link",
+          "add_bag": "Add a bag",
+          "edit_bag": "Edit a bag",
           "cloud_login": "Sign in to xBloom cloud",
           "cloud_logout": "Sign out of xBloom cloud",
           "connection": "Connection (live-session timeout)",
@@ -299,6 +301,46 @@
         "data": {
           "enable": "Track coffee bags"
         }
+      },
+      "add_bag": {
+        "title": "Add a bag",
+        "data": {
+          "name": "Name",
+          "remaining_g": "Grams in the bag",
+          "bag_size_g": "Bag size",
+          "status": "Stage",
+          "roaster": "Roaster",
+          "country": "Country",
+          "region": "Region",
+          "process": "Process",
+          "roaster_notes": "Roaster notes"
+        },
+        "data_description": {
+          "remaining_g": "Weighed. Leave blank to record brews without counting the bag down."
+        }
+      },
+      "edit_bag": {
+        "title": "Edit a bag",
+        "data": {
+          "bag": "Bag"
+        }
+      },
+      "edit_bag_details": {
+        "title": "{name}",
+        "data": {
+          "name": "Name",
+          "remaining_g": "Grams in the bag",
+          "bag_size_g": "Bag size",
+          "status": "Stage",
+          "roaster": "Roaster",
+          "country": "Country",
+          "region": "Region",
+          "process": "Process",
+          "roaster_notes": "Roaster notes"
+        },
+        "data_description": {
+          "remaining_g": "Weighed. Leave blank to record brews without counting the bag down."
+        }
       }
     },
     "error": {
@@ -324,7 +366,8 @@
       "cloud_login_failed": "Sign-in failed. Check your xBloom email and password, then try again."
     },
     "abort": {
-      "no_recipes": "No recipes saved yet."
+      "no_recipes": "No recipes saved yet.",
+      "no_bags": "There are no bags yet."
     }
   },
   "entity": {
