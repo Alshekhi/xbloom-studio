@@ -19,7 +19,7 @@ from homeassistant.util import dt as dt_util
 from xbloom import spec
 
 from ..const import DOMAIN
-from .inventory import Deduct, Flag, Skip, decide_consumption
+from .inventory import Deduct, Flag, Skip, decide_consumption, is_xpod
 from .models import SELECTABLE, Bean, Brew, Review
 from .stats import DEFAULT_PERIOD, PERIODS, Report, earliest_needed, period_report
 from .store import (
@@ -294,6 +294,43 @@ class CoffeeLab:
             remaining_g=decision.new_remaining_g,
             opened=decision.open_bag, finished=decision.finish,
         )
+
+    async def async_record_stopped(
+        self, *, bean_id: str | None, grams: Any, run_id: str | None,
+        cup_type: Any = None, recipe: str | None = None, brewed_at: str | None = None,
+        unattributed: bool = False,
+    ) -> Consumption:
+        """A brew stopped after grinding: its coffee is used, none was made.
+
+        Recorded for someone to decide, with the bag left as it is — whether
+        the grounds were brewed some other way or thrown out is not something
+        the machine can say.
+        """
+        async with self._counting:
+            if self._runs.contains(run_id) or bool(
+                run_id and await self.store.async_has_run(run_id)
+            ):
+                result = Consumption("skipped", reason="already_counted")
+            elif unattributed or is_xpod(cup_type):
+                # No bag to put right: the coffee was in a pod, or came from none.
+                result = Consumption("skipped", reason="no_bag_used")
+            else:
+                await self.store.async_create_brew(Brew(
+                    id="", brewed_at=brewed_at or dt_util.utcnow().isoformat(),
+                    recorded_at=dt_util.utcnow().isoformat(), dose_g=_grams(grams),
+                    brewer=XBLOOM_BREWER, bean_id=bean_id, dripper=cup_label(cup_type),
+                    recipe=recipe, outcome="stopped", run_id=run_id,
+                    review=Review("stopped_after_grinding", {"grams": _grams(grams)}),
+                ))
+                await self._runs.async_add(run_id)
+                result = Consumption(
+                    "flagged", reason="stopped_after_grinding",
+                    detail={"grams": _grams(grams)}, bean_id=bean_id,
+                )
+            await self._async_set_state(last_count={
+                **asdict(result), "at": dt_util.utcnow().isoformat(),
+            })
+            return result
 
     async def async_start_tracking(self, bean_id: str, remaining_g: float) -> Bean:
         """Count a bag down from an amount someone measured.

@@ -142,3 +142,21 @@ async def test_a_brew_refused_before_it_runs_still_has_a_run_id():
     response = await handlers["start_brew"](MagicMock(data={"context": 7}))
     [failed] = _fired(hass, "xbloom_brew_failed")
     assert failed["run_id"] == response["run_id"] and failed["context"] == 7
+
+
+async def test_a_stop_says_whether_the_grinder_had_run(brewing):
+    hass, entry, _h, _r = await brewing()
+    ble = _FakeBle.instances[-1]
+    await ble.on_event(_frame(cmd=40502))       # the grinder starting
+    await ble.on_event(_frame(ACTIVITY_BREWING))
+    await ble.on_event(_frame(HOME))
+    await entry.tasks[0]
+    [stopped] = _fired(hass, "xbloom_brew_stopped")
+    assert stopped["ground"] is True and stopped["dose_g"] == 20
+
+
+async def test_a_stop_before_grinding_says_so(brewing):
+    hass, entry, handlers, _r = await brewing()
+    await handlers["stop_brew"](MagicMock(data={}))
+    [stopped] = _fired(hass, "xbloom_brew_stopped")
+    assert stopped["ground"] is False

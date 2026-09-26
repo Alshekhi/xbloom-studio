@@ -180,3 +180,36 @@ async def test_with_coffee_lab_on_there_are_two_tools_and_the_bag_rule():
     instance = await llm_api.XBloomAPI(MagicMock(), entry).async_get_api_instance(MagicMock())
     assert [t.name for t in instance.tools] == ["xbloom", "coffee_lab"]
     assert "bean" in instance.tools[0].description
+
+
+STOPPED = {"run_id": "run-s", "recipe_name": "K", "dose_g": 18, "cup_type": 2,
+           "by": "machine", "ended_at": "2026-09-26T07:00:00+00:00"}
+
+
+async def test_a_brew_stopped_after_grinding_is_recorded_for_review_bag_untouched():
+    lab, bus, _stop = await _listening()
+    bag = await _bag(lab)
+    await bus.fire("xbloom_brew_stopped", {**STOPPED, "ground": True, "bean_id": bag.id})
+    [brew] = await lab.store.async_list_brews()
+    assert brew.review.reason == "stopped_after_grinding" and brew.dose_g == 18.0
+    assert brew.bean_id == bag.id and brew.outcome == "stopped"
+    assert (await lab.store.async_get_bean(bag.id)).remaining_g == 250.0
+    assert lab.last_count["result"] == "flagged"
+
+
+@pytest.mark.parametrize("extra", [
+    {"ground": False},
+    {"ground": True, "cup_type": 1},          # an xPod
+    {"ground": True, "unattributed": True},
+])
+async def test_a_stop_that_used_no_bag_s_coffee_records_nothing(extra):
+    lab, bus, _stop = await _listening()
+    await bus.fire("xbloom_brew_stopped", {**STOPPED, **extra})
+    assert await lab.store.async_list_brews() == []
+
+
+async def test_the_same_stop_twice_is_recorded_once():
+    lab, bus, _stop = await _listening()
+    for _ in range(2):
+        await bus.fire("xbloom_brew_stopped", {**STOPPED, "ground": True})
+    assert len(await lab.store.async_list_brews()) == 1

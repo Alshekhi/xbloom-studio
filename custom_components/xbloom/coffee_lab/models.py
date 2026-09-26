@@ -14,7 +14,11 @@ Status = Literal["unopened", "open", "finished", "archived"]
 STATUSES: tuple[Status, ...] = ("unopened", "open", "finished", "archived")
 
 # Why a brew was recorded for review: the inventory rules' flags.
-REVIEW_REASONS = ("no_bag", "more_than_left", "bag_closed", "tracked_without_amount")
+REVIEW_REASONS = (
+    "no_bag", "more_than_left", "bag_closed", "tracked_without_amount",
+    # Not the inventory rules': a brew stopped once its coffee was ground.
+    "stopped_after_grinding",
+)
 SELECTABLE: tuple[Status, ...] = ("open", "unopened")
 
 
