@@ -100,12 +100,16 @@ cards — nothing custom to install. It follows the machine from screen to scree
 grinder's controls when you're at the grinder and the brew panel while a recipe runs, and
 it's laid out so every control is clearly labelled and reachable in order.
 
-1. Create the helpers and script from
+It comes in English and Arabic, and shows Coffee Lab's cards only while Coffee
+Lab is switched on.
+
+1. Create the three helpers in
    [`dashboard/dashboard-dependencies.yaml`](dashboard/dashboard-dependencies.yaml).
 2. New dashboard → **Edit dashboard** → three-dot menu → **Raw configuration editor** →
-   paste [`dashboard/dashboard-xbloom-studio.yaml`](dashboard/dashboard-xbloom-studio.yaml).
+   paste [`dashboard/dashboard-xbloom-studio.yaml`](dashboard/dashboard-xbloom-studio.yaml)
+   or [`dashboard/dashboard-xbloom-studio.ar.yaml`](dashboard/dashboard-xbloom-studio.ar.yaml).
 
-[`dashboard/README.md`](dashboard/README.md) documents the two views and what to change if
+[`dashboard/README.md`](dashboard/README.md) documents the views and what to change if
 you adapt it.
 
 ## Automations

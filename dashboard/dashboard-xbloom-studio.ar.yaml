@@ -1,6 +1,6 @@
 # Built by dashboard/build.py — edit that, not this file.
 views:
-- title: Brew
+- title: التحضير
   path: brew
   icon: mdi:coffee
   type: sections
@@ -10,7 +10,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Right now'
+      content: '## الآن'
     - type: tile
       entity: sensor.xbloom_studio_brew_status
       icon_tap_action:
@@ -45,7 +45,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Brew in progress'
+      content: '## تحضير جار'
     - type: tile
       entity: sensor.xbloom_studio_current_recipe
       icon_tap_action:
@@ -92,7 +92,7 @@ views:
         target:
           entity_id: button.xbloom_studio_cancel_brew
         confirmation:
-          text: Stop the brew in progress?
+          text: إيقاف التحضير الجاري؟
     visibility:
     - condition: or
       conditions:
@@ -106,7 +106,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Current bag'
+      content: '## الكيس الحالي'
     - type: tile
       entity: select.xbloom_studio_coffee_bag
       icon_tap_action:
@@ -115,7 +115,7 @@ views:
       - type: select-options
     - type: markdown
       content: '{% set a = states[''select.xbloom_studio_coffee_bag''].attributes if states[''select.xbloom_studio_coffee_bag'']
-        else {} %}{{ [a.get(''roaster''), [a.get(''country''), a.get(''region'')] | select | join('',
+        else {} %}{{ [a.get(''roaster''), [a.get(''country''), a.get(''region'')] | select | join(''،
         ''), a.get(''process'')] | select | join('' · '') }}{% if a.get(''roaster_notes'') %}
 
 
@@ -143,7 +143,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Brew with the xBloom'
+      content: '## التحضير بماكينة xBloom'
     - type: tile
       entity: select.xbloom_studio_recipe
       icon_tap_action:
@@ -194,7 +194,7 @@ views:
         action: none
       tap_action:
         action: toggle
-      name: Show brew adjustments
+      name: إظهار تعديلات التحضير
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_current_module
@@ -215,10 +215,10 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Brew with the xBloom'
+      content: '## التحضير بماكينة xBloom'
     - type: markdown
       text_only: true
-      content: Return the machine to its home screen to brew a recipe.
+      content: أعد الماكينة إلى شاشتها الرئيسية لتحضير وصفة.
     visibility:
     - condition: or
       conditions:
@@ -241,7 +241,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Adjust this brew'
+      content: '## تعديل هذا التحضير'
     - type: tile
       entity: switch.xbloom_studio_use_grinder
       icon_tap_action:
@@ -291,24 +291,24 @@ views:
 
         {% set wu = states(''select.xbloom_studio_weight_unit'') %}
 
-        ### This brew
+        ### هذا التحضير
 
-        {% if wu == ''oz'' %}- **Coffee:** {{ (dose * 0.035274) | round(2) }} oz
+        {% if wu == ''oz'' %}- **القهوة:** {{ (dose * 0.035274) | round(2) }} oz
 
-        - **Water:** {{ (water * 0.033814) | round(1) }} oz
+        - **الماء:** {{ (water * 0.033814) | round(1) }} oz
 
-        {% else %}- **Coffee:** {{ dose | round(1) }} g
+        {% else %}- **القهوة:** {{ dose | round(1) }} غ
 
-        - **Water:** {{ water | round(0) | int }} ml
+        - **الماء:** {{ water | round(0) | int }} مل
 
-        {% endif %}- **Ratio:** 1:{{ ratio | round(1) }}'
+        {% endif %}- **النسبة:** 1:{{ ratio | round(1) }}'
     - type: tile
       entity: input_boolean.xbloom_show_per_pour
       icon_tap_action:
         action: none
       tap_action:
         action: toggle
-      name: Show each pour
+      name: إظهار كل صبة
     - type: markdown
       visibility:
       - condition: state
@@ -332,16 +332,16 @@ views:
 
         {% set wu = states(''select.xbloom_studio_weight_unit'') %}
 
-        {% if pours %}| Pour | Water | Temp |
+        {% if pours %}| الصبة | الماء | الحرارة |
 
         |:--:|:--:|:--:|
 
         {% for p in pours %}| {{ loop.index }} | {% set v = (p.volume_ml | float(0)) * factor %}{% if
-        wu == ''oz'' %}{{ (v * 0.033814) | round(2) }} oz{% else %}{{ v | round(0) | int }} ml{% endif
+        wu == ''oz'' %}{{ (v * 0.033814) | round(2) }} oz{% else %}{{ v | round(0) | int }} مل{% endif
         %} | {% set c = p.temperature_c | float(0) %}{% if tu == ''f'' %}{{ (c * 9 / 5 + 32) | round(0)
         | int }}°F{% else %}{{ c | round(0) | int }}°C{% endif %} |
 
-        {% endfor %}{% else %}_Pick a recipe to see its pours._{% endif %}'
+        {% endfor %}{% else %}_اختر وصفة لعرض صباتها._{% endif %}'
     visibility:
     - condition: state
       entity: input_boolean.xbloom_show_advanced
@@ -365,7 +365,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Save as a new recipe'
+      content: '## حفظ كوصفة جديدة'
     - type: tile
       entity: text.xbloom_studio_new_recipe_name
       icon_tap_action:
@@ -403,14 +403,14 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Manual brew'
+      content: '## تحضير يدوي'
     - type: tile
       entity: input_boolean.xbloom_show_manual_brew
       icon_tap_action:
         action: none
       tap_action:
         action: toggle
-      name: Show manual brew
+      name: إظهار التحضير اليدوي
     - type: tile
       entity: select.xbloom_studio_manual_brewer
       icon_tap_action:
@@ -447,7 +447,7 @@ views:
         target:
           entity_id: button.xbloom_studio_record_manual_brew
         confirmation:
-          text: Record this manual brew?
+          text: تسجيل هذا التحضير اليدوي؟
       visibility:
       - condition: state
         entity: input_boolean.xbloom_show_manual_brew
@@ -470,7 +470,7 @@ views:
     - condition: state
       entity: select.xbloom_studio_manual_brewer
       state_not: unavailable
-- title: Stats
+- title: الإحصاءات
   path: stats
   icon: mdi:chart-bar
   type: sections
@@ -480,7 +480,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Coffee stats'
+      content: '## إحصاءات القهوة'
     - type: tile
       entity: select.xbloom_studio_stats_period
       icon_tap_action:
@@ -493,11 +493,11 @@ views:
         action: none
     - type: markdown
       content: '{% set a = states[''sensor.xbloom_studio_brews''].attributes if states[''sensor.xbloom_studio_brews'']
-        else {} %}- **Coffee used:** {{ a.get(''coffee_g'', 0) | round(0) | int }} g
+        else {} %}- **القهوة المستخدمة:** {{ a.get(''coffee_g'', 0) | round(0) | int }} غ
 
-        {% if a.get(''water_ml'') %}- **Water brewed:** {{ a.get(''water_ml'') | round(0) | int }} ml
+        {% if a.get(''water_ml'') %}- **الماء المستخدم:** {{ a.get(''water_ml'') | round(0) | int }} مل
 
-        {% endif %}- **Brews in the period before:** {{ (a.get(''previous_period'') or {}).get(''brews'',
+        {% endif %}- **التحضيرات في الفترة السابقة:** {{ (a.get(''previous_period'') or {}).get(''brews'',
         0) }}'
     visibility:
     - condition: state
@@ -507,17 +507,17 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## By brewer'
+      content: '## حسب أداة التحضير'
     - type: markdown
       content: '{% for name, n in (state_attr(''sensor.xbloom_studio_brews'',''by_brewer'') or {}).items()
-        %}- **{{ ''Other'' if name == ''other'' else name }}**: {{ n }}
+        %}- **{{ ''أخرى'' if name == ''other'' else name }}**: {{ n }}
 
         {% endfor %}'
     visibility:
     - condition: numeric_state
       entity: sensor.xbloom_studio_brews
       above: 0
-- title: Bags
+- title: الأكياس
   path: bags
   icon: mdi:shopping
   type: sections
@@ -527,15 +527,15 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Bags on hand'
+      content: '## الأكياس المتوفرة'
     - type: markdown
       content: '{% set current = state_attr(''select.xbloom_studio_coffee_bag'',''id'') %}{% for b in
-        state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'') or [] %}- **{{ b.name }}**{{ '' (in
-        use)'' if b.id == current }} — {{ ''unopened'' if b.status == ''unopened'' else ''open'' }}, {{
-        (b.remaining_g | round(0) | int ~ '' g left'') if b.remaining_g is not none else ''not tracked''
-        }}
+        state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'') or [] %}- **{{ b.name }}**{{ '' (قيد
+        الاستخدام)'' if b.id == current }} — {{ ''غير مفتوح'' if b.status == ''unopened'' else ''مفتوح''
+        }}، {{ (b.remaining_g | round(0) | int ~ '' غ متبقية'') if b.remaining_g is not none else ''غير
+        متتبع'' }}
 
-        {% else %}No open or unopened bags.{% endfor %}'
+        {% else %}لا توجد أكياس مفتوحة أو غير مفتوحة.{% endfor %}'
     - type: tile
       entity: select.xbloom_studio_coffee_bag
       icon_tap_action:
@@ -570,7 +570,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Connection & status'
+      content: '## الاتصال والحالة'
     - type: tile
       entity: switch.xbloom_studio_connect
       icon_tap_action:
@@ -630,7 +630,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Modules'
+      content: '## الوحدات'
     - type: tile
       entity: button.xbloom_studio_go_to_grinder
       icon_tap_action:
@@ -685,7 +685,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Grinder'
+      content: '## المطحنة'
     - &id002
       type: tile
       entity: button.xbloom_studio_back_to_home
@@ -736,7 +736,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Brewer'
+      content: '## وحدة الصب'
     - *id002
     - type: tile
       entity: number.xbloom_studio_brew_temperature
@@ -796,7 +796,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Scale'
+      content: '## الميزان'
     - *id002
     - type: tile
       entity: sensor.xbloom_studio_scale_weight
@@ -834,7 +834,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Recipe library'
+      content: '## مكتبة الوصفات'
     - type: tile
       entity: button.xbloom_studio_delete_selected_recipe
       icon_tap_action:
@@ -846,15 +846,15 @@ views:
         target:
           entity_id: button.xbloom_studio_delete_selected_recipe
         confirmation:
-          text: Delete the selected recipe? This cannot be undone.
+          text: حذف الوصفة المختارة؟ لا يمكن التراجع عن ذلك.
     - type: markdown
       text_only: true
-      content: '[Add or edit recipes](/config/integrations/integration/xbloom)'
+      content: '[إضافة الوصفات أو تعديلها](/config/integrations/integration/xbloom)'
   - type: grid
     cards:
     - type: markdown
       text_only: true
-      content: '## Settings'
+      content: '## الإعدادات'
     - type: tile
       entity: select.xbloom_studio_mode
       icon_tap_action:
@@ -877,7 +877,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Connection tools'
+      content: '## أدوات الاتصال'
     - type: tile
       entity: button.xbloom_studio_ble_connect
       icon_tap_action:
@@ -912,14 +912,14 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Voice announcements'
+      content: '## الإعلانات الصوتية'
     - type: tile
       entity: automation.xbloom_brew_announcements
       icon_tap_action:
         action: none
       tap_action:
         action: toggle
-      name: Speak brew progress
+      name: إعلان سير التحضير
       visibility:
       - condition: state
         entity: automation.xbloom_brew_announcements
@@ -930,7 +930,7 @@ views:
         action: none
       tap_action:
         action: toggle
-      name: Speak machine faults
+      name: إعلان أعطال الماكينة
       visibility:
       - condition: state
         entity: automation.xbloom_machine_fault_announcements
@@ -941,7 +941,7 @@ views:
         action: none
       tap_action:
         action: toggle
-      name: Speak live readings
+      name: إعلان القراءات المباشرة
       visibility:
       - condition: state
         entity: automation.xbloom_live_control_announcements
@@ -962,7 +962,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Updates'
+      content: '## التحديثات'
     - type: tile
       entity: update.xbloom_studio_update
       icon_tap_action:
@@ -987,7 +987,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Recent machine events'
+      content: '## أحدث أحداث الماكينة'
     - type: logbook
       target:
         entity_id:

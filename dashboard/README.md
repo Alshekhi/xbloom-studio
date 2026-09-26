@@ -1,90 +1,93 @@
 # xBloom Studio dashboard
 
-Two views built entirely from stock Home Assistant cards — a **sections** view of **tile**
-cards with visibility conditions. Nothing custom to install.
+An example dashboard for the whole integration — brewing, the machine's modules,
+settings, and Coffee Lab — built from stock Home Assistant cards: **sections**
+views of **tile** cards with visibility conditions. Nothing custom to install.
+Paste it, then adapt it to your own home.
 
 | File | What it is |
 |---|---|
-| `dashboard-xbloom-studio.yaml` | The dashboard. Paste into the raw configuration editor. |
-| `dashboard-xbloom-studio.json` | The same config as JSON, for tools that prefer it. |
-| `dashboard-dependencies.yaml` | Two toggle helpers and one script the dashboard references. Create these first. |
+| `dashboard-xbloom-studio.yaml` | The dashboard, English. |
+| `dashboard-xbloom-studio.ar.yaml` | The same dashboard, Arabic. |
+| `dashboard-dependencies.yaml` | Three toggle helpers the dashboard uses. Create these first. |
+| `build.py` | Builds both files from one layout. |
+
+Entity names and states come from the integration, so they follow Home
+Assistant's language on their own. The two files differ only in the
+dashboard's own text: section headings, confirmations, and the few lines built
+from data such as the bag list.
 
 ## Install
 
-1. Create the helpers and script from `dashboard-dependencies.yaml`. The cards that use
-   them error if they're missing.
-2. New dashboard → **Edit dashboard** → three-dot menu → **Raw configuration editor** →
-   paste `dashboard-xbloom-studio.yaml` → **Save**.
+1. Set up the integration.
+2. Create the three helpers in `dashboard-dependencies.yaml`.
+3. New dashboard → **Edit dashboard** → three-dot menu → **Raw configuration
+   editor** → paste the file for your language → **Save**.
 
-The `xbloom_studio_*` entities come from the integration, so set that up first. Importing
-the blueprints in `../blueprints/automation/xbloom/` is optional — it adds the **Voice
-announcements** toggles, and that section stays hidden until at least one of those
-automations exists.
+Optional: import the blueprints in `../blueprints/automation/xbloom/` to get the
+**Voice announcements** toggles. That section stays hidden until at least one
+of those automations exists.
+
+## Coffee Lab
+
+The Coffee Lab cards — the bag in use, what is left, bags on hand, manual
+brews, stats — appear only while Coffee Lab is switched on (**Configure →
+Coffee Lab**). With it off, the dashboard is the machine alone. **Refresh
+Coffee Bags** appears only when Coffee Lab is kept in Notion.
 
 ## The views
 
-**Studio** is the daily driver: connection and status, modules, recipe, an optional brew
-editor, the live module panels, and brew-in-progress.
+- **Brew** — what is happening now, the bag in use, brewing a recipe, one-off
+  adjustments, saving a new recipe, and manual brews.
+- **Stats** — brews and coffee over a chosen period, and brews per brewer.
+- **Bags** — every open or unopened bag, and choosing the one in use.
+- **xBloom** — connection and status, the grinder, brewer and scale modules,
+  the recipe library, settings, tools, announcements, updates, and a 24-hour
+  log of machine events.
 
-**Machine** is settings and tools: mode and units, connection tools, announcement toggles,
-update tiles, and a 24-hour logbook of machine events.
-
-Both use `max_columns: 2`, so they're two-up on a wide screen and single-column on a phone.
+Every view uses `max_columns: 2`: two-up on a wide screen, one column on a
+phone.
 
 ## What controls visibility
 
-Every section carries a `visibility:` block, and two sensors drive all of them:
+Two sensors drive the Brew and xBloom views:
 
 - `sensor.xbloom_studio_current_module` — `home` / `grinder` / `brewer` / `scale`
-- `sensor.xbloom_studio_brew_status` — includes `grinding` and `brewing` during a recipe
-
-Together they make the Studio view behave as a state machine:
+- `sensor.xbloom_studio_brew_status` — `grinding` and `brewing` during a recipe
 
 | Machine is on | Dashboard shows |
 |---|---|
-| Home (idle) | Connection & status, Modules, Recipe, and the brew editor if enabled |
-| Grinder | Only the Grinder section, plus Back to home |
-| Brewer | Only the Brewer section, plus Back to home |
-| Scale | Only the Scale section, plus Back to home |
-| Brewing or grinding | Only Brew-in-progress |
+| Home (idle) | Status, brewing, and the adjustments if shown |
+| Grinder, Brewer or Scale | Only that module, with Back to home |
+| Brewing or grinding | Only the brew in progress |
 
-Module sections match positively (`state: grinder`). Idle sections carry a stack of negative
-matches (`state_not: grinder`, `state_not: brewer`, and so on). That negative stack is what
-makes the idle screen disappear the instant you step onto a module, with no flicker and no
-two panels competing.
+Module sections match positively (`state: grinder`); idle sections stack
+negative matches (`state_not: grinder`, …), so the idle screen goes the instant
+the machine is on a module. The live modules also need
+`switch.xbloom_studio_connect` on, since the knobs only respond while the
+Bluetooth session is held.
 
-Most live sections also require `switch.xbloom_studio_connect: on`, because the knobs only
-stream and respond while the Bluetooth session is held.
-
-Two toggles keep the idle screen short: `input_boolean.xbloom_show_advanced` reveals the
-brew editor, save-as-new-recipe, and the recipe library; `input_boolean.xbloom_show_per_pour`
-reveals the per-pour table inside the editor.
+A card for an entity that may not exist, or may have nothing to show — Coffee
+Lab's, the scale weight, firmware, the announcement automations, the HACS
+update — carries a `state_not: unavailable` guard; a missing entity reads as
+unavailable, so the card is hidden rather than shown broken.
 
 ## Conventions to keep if you edit it
 
-These are deliberate, and changing them degrades the dashboard:
+- **Section titles are `markdown` cards with `text_only: true` and `## …`**,
+  not `heading` cards: only the markdown form renders a real heading, so the
+  page can be moved through by heading.
+- **Every tile sets `icon_tap_action: {action: none}`**, so the icon is not a
+  second control beside the tile's own action. Action tiles also set
+  `hide_state: true`.
+- **Names come from the entities.** Tiles do not override them, so they are
+  translated.
+- **Destructive actions ask first** — Stop brew, Delete selected recipe,
+  Record manual brew.
 
-- **Section titles are `markdown` cards with `text_only: true` and `## …`**, not `heading`
-  cards. Only the markdown form emits a real `<h2>`, so heading navigation works.
-- **Every tile sets `icon_tap_action: {action: none}`**, so the icon isn't a second,
-  redundant tab stop beside the tile's own action. Action tiles also set `hide_state: true`.
-- **Names are overridden everywhere** in plain language — "Grind size (lower is finer)",
-  "Ratio (1:N water)", "You are here (machine screen)" — rather than raw entity names.
-- **Destructive actions carry a `confirmation:` dialog** (Stop brew, Delete recipe).
-- **Anything that could read as "unknown" or "unavailable" is hidden** behind a `state_not`
-  guard rather than shown empty. That covers scale weight, firmware, dose on an xPod, the
-  announcement automations, and the HACS update tile, which doesn't exist on a manual
-  install.
-- **Each section opens with a `text_only` sentence** saying what it does, since there are no
-  visual affordances to lean on.
+## Editing it
 
-## The calculated cards
-
-Two `markdown` cards in the brew editor do the arithmetic so the numbers stay honest and
-unit-aware:
-
-- **This brew** recomputes coffee, water, and ratio from the live sliders, formatting in
-  grams and millilitres or in ounces per `select.xbloom_studio_weight_unit`.
-- **Per-pour table** scales each stored pour by `dose × ratio ÷ sum of original pour
-  volumes`, and prints temperature per `select.xbloom_studio_temperature_unit`
-  (39 = room temperature, 96 = boiling point).
+Change `build.py`, not the built files, then run `python3 dashboard/build.py`
+(it needs PyYAML). The layout is written once and every language is built from
+it, so the files cannot drift apart. A new language is one more entry in
+`TEXT`.
