@@ -201,9 +201,10 @@ def _brew_settings(recipe: dict) -> dict:
     temperature, and inventing one is worse than an empty column.
     """
     pours = recipe.get("pours") or []
+    # The pours only. xbloom-py sends the bypass frame as zero on every brew,
+    # so no bypass water is poured whatever the recipe says; counting it here
+    # recorded water the machine was never told to pour.
     water = sum(float(p.get("volume_ml") or 0) for p in pours)
-    if recipe.get("bypass_water_enabled"):
-        water += float(recipe.get("bypass_volume_ml") or 0)
     dose = recipe.get("dose_g")
 
     def _shared(field: str) -> float | None:
