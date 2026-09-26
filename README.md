@@ -173,6 +173,12 @@ a response.
 **Brews** counts brews that made coffee; a brew stopped after grinding counts
 toward the coffee used but not as a brew.
 
+For charts, the integration keeps the whole brew record as long-term
+statistics — `xbloom:brews_xbloom`, `xbloom:brews_manual`,
+`xbloom:coffee_used` and `xbloom:water_brewed` — rebuilt from the record after
+each change, so they cover every brew in the record, older ones included.
+Any **Statistics graph** card can draw them.
+
 ### Coffee Lab in Notion
 
 Choose **Notion** in **Configure → Coffee Lab**, then give it an [internal

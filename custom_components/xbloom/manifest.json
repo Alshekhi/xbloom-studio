@@ -1,6 +1,9 @@
 {
   "domain": "xbloom",
   "name": "xBloom Studio",
+  "after_dependencies": [
+    "recorder"
+  ],
   "bluetooth": [
     {
       "local_name": "XBLOOM *"

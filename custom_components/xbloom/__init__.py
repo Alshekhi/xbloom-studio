@@ -30,7 +30,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceResponse, SupportsResponse, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
 
 from .const import (
@@ -45,6 +45,7 @@ from .coffee_lab.listener import async_count_completed_brews
 from .coffee_lab.notion import Databases, NotionClient, NotionStore
 from .coffee_lab.store import UnknownBean
 from .tool_common import refuse
+from .coffee_lab.history import ChartFeed
 from .coffee_lab.services import async_register_lab_services
 from .coordinator import XBloomCoordinator
 from . import llm_api
@@ -360,6 +361,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 lab.on_change()
 
             entry.async_on_unload(async_track_time_interval(hass, _reread, NOTION_REFRESH))
+        if "recorder" in hass.config.components:
+            # The brew record as statistics, for the dashboard's charts.
+            charts = ChartFeed(hass, lab)
+            entry.async_on_unload(
+                async_dispatcher_connect(hass, SIGNAL_COFFEE_LAB_UPDATED, charts.schedule)
+            )
+            entry.async_on_unload(charts.cancel)
+            charts.schedule()
 
     # ------------------------------------------------------------------ #
     # Shared BLE-event dispatcher (piggyback refresh)                     #
