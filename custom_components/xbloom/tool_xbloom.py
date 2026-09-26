@@ -604,21 +604,32 @@ async def brew_history(machine: Machine, args: dict[str, Any]) -> dict[str, Any]
         raise fail("history_unavailable")
     days = int(args.get("days") or DEFAULT_HISTORY_DAYS)
     entity_id = machine.entity_id("sensor", "xbloom_brew_status")
+    start = dt_util.utcnow() - timedelta(days=days)
     changes = await get_instance(hass).async_add_executor_job(
         partial(
             history.state_changes_during_period,
-            hass, dt_util.utcnow() - timedelta(days=days),
-            entity_id=entity_id, no_attributes=True,
-            # Off: the state at the window's start is a brew finished before it.
-            include_start_time_state=False,
+            hass, start, entity_id=entity_id, no_attributes=True,
+            # The state before the window, so a brew finishing first in the
+            # window still has what came before it.
+            include_start_time_state=True,
         )
     )
-    finished = [
-        dt_util.as_local(s.last_changed).isoformat(timespec="minutes")
-        for s in changes.get(entity_id, [])
-        if s.state == "done"
+    return {"days": days, "finished_at": finished_times(changes.get(entity_id, []), start)}
+
+
+def finished_times(states: list, start) -> list[str]:
+    """When a brew finished: `done` reached from a brew, not restored.
+
+    At every restart the sensor restores its last state, `done` included, and
+    that is recorded as a change. Only `done` straight after idle, grinding or
+    brewing is a brew finishing.
+    """
+    return [
+        dt_util.as_local(cur.last_changed).isoformat(timespec="minutes")
+        for prev, cur in zip(states, states[1:])
+        if cur.state == "done" and prev.state in ("idle", "grinding", "brewing")
+        and cur.last_changed >= start
     ]
-    return {"days": days, "finished_at": finished}
 
 
 async def standalone_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:

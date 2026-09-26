@@ -369,3 +369,21 @@ async def test_a_brew_without_a_bag_is_refused_while_coffee_lab_is_on():
     with pytest.raises(HomeAssistantError) as caught:
         await ACTIONS["start_brew"].run(tool_xbloom.Machine(FakeHass(), None, lab), {})
     assert caught.value.translation_key == "bag_required"
+
+
+def test_a_restart_restoring_done_is_not_a_brew():
+    from datetime import datetime, timezone
+
+    def at(hour, state):
+        return SimpleNamespace(state=state, last_changed=datetime(2026, 9, 26, hour, tzinfo=timezone.utc))
+
+    start = datetime(2026, 9, 26, 1, tzinfo=timezone.utc)
+    states = [
+        at(0, "done"),                           # before the window
+        at(2, "unavailable"), at(3, "done"),     # a restart restoring done
+        at(4, "idle"), at(5, "grinding"), at(6, "brewing"), at(7, "done"),
+        at(8, "unavailable"), at(9, "done"),     # another restart
+    ]
+    finished = tool_xbloom.finished_times(states, start)
+    assert len(finished) == 1 and finished[0].startswith("2026-09-26T07")
+
