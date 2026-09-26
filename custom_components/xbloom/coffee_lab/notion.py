@@ -281,15 +281,32 @@ def _missing(schema: dict[str, Any], wanted: dict[str, str]) -> list[str]:
     ]
 
 
-async def _children(client: NotionClient, page_id: str) -> list[dict]:
+async def _children(client: NotionClient, block_id: str) -> list[dict]:
     blocks: list[dict] = []
-    path = f"/blocks/{page_id}/children?page_size=100"
+    path = f"/blocks/{block_id}/children?page_size=100"
     while True:
         res = await client.call("GET", path)
         blocks.extend(res.get("results", []))
         if not res.get("has_more"):
             return blocks
-        path = f"/blocks/{page_id}/children?page_size=100&start_cursor={res['next_cursor']}"
+        path = f"/blocks/{block_id}/children?page_size=100&start_cursor={res['next_cursor']}"
+
+
+async def _databases_in(client: NotionClient, page_id: str) -> list[dict]:
+    """The page's databases, including those inside columns or toggles.
+
+    A database laid out beside something else sits in a column block, not on
+    the page itself. Sub-pages are other pages, and are not searched.
+    """
+    found: list[dict] = []
+    pending = [page_id]
+    while pending:
+        for block in await _children(client, pending.pop()):
+            if block.get("type") == "child_database":
+                found.append(block)
+            elif block.get("has_children") and block.get("type") != "child_page":
+                pending.append(block["id"])
+    return found
 
 
 def _schema(fields: dict[str, str], relation_to: str | None = None) -> dict[str, Any]:
@@ -316,7 +333,7 @@ async def async_find_or_create(client: NotionClient, page_id: str) -> Databases:
     other, or a title held by two databases: refused, never guessed.
     """
     try:
-        blocks = await _children(client, page_id)
+        blocks = await _databases_in(client, page_id)
     except NotionError as err:
         if err.status == 401:
             raise SetupProblem("notion_auth") from err

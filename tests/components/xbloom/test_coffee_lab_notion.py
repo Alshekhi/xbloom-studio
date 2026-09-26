@@ -218,3 +218,18 @@ async def test_a_run_is_looked_up_by_its_id():
     assert await NotionStore(notion, Databases("b", "r")).async_has_run("run-9")
     body = notion.calls[0][2]
     assert body["filter"] == {"property": "Run ID", "rich_text": {"equals": "run-9"}}
+
+
+async def test_databases_inside_a_column_are_found_but_not_those_in_sub_pages():
+    column = {"type": "column_list", "id": "cols", "has_children": True}
+    sub_page = {"type": "child_page", "id": "sub", "has_children": True}
+    notion = FakeNotion({
+        ("GET", f"/blocks/{PAGE}/children"): {"results": [column, sub_page]},
+        ("GET", "/blocks/cols/children"): {"results": [{"type": "column", "id": "c1", "has_children": True}]},
+        ("GET", "/blocks/c1/children"): {"results": [_child("Coffee Beans", "b"), _child("Brews", "r")]},
+        ("GET", "/databases/b"): _schema(BEAN_FIELDS),
+        ("GET", "/databases/r"): _schema(BREW_FIELDS),
+    })
+    assert await async_find_or_create(notion, PAGE) == Databases("b", "r")
+    assert not [c for c in notion.calls if c[1].startswith("/blocks/sub")]
+
