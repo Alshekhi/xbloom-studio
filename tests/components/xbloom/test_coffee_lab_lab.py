@@ -1,4 +1,5 @@
 """Coffee Lab at runtime: counting a brew once, and the active bag."""
+import asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 from zoneinfo import ZoneInfo
@@ -50,6 +51,24 @@ async def test_the_same_completion_twice_counts_once():
     again = await lab.async_consume(bean_id=bag.id, grams=18, run_id="run-1")
     assert again.result == "skipped" and again.reason == "already_counted"
     assert (await lab.store.async_get_bean(bag.id)).remaining_g == 232.0
+    assert len(await lab.store.async_list_brews()) == 1
+
+
+async def test_two_deliveries_at_once_still_count_once():
+    lab = await _lab()
+    bag = await _bag(lab, tracked=False, remaining_g=None, status="open")
+    real_create = lab.store.async_create_brew
+
+    async def slow_create(brew):
+        # A store that waits on the network while writing, as Notion does.
+        await asyncio.sleep(0.01)
+        return await real_create(brew)
+
+    lab.store.async_create_brew = slow_create
+    results = await asyncio.gather(*(
+        lab.async_consume(bean_id=bag.id, grams=18, run_id="run-1") for _ in range(2)
+    ))
+    assert sorted(r.result for r in results) == ["recorded", "skipped"]
     assert len(await lab.store.async_list_brews()) == 1
 
 

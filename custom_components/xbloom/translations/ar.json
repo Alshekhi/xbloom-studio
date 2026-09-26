@@ -499,6 +499,189 @@
     },
     "no_recipes": {
       "message": "لا توجد وصفات في المكتبة."
+    },
+    "bag_required": {
+      "message": "مختبر القهوة مفعل، لذا يحتاج التحضير إلى كيس القهوة المستخدم، أو تحديد أنه بلا كيس."
+    },
+    "bag_not_found": {
+      "message": "لا يوجد كيس مفتوح أو غير مفتوح باسم {name}."
+    },
+    "bag_ambiguous": {
+      "message": "يوجد أكثر من كيس باسم {name}. اختر واحدا بمعرفه."
+    },
+    "bag_unopened": {
+      "message": "{name} لم يفتح بعد، فلا يمكن أن يكون قد نفد."
+    },
+    "bag_not_empty": {
+      "message": "لا يزال {name} يظهر {remaining_g} غ متبقية. زن ما تبقى وسجله أولا."
+    }
+  },
+  "services": {
+    "set_active_bean": {
+      "name": "اختيار الكيس المستخدم",
+      "description": "اختر الكيس الذي تحضر منه ماكينة xBloom.",
+      "fields": {
+        "bean": {
+          "name": "الكيس",
+          "description": "الكيس باسمه."
+        },
+        "bean_id": {
+          "name": "معرف الكيس",
+          "description": "معرف الكيس، إذا تشارك كيسان الاسم نفسه."
+        }
+      }
+    },
+    "consume": {
+      "name": "تسجيل قهوة مستخدمة",
+      "description": "سجل قهوة استخدمت بأداة غير ماكينة xBloom.",
+      "fields": {
+        "bean": {
+          "name": "الكيس",
+          "description": "الكيس باسمه."
+        },
+        "bean_id": {
+          "name": "معرف الكيس",
+          "description": "معرف الكيس، إذا تشارك كيسان الاسم نفسه."
+        },
+        "grams": {
+          "name": "الغرامات",
+          "description": "كمية القهوة المستخدمة بالغرام."
+        },
+        "brewer": {
+          "name": "أداة التحضير",
+          "description": "أداة التحضير، مثل V60."
+        }
+      }
+    },
+    "start_tracking": {
+      "name": "بدء عد الكيس",
+      "description": "ابدأ العد التنازلي للكيس من كمية وزنتها.",
+      "fields": {
+        "bean": {
+          "name": "الكيس",
+          "description": "الكيس باسمه."
+        },
+        "bean_id": {
+          "name": "معرف الكيس",
+          "description": "معرف الكيس، إذا تشارك كيسان الاسم نفسه."
+        },
+        "grams": {
+          "name": "الغرامات",
+          "description": "الكمية الموجودة في الكيس الآن بالغرام."
+        }
+      }
+    },
+    "finish_bag": {
+      "name": "إنهاء كيس",
+      "description": "حدد أن الكيس نفد.",
+      "fields": {
+        "bean": {
+          "name": "الكيس",
+          "description": "الكيس باسمه."
+        },
+        "bean_id": {
+          "name": "معرف الكيس",
+          "description": "معرف الكيس، إذا تشارك كيسان الاسم نفسه."
+        }
+      }
+    },
+    "add_bean": {
+      "name": "إضافة كيس",
+      "description": "أضف كيس قهوة.",
+      "fields": {
+        "name": {
+          "name": "الاسم",
+          "description": "اسم القهوة."
+        },
+        "remaining_g": {
+          "name": "الكمية في الكيس",
+          "description": "بعد الوزن؛ إذا أدخلت يبدأ عد الكيس تنازليا."
+        },
+        "bag_size_g": {
+          "name": "حجم الكيس",
+          "description": "حجم الكيس بالغرام."
+        },
+        "status": {
+          "name": "المرحلة",
+          "description": "مرحلة الكيس."
+        },
+        "roaster": {
+          "name": "المحمصة",
+          "description": "الجهة التي حمصته."
+        },
+        "country": {
+          "name": "البلد",
+          "description": "بلد الزراعة."
+        },
+        "region": {
+          "name": "المنطقة",
+          "description": "المنطقة داخل البلد."
+        },
+        "process": {
+          "name": "المعالجة",
+          "description": "طريقة المعالجة، مثل المغسولة أو الطبيعية."
+        },
+        "roaster_notes": {
+          "name": "ملاحظات المحمصة",
+          "description": "ملاحظات التذوق من المحمصة."
+        }
+      }
+    },
+    "update_bean": {
+      "name": "تعديل كيس",
+      "description": "صحح تفاصيل الكيس.",
+      "fields": {
+        "bean": {
+          "name": "الكيس",
+          "description": "الكيس باسمه."
+        },
+        "bean_id": {
+          "name": "معرف الكيس",
+          "description": "معرف الكيس، إذا تشارك كيسان الاسم نفسه."
+        },
+        "new_name": {
+          "name": "الاسم الجديد",
+          "description": "الاسم الجديد للكيس."
+        },
+        "bag_size_g": {
+          "name": "حجم الكيس",
+          "description": "حجم الكيس بالغرام."
+        },
+        "status": {
+          "name": "المرحلة",
+          "description": "مرحلة الكيس."
+        },
+        "roaster": {
+          "name": "المحمصة",
+          "description": "الجهة التي حمصته."
+        },
+        "country": {
+          "name": "البلد",
+          "description": "بلد الزراعة."
+        },
+        "region": {
+          "name": "المنطقة",
+          "description": "المنطقة داخل البلد."
+        },
+        "process": {
+          "name": "المعالجة",
+          "description": "طريقة المعالجة، مثل المغسولة أو الطبيعية."
+        },
+        "roaster_notes": {
+          "name": "ملاحظات المحمصة",
+          "description": "ملاحظات التذوق من المحمصة."
+        }
+      }
+    }
+  },
+  "selector": {
+    "bag_status": {
+      "options": {
+        "unopened": "غير مفتوح",
+        "open": "مفتوح",
+        "finished": "منته",
+        "archived": "مؤرشف"
+      }
     }
   }
 }

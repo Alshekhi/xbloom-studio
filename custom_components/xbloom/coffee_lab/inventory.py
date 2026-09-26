@@ -74,6 +74,7 @@ def decide_consumption(
     grams: Any,
     cup_type: Any = None,
     already_processed: bool = False,
+    unattributed: bool = False,
     finished_below_g: float = DEFAULT_FINISHED_BELOW_G,
 ) -> Decision:
     # Idempotency first: a completion can arrive twice, and subtracting the
@@ -85,6 +86,11 @@ def decide_consumption(
     # that was never going to take from one.
     if is_xpod(cup_type):
         return Skip("xpod", record_brew=True)
+
+    # Said at the start to come from no bag. Recorded, and never flagged as a
+    # brew whose bag was forgotten.
+    if unattributed:
+        return Skip("unattributed", record_brew=True)
 
     try:
         grams = float(grams)

@@ -78,6 +78,21 @@ start_brew:
           min: 1
           max: 80
           step: 1
+    bean_id:
+      name: Bag
+      description: >
+        Coffee Lab only: the id of the bag this brew's coffee comes from.
+        Leave blank to use the selected bag.
+      required: false
+      selector:
+        text:
+    unattributed:
+      name: From no bag
+      description: >
+        Coffee Lab only: the coffee comes from no bag, as with an xPod.
+      required: false
+      selector:
+        boolean:
 
 stop_brew:
   name: Stop Brew
@@ -549,3 +564,155 @@ save_scaled_recipe:
       example: "Ethiopia Yirgacheffe"
       selector:
         text:
+
+# Coffee Lab — registered only while it is switched on. Names and
+# descriptions are in strings.json, so they are translated.
+set_active_bean:
+  fields:
+    bean:
+      selector:
+        text:
+    bean_id:
+      selector:
+        text:
+
+consume:
+  fields:
+    bean:
+      selector:
+        text:
+    bean_id:
+      selector:
+        text:
+    grams:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 2000
+          step: 0.1
+          unit_of_measurement: g
+          mode: box
+    brewer:
+      selector:
+        text:
+
+start_tracking:
+  fields:
+    bean:
+      selector:
+        text:
+    bean_id:
+      selector:
+        text:
+    grams:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 2000
+          step: 0.1
+          unit_of_measurement: g
+          mode: box
+
+finish_bag:
+  fields:
+    bean:
+      selector:
+        text:
+    bean_id:
+      selector:
+        text:
+
+add_bean:
+  fields:
+    name:
+      required: true
+      selector:
+        text:
+    remaining_g:
+      selector:
+        number:
+          min: 0
+          max: 5000
+          step: 0.1
+          unit_of_measurement: g
+          mode: box
+    bag_size_g:
+      selector:
+        number:
+          min: 0
+          max: 5000
+          step: 1
+          unit_of_measurement: g
+          mode: box
+    status:
+      selector:
+        select:
+          translation_key: bag_status
+          options:
+            - unopened
+            - open
+            - finished
+            - archived
+    roaster:
+      selector:
+        text:
+    country:
+      selector:
+        text:
+    region:
+      selector:
+        text:
+    process:
+      selector:
+        text:
+    roaster_notes:
+      selector:
+        text:
+          multiline: true
+
+update_bean:
+  fields:
+    bean:
+      selector:
+        text:
+    bean_id:
+      selector:
+        text:
+    new_name:
+      selector:
+        text:
+    bag_size_g:
+      selector:
+        number:
+          min: 0
+          max: 5000
+          step: 1
+          unit_of_measurement: g
+          mode: box
+    status:
+      selector:
+        select:
+          translation_key: bag_status
+          options:
+            - unopened
+            - open
+            - finished
+            - archived
+    roaster:
+      selector:
+        text:
+    country:
+      selector:
+        text:
+    region:
+      selector:
+        text:
+    process:
+      selector:
+        text:
+    roaster_notes:
+      selector:
+        text:
+          multiline: true

@@ -499,6 +499,189 @@
     },
     "no_recipes": {
       "message": "There are no recipes in the library."
+    },
+    "bag_required": {
+      "message": "Coffee Lab is on, so a brew needs the bag its coffee comes from, or to be marked as from no bag."
+    },
+    "bag_not_found": {
+      "message": "There is no open or unopened bag called {name}."
+    },
+    "bag_ambiguous": {
+      "message": "More than one bag is called {name}. Choose one by its id."
+    },
+    "bag_unopened": {
+      "message": "{name} is still unopened, so it cannot be used up yet."
+    },
+    "bag_not_empty": {
+      "message": "{name} still shows {remaining_g} g left. Weigh what is left and record it first."
+    }
+  },
+  "services": {
+    "set_active_bean": {
+      "name": "Choose the bag in use",
+      "description": "Choose the bag the xBloom draws from.",
+      "fields": {
+        "bean": {
+          "name": "Bag",
+          "description": "The bag, by its name."
+        },
+        "bean_id": {
+          "name": "Bag id",
+          "description": "The bag's id, when two bags share a name."
+        }
+      }
+    },
+    "consume": {
+      "name": "Record coffee used",
+      "description": "Record coffee used by a brewer other than the xBloom.",
+      "fields": {
+        "bean": {
+          "name": "Bag",
+          "description": "The bag, by its name."
+        },
+        "bean_id": {
+          "name": "Bag id",
+          "description": "The bag's id, when two bags share a name."
+        },
+        "grams": {
+          "name": "Grams",
+          "description": "Grams of coffee used."
+        },
+        "brewer": {
+          "name": "Brewer",
+          "description": "What made the coffee, such as V60."
+        }
+      }
+    },
+    "start_tracking": {
+      "name": "Start counting a bag",
+      "description": "Count a bag down from an amount you measured.",
+      "fields": {
+        "bean": {
+          "name": "Bag",
+          "description": "The bag, by its name."
+        },
+        "bean_id": {
+          "name": "Bag id",
+          "description": "The bag's id, when two bags share a name."
+        },
+        "grams": {
+          "name": "Grams",
+          "description": "Grams in the bag now."
+        }
+      }
+    },
+    "finish_bag": {
+      "name": "Finish a bag",
+      "description": "Mark a bag used up.",
+      "fields": {
+        "bean": {
+          "name": "Bag",
+          "description": "The bag, by its name."
+        },
+        "bean_id": {
+          "name": "Bag id",
+          "description": "The bag's id, when two bags share a name."
+        }
+      }
+    },
+    "add_bean": {
+      "name": "Add a bag",
+      "description": "Add a bag of coffee.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "The coffee's name."
+        },
+        "remaining_g": {
+          "name": "Grams in the bag",
+          "description": "Measured; given, the bag is counted down."
+        },
+        "bag_size_g": {
+          "name": "Bag size",
+          "description": "The bag's size in grams."
+        },
+        "status": {
+          "name": "Stage",
+          "description": "The bag's stage."
+        },
+        "roaster": {
+          "name": "Roaster",
+          "description": "Who roasted it."
+        },
+        "country": {
+          "name": "Country",
+          "description": "Where it was grown."
+        },
+        "region": {
+          "name": "Region",
+          "description": "The region within the country."
+        },
+        "process": {
+          "name": "Process",
+          "description": "How it was processed, such as washed or natural."
+        },
+        "roaster_notes": {
+          "name": "Roaster notes",
+          "description": "The roaster's tasting notes."
+        }
+      }
+    },
+    "update_bean": {
+      "name": "Edit a bag",
+      "description": "Correct a bag's details.",
+      "fields": {
+        "bean": {
+          "name": "Bag",
+          "description": "The bag, by its name."
+        },
+        "bean_id": {
+          "name": "Bag id",
+          "description": "The bag's id, when two bags share a name."
+        },
+        "new_name": {
+          "name": "New name",
+          "description": "The bag's new name."
+        },
+        "bag_size_g": {
+          "name": "Bag size",
+          "description": "The bag's size in grams."
+        },
+        "status": {
+          "name": "Stage",
+          "description": "The bag's stage."
+        },
+        "roaster": {
+          "name": "Roaster",
+          "description": "Who roasted it."
+        },
+        "country": {
+          "name": "Country",
+          "description": "Where it was grown."
+        },
+        "region": {
+          "name": "Region",
+          "description": "The region within the country."
+        },
+        "process": {
+          "name": "Process",
+          "description": "How it was processed, such as washed or natural."
+        },
+        "roaster_notes": {
+          "name": "Roaster notes",
+          "description": "The roaster's tasting notes."
+        }
+      }
+    }
+  },
+  "selector": {
+    "bag_status": {
+      "options": {
+        "unopened": "Unopened",
+        "open": "Open",
+        "finished": "Finished",
+        "archived": "Archived"
+      }
     }
   }
 }

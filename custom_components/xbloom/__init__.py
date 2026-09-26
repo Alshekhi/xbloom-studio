@@ -37,6 +37,8 @@ from .const import (
     SIGNAL_COFFEE_LAB_UPDATED,
 )
 from .coffee_lab.lab import CoffeeLab
+from .coffee_lab.listener import async_count_completed_brews
+from .coffee_lab.services import async_register_lab_services
 from .coordinator import XBloomCoordinator
 from . import llm_api
 from xbloom.client import XBloomClient
@@ -308,6 +310,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         lab = await CoffeeLab.async_create(hass)
         lab.on_change = lambda: async_dispatcher_send(hass, SIGNAL_COFFEE_LAB_UPDATED)
         entry.runtime_data.coffee_lab = lab
+        entry.async_on_unload(async_count_completed_brews(hass, lab))
+        entry.async_on_unload(async_register_lab_services(hass, lab))
 
     # ------------------------------------------------------------------ #
     # Shared BLE-event dispatcher (piggyback refresh)                     #
@@ -506,6 +510,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _fire_failed("recipe_not_found", call.data.get("recipe_name"))
             return
 
+        # Coffee Lab: the bag is fixed now, as the brew starts. Choosing another
+        # bag while it runs must not recharge this brew to it.
+        bag: dict = {}
+        if (lab := entry.runtime_data.coffee_lab) is not None:
+            if call.data.get("unattributed"):
+                bag = {"unattributed": True}
+            else:
+                bag = {"bean_id": call.data.get("bean_id") or lab.active_bean_id}
+
         # Per-brew grinder override — does NOT modify the stored recipe.
         # Grinder choice: an explicit use_preground wins; otherwise fall back to
         # the switch.xbloom_studio_use_grinder toggle (OFF = pre-ground / skip).
@@ -619,7 +632,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     # later than this.
                     hass.bus.async_fire(
                         "xbloom_brew_started",
-                        {"recipe_name": recipe_name, "total_pours": total_pours},
+                        {"recipe_name": recipe_name, "total_pours": total_pours, **bag},
                     )
                     outcome = await _await_brew_outcome(
                         ble_client, brew_end_seen, went_home, fault_stopped
@@ -686,6 +699,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                                 1,
                             ),
                             **_brew_settings(recipe),
+                            **bag,
                         },
                     )
             except (CommandRefused, CommandUnanswered) as err:
@@ -1289,6 +1303,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             vol.Optional("dose"): vol.Coerce(float),
             vol.Optional("ratio"): vol.Coerce(float),
             vol.Optional("grind_size"): vol.Coerce(int),
+            # Coffee Lab: the bag this brew's coffee comes from, or none.
+            vol.Optional("bean_id"): str,
+            vol.Optional("unattributed"): bool,
         }),
     )
     hass.services.async_register(DOMAIN, "stop_brew", handle_stop_brew)
@@ -1575,7 +1592,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         )
 
     # The AI tools call the services above, so they come and go with them.
-    entry.async_on_unload(llm_api.async_register(hass))
+    entry.async_on_unload(llm_api.async_register(hass, entry))
 
     _LOGGER.debug("xbloom: loading platforms %s", PLATFORMS)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

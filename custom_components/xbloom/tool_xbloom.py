@@ -38,7 +38,10 @@ from homeassistant.util import dt as dt_util
 from xbloom import spec
 from xbloom.recipe_validate import normalize_recipe
 
+from .coffee_lab.actions import resolve_bean
+from .coffee_lab.lab import CoffeeLab
 from .const import DOMAIN
+from .tool_common import Spec, check_arguments as _check, describe as _describe, refuse
 
 DEFAULT_HISTORY_DAYS = 7
 
@@ -65,6 +68,8 @@ class Machine:
 
     hass: HomeAssistant
     context: Context | None
+    # Coffee Lab, when it is switched on.
+    lab: CoffeeLab | None = None
 
     async def call(self, service: str, data: dict[str, Any] | None = None) -> None:
         await self.hass.services.async_call(
@@ -81,10 +86,7 @@ class Machine:
     def entity_id(self, platform: str, unique_id: str) -> str:
         entity_id = er.async_get(self.hass).async_get_entity_id(platform, DOMAIN, unique_id)
         if entity_id is None:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN, translation_key="entity_missing",
-                translation_placeholders={"entity": f"{platform}.{unique_id}"},
-            )
+            raise refuse("entity_missing", entity=f"{platform}.{unique_id}")
         return entity_id
 
     def state(self, platform: str, unique_id: str) -> str | None:
@@ -108,11 +110,7 @@ class Machine:
         )
 
 
-def _refuse(key: str, **placeholders: Any) -> HomeAssistantError:
-    return HomeAssistantError(
-        translation_domain=DOMAIN, translation_key=key,
-        translation_placeholders={k: str(v) for k, v in placeholders.items()},
-    )
+_refuse = refuse
 
 
 # ── Recipes as facts ─────────────────────────────────────────────────────────
@@ -449,6 +447,19 @@ async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
         data["use_preground"] = args["use_preground"]
     overrides = {k: args[k] for k in ("dose", "ratio", "grind_size") if args.get(k) is not None}
     data.update(overrides)
+    bag = None
+    if machine.lab is not None:
+        # Named on the brew itself, so it cannot be forgotten, nor charged to
+        # a bag chosen for an earlier brew.
+        if args.get("unattributed"):
+            data["unattributed"] = True
+        else:
+            if not (args.get("bean") or args.get("bean_id")):
+                raise refuse("bag_required")
+            bag = await resolve_bean(machine.lab, args)
+            data["bean_id"] = bag.id
+            # The bag in use is the one the dashboard should show.
+            await machine.lab.async_select(bag.id)
 
     hass = machine.hass
     answer: asyncio.Future[Event] = hass.loop.create_future()
@@ -486,6 +497,8 @@ async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
     }
     if overrides:
         facts["overrides_this_brew_only"] = overrides
+    if bag is not None:
+        facts["bag"] = bag.name
     return facts
 
 
@@ -659,17 +672,6 @@ async def firmware_status(machine: Machine, args: dict[str, Any]) -> dict[str, A
 # ── The action table ─────────────────────────────────────────────────────────
 
 
-@dataclass(frozen=True)
-class Spec:
-    """One action: what it does, what it cannot run without, and its handler."""
-
-    run: Action
-    help: str
-    requires: tuple[str, ...] = ()
-    # Arguments of which at least one must be given.
-    one_of: tuple[str, ...] = ()
-
-
 ACTIONS: dict[str, Spec] = {
     # Recipes
     "list_recipes": Spec(list_recipes, "every recipe in the library"),
@@ -763,29 +765,27 @@ ACTIONS: dict[str, Spec] = {
 }
 
 
-def describe() -> str:
+INTRO = (
+    "The xBloom Studio coffee machine. Pick an action; each line names the "
+    "arguments that action cannot run without."
+)
+
+# Said of start_brew only while Coffee Lab is on.
+BAG_RULE = (
+    "Coffee Lab is on: start_brew also needs the bag the coffee comes from — "
+    "bean (its name) or bean_id — or unattributed=true for a brew from no bag, "
+    "such as an xPod. The bag is counted when the brew completes."
+)
+
+
+def describe(lab_on: bool = False) -> str:
     """The tool's description: every action, with what it needs."""
-    lines = [
-        "The xBloom Studio coffee machine. Pick an action; each line names the "
-        "arguments that action cannot run without.",
-    ]
-    for action, entry in ACTIONS.items():
-        needs = [", ".join(entry.requires)] if entry.requires else []
-        if entry.one_of:
-            needs.append("one of " + "/".join(entry.one_of))
-        suffix = f" [needs {'; '.join(needs)}]" if needs else ""
-        lines.append(f"- {action}: {entry.help}{suffix}")
-    return "\n".join(lines)
+    text = _describe(INTRO, ACTIONS)
+    return f"{text}\n{BAG_RULE}" if lab_on else text
 
 
 def check_arguments(action: str, args: dict[str, Any]) -> None:
-    """Refuse a call missing what its action needs, naming what is missing."""
-    entry = ACTIONS[action]
-    missing = [name for name in entry.requires if args.get(name) in (None, "")]
-    if entry.one_of and not any(args.get(name) not in (None, "") for name in entry.one_of):
-        missing.append(" or ".join(entry.one_of))
-    if missing:
-        raise _refuse("missing_arguments", action=action, arguments=", ".join(missing))
+    _check(ACTIONS, action, args)
 
 
 # ── The argument schema ──────────────────────────────────────────────────────
@@ -869,12 +869,21 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
 }
 
 
-def parameters() -> vol.Schema:
+# Offered only while Coffee Lab is on.
+BAG_ARGUMENTS: dict[str, tuple[Any, str]] = {
+    "bean": (str, "For start_brew: the name of the bag the coffee comes from."),
+    "bean_id": (str, "For start_brew: the bag's id, when two bags share a name."),
+    "unattributed": (bool, "For start_brew: the coffee comes from no bag, as with an xPod."),
+}
+
+
+def parameters(lab_on: bool = False) -> vol.Schema:
+    arguments = {**ARGUMENTS, **BAG_ARGUMENTS} if lab_on else ARGUMENTS
     return vol.Schema({
         vol.Required("action", description="Which action to run; see the tool description."):
             vol.In(list(ACTIONS)),
         **{
             vol.Optional(key, description=text): validator
-            for key, (validator, text) in ARGUMENTS.items()
+            for key, (validator, text) in arguments.items()
         },
     })

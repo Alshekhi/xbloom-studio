@@ -26,9 +26,18 @@ _REGISTER_RE = re.compile(
 _SERVICE_KEY_RE = re.compile(r"^([a-z_]+):$", re.M)
 
 
-def _registered() -> set[str]:
+# Coffee Lab's services are one table, registered and removed by one loop.
+_LAB_SERVICE_RE = re.compile(r'^    "([a-z_]+)": \(actions\.', re.M)
+
+
+def _registered_by_init() -> set[str]:
     source = (_COMPONENT / "__init__.py").read_text()
     return set(_REGISTER_RE.findall(source))
+
+
+def _registered() -> set[str]:
+    lab = (_COMPONENT / "coffee_lab" / "services.py").read_text()
+    return _registered_by_init() | set(_LAB_SERVICE_RE.findall(lab))
 
 
 def _documented() -> set[str]:
@@ -49,10 +58,10 @@ def test_every_documented_service_is_registered() -> None:
 def test_every_service_is_removed_on_unload() -> None:
     """A service left behind after unload keeps answering with a dead entry."""
     source = (_COMPONENT / "__init__.py").read_text()
-    block = source.split("entry.async_on_unload(")[0].rsplit("for svc in (", 1)
-    assert len(block) == 2, "the unload service tuple moved — update this test"
-    unloaded = set(re.findall(r"\"([a-z_]+)\"", block[1]))
-    missing = _registered() - unloaded
+    block = re.search(r"for svc in \((.*?)\n    \):", source, re.S)
+    assert block, "the unload service tuple moved — update this test"
+    unloaded = set(re.findall(r"\"([a-z_]+)\"", block.group(1)))
+    missing = _registered_by_init() - unloaded
     assert not missing, f"registered but never removed on unload: {sorted(missing)}"
 
 

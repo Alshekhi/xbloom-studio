@@ -6,6 +6,7 @@ inventory rules exist in one place.
 """
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -63,6 +64,13 @@ def cup_label(cup_type: Any) -> str | None:
         return None
 
 
+def _grams(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class CoffeeLab:
     """One install's Coffee Lab."""
 
@@ -76,6 +84,10 @@ class CoffeeLab:
         self._state: dict[str, Any] = {}
         # Entities subscribe to this; anything that changes what they show calls it.
         self.on_change = on_change
+        # One brew at a time: two deliveries of one completion, handled
+        # together, would both pass the duplicate check while the first waits
+        # on the store, and subtract twice.
+        self._counting = asyncio.Lock()
 
     @classmethod
     async def async_create(cls, hass: HomeAssistant) -> CoffeeLab:
@@ -170,11 +182,25 @@ class CoffeeLab:
     async def async_consume(
         self, *, bean_id: str | None, grams: Any, run_id: str | None = None,
         cup_type: Any = None, recipe: str | None = None,
-        brewer: str = XBLOOM_BREWER, brewed_at: str | None = None,
+        brewer: str | None = XBLOOM_BREWER, brewed_at: str | None = None,
         recipe_source: str | None = None, outcome: str | None = None,
-        settings: dict[str, Any] | None = None,
+        settings: dict[str, Any] | None = None, unattributed: bool = False,
     ) -> Consumption:
         """Apply one brew to its bag and the record."""
+        async with self._counting:
+            return await self._async_consume(
+                bean_id=bean_id, grams=grams, run_id=run_id, cup_type=cup_type,
+                recipe=recipe, brewer=brewer, brewed_at=brewed_at,
+                recipe_source=recipe_source, outcome=outcome, settings=settings,
+                unattributed=unattributed,
+            )
+
+    async def _async_consume(
+        self, *, bean_id: str | None, grams: Any, run_id: str | None,
+        cup_type: Any, recipe: str | None, brewer: str | None,
+        brewed_at: str | None, recipe_source: str | None, outcome: str | None,
+        settings: dict[str, Any] | None, unattributed: bool,
+    ) -> Consumption:
         # Read the bag fresh: a cached amount is exactly what must not be stale
         # when subtracting from it.
         bean: Bean | None = None
@@ -185,7 +211,7 @@ class CoffeeLab:
                 bean = None
         decision = decide_consumption(
             bean=bean, grams=grams, cup_type=cup_type,
-            already_processed=self._runs.contains(run_id),
+            already_processed=self._runs.contains(run_id), unattributed=unattributed,
         )
 
         def record(bag: str | None, review: Review | None = None) -> Brew:
@@ -193,7 +219,9 @@ class CoffeeLab:
                 id="",
                 brewed_at=brewed_at or dt_util.utcnow().isoformat(),
                 recorded_at=dt_util.utcnow().isoformat(),
-                dose_g=float(grams), brewer=brewer, bean_id=bag,
+                # An xPod or unattributed brew may arrive with no dose.
+                dose_g=_grams(grams), brewer=brewer, bean_id=bag,
+                water_ml=_grams((settings or {}).get("water_ml")),
                 dripper=cup_label(cup_type), recipe=recipe,
                 recipe_source=recipe_source, outcome=outcome, run_id=run_id,
                 settings={k: v for k, v in (settings or {}).items() if v is not None},

@@ -78,8 +78,10 @@ def _exceptions(path: Path) -> dict:
 
 
 def _refusal_keys() -> set[str]:
-    source = (COMPONENT / "tool_xbloom.py").read_text()
-    keys = set(re.findall(r'_refuse\(\s*"([a-z_]+)"', source))
+    source = "".join(p.read_text() for p in COMPONENT.rglob("*.py"))
+    keys = set(re.findall(r'refuse\(\s*"([a-z_]+)"', source))
+    # finish_bag raises the code finish_refusal returns.
+    keys |= set(re.findall(r'return "(bag_[a-z_]+)"', source))
     from xbloom import spec
 
     keys |= {f"refused_{reason}" for reason in spec.REPLY_REFUSALS.values()}
@@ -332,8 +334,18 @@ async def test_the_tool_refuses_before_touching_the_machine():
     assert hass.calls == []
 
 
-async def test_the_api_serves_the_xbloom_tool():
-    api = llm_api.XBloomAPI(hass=MagicMock(), id=llm_api.API_ID, name="xBloom Studio")
+async def test_without_coffee_lab_there_is_only_the_machine():
+    entry = SimpleNamespace(runtime_data=SimpleNamespace(coffee_lab=None))
+    api = llm_api.XBloomAPI(MagicMock(), entry)
     instance = await api.async_get_api_instance(MagicMock())
     assert [tool.name for tool in instance.tools] == ["xbloom"]
     assert llm_api.API_ID == "xbloom"
+    [tool] = instance.tools
+    assert "bean" not in tool.description and "Coffee Lab" not in tool.description
+
+
+async def test_a_brew_without_a_bag_is_refused_while_coffee_lab_is_on():
+    lab = SimpleNamespace(store=None)
+    with pytest.raises(HomeAssistantError) as caught:
+        await ACTIONS["start_brew"].run(tool_xbloom.Machine(FakeHass(), None, lab), {})
+    assert caught.value.translation_key == "bag_required"
