@@ -76,8 +76,12 @@ class CoffeeLabStore(ABC):
     async def async_set_tracking(self, bean_id: str, tracked: bool) -> Bean:
         return await self.async_update_bean(bean_id, tracked=tracked)
 
-    async def async_finish_bag(self, bean_id: str) -> Bean:
-        return await self.async_update_bean(bean_id, status="finished")
+    async def async_finish_bag(self, bean_id: str, today: str) -> Bean:
+        return await self.async_update_bean(bean_id, status="finished", finished_on=today)
+
+    @abstractmethod
+    async def async_has_run(self, run_id: str) -> bool:
+        """Whether a brew with this run id is already recorded."""
 
     async def async_apply_bean_update(
         self, bean_id: str, *, remaining_g: float, open_bag: bool, finish: bool,
@@ -87,6 +91,7 @@ class CoffeeLabStore(ABC):
         changes: dict[str, Any] = {"remaining_g": remaining_g}
         if finish:
             changes["status"] = "finished"
+            changes["finished_on"] = today
         elif open_bag:
             changes["status"] = "open"
             changes["opened_on"] = today
@@ -161,6 +166,9 @@ class LocalStore(CoffeeLabStore):
         dated.sort(key=lambda pair: pair[0], reverse=True)
         brews = [b for m, b in dated if since is None or m >= since]
         return brews[:limit] if limit is not None else brews
+
+    async def async_has_run(self, run_id: str) -> bool:
+        return any(b.run_id == run_id for b in self._brews)
 
     async def async_create_brew(self, brew: Brew) -> Brew:
         recorded = replace(brew, id=uuid.uuid4().hex)

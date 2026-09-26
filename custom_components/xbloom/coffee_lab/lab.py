@@ -227,9 +227,14 @@ class CoffeeLab:
                 bean = await self.store.async_get_bean(bean_id)
             except UnknownBean:
                 bean = None
+        # Counted here before, or already in the record: Home Assistant's own
+        # list of counted runs can be lost, the store's record of a brew cannot.
+        already = self._runs.contains(run_id) or bool(
+            run_id and await self.store.async_has_run(run_id)
+        )
         decision = decide_consumption(
             bean=bean, grams=grams, cup_type=cup_type,
-            already_processed=self._runs.contains(run_id), unattributed=unattributed,
+            already_processed=already, unattributed=unattributed,
         )
 
         def record(bag: str | None, review: Review | None = None) -> Brew:
@@ -314,7 +319,7 @@ class CoffeeLab:
         return None
 
     async def async_finish(self, bean_id: str) -> Bean:
-        bean = await self.store.async_finish_bag(bean_id)
+        bean = await self.store.async_finish_bag(bean_id, dt_util.now().date().isoformat())
         if self.active_bean_id == bean_id:
             await self._async_set_state(active_bean_id=None)
         self.on_change()

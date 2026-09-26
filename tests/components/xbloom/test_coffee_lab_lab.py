@@ -187,3 +187,25 @@ async def test_the_switch_is_in_the_options_menu_and_off_by_default():
             CONF_COFFEE_LAB_STORE: "local",
         }
     )
+
+
+async def test_a_brew_already_in_the_record_is_not_counted_again():
+    # Home Assistant's own list of counted runs can be lost to a restore; the
+    # store's record of the brew is the second guard.
+    lab = await _lab()
+    bag = await _bag(lab)
+    await lab.async_consume(bean_id=bag.id, grams=18, run_id="run-1")
+    lab._runs._run_ids = []
+    again = await lab.async_consume(bean_id=bag.id, grams=18, run_id="run-1")
+    assert again.result == "skipped"
+    assert (await lab.store.async_get_bean(bag.id)).remaining_g == 232.0
+
+
+async def test_a_bag_finished_by_hand_or_by_a_brew_records_the_day():
+    lab = await _lab()
+    by_hand = await _bag(lab, status="open", remaining_g=10.0)
+    assert (await lab.async_finish(by_hand.id)).finished_on
+    by_brew = await _bag(lab, status="open", remaining_g=20.0)
+    await lab.async_consume(bean_id=by_brew.id, grams=18, run_id="r")
+    after = await lab.store.async_get_bean(by_brew.id)
+    assert after.status == "finished" and after.finished_on

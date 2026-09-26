@@ -199,3 +199,22 @@ async def test_brews_since_a_moment_are_exact_though_the_query_reaches_back_a_da
     assert [b.id for b in brews] == ["a"]
     body = notion.calls[0][2]
     assert body["filter"]["or"][0]["date"]["on_or_after"] == "2026-09-23"
+
+
+def test_why_a_brew_needs_review_and_its_run_id_reach_notion():
+    brew = Brew(id="", brewed_at="2026-09-26T07:00:00Z", recorded_at="", dose_g=18.0,
+                run_id="run-9", review=Review("more_than_left", {"grams": 18.0}))
+    back = brew_from_page(_page_from(brew_properties(brew)))
+    assert back.review.reason == "more_than_left" and back.run_id == "run-9"
+
+
+def test_a_finished_bag_keeps_the_day():
+    bean = bean_from_page(_page_from(bean_properties({"name": "K", "finished_on": "2026-09-26"})))
+    assert bean.finished_on == "2026-09-26"
+
+
+async def test_a_run_is_looked_up_by_its_id():
+    notion = FakeNotion({("POST", "/databases/r/query"): {"results": [{"id": "x"}]}})
+    assert await NotionStore(notion, Databases("b", "r")).async_has_run("run-9")
+    body = notion.calls[0][2]
+    assert body["filter"] == {"property": "Run ID", "rich_text": {"equals": "run-9"}}

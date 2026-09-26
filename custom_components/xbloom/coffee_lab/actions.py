@@ -41,6 +41,7 @@ def bean_facts(bean: Bean) -> dict[str, Any]:
         "remaining_g": bean.remaining_g if bean.tracked else None,
         "bag_size_g": bean.bag_size_g,
         "opened_on": bean.opened_on or None,
+        "finished_on": bean.finished_on or None,
     }
     facts.update({key: getattr(bean, key) for key in DESCRIPTIVE if getattr(bean, key)})
     return facts

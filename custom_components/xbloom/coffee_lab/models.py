@@ -12,6 +12,9 @@ from typing import Any, Literal
 # history, but nothing is brewed from them.
 Status = Literal["unopened", "open", "finished", "archived"]
 STATUSES: tuple[Status, ...] = ("unopened", "open", "finished", "archived")
+
+# Why a brew was recorded for review: the inventory rules' flags.
+REVIEW_REASONS = ("no_bag", "more_than_left", "bag_closed", "tracked_without_amount")
 SELECTABLE: tuple[Status, ...] = ("open", "unopened")
 
 
@@ -37,6 +40,7 @@ class Bean:
     process: str = ""
     roaster_notes: str = ""
     opened_on: str = ""   # YYYY-MM-DD
+    finished_on: str = ""   # YYYY-MM-DD
 
 
 @dataclass(frozen=True)

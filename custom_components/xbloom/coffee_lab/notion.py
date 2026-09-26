@@ -22,7 +22,7 @@ from typing import Any
 import aiohttp
 
 from ..tool_common import fail
-from .models import SELECTABLE, Bean, Brew, Review
+from .models import REVIEW_REASONS, SELECTABLE, Bean, Brew, Review
 from .stats import moment
 from .store import CoffeeLabStore, UnknownBean, _check_changes
 
@@ -40,7 +40,7 @@ BEAN_FIELDS = {
     "Bean": "title", "Status": "select", "Remaining g": "number",
     "Bag Size g": "number", "Inventory Tracking": "select", "Roaster": "rich_text",
     "Country": "rich_text", "Region": "rich_text", "Process": "select",
-    "Roaster Notes": "rich_text", "Opened Date": "date",
+    "Roaster Notes": "rich_text", "Opened Date": "date", "Finished Date": "date",
 }
 BREW_FIELDS = {
     "Brew": "title", "Brewed At": "date", "Dose g": "number", "Brewer": "select",
@@ -48,6 +48,7 @@ BREW_FIELDS = {
     "Needs Review": "checkbox", "Outcome": "select", "Grind": "rich_text",
     "Ratio": "number", "Water g": "number", "Temperature C": "number",
     "Flow Rate": "number", "Total Time sec": "number",
+    "Review Reason": "select", "Run ID": "rich_text",
 }
 
 # Notion's option names for the store-neutral values, both ways.
@@ -158,6 +159,7 @@ def bean_from_page(page: dict) -> Bean:
         process=_select(props.get("Process")) or "",
         roaster_notes=_plain(props.get("Roaster Notes")),
         opened_on=_date(props.get("Opened Date")),
+        finished_on=_date(props.get("Finished Date")),
     )
 
 
@@ -175,8 +177,9 @@ def bean_properties(values: dict[str, Any]) -> dict[str, Any]:
             out["Remaining g" if key == "remaining_g" else "Bag Size g"] = {"number": value}
         elif key == "process":
             out["Process"] = _choice(value or None)
-        elif key == "opened_on":
-            out["Opened Date"] = {"date": {"start": value} if value else None}
+        elif key in ("opened_on", "finished_on"):
+            label = "Opened Date" if key == "opened_on" else "Finished Date"
+            out[label] = {"date": {"start": value} if value else None}
         else:
             label = {"roaster": "Roaster", "country": "Country", "region": "Region",
                      "roaster_notes": "Roaster Notes"}[key]
@@ -205,8 +208,11 @@ def brew_from_page(page: dict) -> Brew:
         recipe=_plain(props.get("Recipe")) or None,
         outcome={v: k for k, v in OUTCOME.items()}.get(_select(props.get("Outcome")) or ""),
         settings={k: v for k, v in settings.items() if v is not None},
-        # Notion keeps that a brew needs review, not why.
-        review=Review("needs_review") if (props.get("Needs Review") or {}).get("checkbox") else None,
+        run_id=_plain(props.get("Run ID")) or None,
+        review=(
+            Review(_select(props.get("Review Reason")) or "needs_review")
+            if (props.get("Needs Review") or {}).get("checkbox") else None
+        ),
     )
 
 
@@ -229,6 +235,9 @@ def brew_properties(brew: Brew) -> dict[str, Any]:
     if brew.review is not None:
         # Only when there is something to say, so the column filters well.
         props["Needs Review"] = {"checkbox": True}
+        props["Review Reason"] = _choice(brew.review.reason)
+    if brew.run_id:
+        props["Run ID"] = _text(brew.run_id)
     if brew.water_ml is not None:
         props["Water g"] = {"number": brew.water_ml}
     for key, name in SETTINGS.items():
@@ -292,7 +301,7 @@ def _schema(fields: dict[str, str], relation_to: str | None = None) -> dict[str,
             options = {
                 "Status": list(STATUS.values()), "Inventory Tracking": list(TRACKING.values()),
                 "Outcome": list(OUTCOME.values()), "Dripper": list(DRIPPER.values()),
-                "Brewer": [OTHER],
+                "Brewer": [OTHER], "Review Reason": list(REVIEW_REASONS),
             }.get(name, [])
             out[name] = {"select": {"options": [{"name": o} for o in options]}}
         else:
@@ -460,6 +469,15 @@ class NotionStore(CoffeeLabStore):
             b for b in brews
             if (m := moment(b.brewed_at or b.recorded_at, since.tzinfo)) is not None and m >= since
         ]
+
+    async def async_has_run(self, run_id: str) -> bool:
+        try:
+            pages = await self._client.query(self._db.brews, {
+                "filter": {"property": "Run ID", "rich_text": {"equals": run_id}},
+            }, limit=1)
+        except NotionError as err:
+            raise fail("notion_failed", error=str(err)) from err
+        return bool(pages)
 
     async def async_create_brew(self, brew: Brew) -> Brew:
         props = brew_properties(brew)
