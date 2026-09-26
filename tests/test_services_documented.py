@@ -58,3 +58,30 @@ def test_every_service_is_removed_on_unload() -> None:
 
 def test_services_yaml_uses_no_tabs() -> None:
     assert "\t" not in (_COMPONENT / "services.yaml").read_text()
+
+
+def _translated(path: str) -> dict:
+    import json
+
+    return json.loads((_COMPONENT / path).read_text()).get("services", {})
+
+
+def test_every_service_is_named_and_described_in_every_language() -> None:
+    """services.yaml holds fields and selectors; what a person reads is translated."""
+    for path in ("strings.json", "translations/en.json", "translations/ar.json"):
+        table = _translated(path)
+        missing = _documented() - set(table)
+        assert not missing, f"{path} lacks {sorted(missing)}"
+        for service in _documented():
+            assert table[service]["name"] and table[service]["description"], (path, service)
+
+
+def test_the_arabic_describes_the_same_fields() -> None:
+    en, ar = _translated("strings.json"), _translated("translations/ar.json")
+    for service, body in en.items():
+        assert set(body.get("fields", {})) == set(ar[service].get("fields", {})), service
+
+
+def test_services_yaml_leaves_names_to_the_translations() -> None:
+    source = (_COMPONENT / "services.yaml").read_text()
+    assert not re.search(r"^  (name|description):", source, re.M)
