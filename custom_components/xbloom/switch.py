@@ -97,7 +97,7 @@ class XBloomConnectSwitch(SwitchEntity):
     Transient by design; auto-expires on idle so the iOS app can reclaim BLE."""
 
     _attr_has_entity_name = True
-    _attr_name = "Connect"
+    _attr_translation_key = "connect"
     _attr_unique_id = "xbloom_connect_switch"
     _attr_icon = "mdi:bluetooth-connect"
 

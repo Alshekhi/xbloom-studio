@@ -70,7 +70,7 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity, RestoreEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_name = "Recipe"
+    _attr_translation_key = "recipe"
     _attr_unique_id = "xbloom_recipe_select"
 
     def __init__(self, coordinator: XBloomCoordinator) -> None:

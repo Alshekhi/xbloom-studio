@@ -482,6 +482,9 @@
         "state": {
           "other": "Other"
         }
+      },
+      "recipe": {
+        "name": "Recipe"
       }
     },
     "sensor": {
@@ -554,6 +557,9 @@
     "switch": {
       "use_grinder": {
         "name": "Use Grinder"
+      },
+      "connect": {
+        "name": "Connect"
       }
     },
     "update": {
@@ -564,11 +570,99 @@
     "number": {
       "coffee_lab_manual_dose": {
         "name": "Manual brew dose"
+      },
+      "grind_size": {
+        "name": "Grind Size"
+      },
+      "grind_speed": {
+        "name": "Grind Speed"
+      },
+      "brew_volume": {
+        "name": "Brew Volume"
+      },
+      "brew_temperature": {
+        "name": "Brew Temperature"
+      },
+      "brew_flow_rate": {
+        "name": "Brew Flow Rate"
+      },
+      "brew_grind_size": {
+        "name": "Brew Grind Size"
+      },
+      "brew_ratio": {
+        "name": "Brew Ratio"
+      },
+      "brew_dose": {
+        "name": "Brew Dose"
       }
     },
     "button": {
       "coffee_lab_record_manual_brew": {
         "name": "Record manual brew"
+      },
+      "refresh_recipes": {
+        "name": "Refresh Recipes"
+      },
+      "start_brew": {
+        "name": "Start Brew"
+      },
+      "cancel_brew": {
+        "name": "Cancel Brew"
+      },
+      "tare_scale": {
+        "name": "Tare Scale"
+      },
+      "back_to_home": {
+        "name": "Back to Home"
+      },
+      "pause_brew": {
+        "name": "Pause Brew"
+      },
+      "resume_brew": {
+        "name": "Resume Brew"
+      },
+      "grind": {
+        "name": "Grind"
+      },
+      "brew_standalone": {
+        "name": "Brew (standalone)"
+      },
+      "ble_connect": {
+        "name": "BLE Connect"
+      },
+      "ble_disconnect": {
+        "name": "BLE Disconnect"
+      },
+      "refresh_status": {
+        "name": "Refresh Status"
+      },
+      "go_to_grinder": {
+        "name": "Go to Grinder"
+      },
+      "go_to_brewer": {
+        "name": "Go to Brewer"
+      },
+      "go_to_scale": {
+        "name": "Go to Scale"
+      },
+      "save_as_new_recipe": {
+        "name": "Save as New Recipe"
+      },
+      "delete_selected_recipe": {
+        "name": "Delete Selected Recipe"
+      },
+      "coffee_lab_refresh_bags": {
+        "name": "Refresh Coffee Bags"
+      }
+    },
+    "text": {
+      "new_recipe_name": {
+        "name": "New Recipe Name"
+      }
+    },
+    "event": {
+      "brew_event": {
+        "name": "Brew Event"
       }
     }
   },

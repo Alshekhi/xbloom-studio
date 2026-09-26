@@ -10,6 +10,7 @@ import logging
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.core import Event, EventStateChangedData, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -17,6 +18,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import XBloomCoordinator
 from .coffee_lab.entities import entities_for as coffee_lab_entities
+from .tool_common import refuse
 
 _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 1  # action entity — serialize concurrent button presses
@@ -27,6 +29,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     coordinator = entry.runtime_data.coordinator
     async_add_entities([
         XBloomRefreshButton(coordinator),
+        XBloomDeleteSelectedRecipeButton(coordinator),
         XBloomStartBrewButton(coordinator, entry),
         XBloomCancelBrewButton(entry),
         # Simple-command primitives
@@ -60,7 +63,7 @@ class XBloomRefreshButton(CoordinatorEntity, ButtonEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_name = "Refresh Recipes"
+    _attr_translation_key = "refresh_recipes"
     _attr_unique_id = "xbloom_refresh_button"
     _attr_icon = "mdi:refresh"
 
@@ -80,6 +83,33 @@ class XBloomRefreshButton(CoordinatorEntity, ButtonEntity):
         await self.coordinator.async_request_refresh()
 
 
+class XBloomDeleteSelectedRecipeButton(CoordinatorEntity, ButtonEntity):
+    """Delete the recipe picked in the Recipe select, by its id.
+
+    By id, because two recipes can share a name. The dashboard asks for
+    confirmation; a deleted recipe cannot be brought back.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "delete_selected_recipe"
+    _attr_unique_id = "xbloom_delete_selected_recipe_button"
+    _attr_icon = "mdi:delete"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, "xbloom_studio")})
+
+    async def async_press(self) -> None:
+        select_id = er.async_get(self.hass).async_get_entity_id(
+            "select", DOMAIN, "xbloom_recipe_select"
+        )
+        picked = self.hass.states.get(select_id) if select_id else None
+        recipe_id = picked.attributes.get("id") if picked is not None else None
+        if not recipe_id:
+            raise refuse("no_recipe_selected")
+        await self.coordinator.async_delete_recipe(str(recipe_id))
+
+
 class XBloomStartBrewButton(CoordinatorEntity, ButtonEntity):
     """Triggers a cloud brew for the currently selected recipe.
 
@@ -90,7 +120,7 @@ class XBloomStartBrewButton(CoordinatorEntity, ButtonEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_name = "Start Brew"
+    _attr_translation_key = "start_brew"
     _attr_unique_id = "xbloom_start_brew_button"
     _attr_icon = "mdi:coffee-maker-check"
 
@@ -177,7 +207,7 @@ class XBloomCancelBrewButton(ButtonEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_name = "Cancel Brew"
+    _attr_translation_key = "cancel_brew"
     _attr_unique_id = "xbloom_cancel_brew_button"
     _attr_icon = "mdi:coffee-maker-off"
 
@@ -233,7 +263,7 @@ class _XBloomSimpleCommandButton(ButtonEntity):
 class XBloomTareButton(_XBloomSimpleCommandButton):
     """Zero the scale on the machine (BLE cmd 8500)."""
 
-    _attr_name = "Tare Scale"
+    _attr_translation_key = "tare_scale"
     _attr_unique_id = "xbloom_tare_button"
     _attr_icon = "mdi:scale-balance"
     _service = "tare"
@@ -242,7 +272,7 @@ class XBloomTareButton(_XBloomSimpleCommandButton):
 class XBloomBackToHomeButton(_XBloomSimpleCommandButton):
     """Return the machine UI to the home screen (BLE cmd 8022)."""
 
-    _attr_name = "Back to Home"
+    _attr_translation_key = "back_to_home"
     _attr_unique_id = "xbloom_back_to_home_button"
     _attr_icon = "mdi:home"
     _service = "back_to_home"
@@ -251,7 +281,7 @@ class XBloomBackToHomeButton(_XBloomSimpleCommandButton):
 class XBloomBrewPauseButton(_XBloomSimpleCommandButton):
     """Pause an in-flight brew (BLE cmd 40518)."""
 
-    _attr_name = "Pause Brew"
+    _attr_translation_key = "pause_brew"
     _attr_unique_id = "xbloom_brew_pause_button"
     _attr_icon = "mdi:pause"
     _service = "brew_pause"
@@ -260,7 +290,7 @@ class XBloomBrewPauseButton(_XBloomSimpleCommandButton):
 class XBloomBrewResumeButton(_XBloomSimpleCommandButton):
     """Resume a paused brew (BLE cmd 8021)."""
 
-    _attr_name = "Resume Brew"
+    _attr_translation_key = "resume_brew"
     _attr_unique_id = "xbloom_brew_resume_button"
     _attr_icon = "mdi:play"
     _service = "brew_resume"
@@ -269,7 +299,7 @@ class XBloomBrewResumeButton(_XBloomSimpleCommandButton):
 class XBloomGrindButton(_XBloomSimpleCommandButton):
     """One-press standalone grind — reads size and speed from number entities."""
 
-    _attr_name = "Grind"
+    _attr_translation_key = "grind"
     _attr_unique_id = "xbloom_grind_button"
     _attr_icon = "mdi:grain"
     _service = "grind"
@@ -298,7 +328,7 @@ class XBloomGrindButton(_XBloomSimpleCommandButton):
 class XBloomBrewStandaloneButton(_XBloomSimpleCommandButton):
     """One-press standalone brew — reads volume, temp, flow rate, and pattern from entities."""
 
-    _attr_name = "Brew (standalone)"
+    _attr_translation_key = "brew_standalone"
     _attr_unique_id = "xbloom_brew_standalone_button"
     _attr_icon = "mdi:coffee"
     _service = "brew_standalone"
@@ -315,7 +345,7 @@ class XBloomBleConnectButton(_XBloomSimpleCommandButton):
     diagnosing connection failures (especially if a Mode listener fails).
     """
 
-    _attr_name = "BLE Connect"
+    _attr_translation_key = "ble_connect"
     _attr_unique_id = "xbloom_ble_connect_button"
     _attr_icon = "mdi:bluetooth-connect"
     _service = "ble_connect"
@@ -327,7 +357,7 @@ class XBloomBleDisconnectButton(_XBloomSimpleCommandButton):
     app can't connect.
     """
 
-    _attr_name = "BLE Disconnect"
+    _attr_translation_key = "ble_disconnect"
     _attr_unique_id = "xbloom_ble_disconnect_button"
     _attr_icon = "mdi:bluetooth-off"
     _service = "ble_disconnect"
@@ -341,7 +371,7 @@ class XBloomRefreshStatusButton(_XBloomSimpleCommandButton):
     entity instead of an entity-less button card.
     """
 
-    _attr_name = "Refresh Status"
+    _attr_translation_key = "refresh_status"
     _attr_unique_id = "xbloom_refresh_status_button"
     _attr_icon = "mdi:cloud-sync"
     _service = "refresh_status"
@@ -378,7 +408,7 @@ class _XBloomEnterModuleButton(_XBloomSimpleCommandButton):
 class XBloomEnterGrinderButton(_XBloomEnterModuleButton):
     """Route the machine to the Grinder screen (cmd 8006 [size, speed])."""
 
-    _attr_name = "Go to Grinder"
+    _attr_translation_key = "go_to_grinder"
     _attr_unique_id = "xbloom_enter_grinder_button"
     _attr_icon = "mdi:grain"
 
@@ -392,7 +422,7 @@ class XBloomEnterGrinderButton(_XBloomEnterModuleButton):
 class XBloomEnterBrewerButton(_XBloomEnterModuleButton):
     """Route the machine to the Brewer screen (cmd 8007 [pattern, temp×10])."""
 
-    _attr_name = "Go to Brewer"
+    _attr_translation_key = "go_to_brewer"
     _attr_unique_id = "xbloom_enter_brewer_button"
     _attr_icon = "mdi:cup-water"
 
@@ -413,7 +443,7 @@ class XBloomEnterBrewerButton(_XBloomEnterModuleButton):
 class XBloomEnterScaleButton(_XBloomEnterModuleButton):
     """Route the machine to the Scale screen (cmd 8003, no data)."""
 
-    _attr_name = "Go to Scale"
+    _attr_translation_key = "go_to_scale"
     _attr_unique_id = "xbloom_enter_scale_button"
     _attr_icon = "mdi:scale-balance"
 
@@ -432,7 +462,7 @@ class XBloomSaveAsNewRecipeButton(ButtonEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_name = "Save as New Recipe"
+    _attr_translation_key = "save_as_new_recipe"
     _attr_unique_id = "xbloom_save_as_new_recipe_button"
     _attr_icon = "mdi:content-save-plus"
 

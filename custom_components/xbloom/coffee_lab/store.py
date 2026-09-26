@@ -47,6 +47,9 @@ class Storage(Protocol):
 class CoffeeLabStore(ABC):
     """What Coffee Lab asks of any store."""
 
+    # True for a store that can be changed outside Home Assistant.
+    remote = False
+
     @abstractmethod
     async def async_list_beans(self, *, selectable_only: bool = True) -> list[Bean]:
         """Bags, by default only those that can be brewed from."""

@@ -33,7 +33,13 @@ def _make():
 def test_identity_is_pinned() -> None:
     """Renamed from xbloom_live_control_switch in PR #2 — a breaking change."""
     assert XBloomConnectSwitch._attr_unique_id == "xbloom_connect_switch"
-    assert XBloomConnectSwitch._attr_name == "Connect"
+    # The English name is what a new install's entity id is made from.
+    import json
+    import pathlib
+
+    strings = pathlib.Path(__file__).parents[3] / "custom_components" / "xbloom" / "strings.json"
+    key = XBloomConnectSwitch._attr_translation_key
+    assert json.loads(strings.read_text())["entity"]["switch"][key]["name"] == "Connect"
 
 
 def test_starts_off() -> None:

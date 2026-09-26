@@ -571,7 +571,7 @@ class XBloomBrewEventBleEntity(EventEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_name = "Brew Event"
+    _attr_translation_key = "brew_event"
     _attr_unique_id = "xbloom_brew_event"  # matches MQTT-mode unique_id
     _attr_icon = "mdi:coffee-maker"
     _attr_event_types = [

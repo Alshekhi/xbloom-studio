@@ -482,6 +482,9 @@
         "state": {
           "other": "أخرى"
         }
+      },
+      "recipe": {
+        "name": "الوصفة"
       }
     },
     "sensor": {
@@ -554,6 +557,9 @@
     "switch": {
       "use_grinder": {
         "name": "استخدام المطحنة"
+      },
+      "connect": {
+        "name": "الاتصال"
       }
     },
     "update": {
@@ -564,11 +570,99 @@
     "number": {
       "coffee_lab_manual_dose": {
         "name": "جرعة التحضير اليدوي"
+      },
+      "grind_size": {
+        "name": "حجم الطحن"
+      },
+      "grind_speed": {
+        "name": "سرعة الطحن"
+      },
+      "brew_volume": {
+        "name": "كمية الصب"
+      },
+      "brew_temperature": {
+        "name": "حرارة الصب"
+      },
+      "brew_flow_rate": {
+        "name": "معدل تدفق الصب"
+      },
+      "brew_grind_size": {
+        "name": "حجم طحن التحضير"
+      },
+      "brew_ratio": {
+        "name": "نسبة التحضير"
+      },
+      "brew_dose": {
+        "name": "جرعة التحضير"
       }
     },
     "button": {
       "coffee_lab_record_manual_brew": {
         "name": "تسجيل تحضير يدوي"
+      },
+      "refresh_recipes": {
+        "name": "تحديث الوصفات"
+      },
+      "start_brew": {
+        "name": "بدء التحضير"
+      },
+      "cancel_brew": {
+        "name": "إلغاء التحضير"
+      },
+      "tare_scale": {
+        "name": "تصفير الميزان"
+      },
+      "back_to_home": {
+        "name": "العودة للشاشة الرئيسية"
+      },
+      "pause_brew": {
+        "name": "إيقاف التحضير مؤقتا"
+      },
+      "resume_brew": {
+        "name": "استئناف التحضير"
+      },
+      "grind": {
+        "name": "طحن"
+      },
+      "brew_standalone": {
+        "name": "صب مستقل"
+      },
+      "ble_connect": {
+        "name": "اتصال البلوتوث"
+      },
+      "ble_disconnect": {
+        "name": "قطع البلوتوث"
+      },
+      "refresh_status": {
+        "name": "تحديث الحالة"
+      },
+      "go_to_grinder": {
+        "name": "الانتقال إلى المطحنة"
+      },
+      "go_to_brewer": {
+        "name": "الانتقال إلى وحدة الصب"
+      },
+      "go_to_scale": {
+        "name": "الانتقال إلى الميزان"
+      },
+      "save_as_new_recipe": {
+        "name": "حفظ كوصفة جديدة"
+      },
+      "delete_selected_recipe": {
+        "name": "حذف الوصفة المختارة"
+      },
+      "coffee_lab_refresh_bags": {
+        "name": "تحديث أكياس القهوة"
+      }
+    },
+    "text": {
+      "new_recipe_name": {
+        "name": "اسم الوصفة الجديدة"
+      }
+    },
+    "event": {
+      "brew_event": {
+        "name": "حدث التحضير"
       }
     }
   },

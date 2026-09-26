@@ -237,7 +237,7 @@ class _XBloomGrinderNumber(_XBloomNumberBase):
 
 
 class XBloomGrindSizeNumber(_XBloomGrinderNumber):
-    _attr_name = "Grind Size"
+    _attr_translation_key = "grind_size"
     _attr_unique_id = "xbloom_grind_size"
     _attr_native_min_value, _attr_native_max_value, _attr_native_step = _range("grind_size")
     _attr_native_unit_of_measurement = None
@@ -257,7 +257,7 @@ class XBloomGrindSizeNumber(_XBloomGrinderNumber):
 
 
 class XBloomGrindSpeedNumber(_XBloomGrinderNumber):
-    _attr_name = "Grind Speed"
+    _attr_translation_key = "grind_speed"
     _attr_unique_id = "xbloom_grind_speed"
     _attr_native_min_value, _attr_native_max_value, _attr_native_step = _range("grinder_speed_rpm")
     _attr_native_unit_of_measurement = "RPM"
@@ -276,7 +276,7 @@ class XBloomGrindSpeedNumber(_XBloomGrinderNumber):
 
 
 class XBloomBrewVolumeNumber(_XBloomNumberBase):
-    _attr_name = "Brew Volume"
+    _attr_translation_key = "brew_volume"
     _attr_unique_id = "xbloom_brew_volume"
     # The standalone brewer's own range, not a recipe pour's: the pour stops
     # at this volume, so it can never be zero.
@@ -298,7 +298,7 @@ class XBloomBrewTemperatureNumber(_XBloomNumberBase):
     set gets no machine knob-event otherwise).
     """
 
-    _attr_name = "Brew Temperature"
+    _attr_translation_key = "brew_temperature"
     _attr_unique_id = "xbloom_brew_temperature"
     # DISPLAY domain 39..96 — the unified model (spec.brew_temp_*): this is what
     # the machine's brewer knob (cmd 8108) reports and what the app's brewer
@@ -368,7 +368,7 @@ class XBloomBrewTemperatureNumber(_XBloomNumberBase):
 
 
 class XBloomBrewFlowRateNumber(_XBloomNumberBase):
-    _attr_name = "Brew Flow Rate"
+    _attr_translation_key = "brew_flow_rate"
     _attr_unique_id = "xbloom_brew_flow_rate"
     _attr_native_min_value, _attr_native_max_value, _attr_native_step = _range("pour_flow_rate")
     _attr_native_unit_of_measurement = "ml/s"
@@ -424,7 +424,7 @@ class _XBloomRecipeOverrideNumber(_XBloomNumberBase):
 
 
 class XBloomBrewGrindNumber(_XBloomRecipeOverrideNumber):
-    _attr_name = "Brew Grind Size"
+    _attr_translation_key = "brew_grind_size"
     _attr_unique_id = "xbloom_brew_grind"
     _attr_native_min_value, _attr_native_max_value, _attr_native_step = _range("grind_size")
     _attr_icon = "mdi:grain"
@@ -433,7 +433,7 @@ class XBloomBrewGrindNumber(_XBloomRecipeOverrideNumber):
 
 
 class XBloomBrewRatioNumber(_XBloomRecipeOverrideNumber):
-    _attr_name = "Brew Ratio"
+    _attr_translation_key = "brew_ratio"
     _attr_unique_id = "xbloom_brew_ratio"
     _attr_native_min_value = spec.RATIO_DENOM.min
     _attr_native_max_value = spec.RATIO_DENOM.max
@@ -446,7 +446,7 @@ class XBloomBrewRatioNumber(_XBloomRecipeOverrideNumber):
 class XBloomBrewDoseNumber(_XBloomRecipeOverrideNumber):
     """Dose (g) — clamped to the recipe's cup dose window; hidden for xPod."""
 
-    _attr_name = "Brew Dose"
+    _attr_translation_key = "brew_dose"
     _attr_unique_id = "xbloom_brew_dose"
     _attr_native_step = 0.5
     _attr_native_unit_of_measurement = "g"

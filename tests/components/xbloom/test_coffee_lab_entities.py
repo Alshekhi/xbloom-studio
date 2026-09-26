@@ -105,3 +105,19 @@ async def test_a_brew_made_with_other_is_counted_as_other():
     report = await lab.async_stats("today")
     assert dict(report.now.by_brewer) == {"other": 1}
 
+
+def test_every_entity_name_is_in_both_languages():
+    en = json.loads((COMPONENT / "strings.json").read_text())["entity"]
+    ar = json.loads((COMPONENT / "translations/ar.json").read_text())["entity"]
+    for platform, entities in en.items():
+        for key, entry in entities.items():
+            if "name" in entry:
+                assert ar[platform][key]["name"], (platform, key)
+
+
+def test_no_entity_hardcodes_its_name():
+    import re
+
+    for path in COMPONENT.rglob("*.py"):
+        assert not re.search(r"^\s*_attr_name = ", path.read_text(), re.M), path.name
+

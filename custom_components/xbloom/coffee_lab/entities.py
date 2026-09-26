@@ -234,6 +234,18 @@ class RecordManualBrewButton(CoffeeLabEntity, ButtonEntity):
         await actions.record_manual_brew(self.lab, {})
 
 
+class RefreshBagsButton(CoffeeLabEntity, ButtonEntity):
+    """Re-read the bags now, from a store that can change outside Home Assistant."""
+
+    _attr_icon = "mdi:refresh"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "refresh_bags")
+
+    async def async_press(self) -> None:
+        self.lab.on_change()
+
+
 def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
     """The Coffee Lab entities of one platform, or none when it is off."""
     if lab is None:
@@ -244,4 +256,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
         "number": [ManualDoseNumber],
         "button": [RecordManualBrewButton],
     }
+    # Only a store edited elsewhere — Notion — can be out of date here.
+    if lab.store.remote:
+        makers["button"].append(RefreshBagsButton)
     return [make(lab) for make in makers.get(platform, [])]

@@ -27,7 +27,7 @@ class XBloomNewRecipeName(TextEntity):
     """Editable name for 'Save as new recipe'; suggests '<recipe> (custom)'."""
 
     _attr_has_entity_name = True
-    _attr_name = "New Recipe Name"
+    _attr_translation_key = "new_recipe_name"
     _attr_unique_id = "xbloom_new_recipe_name"
     _attr_icon = "mdi:rename-box"
     _attr_native_max = 60

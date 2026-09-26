@@ -379,6 +379,8 @@ async def async_find_or_create(client: NotionClient, page_id: str) -> Databases:
 class NotionStore(CoffeeLabStore):
     """Coffee Lab in two Notion databases."""
 
+    remote = True
+
     def __init__(self, client: NotionClient, databases: Databases) -> None:
         self._client = client
         self._db = databases
