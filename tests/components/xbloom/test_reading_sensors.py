@@ -22,6 +22,7 @@ from custom_components.xbloom.reading_sensors import (
     EV_RECIPE_CARD,
     READING_SENSORS,
     XBloomCurrentModuleSensor,
+    XBloomBrewTimeSensor,
     XBloomCurrentPourSensor,
     XBloomGrindSizeSensor,
     XBloomLastRecipeCardSensor,
@@ -278,3 +279,41 @@ def test_recipe_card_sensor_listens_for_scans() -> None:
     assert EV_RECIPE_CARD in XBloomLastRecipeCardSensor._events
 
 
+
+
+# ── Brew Time ────────────────────────────────────────────────────────────────
+
+CMD_ENJOY = 40512
+
+
+@pytest.mark.asyncio
+async def test_brew_time_starts_at_the_first_pour_and_holds_it() -> None:
+    entity = _make(XBloomBrewTimeSensor)
+    handlers = await _wire(entity)
+    assert entity._attr_native_value is None
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    first = entity._attr_native_value
+    assert first is not None and first.tzinfo is not None
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 1})
+    assert entity._attr_native_value == first
+
+
+@pytest.mark.asyncio
+async def test_brew_time_clears_on_enjoy_and_when_the_brew_ends() -> None:
+    entity = _make(XBloomBrewTimeSensor)
+    handlers = await _wire(entity)
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    handlers.signals[0]({"cmd": CMD_ENJOY})
+    assert entity._attr_native_value is None
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    handlers.signals[1]("ended")
+    assert entity._attr_native_value is None
+
+
+@pytest.mark.asyncio
+async def test_a_new_brew_starts_brew_time_afresh() -> None:
+    entity = _make(XBloomBrewTimeSensor)
+    handlers = await _wire(entity)
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    handlers[EV_BREW_STARTED](_event(EV_BREW_STARTED, {"total_pours": 3}))
+    assert entity._attr_native_value is None

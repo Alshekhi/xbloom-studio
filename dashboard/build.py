@@ -34,7 +34,7 @@ TEXT = {
         "add_recipes": "Add or edit recipes", "add_bags": "Add or edit bags",
         "h_archive": "Archived recipes",
         "this_brew": "This brew", "coffee": "Coffee", "water": "Water", "ratio": "Ratio",
-        "pour": "Pour", "temp": "Temp", "pick_recipe": "Pick a recipe to see its pours.",
+        "pour": "Pour", "of": "of", "temp": "Temp", "pick_recipe": "Pick a recipe to see its pours.",
         "coffee_used": "Coffee used", "water_brewed": "Water brewed",
         "previous": "Brews in the period before", "other": "Other",
         "h_charts": "Brew history", "brews_daily": "Brews per day", "brews_monthly": "Brews per month",
@@ -63,7 +63,7 @@ TEXT = {
         "add_recipes": "إضافة الوصفات أو تعديلها", "add_bags": "إضافة الأكياس أو تعديلها",
         "h_archive": "الوصفات المؤرشفة",
         "this_brew": "هذا التحضير", "coffee": "القهوة", "water": "الماء", "ratio": "النسبة",
-        "pour": "الصبة", "temp": "الحرارة", "pick_recipe": "اختر وصفة لعرض صباتها.",
+        "pour": "الصبة", "of": "من", "temp": "الحرارة", "pick_recipe": "اختر وصفة لعرض صباتها.",
         "coffee_used": "القهوة المستخدمة", "water_brewed": "الماء المستخدم",
         "previous": "التحضيرات في الفترة السابقة", "other": "أخرى",
         "h_charts": "سجل التحضير", "brews_daily": "التحضيرات يوميا", "brews_monthly": "التحضيرات شهريا",
@@ -158,7 +158,15 @@ def brew_view(t: dict) -> dict:
         ]),
         section(t["h_in_progress"], [
             tile(f"sensor.{E}_current_recipe", visibility=present(f"sensor.{E}_current_recipe")),
-            tile(f"sensor.{E}_current_pour"),
+            # "Pour 2 of 3", once the pours have begun.
+            {"type": "markdown", "text_only": True, "content": (
+                f"{{% set p = 'sensor.{E}_current_pour' %}}{{% set total = state_attr(p, 'total_pours') %}}"
+                f"**{t['pour']} {{{{ states(p) }}}}{{% if total %}} {t['of']} {{{{ total }}}}{{% endif %}}**"
+            ), "visibility": [{"condition": "numeric_state", "entity": f"sensor.{E}_current_pour", "above": 0}]},
+            # A timestamp shown as a running total: the frontend counts it up
+            # every second, so nothing is written to Home Assistant to do it.
+            {"type": "entities", "entities": [{"entity": f"sensor.{E}_brew_time", "format": "total"}],
+             "visibility": present(f"sensor.{E}_brew_time")},
             press(f"button.{E}_pause_brew"),
             press(f"button.{E}_resume_brew"),
             press(f"button.{E}_cancel_brew", t["confirm_stop"]),

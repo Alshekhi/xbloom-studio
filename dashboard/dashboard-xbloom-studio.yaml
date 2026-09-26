@@ -57,10 +57,25 @@ views:
       - condition: state
         entity: sensor.xbloom_studio_current_recipe
         state_not: unknown
-    - type: tile
-      entity: sensor.xbloom_studio_current_pour
-      icon_tap_action:
-        action: none
+    - type: markdown
+      text_only: true
+      content: '{% set p = ''sensor.xbloom_studio_current_pour'' %}{% set total = state_attr(p, ''total_pours'')
+        %}**Pour {{ states(p) }}{% if total %} of {{ total }}{% endif %}**'
+      visibility:
+      - condition: numeric_state
+        entity: sensor.xbloom_studio_current_pour
+        above: 0
+    - type: entities
+      entities:
+      - entity: sensor.xbloom_studio_brew_time
+        format: total
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_brew_time
+        state_not: unavailable
+      - condition: state
+        entity: sensor.xbloom_studio_brew_time
+        state_not: unknown
     - type: tile
       entity: button.xbloom_studio_pause_brew
       icon_tap_action:

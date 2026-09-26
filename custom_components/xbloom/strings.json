@@ -563,6 +563,9 @@
           "skipped": "Not counted",
           "flagged": "Needs review"
         }
+      },
+      "brew_time": {
+        "name": "Brew Time"
       }
     },
     "switch": {
