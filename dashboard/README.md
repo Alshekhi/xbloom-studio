@@ -46,9 +46,11 @@ Coffee Bags** appears only when Coffee Lab is kept in Notion.
 - **Bags** — every open or unopened bag, choosing the one in use, and a link
   to where bags are added and edited.
 - **xBloom** — connection and status, the grinder, brewer and scale modules,
-  the recipe library with its actions (archive, delete) and the archived
-  recipes, settings, tools, announcements, updates, and a 24-hour log of
+  the recipe library with its actions (archive, delete), settings, tools, announcements, updates, and a 24-hour log of
   machine events.
+- **Archived recipes** — a subview with no tab of its own, opened from the
+  recipe library's link, which shows only while something is archived.
+  Restoring a recipe is done here.
 
 Every view uses `max_columns: 2`: two-up on a wide screen, one column on a
 phone.

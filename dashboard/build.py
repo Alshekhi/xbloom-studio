@@ -306,6 +306,18 @@ def bags_view(t: dict) -> dict:
     ]}
 
 
+def archive_view(t: dict) -> dict:
+    """The archived recipes, as a subview: no tab, opened from the library."""
+    return {"title": t["h_archive"], "path": "archive", "subview": True, "type": "sections",
+            "max_columns": 2, "sections": [
+        # The page's title names it; a heading would say it again.
+        {"type": "grid", "cards": [
+            select(f"select.{E}_archived_recipe"),
+            press(f"button.{E}_restore_archived_recipe"),
+        ], "visibility": present(f"select.{E}_archived_recipe")},
+    ]}
+
+
 def xbloom_view(t: dict) -> dict:
     live = is_(f"switch.{E}_connect", "on")
     on = lambda module: [live, is_(f"sensor.{E}_current_module", module), *not_busy()]  # noqa: E731
@@ -354,11 +366,12 @@ def xbloom_view(t: dict) -> dict:
             select(f"select.{E}_recipe_action"),
             press(f"button.{E}_run_recipe_action", t["confirm_run"]),
             {"type": "markdown", "text_only": True, "content": f"[{t['add_recipes']}]({INTEGRATION})"},
+            # The archive is a page of its own, reached from here, so what is
+            # archived stays out of the library; the link shows only while
+            # there is something in it.
+            {"type": "markdown", "text_only": True, "content": f"[{t['h_archive']}](archive)",
+             "visibility": present(f"select.{E}_archived_recipe")},
         ]),
-        section(t["h_archive"], [
-            select(f"select.{E}_archived_recipe"),
-            press(f"button.{E}_restore_archived_recipe"),
-        ], present(f"select.{E}_archived_recipe")),
         section(t["h_settings"], [
             select(f"select.{E}_mode"),
             select(f"select.{E}_temperature_unit"),
@@ -389,7 +402,7 @@ def xbloom_view(t: dict) -> dict:
 
 def dashboard(lang: str) -> dict:
     t = TEXT[lang]
-    return {"views": [brew_view(t), stats_view(t), bags_view(t), xbloom_view(t)]}
+    return {"views": [brew_view(t), stats_view(t), bags_view(t), xbloom_view(t), archive_view(t)]}
 
 
 def main() -> None:

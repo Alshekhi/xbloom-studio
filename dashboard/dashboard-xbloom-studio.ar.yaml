@@ -918,34 +918,16 @@ views:
     - type: markdown
       text_only: true
       content: '[إضافة الوصفات أو تعديلها](/config/integrations/integration/xbloom)'
-  - type: grid
-    cards:
     - type: markdown
       text_only: true
-      content: '## الوصفات المؤرشفة'
-    - type: tile
-      entity: select.xbloom_studio_archived_recipe
-      icon_tap_action:
-        action: none
-      features:
-      - type: select-options
-    - type: tile
-      entity: button.xbloom_studio_restore_archived_recipe
-      icon_tap_action:
-        action: none
-      hide_state: true
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.xbloom_studio_restore_archived_recipe
-    visibility:
-    - condition: state
-      entity: select.xbloom_studio_archived_recipe
-      state_not: unavailable
-    - condition: state
-      entity: select.xbloom_studio_archived_recipe
-      state_not: unknown
+      content: '[الوصفات المؤرشفة](archive)'
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_archived_recipe
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_archived_recipe
+        state_not: unknown
   - type: grid
     cards:
     - type: markdown
@@ -1090,3 +1072,34 @@ views:
         - sensor.xbloom_studio_brew_status
         - event.xbloom_studio_brew_event
       hours_to_show: 24
+- title: الوصفات المؤرشفة
+  path: archive
+  subview: true
+  type: sections
+  max_columns: 2
+  sections:
+  - type: grid
+    cards:
+    - type: tile
+      entity: select.xbloom_studio_archived_recipe
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: tile
+      entity: button.xbloom_studio_restore_archived_recipe
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_restore_archived_recipe
+    visibility:
+    - condition: state
+      entity: select.xbloom_studio_archived_recipe
+      state_not: unavailable
+    - condition: state
+      entity: select.xbloom_studio_archived_recipe
+      state_not: unknown
