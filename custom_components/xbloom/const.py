@@ -33,6 +33,15 @@ CONF_COFFEE_LAB = "coffee_lab"
 # person edits the list. Seeded with brand names only, which read the same in
 # any language. entry.data.
 CONF_BREWERS = "coffee_lab_brewers"
+
+# Where Coffee Lab keeps its bags and brews: "local" (Home Assistant's own
+# storage) or "notion". With Notion, the token, the page shared with it, and
+# the two databases found or created there. entry.data.
+CONF_COFFEE_LAB_STORE = "coffee_lab_store"
+CONF_NOTION_TOKEN = "notion_token"
+CONF_NOTION_PAGE = "notion_page"
+CONF_NOTION_BEANS = "notion_beans_db"
+CONF_NOTION_BREWS = "notion_brews_db"
 DEFAULT_BREWERS = ("V60", "Chemex", "AeroPress", "Kalita Wave", "Clever")
 
 # Where brew callbacks may be sent, by name: {name: {"url", "secret"}}. A caller

@@ -93,9 +93,12 @@ class CoffeeLab:
         self._counting = asyncio.Lock()
 
     @classmethod
-    async def async_create(cls, hass: HomeAssistant, brewers: tuple[str, ...] = ()) -> CoffeeLab:
+    async def async_create(
+        cls, hass: HomeAssistant, brewers: tuple[str, ...] = (),
+        store: CoffeeLabStore | None = None,
+    ) -> CoffeeLab:
         lab = cls(
-            await async_local_store(hass),
+            store or await async_local_store(hass),
             await async_processed_runs(hass),
             Store(hass, STORAGE_VERSION, STATE_KEY),
             brewers=brewers,

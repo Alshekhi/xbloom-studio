@@ -302,7 +302,8 @@
         "description": "Track bags of coffee and what each brew uses.",
         "data": {
           "enable": "Track coffee bags",
-          "brewers": "Brewers"
+          "brewers": "Brewers",
+          "store": "Where to keep it"
         },
         "data_description": {
           "brewers": "Offered when recording a brew made without the xBloom."
@@ -365,6 +366,16 @@
         "data": {
           "name": "Target"
         }
+      },
+      "coffee_lab_notion": {
+        "title": "Notion",
+        "data": {
+          "token": "Integration token",
+          "page": "Page"
+        },
+        "data_description": {
+          "page": "The page shared with the integration, as a link or an id."
+        }
       }
     },
     "error": {
@@ -390,7 +401,13 @@
       "cloud_login_failed": "Sign-in failed. Check your xBloom email and password, then try again.",
       "callback_name_invalid": "Use lowercase letters, digits and _.",
       "callback_url_invalid": "Enter an http or https URL.",
-      "callback_secret_invalid": "Enter a Standard Webhooks secret: whsec_ followed by at least 24 bytes in base64."
+      "callback_secret_invalid": "Enter a Standard Webhooks secret: whsec_ followed by at least 24 bytes in base64.",
+      "notion_auth": "Notion did not accept the token.",
+      "notion_page": "The page was not found. Share it with the integration, then try again.",
+      "notion_unreachable": "Notion could not be reached: {detail}",
+      "notion_duplicate": "The page has more than one database called {detail}. Keep one.",
+      "notion_half": "The page is missing {detail}. Add it, or use a page with neither.",
+      "notion_fields": "These fields are missing or of the wrong type — {detail}."
     },
     "abort": {
       "no_recipes": "No recipes saved yet.",
@@ -642,6 +659,9 @@
     },
     "callback_target_unknown": {
       "message": "There is no callback target called {target}. Set up: {targets}."
+    },
+    "notion_failed": {
+      "message": "Notion could not be reached or refused the change: {error}"
     }
   },
   "services": {
@@ -1100,6 +1120,12 @@
         "open": "Open",
         "finished": "Finished",
         "archived": "Archived"
+      }
+    },
+    "coffee_lab_store": {
+      "options": {
+        "local": "Home Assistant",
+        "notion": "Notion"
       }
     }
   }

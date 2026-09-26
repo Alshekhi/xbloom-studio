@@ -302,7 +302,8 @@
         "description": "تتبع أكياس القهوة وما يستهلكه كل تحضير.",
         "data": {
           "enable": "تتبع أكياس القهوة",
-          "brewers": "أدوات التحضير"
+          "brewers": "أدوات التحضير",
+          "store": "مكان الحفظ"
         },
         "data_description": {
           "brewers": "تعرض عند تسجيل تحضير دون ماكينة xBloom."
@@ -365,6 +366,16 @@
         "data": {
           "name": "الوجهة"
         }
+      },
+      "coffee_lab_notion": {
+        "title": "Notion",
+        "data": {
+          "token": "رمز التكامل",
+          "page": "الصفحة"
+        },
+        "data_description": {
+          "page": "الصفحة المشاركة مع التكامل، كرابط أو معرف."
+        }
       }
     },
     "error": {
@@ -390,7 +401,13 @@
       "cloud_login_failed": "تعذّر تسجيل الدخول. تحقّق من بريدك الإلكتروني وكلمة المرور، ثم حاول من جديد.",
       "callback_name_invalid": "استخدم أحرفا لاتينية صغيرة وأرقاما و_.",
       "callback_url_invalid": "أدخل رابطا يبدأ بـ http أو https.",
-      "callback_secret_invalid": "أدخل مفتاح Standard Webhooks: whsec_ متبوعا بـ 24 بايت على الأقل بترميز base64."
+      "callback_secret_invalid": "أدخل مفتاح Standard Webhooks: whsec_ متبوعا بـ 24 بايت على الأقل بترميز base64.",
+      "notion_auth": "لم يقبل Notion الرمز.",
+      "notion_page": "لم يعثر على الصفحة. شاركها مع التكامل ثم حاول مرة أخرى.",
+      "notion_unreachable": "تعذر الوصول إلى Notion: {detail}",
+      "notion_duplicate": "في الصفحة أكثر من قاعدة بيانات باسم {detail}. أبق واحدة.",
+      "notion_half": "ينقص الصفحة {detail}. أضفها، أو استخدم صفحة لا تحتوي أيا منهما.",
+      "notion_fields": "هذه الحقول مفقودة أو من نوع خاطئ — {detail}."
     },
     "abort": {
       "no_recipes": "لا توجد وصفات محفوظة بعد.",
@@ -642,6 +659,9 @@
     },
     "callback_target_unknown": {
       "message": "لا توجد وجهة إشعار باسم {target}. المهيأة: {targets}."
+    },
+    "notion_failed": {
+      "message": "تعذر الوصول إلى Notion أو رفض التغيير: {error}"
     }
   },
   "services": {
@@ -1100,6 +1120,12 @@
         "open": "مفتوح",
         "finished": "منته",
         "archived": "مؤرشف"
+      }
+    },
+    "coffee_lab_store": {
+      "options": {
+        "local": "Home Assistant",
+        "notion": "Notion"
       }
     }
   }

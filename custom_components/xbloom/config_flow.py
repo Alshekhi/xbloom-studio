@@ -25,7 +25,10 @@ from homeassistant.components.bluetooth import (
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
 from .callbacks import target_problem
+from .coffee_lab.notion import NotionClient, SetupProblem, async_find_or_create, page_id_from
 from .coffee_lab import actions as coffee_lab_actions
 from .coffee_lab.entities import bag_labels
 from .coffee_lab.models import STATUSES
@@ -36,6 +39,11 @@ from .const import (
     CONF_BREWERS,
     CONF_CALLBACK_TARGETS,
     CONF_COFFEE_LAB,
+    CONF_COFFEE_LAB_STORE,
+    CONF_NOTION_BEANS,
+    CONF_NOTION_BREWS,
+    CONF_NOTION_PAGE,
+    CONF_NOTION_TOKEN,
     CONF_ENABLE_FLASHING,
     CONF_CLOUD_EMAIL,
     CONF_CLOUD_MEMBER_ID,
@@ -305,6 +313,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         self._pending_login: dict | None = None
         self._reconcile_count: int = 0
         self._bag_id: str | None = None
+        self._coffee_lab: dict[str, Any] = {}
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -391,14 +400,18 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         entry = self.config_entry
         current = bool(entry.data.get(CONF_COFFEE_LAB))
         brewers = list(entry.data.get(CONF_BREWERS, DEFAULT_BREWERS))
+        store = entry.data.get(CONF_COFFEE_LAB_STORE, "local")
         if user_input is not None:
             enabled = bool(user_input.get("enable"))
             # Blank lines and repeats dropped, the order kept.
             chosen = list(dict.fromkeys(
                 b.strip() for b in user_input.get("brewers", brewers) if b.strip()
             ))
+            self._coffee_lab = {CONF_COFFEE_LAB: enabled, CONF_BREWERS: chosen}
+            if enabled and user_input.get("store", store) == "notion":
+                return await self.async_step_coffee_lab_notion()
             self.hass.config_entries.async_update_entry(
-                entry, data={**entry.data, CONF_COFFEE_LAB: enabled, CONF_BREWERS: chosen}
+                entry, data={**entry.data, **self._coffee_lab, CONF_COFFEE_LAB_STORE: "local"}
             )
             # Reload so the entities and the tool follow the switch.
             self.hass.async_create_task(
@@ -412,6 +425,11 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                 vol.Required("enable", default=current): selector.BooleanSelector(),
                 vol.Optional("brewers", default=brewers): selector.TextSelector(
                     selector.TextSelectorConfig(multiple=True)
+                ),
+                vol.Required("store", default=store): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=["local", "notion"], translation_key="coffee_lab_store",
+                    )
                 ),
             }),
         )
@@ -513,6 +531,53 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             data_schema=self._bag_schema(user_input or current, list(STATUSES)),
             errors=errors,
             description_placeholders={"name": bean.name},
+        )
+
+    async def async_step_coffee_lab_notion(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Notion: a token and one page shared with it; the rest is found there.
+
+        Existing Coffee Beans and Brews in the page are used once every field
+        is checked; with neither, both are created. Anything else is refused
+        with what is wrong, before anything is saved.
+        """
+        entry = self.config_entry
+        errors: dict[str, str] = {}
+        detail = ""
+        if user_input is not None:
+            token = user_input["token"].strip()
+            page = page_id_from(user_input["page"])
+            if not page:
+                errors["page"] = "notion_page"
+            else:
+                client = NotionClient(async_get_clientsession(self.hass), token)
+                try:
+                    databases = await async_find_or_create(client, page)
+                except SetupProblem as problem:
+                    errors["base"], detail = problem.error, problem.detail
+                else:
+                    self.hass.config_entries.async_update_entry(entry, data={
+                        **entry.data, **self._coffee_lab,
+                        CONF_COFFEE_LAB_STORE: "notion", CONF_NOTION_TOKEN: token,
+                        CONF_NOTION_PAGE: page, CONF_NOTION_BEANS: databases.beans,
+                        CONF_NOTION_BREWS: databases.brews,
+                    })
+                    self.hass.async_create_task(
+                        self.hass.config_entries.async_reload(entry.entry_id)
+                    )
+                    return self.async_create_entry(title="", data={"_coffee_lab": "notion"})
+        return self.async_show_form(
+            step_id="coffee_lab_notion",
+            data_schema=vol.Schema({
+                vol.Required("token", default=entry.data.get(CONF_NOTION_TOKEN, "")):
+                    selector.TextSelector(selector.TextSelectorConfig(
+                        type=selector.TextSelectorType.PASSWORD)),
+                vol.Required("page", default=entry.data.get(CONF_NOTION_PAGE, "")):
+                    selector.TextSelector(),
+            }),
+            errors=errors,
+            description_placeholders={"detail": detail},
         )
 
     # ------------------------------------------------------------------ #

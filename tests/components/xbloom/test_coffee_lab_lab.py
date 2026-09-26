@@ -9,7 +9,7 @@ from xbloom import spec
 
 from custom_components.xbloom.coffee_lab.lab import CoffeeLab
 from custom_components.xbloom.coffee_lab.store import LocalStore, ProcessedRuns, UnknownBean
-from custom_components.xbloom.const import CONF_BREWERS, CONF_COFFEE_LAB
+from custom_components.xbloom.const import CONF_BREWERS, CONF_COFFEE_LAB, CONF_COFFEE_LAB_STORE
 
 from .test_coffee_lab_store import FakeStorage
 
@@ -182,5 +182,8 @@ async def test_the_switch_is_in_the_options_menu_and_off_by_default():
     )
     # Blank and repeated brewers dropped, the order kept.
     flow.hass.config_entries.async_update_entry.assert_called_once_with(
-        entry, data={CONF_COFFEE_LAB: True, CONF_BREWERS: ["V60", "Hario Switch"]}
+        entry, data={
+            CONF_COFFEE_LAB: True, CONF_BREWERS: ["V60", "Hario Switch"],
+            CONF_COFFEE_LAB_STORE: "local",
+        }
     )

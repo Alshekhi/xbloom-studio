@@ -21,26 +21,28 @@ import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import json
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceResponse, SupportsResponse
+from homeassistant.core import HomeAssistant, ServiceResponse, SupportsResponse, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.event import async_track_time_interval
 
 from .const import (
     CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_BREWERS, CONF_CALLBACK_TARGETS, CONF_COFFEE_LAB,
-    CONF_PRODUCT_ID,
-    DEFAULT_BREWERS, DOMAIN,
+    CONF_COFFEE_LAB_STORE, CONF_NOTION_BEANS, CONF_NOTION_BREWS, CONF_NOTION_TOKEN,
+    CONF_PRODUCT_ID, DEFAULT_BREWERS, DOMAIN,
     SIGNAL_COFFEE_LAB_UPDATED,
 )
 from .callbacks import Callbacks, targets_from
 from .coffee_lab.lab import CoffeeLab
 from .coffee_lab.listener import async_count_completed_brews
+from .coffee_lab.notion import Databases, NotionClient, NotionStore
 from .coffee_lab.store import UnknownBean
 from .tool_common import refuse
 from .coffee_lab.services import async_register_lab_services
@@ -120,6 +122,10 @@ BREW_END_GRACE_S = 120.0
 # and reports the fault a moment later; that fault is the real ending, and a
 # stop decided at once would drop it.
 BREW_STOP_GRACE_S = 10.0
+
+# How often Coffee Lab's entities re-read a Notion store. One query every ten
+# minutes is far below any rate limit worth worrying about.
+NOTION_REFRESH = timedelta(minutes=10)
 
 
 async def _await_brew_outcome(
@@ -333,13 +339,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         ble_device_resolver=_ble_device_for_listener,
     )
     if entry.data.get(CONF_COFFEE_LAB):
+        store = None
+        if entry.data.get(CONF_COFFEE_LAB_STORE) == "notion":
+            store = NotionStore(
+                NotionClient(async_get_clientsession(hass), entry.data[CONF_NOTION_TOKEN]),
+                Databases(entry.data[CONF_NOTION_BEANS], entry.data[CONF_NOTION_BREWS]),
+            )
         lab = await CoffeeLab.async_create(
-            hass, tuple(entry.data.get(CONF_BREWERS, DEFAULT_BREWERS))
+            hass, tuple(entry.data.get(CONF_BREWERS, DEFAULT_BREWERS)), store
         )
         lab.on_change = lambda: async_dispatcher_send(hass, SIGNAL_COFFEE_LAB_UPDATED)
         entry.runtime_data.coffee_lab = lab
         entry.async_on_unload(async_count_completed_brews(hass, lab))
         entry.async_on_unload(async_register_lab_services(hass, lab))
+        if store is not None:
+            # Nothing tells Home Assistant of a bag added or edited in Notion
+            # itself, so what the entities show is re-read on a timer.
+            @callback
+            def _reread(_now) -> None:
+                lab.on_change()
+
+            entry.async_on_unload(async_track_time_interval(hass, _reread, NOTION_REFRESH))
 
     # ------------------------------------------------------------------ #
     # Shared BLE-event dispatcher (piggyback refresh)                     #
