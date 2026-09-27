@@ -67,8 +67,7 @@ views:
         above: 0
     - type: entities
       entities:
-      - entity: sensor.xbloom_studio_brew_time
-        format: total
+      - sensor.xbloom_studio_brew_time
       visibility:
       - condition: state
         entity: sensor.xbloom_studio_brew_time

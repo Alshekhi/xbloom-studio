@@ -35,10 +35,12 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
 )
-from datetime import datetime
+from datetime import datetime, timedelta
 
+from homeassistant.const import UnitOfTime
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .ble_entities import (
@@ -307,29 +309,71 @@ class XBloomCurrentPourSensor(SensorEntity):
 
 
 class XBloomBrewTimeSensor(SensorEntity):
-    """When the brew in progress poured first; empty otherwise.
+    """How long the brew in progress has been pouring, in seconds; empty otherwise.
 
-    A timestamp, so a dashboard shows how long the brew has been pouring and
-    counts it up itself, with no state written every second. It starts where
-    the recorded brew time starts — the first pour — and clears when the brew
-    ends, so it never shows a brew that is not running.
+    It counts from where the recorded brew time starts — the first pour — and
+    updates every second while the brew runs, so a dashboard shows minutes and
+    seconds. A timestamp the frontend counts up would write nothing, but no
+    built-in format shows it past the first minute as more than whole minutes;
+    the cost here is one recorded state a second for the few minutes a brew
+    pours. It clears when the brew ends, so it never shows a brew that is not
+    running.
     """
 
     _attr_has_entity_name = True
     _attr_should_poll = False
     _attr_translation_key = "brew_time"
     _attr_unique_id = "xbloom_brew_time"
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
     _attr_icon = "mdi:timer-outline"
+
+    TICK = timedelta(seconds=1)
+    # A brew started at the machine whose ENJOY goes unheard has no other end,
+    # so the count gives up well past any real brew rather than tick forever.
+    GIVE_UP = timedelta(minutes=15)
 
     def __init__(self, entry) -> None:
         self._entry = entry
-        self._attr_native_value: datetime | None = None
+        self._attr_native_value: int | None = None
+        self._first_pour: datetime | None = None
+        self._stop_ticking = None
         self._on_module_screen = False
 
     @property
     def device_info(self):
         return _device_info(self._entry.entry_id)
+
+    @callback
+    def _tick(self, _now=None) -> None:
+        running = dt_util.utcnow() - self._first_pour
+        if running > self.GIVE_UP:
+            self._clear()
+            return
+        elapsed = int(running.total_seconds())
+        if elapsed != self._attr_native_value:
+            self._attr_native_value = elapsed
+            self.async_write_ha_state()
+
+    @callback
+    def _start(self) -> None:
+        self._first_pour = dt_util.utcnow()
+        self._stop_ticking = async_track_time_interval(self.hass, self._tick, self.TICK)
+        self._tick()
+
+    @callback
+    def _stop(self) -> None:
+        if self._stop_ticking is not None:
+            self._stop_ticking()
+            self._stop_ticking = None
+
+    @callback
+    def _clear(self) -> None:
+        self._stop()
+        self._first_pour = None
+        if self._attr_native_value is not None:
+            self._attr_native_value = None
+            self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -337,9 +381,7 @@ class XBloomBrewTimeSensor(SensorEntity):
         @callback
         def _on_started(_event) -> None:
             self._on_module_screen = False
-            if self._attr_native_value is not None:
-                self._attr_native_value = None
-                self.async_write_ha_state()
+            self._clear()
 
         @callback
         def _on_signal(decoded: dict) -> None:
@@ -347,21 +389,19 @@ class XBloomBrewTimeSensor(SensorEntity):
             if self._on_module_screen:
                 return
             cmd = decoded.get("cmd")
-            if cmd == CMD_BLOOM and self._attr_native_value is None:
-                self._attr_native_value = dt_util.utcnow()
-                self.async_write_ha_state()
-            elif cmd == CMD_ENJOY and self._attr_native_value is not None:
+            if cmd == CMD_BLOOM and self._first_pour is None:
+                self._start()
+            elif cmd == CMD_ENJOY:
                 # The machine's own end: a brew started at the machine runs no
                 # Home Assistant brew task, so no "ended" follows it.
-                self._attr_native_value = None
-                self.async_write_ha_state()
+                self._clear()
 
         @callback
         def _on_lifecycle(phase: str) -> None:
-            if phase == "ended" and self._attr_native_value is not None:
-                self._attr_native_value = None
-                self.async_write_ha_state()
+            if phase == "ended":
+                self._clear()
 
+        self.async_on_remove(self._stop)
         self.async_on_remove(self.hass.bus.async_listen(EV_BREW_STARTED, _on_started))
         self.async_on_remove(
             async_dispatcher_connect(self.hass, signal_event(self._entry.entry_id), _on_signal)

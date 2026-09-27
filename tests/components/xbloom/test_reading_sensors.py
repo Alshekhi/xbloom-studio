@@ -10,6 +10,7 @@ So the tests here are mostly about clearing, not about setting.
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -286,34 +287,97 @@ def test_recipe_card_sensor_listens_for_scans() -> None:
 CMD_ENJOY = 40512
 
 
+class _Clock:
+    """A settable utcnow, and the one-second tick Brew Time registers."""
+
+    def __init__(self) -> None:
+        self.now = datetime(2026, 1, 1, 8, 0, 0, tzinfo=timezone.utc)
+        self.tick = None
+        self.stopped = 0
+
+    def utcnow(self):
+        return self.now
+
+    def track(self, _hass, action, interval):
+        assert interval == timedelta(seconds=1)
+        self.tick = action
+
+        def _stop():
+            self.stopped += 1
+            self.tick = None
+
+        return _stop
+
+    def advance(self, seconds: float) -> None:
+        self.now += timedelta(seconds=seconds)
+        self.tick(self.now)
+
+
+@pytest.fixture
+def clock():
+    import custom_components.xbloom.reading_sensors as rs
+
+    c = _Clock()
+    with patch.object(rs.dt_util, "utcnow", c.utcnow), \
+            patch.object(rs, "async_track_time_interval", c.track):
+        yield c
+
+
 @pytest.mark.asyncio
-async def test_brew_time_starts_at_the_first_pour_and_holds_it() -> None:
+async def test_brew_time_counts_seconds_from_the_first_pour(clock) -> None:
     entity = _make(XBloomBrewTimeSensor)
     handlers = await _wire(entity)
     assert entity._attr_native_value is None
     handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
-    first = entity._attr_native_value
-    assert first is not None and first.tzinfo is not None
+    assert entity._attr_native_value == 0
+    clock.advance(65.4)
+    assert entity._attr_native_value == 65
     handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 1})
-    assert entity._attr_native_value == first
+    clock.advance(1)
+    assert entity._attr_native_value == 66
 
 
 @pytest.mark.asyncio
-async def test_brew_time_clears_on_enjoy_and_when_the_brew_ends() -> None:
+async def test_brew_time_writes_only_when_the_second_changes(clock) -> None:
+    entity = _make(XBloomBrewTimeSensor)
+    handlers = await _wire(entity)
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    writes = entity.async_write_ha_state.call_count
+    clock.advance(0.4)
+    assert entity.async_write_ha_state.call_count == writes
+
+
+@pytest.mark.asyncio
+async def test_brew_time_clears_and_stops_on_enjoy_and_when_the_brew_ends(clock) -> None:
     entity = _make(XBloomBrewTimeSensor)
     handlers = await _wire(entity)
     handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
     handlers.signals[0]({"cmd": CMD_ENJOY})
-    assert entity._attr_native_value is None
+    assert entity._attr_native_value is None and clock.tick is None
     handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
     handlers.signals[1]("ended")
-    assert entity._attr_native_value is None
+    assert entity._attr_native_value is None and clock.tick is None
+    assert clock.stopped == 2
 
 
 @pytest.mark.asyncio
-async def test_a_new_brew_starts_brew_time_afresh() -> None:
+async def test_a_new_brew_starts_brew_time_afresh(clock) -> None:
     entity = _make(XBloomBrewTimeSensor)
     handlers = await _wire(entity)
     handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    clock.advance(30)
     handlers[EV_BREW_STARTED](_event(EV_BREW_STARTED, {"total_pours": 3}))
-    assert entity._attr_native_value is None
+    assert entity._attr_native_value is None and clock.tick is None
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    assert entity._attr_native_value == 0
+
+
+@pytest.mark.asyncio
+async def test_brew_time_gives_up_on_a_brew_that_never_ends(clock) -> None:
+    entity = _make(XBloomBrewTimeSensor)
+    handlers = await _wire(entity)
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    clock.advance(15 * 60)
+    assert entity._attr_native_value == 900
+    clock.advance(1)
+    assert entity._attr_native_value is None and clock.tick is None

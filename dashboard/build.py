@@ -163,9 +163,7 @@ def brew_view(t: dict) -> dict:
                 f"{{% set p = 'sensor.{E}_current_pour' %}}{{% set total = state_attr(p, 'total_pours') %}}"
                 f"**{t['pour']} {{{{ states(p) }}}}{{% if total %}} {t['of']} {{{{ total }}}}{{% endif %}}**"
             ), "visibility": [{"condition": "numeric_state", "entity": f"sensor.{E}_current_pour", "above": 0}]},
-            # A timestamp shown as a running total: the frontend counts it up
-            # every second, so nothing is written to Home Assistant to do it.
-            {"type": "entities", "entities": [{"entity": f"sensor.{E}_brew_time", "format": "total"}],
+            {"type": "entities", "entities": [f"sensor.{E}_brew_time"],
              "visibility": present(f"sensor.{E}_brew_time")},
             press(f"button.{E}_pause_brew"),
             press(f"button.{E}_resume_brew"),
