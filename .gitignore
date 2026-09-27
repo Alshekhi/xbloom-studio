@@ -19,7 +19,7 @@ CLAUDE.md
 graphify-out/
 
 # Reference material kept outside the repo
-docs/
+docs/superpowers/
 
 # Virtual environment
 .venv/
