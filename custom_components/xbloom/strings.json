@@ -960,7 +960,7 @@
         },
         "share_url": {
           "name": "Share URL",
-          "description": "Brew straight from an xBloom app share URL (e.g. https://share-h5.xbloom.com/?id=...). Fetched fresh — the recipe does not have to be in the library first, and nothing is saved."
+          "description": "Brew straight from an xBloom app share URL. Fetched fresh — the recipe does not have to be in the library first, and nothing is saved."
         },
         "share_id": {
           "name": "Share ID",
@@ -1097,7 +1097,7 @@
         },
         "share_url": {
           "name": "Share URL",
-          "description": "A share URL from the xBloom iOS app (e.g. https://share-h5.xbloom.com/?id=...). Fetched fresh — no need to import it from the Configure menu first."
+          "description": "A share URL from the xBloom iOS app. Fetched fresh — no need to import it from the Configure menu first."
         },
         "share_id": {
           "name": "Share ID",
