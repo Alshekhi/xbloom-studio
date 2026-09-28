@@ -473,12 +473,24 @@ async def prepare_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]
     return {"prepared": True, "recipe": machine.state("select", "xbloom_recipe_select")}
 
 
+# The brew customizer's sliders, as the dashboard's Start Brew reads them.
+_PICKED = (("dose", "xbloom_brew_dose"), ("ratio", "xbloom_brew_ratio"), ("grind_size", "xbloom_brew_grind"))
+
+
 async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
+    # One path, whatever the request: the recipe is prepared — unless the
+    # machine already holds exactly it — and then started. Only a share link,
+    # which is not in the library and so cannot be picked, is brewed directly.
     data: dict[str, Any] = _recipe_source(args)
+    prepared = not data
+    changes = {
+        k: args[k] for k in ("dose", "ratio", "grind_size", "use_preground") if args.get(k) is not None
+    }
     if not data and args.get("name"):
-        data["recipe_name"] = await _resolve_recipe_name(machine, args["name"])
-    if args.get("use_preground") is not None:
-        data["use_preground"] = args["use_preground"]
+        changes["name"] = args["name"]
+    if data:
+        if args.get("use_preground") is not None:
+            data["use_preground"] = args["use_preground"]
     # notify_context is the name callers already use for the same thing.
     context = args.get("context") if args.get("context") is not None else args.get("notify_context")
     if context is not None:
@@ -487,7 +499,8 @@ async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
         data["notify_target"] = args["notify_target"]
         data["notify_progress"] = bool(args.get("notify_progress"))
     overrides = {k: args[k] for k in ("dose", "ratio", "grind_size") if args.get(k) is not None}
-    data.update(overrides)
+    if not prepared:
+        data.update(overrides)
     bag = None
     if machine.lab is not None:
         # Named on the brew itself, so it cannot be forgotten, nor charged to
@@ -501,6 +514,15 @@ async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
             data["bean_id"] = bag.id
             # The bag in use is the one the dashboard should show.
             await machine.lab.async_select(bag.id)
+    if prepared:
+        ready = machine.state("binary_sensor", "xbloom_recipe_ready") == "on"
+        if changes or not ready:
+            await prepare_brew(machine, {**args, **changes})
+        # Start exactly what was prepared: the picks, as Start Brew sends them.
+        for key, unique_id in _PICKED:
+            value = machine.state("number", unique_id)
+            if value is not None:
+                data[key] = int(float(value)) if key == "grind_size" else float(value)
 
     hass = machine.hass
     heard: list[Event] = []
@@ -797,21 +819,19 @@ ACTIONS: dict[str, Spec] = {
     # Brewing
     "start_brew": Spec(
         start_brew,
-        "brew a recipe by name, share_url or share_id, or the machine's selected "
-        "recipe if none. dose/ratio/grind_size apply to this brew only; "
-        "use_preground skips the grinder. With no recipe named and "
-        "brew_status.recipe_ready, it starts the prepared recipe at once; "
-        "otherwise it sends the whole brew, which takes several seconds. Waits "
-        "for the machine to take the brew: outcome `started`, or `pending` if it "
-        "has not answered yet — then read brew_status",
+        "start a brew: a recipe by name, or the chosen one if none, or a "
+        "share_url/share_id. dose/ratio/grind_size apply to this brew only; "
+        "use_preground skips the grinder. The machine is made ready first when "
+        "it is not already. Waits for the machine to take the brew: outcome "
+        "`started`, or `pending` if it has not answered yet — then read "
+        "brew_status",
     ),
     "prepare_brew": Spec(
         prepare_brew,
-        "pick a recipe by name, or keep the selected one, with dose/ratio/"
-        "grind_size/use_preground, and send it to the machine without starting "
-        "it — use it when the person wants to start later, at once. Answers once "
-        "the machine has accepted it; start_brew with no recipe then starts it "
-        "at once",
+        "choose a recipe by name, or keep the chosen one, with dose/ratio/"
+        "grind_size/use_preground, and get the machine ready without starting. "
+        "Answers once the machine has accepted it; start_brew then starts it at "
+        "once",
     ),
     "cancel_preparation": Spec(
         partial(_plain, "cancel_preparation"),

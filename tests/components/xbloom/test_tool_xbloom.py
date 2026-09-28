@@ -183,7 +183,10 @@ async def test_start_brew_reports_started_when_the_machine_takes_it():
         "recipe": "Kenya",
         "overrides_this_brew_only": {"dose": 18.0},
     }
-    assert ("xbloom", "start_brew", {"recipe_name": "Kenya", "dose": 18.0}) in hass.calls
+    # One path: the recipe is made ready, then what was made ready is started.
+    services = [call[1] for call in hass.calls if call[0] == "xbloom"]
+    assert services[-2:] == ["prepare_brew", "start_brew"]
+    assert ("xbloom", "prepare_brew", {"recipe_name": "Kenya", "dose": 18.0}) in hass.calls
     assert not any(hass.listeners.values()), "listeners left behind"
 
 
@@ -426,3 +429,33 @@ async def test_cancel_preparation_takes_the_recipe_back():
     hass = FakeHass()
     assert await ACTIONS["cancel_preparation"].run(_machine(hass), {}) == {"done": True}
     assert ("xbloom", "cancel_preparation", {}) in hass.calls
+
+
+async def test_start_brew_starts_a_recipe_already_ready_without_preparing_again():
+    hass = FakeHass(
+        states={
+            "binary_sensor.xbloom_recipe_ready": "on",
+            "number.xbloom_brew_dose": "18.0",
+            "number.xbloom_brew_ratio": "16.0",
+            "number.xbloom_brew_grind": "50.0",
+        },
+        responses={"start_brew": {"run_id": "r1"}},
+        on_call=lambda h, svc: svc == "start_brew" and h.fire(
+            "xbloom_brew_started", {"recipe_name": "Kenya", "run_id": "r1"}
+        ),
+    )
+    await ACTIONS["start_brew"].run(_machine(hass), {})
+    assert [c[1] for c in hass.calls] == ["start_brew"]
+    assert ("xbloom", "start_brew", {"dose": 18.0, "ratio": 16.0, "grind_size": 50}) in hass.calls
+
+
+async def test_start_brew_from_a_share_link_brews_it_directly():
+    # Not in the library, so there is nothing to choose and make ready.
+    hass = FakeHass(
+        responses={"start_brew": {"run_id": "r1"}},
+        on_call=lambda h, svc: svc == "start_brew" and h.fire(
+            "xbloom_brew_started", {"recipe_name": "Shared", "run_id": "r1"}
+        ),
+    )
+    await ACTIONS["start_brew"].run(_machine(hass), {"share_url": "https://example.invalid/r"})
+    assert [c[1] for c in hass.calls] == ["start_brew"]
