@@ -859,6 +859,8 @@ ACTIONS: dict[str, Spec] = {
         prepare_brew,
         "choose a recipe by name, or keep the chosen one, with dose/ratio/"
         "grind_size/use_preground, and make the machine ready without brewing. "
+        "Before calling it, confirm the recipe with the person and ask whether to "
+        "change the dose, ratio or grind, unless they already said. "
         "Takes several seconds and answers once it is ready, with the recipe, "
         "settings, what differs from the saved recipe, and the bag, or says why "
         "not. To adjust before starting, call it again with just the new "
