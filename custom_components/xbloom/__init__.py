@@ -627,6 +627,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 raise HomeAssistantError(
                     translation_domain=DOMAIN, translation_key="machine_unreachable",
                 )
+        # Already on the machine, over this connection: sending it again only
+        # makes a start wait for a round trip the machine does not need.
+        if brew_session["prepared"] == _prepared_key(session, recipe):
+            _LOGGER.info("xbloom.prepare_brew: '%s' is already prepared", recipe_name)
+            return
         brew_session["prepared"] = None
         try:
             await session.send_prepare(recipe)

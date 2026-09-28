@@ -186,7 +186,7 @@ async def test_start_brew_reports_started_when_the_machine_takes_it():
     # One path: the recipe is made ready, then what was made ready is started.
     services = [call[1] for call in hass.calls if call[0] == "xbloom"]
     assert services[-2:] == ["prepare_brew", "start_brew"]
-    assert ("xbloom", "prepare_brew", {"recipe_name": "Kenya", "dose": 18.0, "wait": False}) in hass.calls
+    assert ("xbloom", "prepare_brew", {"recipe_name": "Kenya", "dose": 18.0}) in hass.calls
     assert not any(hass.listeners.values()), "listeners left behind"
 
 
@@ -435,20 +435,20 @@ async def test_brew_status_with_no_recipe_chosen():
     assert facts["preparation"] == {"state": "none"}
 
 
-async def test_prepare_brew_answers_at_once_with_what_it_is_preparing():
-    # Preparing takes several seconds; the assistant says what it started
-    # instead of going quiet, and checks brew_status for the outcome.
+async def test_prepare_brew_answers_once_the_machine_is_ready():
+    # One call, one definite answer: an assistant cannot be told later, so an
+    # early answer only means being asked again.
     hass = FakeHass(
         states={
             "select.xbloom_recipe_select": "Kenya",
-            "binary_sensor.xbloom_recipe_ready": ("off", {"preparing": True, "reason": None}),
+            "binary_sensor.xbloom_recipe_ready": "on",
             "number.xbloom_brew_dose": "18.0",
         },
         responses={"list_recipes": {"recipes": [{"name": "Kenya"}]}},
     )
     facts = await ACTIONS["prepare_brew"].run(_machine(hass), {"name": "kenya", "dose": 18.0})
-    assert facts["state"] == "preparing" and facts["recipe"] == "Kenya" and facts["dose"] == 18.0
-    assert ("xbloom", "prepare_brew", {"recipe_name": "Kenya", "dose": 18.0, "wait": False}) in hass.calls
+    assert facts["state"] == "ready" and facts["recipe"] == "Kenya" and facts["dose"] == 18.0
+    assert ("xbloom", "prepare_brew", {"recipe_name": "Kenya", "dose": 18.0}) in hass.calls
 
 
 async def test_cancel_preparation_takes_the_recipe_back():

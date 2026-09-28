@@ -480,8 +480,12 @@ def _preparation(machine: Machine) -> dict[str, Any]:
 
 
 async def prepare_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
-    """Choose a recipe and its settings, and start making the machine ready."""
-    data: dict[str, Any] = {"wait": False}
+    """Choose a recipe and its settings, and make the machine ready.
+
+    Waits for the outcome: an assistant cannot be told later, so answering
+    before the machine does only means being asked again.
+    """
+    data: dict[str, Any] = {}
     if args.get("name"):
         data["recipe_name"] = await _resolve_recipe_name(machine, args["name"])
     for key in ("dose", "ratio", "grind_size", "use_preground"):
@@ -845,10 +849,9 @@ ACTIONS: dict[str, Spec] = {
     "prepare_brew": Spec(
         prepare_brew,
         "choose a recipe by name, or keep the chosen one, with dose/ratio/"
-        "grind_size/use_preground, and start making the machine ready without "
-        "brewing. Answers at once with what is being prepared; it takes several "
-        "seconds, and brew_status.preparation says when it is ready or why not. "
-        "start_brew then starts it at once",
+        "grind_size/use_preground, and make the machine ready without brewing. "
+        "Takes several seconds and answers once it is ready, with the recipe, "
+        "settings and bag, or says why not; start_brew then starts it at once",
     ),
     "cancel_preparation": Spec(
         partial(_plain, "cancel_preparation"),

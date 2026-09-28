@@ -330,3 +330,15 @@ async def test_a_preparation_waits_for_the_session_it_turned_on_to_be_ready():
         await asyncio.wait_for(task, timeout=2)
     assert order == ["connect on", "prepare"]
     assert listeners["xbloom_connect_ready"] == [], "listener left behind"
+
+
+async def test_what_the_machine_already_holds_is_not_sent_again():
+    # The assistant sets the recipe, the sliders and the bag; the bag's change
+    # arriving after the preparation started asked for a second, identical one.
+    session = _PreparingSession()
+    _hass, entry, _handlers = await _handlers_with(session, hass=_make_hass())
+    with _machine_in_range():
+        await entry.runtime_data.preparer._prepare({"dose": 15})
+        await entry.runtime_data.preparer._prepare({"dose": 15})
+        await entry.runtime_data.preparer._prepare({"dose": 16})
+    assert session.sent == ["prepare", "prepare"]
