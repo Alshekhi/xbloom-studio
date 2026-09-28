@@ -493,3 +493,44 @@ async def test_bypass_water_is_not_counted_since_none_is_sent(bypass):
             if c.args and c.args[0] == "xbloom_brew_completed"][0]
     assert done["water_ml"] == 60
 
+
+
+# ── Whether a brew used its coffee, for what happens to the picks after ──────
+
+CMD_GRINDER_START = 40502
+
+
+async def _ended_with(frames, stopped_by_machine_home=False):
+    """Run a brew through `frames`; return what the preparer was told."""
+    _FakeBle.enjoy = False
+    hass = _make_hass()
+    entry = _Entry()
+    told: list[bool] = []
+    with patch("custom_components.xbloom._resolve_ble_device",
+               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
+         patch("xbloom.ble.XBloomBleClient", _FakeBle), \
+         patch("custom_components.xbloom.BREW_STOP_GRACE_S", 0.01):
+        handlers = await _setup_and_get_handlers(hass, entry)
+        entry.runtime_data.preparer.async_brew_ended = lambda used: told.append(used)
+        await handlers["start_brew"](MagicMock(data={}))
+        await asyncio.sleep(0)
+        for frame in frames:
+            await _FakeBle.instances[0].on_event(frame)
+        await asyncio.wait_for(entry.tasks[0], timeout=2.0)
+    return told
+
+
+async def test_no_beans_after_the_grinder_started_used_no_coffee():
+    # The grinder starts, finds nothing, and the machine stops: the recipe and
+    # the bag stay picked for another try.
+    told = await _ended_with([{"cmd": CMD_GRINDER_START}, {"cmd": CMD_NO_BEANS}])
+    assert told == [False]
+
+
+async def test_a_brew_stopped_at_the_machine_after_grinding_used_its_coffee():
+    told = await _ended_with([
+        {"cmd": CMD_GRINDER_START},
+        {"cmd": CMD_MACHINE_ACTIVITY, "activity": ACTIVITY_BREWING},
+        {"cmd": CMD_MACHINE_ACTIVITY, "activity": ACTIVITY_HOME},
+    ])
+    assert told == [True]

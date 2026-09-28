@@ -934,7 +934,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                         ble_client, brew_end_seen, went_home, fault_stopped, stopped_home,
                     )
                 completed = outcome == "confirmed"
-                ending["used"] = outcome in ("confirmed", "presumed", None) or ground.is_set()
+                # A fault the machine stops for (no beans) used no coffee even
+                # though the grinder started: it found nothing to grind. A brew
+                # someone stopped after grinding did use its coffee.
+                ending["used"] = outcome in ("confirmed", "presumed", None) or (
+                    outcome == "cancelled" and ground.is_set()
+                )
                 _LOGGER.info(
                     "xbloom.start_brew: '%s' over BLE '%s' (%s)",
                     recipe_name, ble_name,
