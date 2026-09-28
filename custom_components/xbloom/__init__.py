@@ -480,7 +480,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # left the task blocked in wait_for_completion for the full 10-minute
     # timeout, holding both the guard and BLE so no restart was possible until
     # the integration reloaded.
-    brew_session: dict = {"task": None, "started_at": 0.0}
+    # `client` is the brew's own BLE link while it is held: a one-shot command
+    # sent during a brew (pause, resume) travels over it, since a second link
+    # to the machine tears the brew's down and nothing is heard after that.
+    brew_session: dict = {"task": None, "started_at": 0.0, "client": None}
 
     async def _cancel_active_brew(reason: str, by: str | None = None) -> None:
         """Cancel the in-flight brew task (if any) and wait for it to unwind.
@@ -753,6 +756,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 _LOGGER.info("xbloom.start_brew: opening BLE connection …")
                 ble_client = XBloomBleClient(ble_device, on_event=_on_event)
                 async with ble_client:
+                    brew_session["client"] = ble_client
                     _LOGGER.info("xbloom.start_brew: ✓ connected, sending brew frames …")
                     await ble_client.brew(recipe)
                     _LOGGER.info(
@@ -864,6 +868,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     hass.bus.async_fire("xbloom_brew_stopped", _stopped(by))
                 raise
             finally:
+                brew_session["client"] = None
                 async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "ended")
 
         # Preempt any still-running (stale/wedged) session now that we're
@@ -1035,6 +1040,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
         if await send_live_frame(entry, packet):
             _LOGGER.info("xbloom.%s: ✓ sent over the held Connect session", label)
+            return
+
+        brew_client = brew_session["client"]
+        if brew_client is not None:
+            try:
+                confirmed = await brew_client.send_command(label, packet)
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.error("xbloom.%s: BLE dispatch failed: %s", label, err)
+                return
+            _LOGGER.info(
+                "xbloom.%s: ✓ sent over the brew's link (echo %s)",
+                label, "confirmed" if confirmed else "unconfirmed",
+            )
             return
 
         ble_name = _resolve_ble_name(entry)
