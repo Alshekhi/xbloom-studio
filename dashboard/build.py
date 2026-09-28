@@ -199,7 +199,8 @@ def brew_view(t: dict) -> dict:
             # way to Start Brew.
             {"type": "markdown", "text_only": True, "content": (
                 f"{{% set r = state_attr('binary_sensor.{E}_recipe_ready', 'reason') %}}"
-                f"{{% if r is none %}}{t['preparing']}"
+                f"{{% if state_attr('binary_sensor.{E}_recipe_ready', 'preparing') %}}{t['preparing']}"
+                f"{{% elif r is none %}}{t['not_taken']}"
                 f"{{% elif r == 'no_bag' %}}{t['need_bag']}"
                 f"{{% elif r in ['machine_not_found', 'machine_unreachable'] %}}{t['out_of_range']}"
                 f"{{% elif r == 'refused_not_on_home_screen' %}}{t['go_home']}"

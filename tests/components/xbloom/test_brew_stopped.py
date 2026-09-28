@@ -147,12 +147,28 @@ async def test_a_brew_refused_before_it_runs_still_has_a_run_id():
 async def test_a_stop_says_whether_the_grinder_had_run(brewing):
     hass, entry, _h, _r = await brewing()
     ble = _FakeBle.instances[-1]
-    await ble.on_event(_frame(cmd=40502))       # the grinder starting
+    # The grinder ran long enough to grind the dose.
+    with patch("custom_components.xbloom.GROUND_MIN_S", 0.0):
+        await ble.on_event(_frame(cmd=40502))       # the grinder starting
+        await ble.on_event(_frame(ACTIVITY_BREWING))
+        await ble.on_event(_frame(HOME))
+        await entry.tasks[0]
+    [stopped] = _fired(hass, "xbloom_brew_stopped")
+    assert stopped["ground"] is True and stopped["dose_g"] == 20
+
+
+async def test_a_stop_seconds_into_grinding_ground_nothing(brewing):
+    # Stopped at the machine three seconds in, or an empty hopper: a full dose
+    # takes 26-40 s to grind, so this used no coffee worth counting.
+    hass, entry, _h, _r = await brewing()
+    ble = _FakeBle.instances[-1]
+    await ble.on_event(_frame(cmd=40502))           # the grinder starting
+    await ble.on_event(_frame(cmd=40507))           # and stopping at once
     await ble.on_event(_frame(ACTIVITY_BREWING))
     await ble.on_event(_frame(HOME))
     await entry.tasks[0]
     [stopped] = _fired(hass, "xbloom_brew_stopped")
-    assert stopped["ground"] is True and stopped["dose_g"] == 20
+    assert stopped["ground"] is False
 
 
 async def test_a_stop_before_grinding_says_so(brewing):

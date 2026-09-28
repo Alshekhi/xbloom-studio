@@ -169,8 +169,9 @@ class XBloomBrewPausedSensor(BinarySensorEntity):
 class XBloomRecipeReadySensor(BinarySensorEntity):
     """On while the machine holds the picked recipe, ready to start at once.
 
-    `reason` says why it is not, when something stopped it: no bag picked,
-    the machine refused, a brew running.
+    `preparing` is on while a preparation waits to go or is under way;
+    `reason` says why it is not ready, when something stopped it: no bag
+    picked, the machine refused, a brew running.
     """
 
     _attr_has_entity_name = True
@@ -181,7 +182,7 @@ class XBloomRecipeReadySensor(BinarySensorEntity):
     def __init__(self, entry) -> None:
         self._entry = entry
         self._attr_is_on = False
-        self._attr_extra_state_attributes = {"reason": None}
+        self._attr_extra_state_attributes = {"preparing": False, "reason": None}
 
     @property
     def device_info(self):
@@ -195,9 +196,9 @@ class XBloomRecipeReadySensor(BinarySensorEntity):
         await super().async_added_to_hass()
 
         @callback
-        def _on_prepared(ready: bool, reason: str | None) -> None:
+        def _on_prepared(ready: bool, reason: str | None, preparing: bool) -> None:
             self._attr_is_on = ready
-            self._attr_extra_state_attributes = {"reason": reason}
+            self._attr_extra_state_attributes = {"preparing": preparing, "reason": reason}
             self.async_write_ha_state()
 
         self.async_on_remove(

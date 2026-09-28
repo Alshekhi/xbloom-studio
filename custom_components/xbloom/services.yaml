@@ -109,6 +109,11 @@ prepare_brew:
       required: false
       selector:
         boolean:
+    wait:
+      required: false
+      default: true
+      selector:
+        boolean:
 
 cancel_preparation:
 

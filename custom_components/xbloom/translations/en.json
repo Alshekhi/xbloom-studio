@@ -1055,6 +1055,10 @@
         "unattributed": {
           "name": "From no bag",
           "description": "Coffee Lab only: the coffee comes from no bag, as with an xPod."
+        },
+        "wait": {
+          "name": "Wait until ready",
+          "description": "On: answer once the machine has accepted the recipe. Off: answer as soon as preparing starts; Recipe Ready shows how it went."
         }
       }
     },

@@ -198,11 +198,12 @@ views:
     - type: markdown
       text_only: true
       content: '{% set r = state_attr(''binary_sensor.xbloom_studio_recipe_ready'', ''reason'') %}{% if
-        r is none %}Preparing the recipe.{% elif r == ''no_bag'' %}Pick a bag to prepare this recipe.{%
-        elif r in [''machine_not_found'', ''machine_unreachable''] %}The machine is out of range.{% elif
-        r == ''refused_not_on_home_screen'' %}Return the machine to its home screen to brew a recipe.{%
-        elif r == ''refused_no_water'' %}Fill the water tank.{% else %}The machine did not take the recipe.
-        Pick it again.{% endif %}'
+        state_attr(''binary_sensor.xbloom_studio_recipe_ready'', ''preparing'') %}Preparing the recipe.{%
+        elif r is none %}The machine did not take the recipe. Pick it again.{% elif r == ''no_bag'' %}Pick
+        a bag to prepare this recipe.{% elif r in [''machine_not_found'', ''machine_unreachable''] %}The
+        machine is out of range.{% elif r == ''refused_not_on_home_screen'' %}Return the machine to its
+        home screen to brew a recipe.{% elif r == ''refused_no_water'' %}Fill the water tank.{% else %}The
+        machine did not take the recipe. Pick it again.{% endif %}'
       visibility:
       - condition: state
         entity: select.xbloom_studio_recipe

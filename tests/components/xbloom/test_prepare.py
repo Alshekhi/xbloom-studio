@@ -349,3 +349,28 @@ async def test_closing_a_session_that_prepared_nothing_leaves_the_picks(rig_fact
     await rig.preparer.async_undo()
     assert rig.quits == 0
     assert (prep.signal_clear_recipe("e1"),) not in rig.signals
+
+
+async def test_preparing_shows_while_a_preparation_waits_or_runs(rig_factory):
+    rig = rig_factory()
+    rig.change(prep.DOSE, "16.0", old="15.0")
+    assert rig.preparer.preparing and not rig.ready()
+    await rig.settle()
+    assert rig.ready() and not rig.preparer.preparing
+
+
+async def test_preparing_soon_answers_before_the_machine_does(rig_factory):
+    rig = rig_factory()
+    rig.preparer.async_prepare_soon()
+    assert rig.preparer.preparing and rig.prepared == []
+    for _ in range(10):
+        await asyncio.sleep(0)
+    assert rig.ready() and len(rig.prepared) == 1
+
+
+async def test_preparing_soon_refuses_at_once_without_a_bag(rig_factory):
+    rig = rig_factory(lab=_Lab(bean=None))
+    rig.hass.states_by_id[prep.BAG] = "unknown"
+    with pytest.raises(PrepareRefused) as err:
+        rig.preparer.async_prepare_soon()
+    assert err.value.reason == "no_bag" and not rig.preparer.preparing

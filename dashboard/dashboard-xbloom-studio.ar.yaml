@@ -198,10 +198,12 @@ views:
     - type: markdown
       text_only: true
       content: '{% set r = state_attr(''binary_sensor.xbloom_studio_recipe_ready'', ''reason'') %}{% if
-        r is none %}يجري تجهيز الوصفة.{% elif r == ''no_bag'' %}اختر كيسا لتجهيز هذه الوصفة.{% elif r
-        in [''machine_not_found'', ''machine_unreachable''] %}الماكينة خارج النطاق.{% elif r == ''refused_not_on_home_screen''
-        %}أعد الماكينة إلى شاشتها الرئيسية لتحضير وصفة.{% elif r == ''refused_no_water'' %}املأ خزان الماء.{%
-        else %}لم تقبل الماكينة الوصفة. اخترها مرة أخرى.{% endif %}'
+        state_attr(''binary_sensor.xbloom_studio_recipe_ready'', ''preparing'') %}يجري تجهيز الوصفة.{%
+        elif r is none %}لم تقبل الماكينة الوصفة. اخترها مرة أخرى.{% elif r == ''no_bag'' %}اختر كيسا
+        لتجهيز هذه الوصفة.{% elif r in [''machine_not_found'', ''machine_unreachable''] %}الماكينة خارج
+        النطاق.{% elif r == ''refused_not_on_home_screen'' %}أعد الماكينة إلى شاشتها الرئيسية لتحضير وصفة.{%
+        elif r == ''refused_no_water'' %}املأ خزان الماء.{% else %}لم تقبل الماكينة الوصفة. اخترها مرة
+        أخرى.{% endif %}'
       visibility:
       - condition: state
         entity: select.xbloom_studio_recipe

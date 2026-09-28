@@ -528,9 +528,21 @@ async def test_no_beans_after_the_grinder_started_used_no_coffee():
 
 
 async def test_a_brew_stopped_at_the_machine_after_grinding_used_its_coffee():
+    with patch("custom_components.xbloom.GROUND_MIN_S", 0.0):
+        told = await _ended_with([
+            {"cmd": CMD_GRINDER_START},
+            {"cmd": CMD_MACHINE_ACTIVITY, "activity": ACTIVITY_BREWING},
+            {"cmd": CMD_MACHINE_ACTIVITY, "activity": ACTIVITY_HOME},
+        ])
+    assert told == [True]
+
+
+async def test_a_brew_stopped_at_the_machine_seconds_into_grinding_used_none():
+    # Stopped at the machine three seconds into grinding.
     told = await _ended_with([
         {"cmd": CMD_GRINDER_START},
+        {"cmd": 40507},
         {"cmd": CMD_MACHINE_ACTIVITY, "activity": ACTIVITY_BREWING},
         {"cmd": CMD_MACHINE_ACTIVITY, "activity": ACTIVITY_HOME},
     ])
-    assert told == [True]
+    assert told == [False]

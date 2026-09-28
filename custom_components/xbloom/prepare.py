@@ -49,7 +49,7 @@ UNUSABLE = ("unknown", "unavailable", "")
 
 
 def signal_prepared(entry_id: str) -> str:
-    """Recipe Ready changed: payload (ready: bool, reason: str | None)."""
+    """Recipe Ready changed: payload (ready, reason, preparing)."""
     return f"xbloom_prepared_{entry_id}"
 
 
@@ -96,6 +96,8 @@ class BrewPreparer:
         self._task: asyncio.Task | None = None
         self.ready = False
         self.reason: str | None = None
+        # A preparation is waiting to go, or under way.
+        self.preparing = False
         # Connect was turned on by this, not by someone, so this turns it off.
         self.owns_connect = False
         # While this changes the picks itself, their changes are not requests.
@@ -147,11 +149,11 @@ class BrewPreparer:
             return
         if event.data["entity_id"] == RECIPE and new.state not in UNUSABLE:
             self._cancel_idle_release()
-        self._set_ready(False, None)
         self._schedule()
 
     @callback
     def _schedule(self) -> None:
+        self._set_ready(False, None, preparing=True)
         if self._timer is not None:
             self._timer()
         self._timer = async_call_later(self._hass, SETTLE_S, self._fire)
@@ -197,6 +199,21 @@ class BrewPreparer:
                 return
             self._set_ready(True, None)
 
+    @callback
+    def async_prepare_soon(self) -> None:
+        """Start preparing the picks at once, without waiting for it.
+
+        For a caller that should answer straight away and check back: the
+        outcome shows in Recipe Ready, and a start waits for it. What stops
+        it before anything is sent is raised now.
+        """
+        if (missing := self._missing()) is not None:
+            self._set_ready(False, missing)
+            raise PrepareRefused(missing)
+        self._cancel_timer()
+        self._set_ready(False, None, preparing=True)
+        self._task = self._hass.async_create_task(self._prepare_picks())
+
     async def async_prepare_now(self) -> None:
         """Prepare the picks at once and wait; raise what stopped it.
 
@@ -208,6 +225,7 @@ class BrewPreparer:
             if (missing := self._missing()) is not None:
                 self._set_ready(False, missing)
                 raise PrepareRefused(missing)
+            self._set_ready(False, None, preparing=True)
             self._sent = True
             try:
                 await self._prepare(dashboard_brew(self._hass))
@@ -358,11 +376,13 @@ class BrewPreparer:
             self._timer = None
 
     @callback
-    def _set_ready(self, ready: bool, reason: str | None) -> None:
-        if (ready, reason) == (self.ready, self.reason):
+    def _set_ready(self, ready: bool, reason: str | None, preparing: bool = False) -> None:
+        if (ready, reason, preparing) == (self.ready, self.reason, self.preparing):
             return
-        self.ready, self.reason = ready, reason
-        async_dispatcher_send(self._hass, signal_prepared(self._entry.entry_id), ready, reason)
+        self.ready, self.reason, self.preparing = ready, reason, preparing
+        async_dispatcher_send(
+            self._hass, signal_prepared(self._entry.entry_id), ready, reason, preparing,
+        )
 
 
 class PrepareRefused(Exception):

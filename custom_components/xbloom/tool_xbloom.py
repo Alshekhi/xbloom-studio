@@ -453,9 +453,35 @@ def _brew_failure(data: dict[str, Any]) -> HomeAssistantError:
     return fail("brew_not_started", reason=reason)
 
 
+# The brew customizer's sliders, as the dashboard's Start Brew reads them.
+_PICKED = (("dose", "xbloom_brew_dose"), ("ratio", "xbloom_brew_ratio"), ("grind_size", "xbloom_brew_grind"))
+
+
+def _preparation(machine: Machine) -> dict[str, Any]:
+    """What the machine is being made ready for, and how far it has got."""
+    recipe = machine.state("select", "xbloom_recipe_select")
+    if recipe is None:
+        return {"state": "none"}
+    ready = machine.state("binary_sensor", "xbloom_recipe_ready") == "on"
+    attrs = machine.attributes("binary_sensor", "xbloom_recipe_ready")
+    facts: dict[str, Any] = {"recipe": recipe}
+    for key, unique_id in _PICKED:
+        value = machine.state("number", unique_id)
+        if value is not None:
+            facts[key] = int(float(value)) if key == "grind_size" else float(value)
+    facts["use_grinder"] = machine.state("switch", "xbloom_use_grinder") != "off"
+    if machine.lab is not None:
+        facts["bag"] = machine.state("select", "xbloom_coffee_lab_active_bag")
+    if ready:
+        return {"state": "ready", **facts}
+    if attrs.get("preparing"):
+        return {"state": "preparing", **facts}
+    return {"state": "not_ready", "because": attrs.get("reason"), **facts}
+
+
 async def prepare_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
-    """Pick a recipe and its settings, and send it to the machine unstarted."""
-    data: dict[str, Any] = {}
+    """Choose a recipe and its settings, and start making the machine ready."""
+    data: dict[str, Any] = {"wait": False}
     if args.get("name"):
         data["recipe_name"] = await _resolve_recipe_name(machine, args["name"])
     for key in ("dose", "ratio", "grind_size", "use_preground"):
@@ -470,11 +496,7 @@ async def prepare_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]
                 raise refuse("bag_required")
             data["bean_id"] = (await resolve_bean(machine.lab, args)).id
     await machine.call("prepare_brew", data)
-    return {"prepared": True, "recipe": machine.state("select", "xbloom_recipe_select")}
-
-
-# The brew customizer's sliders, as the dashboard's Start Brew reads them.
-_PICKED = (("dose", "xbloom_brew_dose"), ("ratio", "xbloom_brew_ratio"), ("grind_size", "xbloom_brew_grind"))
+    return _preparation(machine)
 
 
 async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
@@ -515,8 +537,9 @@ async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
             # The bag in use is the one the dashboard should show.
             await machine.lab.async_select(bag.id)
     if prepared:
-        ready = machine.state("binary_sensor", "xbloom_recipe_ready") == "on"
-        if changes or not ready:
+        # A new recipe or settings are made ready first; otherwise the start
+        # takes what is ready, or waits for a preparation still under way.
+        if changes:
             await prepare_brew(machine, {**args, **changes})
         # Start exactly what was prepared: the picks, as Start Brew sends them.
         for key, unique_id in _PICKED:
@@ -622,19 +645,12 @@ def _in_range(machine: Machine) -> bool | None:
 
 
 async def brew_status(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
-    ready = machine.state("binary_sensor", "xbloom_recipe_ready") == "on"
-    facts = {
+    return {
         "brew_status": machine.state("sensor", "xbloom_brew_status"),
         "recipe": machine.state("sensor", "xbloom_current_recipe"),
         "in_range": _in_range(machine),
-        # Whether the machine holds a prepared recipe that start_brew starts at once.
-        "recipe_ready": ready,
+        "preparation": _preparation(machine),
     }
-    if ready:
-        facts["prepared_recipe"] = machine.state("select", "xbloom_recipe_select")
-    elif reason := machine.attributes("binary_sensor", "xbloom_recipe_ready").get("reason"):
-        facts["not_ready_because"] = reason
-    return facts
 
 
 async def machine_status(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
@@ -829,9 +845,10 @@ ACTIONS: dict[str, Spec] = {
     "prepare_brew": Spec(
         prepare_brew,
         "choose a recipe by name, or keep the chosen one, with dose/ratio/"
-        "grind_size/use_preground, and get the machine ready without starting. "
-        "Answers once the machine has accepted it; start_brew then starts it at "
-        "once",
+        "grind_size/use_preground, and start making the machine ready without "
+        "brewing. Answers at once with what is being prepared; it takes several "
+        "seconds, and brew_status.preparation says when it is ready or why not. "
+        "start_brew then starts it at once",
     ),
     "cancel_preparation": Spec(
         partial(_plain, "cancel_preparation"),

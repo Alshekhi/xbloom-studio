@@ -186,7 +186,7 @@ async def test_start_brew_reports_started_when_the_machine_takes_it():
     # One path: the recipe is made ready, then what was made ready is started.
     services = [call[1] for call in hass.calls if call[0] == "xbloom"]
     assert services[-2:] == ["prepare_brew", "start_brew"]
-    assert ("xbloom", "prepare_brew", {"recipe_name": "Kenya", "dose": 18.0}) in hass.calls
+    assert ("xbloom", "prepare_brew", {"recipe_name": "Kenya", "dose": 18.0, "wait": False}) in hass.calls
     assert not any(hass.listeners.values()), "listeners left behind"
 
 
@@ -398,31 +398,57 @@ def test_a_restart_restoring_done_is_not_a_brew():
 async def test_brew_status_says_which_recipe_is_ready_to_start_at_once():
     hass = FakeHass(states={
         "sensor.xbloom_brew_status": "idle",
-        "binary_sensor.xbloom_recipe_ready": "on",
         "select.xbloom_recipe_select": "Kenya",
+        "binary_sensor.xbloom_recipe_ready": "on",
+        "number.xbloom_brew_dose": "18.0",
+        "number.xbloom_brew_ratio": "16.0",
+        "number.xbloom_brew_grind": "50.0",
     })
     facts = await ACTIONS["brew_status"].run(_machine(hass), {})
-    assert facts["recipe_ready"] is True and facts["prepared_recipe"] == "Kenya"
+    assert facts["preparation"] == {
+        "state": "ready", "recipe": "Kenya", "dose": 18.0, "ratio": 16.0,
+        "grind_size": 50, "use_grinder": True,
+    }
+
+
+async def test_brew_status_says_a_preparation_is_under_way():
+    hass = FakeHass(states={
+        "select.xbloom_recipe_select": "Kenya",
+        "binary_sensor.xbloom_recipe_ready": ("off", {"preparing": True, "reason": None}),
+    })
+    facts = await ACTIONS["brew_status"].run(_machine(hass), {})
+    assert facts["preparation"]["state"] == "preparing"
 
 
 async def test_brew_status_says_why_nothing_is_ready():
     hass = FakeHass(states={
-        "sensor.xbloom_brew_status": "idle",
-        "binary_sensor.xbloom_recipe_ready": ("off", {"reason": "no_bag"}),
+        "select.xbloom_recipe_select": "Kenya",
+        "binary_sensor.xbloom_recipe_ready": ("off", {"preparing": False, "reason": "no_bag"}),
     })
     facts = await ACTIONS["brew_status"].run(_machine(hass), {})
-    assert facts["recipe_ready"] is False and facts["not_ready_because"] == "no_bag"
-    assert "prepared_recipe" not in facts
+    assert facts["preparation"]["state"] == "not_ready"
+    assert facts["preparation"]["because"] == "no_bag"
 
 
-async def test_prepare_brew_answers_once_the_machine_has_the_recipe():
+async def test_brew_status_with_no_recipe_chosen():
+    facts = await ACTIONS["brew_status"].run(_machine(FakeHass()), {})
+    assert facts["preparation"] == {"state": "none"}
+
+
+async def test_prepare_brew_answers_at_once_with_what_it_is_preparing():
+    # Preparing takes several seconds; the assistant says what it started
+    # instead of going quiet, and checks brew_status for the outcome.
     hass = FakeHass(
-        states={"select.xbloom_recipe_select": "Kenya"},
+        states={
+            "select.xbloom_recipe_select": "Kenya",
+            "binary_sensor.xbloom_recipe_ready": ("off", {"preparing": True, "reason": None}),
+            "number.xbloom_brew_dose": "18.0",
+        },
         responses={"list_recipes": {"recipes": [{"name": "Kenya"}]}},
     )
     facts = await ACTIONS["prepare_brew"].run(_machine(hass), {"name": "kenya", "dose": 18.0})
-    assert facts == {"prepared": True, "recipe": "Kenya"}
-    assert ("xbloom", "prepare_brew", {"recipe_name": "Kenya", "dose": 18.0}) in hass.calls
+    assert facts["state"] == "preparing" and facts["recipe"] == "Kenya" and facts["dose"] == 18.0
+    assert ("xbloom", "prepare_brew", {"recipe_name": "Kenya", "dose": 18.0, "wait": False}) in hass.calls
 
 
 async def test_cancel_preparation_takes_the_recipe_back():

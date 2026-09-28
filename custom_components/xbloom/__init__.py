@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -120,6 +121,11 @@ PLATFORMS = [
 # How long a preparation waits for a Connect session it turned on to be ready:
 # connected, subscribed to the machine's replies, handshake sent.
 SESSION_READY_TIMEOUT_S = 15.0
+
+# A brew stopped before pouring used its coffee only once the grinder ran
+# this long: a full dose took 26-40 s to grind (2026-09-26/28), an empty
+# hopper stops it after about 8 s, and a stop at the machine can come sooner.
+GROUND_MIN_S = 10.0
 BREW_DUP_WINDOW_S = 20.0
 
 # How long RD_ENJOY has to follow CMD_BREW_END before the brew is called
@@ -685,7 +691,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             elif bean_id := call.data.get("bean_id"):
                 await lab.async_select(bean_id)
         try:
-            await preparer.async_prepare_now()
+            if call.data.get("wait", True):
+                await preparer.async_prepare_now()
+            else:
+                preparer.async_prepare_soon()
         except PrepareRefused as err:
             raise refuse({
                 "no_recipe": "no_recipe_selected",
@@ -719,6 +728,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             CMD_BREW_END,
             CMD_ENJOY,
             CMD_GRINDER_START,
+            CMD_GRINDER_STOP,
             CMD_MACHINE_ACTIVITY,
             signal_brew_lifecycle,
             signal_event,
@@ -821,8 +831,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         # its home screen on connect.
         brew_running = asyncio.Event()
         stopped_home = asyncio.Event()
-        # The grinder ran: a brew stopped after this has used its coffee.
-        ground = asyncio.Event()
+        # When the grinder started and stopped. A brew stopped once coffee
+        # was ground has used it; one stopped seconds into grinding — an
+        # empty hopper, or a stop at the machine straight away — has not.
+        grind: dict[str, float] = {}
+
+        def coffee_ground() -> bool:
+            if "first_pour" in heard:
+                return True
+            if "start" not in grind:
+                return False
+            end = grind.get("stop", time.monotonic())
+            return end - grind["start"] >= GROUND_MIN_S
         stopped_by: dict[str, str] = {}
         # When the first pour, BREW_END and ENJOY arrived. A brew's time is
         # its pours: first pour to ENJOY, or to BREW_END when ENJOY never
@@ -837,7 +857,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 fault_stopped.set()
             activity = decoded.get("activity")
             if decoded.get("cmd") == CMD_GRINDER_START:
-                ground.set()
+                grind.setdefault("start", time.monotonic())
+            elif decoded.get("cmd") == CMD_GRINDER_STOP and "start" in grind:
+                grind.setdefault("stop", time.monotonic())
             moment = {CMD_BLOOM: "first_pour", CMD_BREW_END: "brew_end", CMD_ENJOY: "enjoy"}.get(
                 decoded.get("cmd"))
             if moment is not None:
@@ -873,7 +895,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             # Whether the grinder ran, and the dose it was told: a stopped brew
             # that ground has used its coffee even though it made none.
             return {
-                "recipe_name": recipe_name, "by": by, "ground": ground.is_set(),
+                "recipe_name": recipe_name, "by": by, "ground": coffee_ground(),
                 "dose_g": recipe.get("dose_g"), "cup_type": recipe.get("cup_type"),
                 "ended_at": datetime.now(timezone.utc).isoformat(), **meta,
             }
@@ -956,7 +978,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 # though the grinder started: it found nothing to grind. A brew
                 # someone stopped after grinding did use its coffee.
                 ending["used"] = outcome in ("confirmed", "presumed", None) or (
-                    outcome == "cancelled" and ground.is_set()
+                    outcome == "cancelled" and coffee_ground()
                 )
                 _LOGGER.info(
                     "xbloom.start_brew: '%s' over BLE '%s' (%s)",
@@ -1044,7 +1066,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 by = brew_session.get("cancelled_by")
                 if started and by:
                     hass.bus.async_fire("xbloom_brew_stopped", _stopped(by))
-                ending["used"] = ground.is_set()
+                ending["used"] = coffee_ground()
                 # A newer brew takes over the picks; an unload leaves them.
                 ending["report"] = by not in (None, "superseded")
                 raise
@@ -1676,6 +1698,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             vol.Optional("grind_size"): vol.Coerce(int),
             vol.Optional("bean_id"): str,
             vol.Optional("unattributed"): bool,
+            # False: answer once preparing has started; Recipe Ready says how
+            # it went, and a start waits for it.
+            vol.Optional("wait", default=True): bool,
         }),
     )
     hass.services.async_register(DOMAIN, "cancel_preparation", handle_cancel_preparation)
