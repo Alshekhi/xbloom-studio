@@ -374,3 +374,18 @@ async def test_preparing_soon_refuses_at_once_without_a_bag(rig_factory):
     with pytest.raises(PrepareRefused) as err:
         rig.preparer.async_prepare_soon()
     assert err.value.reason == "no_bag" and not rig.preparer.preparing
+
+
+async def test_pre_ground_for_one_brew_is_put_back_after_it(rig_factory):
+    rig = rig_factory()
+    rig.preparer.grinder_before = "on"
+    await rig.preparer.async_brew_ended(used_coffee=True)
+    assert ("switch", "turn_on", {"entity_id": prep.USE_GRINDER}) in rig.hass.calls
+    assert rig.preparer.grinder_before is None
+
+
+async def test_a_change_of_mind_puts_the_grinder_back_too(rig_factory):
+    rig = rig_factory()
+    rig.preparer.grinder_before = "on"
+    await rig.preparer.async_cancel()
+    assert ("switch", "turn_on", {"entity_id": prep.USE_GRINDER}) in rig.hass.calls

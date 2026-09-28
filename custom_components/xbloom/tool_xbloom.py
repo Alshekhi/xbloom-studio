@@ -470,6 +470,15 @@ def _preparation(machine: Machine) -> dict[str, Any]:
         if value is not None:
             facts[key] = int(float(value)) if key == "grind_size" else float(value)
     facts["use_grinder"] = machine.state("switch", "xbloom_use_grinder") != "off"
+    # What this brew changes from the saved recipe, so the assistant can say so.
+    saved = machine.attributes("select", "xbloom_recipe_select")
+    changed = {
+        key: {"saved": saved[attr], "now": facts[key]}
+        for key, attr in (("dose", "dose_g"), ("ratio", "water_ratio"), ("grind_size", "grinder_size"))
+        if key in facts and saved.get(attr) is not None and float(saved[attr]) != float(facts[key])
+    }
+    if changed:
+        facts["changed_from_recipe"] = changed
     if machine.lab is not None:
         facts["bag"] = machine.state("select", "xbloom_coffee_lab_active_bag")
     if ready:
@@ -851,7 +860,9 @@ ACTIONS: dict[str, Spec] = {
         "choose a recipe by name, or keep the chosen one, with dose/ratio/"
         "grind_size/use_preground, and make the machine ready without brewing. "
         "Takes several seconds and answers once it is ready, with the recipe, "
-        "settings and bag, or says why not; start_brew then starts it at once",
+        "settings, what differs from the saved recipe, and the bag, or says why "
+        "not. To adjust before starting, call it again with just the new "
+        "values. start_brew then starts it at once",
     ),
     "cancel_preparation": Spec(
         partial(_plain, "cancel_preparation"),

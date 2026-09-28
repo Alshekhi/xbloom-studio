@@ -91,6 +91,9 @@ class BrewPreparer:
         self.unattributed = False
         # Something was sent to the machine that a quit should take back.
         self._sent = False
+        # What Use Grinder was before a preparation changed it: put back when
+        # the picks are cleared, so pre-ground for one brew is not every brew.
+        self.grinder_before: str | None = None
         self._lock = asyncio.Lock()
         self._timer: CALLBACK_TYPE | None = None
         self._task: asyncio.Task | None = None
@@ -348,6 +351,12 @@ class BrewPreparer:
         try:
             self.unattributed = False
             async_dispatcher_send(self._hass, signal_clear_recipe(self._entry.entry_id))
+            if self.grinder_before is not None:
+                before, self.grinder_before = self.grinder_before, None
+                await self._hass.services.async_call(
+                    "switch", "turn_on" if before == "on" else "turn_off",
+                    {"entity_id": USE_GRINDER}, blocking=True,
+                )
             lab = self._entry.runtime_data.coffee_lab
             if bag and lab is not None and lab.active_bean_id is not None:
                 await lab.async_select(None)

@@ -485,3 +485,16 @@ async def test_start_brew_from_a_share_link_brews_it_directly():
     )
     await ACTIONS["start_brew"].run(_machine(hass), {"share_url": "https://example.invalid/r"})
     assert [c[1] for c in hass.calls] == ["start_brew"]
+
+
+
+async def test_the_assistant_is_told_what_differs_from_the_saved_recipe():
+    hass = FakeHass(states={
+        "select.xbloom_recipe_select": ("Kenya", {"dose_g": 20, "water_ratio": 16, "grinder_size": 50}),
+        "binary_sensor.xbloom_recipe_ready": "on",
+        "number.xbloom_brew_dose": "18.0",
+        "number.xbloom_brew_ratio": "16.0",
+        "number.xbloom_brew_grind": "50.0",
+    })
+    facts = await ACTIONS["brew_status"].run(_machine(hass), {})
+    assert facts["preparation"]["changed_from_recipe"] == {"dose": {"saved": 20, "now": 18.0}}

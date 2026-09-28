@@ -686,10 +686,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     "number", "set_value", {"entity_id": entity_id, "value": call.data[key]}, blocking=True,
                 )
         if call.data.get("use_preground") is not None:
-            await hass.services.async_call(
-                "switch", "turn_off" if call.data["use_preground"] else "turn_on",
-                {"entity_id": PREP_USE_GRINDER}, blocking=True,
-            )
+            wanted = "off" if call.data["use_preground"] else "on"
+            current = hass.states.get(PREP_USE_GRINDER)
+            if current is not None and current.state != wanted:
+                # Put back once this brew is over: a request, not a setting.
+                if preparer.grinder_before is None:
+                    preparer.grinder_before = current.state
+                await hass.services.async_call(
+                    "switch", f"turn_{wanted}", {"entity_id": PREP_USE_GRINDER}, blocking=True,
+                )
         if (lab := entry.runtime_data.coffee_lab) is not None:
             if call.data.get("unattributed"):
                 preparer.unattributed = True
