@@ -81,18 +81,64 @@ def held_session(entry):
     return listener
 
 
-async def end_held_session(hass, entry, reason: str) -> None:
-    """Close the Connect session, if one is held, and say so on the bus.
+class SessionBrew:
+    """A recipe brew carried by the held Connect session.
 
-    For an action that needs a link of its own — a recipe brew waits on every
-    step being accepted, which a session cannot carry. `xbloom_connect_stopped`
-    is what the Connect switch and the live-only sensors key their reset on.
+    Stands in for the brew's own link: sends the steps over the session,
+    hears the brew's frames through the session (which already passes them on
+    to the entities), and waits for ENJOY there. When the session ends
+    mid-brew, nothing more can be heard, so the wait for ENJOY ends with it.
     """
-    listener = held_session(entry)
-    if listener is None:
-        return
-    await listener.stop()
-    hass.bus.async_fire("xbloom_connect_stopped", {"reason": reason})
+
+    def __init__(self, hass, entry_id: str, session, observe) -> None:
+        import asyncio
+
+        self._hass = hass
+        self._entry_id = entry_id
+        self._session = session
+        self._observe = observe
+        self._enjoy = asyncio.Event()
+        self._unsub = None
+
+    async def __aenter__(self):
+        self._unsub = async_dispatcher_connect(
+            self._hass, signal_event(self._entry_id), self._on_frame
+        )
+        return self
+
+    async def __aexit__(self, *_exc) -> bool:
+        if self._unsub is not None:
+            self._unsub()
+            self._unsub = None
+        return False
+
+    async def _on_frame(self, decoded: dict) -> None:
+        await self._observe(decoded)
+        if decoded.get("cmd") == CMD_ENJOY:
+            self._enjoy.set()
+
+    async def brew(self, recipe: dict) -> None:
+        await self._session.send_brew(recipe)
+
+    async def send_command(self, name: str, frame: bytes, **_kw) -> bool:
+        return await self._session.send_confirmed(name, frame)
+
+    async def wait_for_completion(self, timeout: float = 600.0) -> bool:
+        """True once ENJOY arrives; False on timeout or when the session ends."""
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while loop.time() < deadline:
+            if self._enjoy.is_set():
+                return True
+            if not getattr(self._session, "is_running", False):
+                return False
+            try:
+                await asyncio.wait_for(self._enjoy.wait(), timeout=1.0)
+            except TimeoutError:
+                continue
+        return self._enjoy.is_set()
 
 
 async def send_brewer_temp_live(entry, temp_c_wire: float) -> bool:

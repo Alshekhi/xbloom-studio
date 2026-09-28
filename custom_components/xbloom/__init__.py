@@ -536,7 +536,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         )
         from xbloom.ble import CommandRefused, CommandUnanswered, XBloomBleClient
 
-        from .ble_entities import end_held_session
+        from .ble_entities import SessionBrew, held_session
 
         active = brew_session["task"]
         if active is not None and not active.done():
@@ -676,7 +676,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         # comes — not the connecting, sending and grinding before them.
         heard: dict[str, datetime] = {}
 
-        async def _on_event(decoded: dict) -> None:
+        async def _observe(decoded: dict) -> None:
+            """What this brew learns from a frame: its pours, its end, a fault."""
             fault = spec.FAULTS.get(decoded.get("cmd"))
             if fault and fault[0] in BREW_STOPPING_FAULTS:
                 stopped_by.setdefault("status", fault[0])
@@ -707,6 +708,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 and decoded.get("activity") in ACTIVITY_HOME_STATES
             ):
                 went_home.set()
+
+        async def _on_event(decoded: dict) -> None:
+            # A link of the brew's own: nothing else passes its frames on.
+            await _observe(decoded)
             async_dispatcher_send(hass, signal_event(entry.entry_id), decoded)
 
         total_pours = len(recipe.get("pours", []) or [])
@@ -733,15 +738,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             # machine has taken the brew: see where it is fired below.
             async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "started")
 
-            # A recipe brew needs a link of its own — it waits on every step
-            # being accepted, which a Connect session cannot carry — and the
-            # machine takes one connection at a time. So a held session is
-            # closed first, rather than torn down underneath by this one.
-            await end_held_session(hass, entry, reason="brew")
-
-            _LOGGER.info("xbloom.start_brew: looking up %r in HA bluetooth …", ble_name)
-            ble_device = await _resolve_ble_device(hass, entry, ble_name)
-            if ble_device is None:
+            # While Connect holds the link the brew runs over it: the machine
+            # takes one connection at a time, and closing the session to open
+            # another cost a disconnect, a connect and a handshake before the
+            # first step. Without a session the brew opens a link of its own.
+            session = held_session(entry)
+            ble_device = None
+            if session is None:
+                _LOGGER.info("xbloom.start_brew: looking up %r in HA bluetooth …", ble_name)
+                ble_device = await _resolve_ble_device(hass, entry, ble_name)
+            if session is None and ble_device is None:
                 _LOGGER.error(
                     "xbloom.start_brew: HA bluetooth has not seen %r — "
                     "make sure the machine is on and within range",
@@ -750,11 +756,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 _fire_failed("machine_not_found", recipe_name)
                 async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "ended")
                 return
-            _LOGGER.info("xbloom.start_brew: ✓ found device %s", ble_device.address)
-
             try:
-                _LOGGER.info("xbloom.start_brew: opening BLE connection …")
-                ble_client = XBloomBleClient(ble_device, on_event=_on_event)
+                if session is not None:
+                    _LOGGER.info("xbloom.start_brew: brewing over the held Connect session …")
+                    ble_client = SessionBrew(hass, entry.entry_id, session, _observe)
+                else:
+                    _LOGGER.info("xbloom.start_brew: ✓ found device %s", ble_device.address)
+                    _LOGGER.info("xbloom.start_brew: opening BLE connection …")
+                    ble_client = XBloomBleClient(ble_device, on_event=_on_event)
                 async with ble_client:
                     brew_session["client"] = ble_client
                     _LOGGER.info("xbloom.start_brew: ✓ connected, sending brew frames …")

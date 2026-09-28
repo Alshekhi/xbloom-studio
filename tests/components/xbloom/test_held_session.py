@@ -6,6 +6,7 @@ the brewer screen long after the machine had gone home. So while a session is
 held, those actions travel over it — still confirmed, so a refusal reaches the
 caller — and a recipe brew, which needs its own link, ends the session first.
 """
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -131,32 +132,64 @@ async def test_a_grind_the_machine_refuses_is_an_error():
     assert "grind_stop" not in session.sent
 
 
-async def test_a_recipe_brew_ends_the_held_session_before_it_connects():
-    session = _Session()
+class _BrewingSession(_Session):
+    """A held session that also carries a recipe brew."""
+
+    async def send_brew(self, recipe):
+        self.sent.append("brew")
+
+
+def _frames_through_the_session():
+    """Capture the handler a brew subscribes to, and hand frames to it."""
+    handlers: list = []
+
+    def _connect(_hass, _signal, handler):
+        handlers.append(handler)
+        return lambda: None
+
+    return handlers, patch("custom_components.xbloom.ble_entities.async_dispatcher_connect", _connect)
+
+
+def _fired(hass, name):
+    return [c.args[1] for c in hass.bus.async_fire.call_args_list if c.args and c.args[0] == name]
+
+
+async def test_a_recipe_brew_goes_over_the_held_session():
+    # Closing the session to open a link of its own cost a disconnect, a
+    # connect and a handshake before the first step.
+    session = _BrewingSession()
     hass, entry, handlers = await _handlers_with(session, hass=_make_hass())
-    order: list[str] = []
-
-    class _Brew(_FakeBle):
-        async def brew(self, recipe):
-            order.append("brew")
-
-    real_stop = session.stop
-
-    async def _stop():
-        order.append("session_stopped")
-        await real_stop()
-    session.stop = _stop
-
-    with patch("custom_components.xbloom._resolve_ble_device",
-               AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
-         patch("xbloom.ble.XBloomBleClient", _Brew):
+    frames, capture = _frames_through_the_session()
+    with capture, _machine_in_range():
         await handlers["start_brew"](MagicMock(data={}))
+        for _ in range(10):
+            await asyncio.sleep(0)
+        for frame in frames:
+            await frame({"cmd": 40512})
         await entry.tasks[0]
 
-    assert order[:2] == ["session_stopped", "brew"]
-    stopped = [c.args[1] for c in hass.bus.async_fire.call_args_list
-               if c.args and c.args[0] == "xbloom_connect_stopped"]
-    assert stopped == [{"reason": "brew"}]
+    assert session.sent == ["brew"]
+    assert session.is_running and not session.stopped
+    assert _NoSecondLink.opened == []
+    assert [e["outcome"] for e in _fired(hass, "xbloom_brew_completed")] == ["confirmed"]
+    assert _fired(hass, "xbloom_connect_stopped") == []
+
+
+async def test_a_session_that_ends_mid_brew_ends_the_wait_for_its_ending():
+    # Nothing more can be heard once the session's link is gone, so waiting
+    # the full ten minutes for an ending would only keep the brew "running".
+    session = _BrewingSession()
+    hass, entry, handlers = await _handlers_with(session, hass=_make_hass())
+    frames, capture = _frames_through_the_session()
+    with capture, _machine_in_range():
+        await handlers["start_brew"](MagicMock(data={}))
+        for _ in range(10):
+            await asyncio.sleep(0)
+        session.is_running = False
+        await asyncio.wait_for(entry.tasks[0], timeout=5)
+
+    assert _fired(hass, "xbloom_brew_completed") == []
+    assert len(_fired(hass, "xbloom_brew_timeout")) == 1
 
 
 def test_every_refusal_has_a_message_in_each_language():
