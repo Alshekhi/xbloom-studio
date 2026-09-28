@@ -28,6 +28,9 @@ TEXT = {
         "h_voice": "Voice announcements", "h_updates": "Updates", "h_events": "Recent machine events",
         "go_home": "Return the machine to its home screen to brew a recipe.",
         "show_advanced": "Show brew adjustments", "show_per_pour": "Show each pour",
+        "preparing": "Preparing the recipe.", "need_bag": "Pick a bag to prepare this recipe.",
+        "out_of_range": "The machine is out of range.", "need_water": "Fill the water tank.",
+        "not_taken": "The machine did not take the recipe. Pick it again.",
         "show_manual": "Show manual brew",
         "confirm_stop": "Stop the brew in progress?", "confirm_record": "Record this manual brew?",
         "confirm_run": "Run the chosen action on the selected recipe?",
@@ -57,6 +60,9 @@ TEXT = {
         "h_voice": "الإعلانات الصوتية", "h_updates": "التحديثات", "h_events": "أحدث أحداث الماكينة",
         "go_home": "أعد الماكينة إلى شاشتها الرئيسية لتحضير وصفة.",
         "show_advanced": "إظهار تعديلات التحضير", "show_per_pour": "إظهار كل صبة",
+        "preparing": "يجري تجهيز الوصفة.", "need_bag": "اختر كيسا لتجهيز هذه الوصفة.",
+        "out_of_range": "الماكينة خارج النطاق.", "need_water": "املأ خزان الماء.",
+        "not_taken": "لم تقبل الماكينة الوصفة. اخترها مرة أخرى.",
         "show_manual": "إظهار التحضير اليدوي",
         "confirm_stop": "إيقاف التحضير الجاري؟", "confirm_record": "تسجيل هذا التحضير اليدوي؟",
         "confirm_run": "تنفيذ الإجراء المختار على الوصفة المختارة؟",
@@ -188,8 +194,18 @@ def brew_view(t: dict) -> dict:
         ], present(bag)[:1]),
         section(t["h_brew"], [
             select(f"select.{E}_recipe"),
-            # On once the machine holds the picked recipe; Start Brew is then instant.
-            tile(f"binary_sensor.{E}_recipe_ready", visibility=present(f"select.{E}_recipe")),
+            # While a picked recipe is not yet ready: that it is being prepared,
+            # or what stops it. Plain text, not a button; once ready it gives
+            # way to Start Brew.
+            {"type": "markdown", "text_only": True, "content": (
+                f"{{% set r = state_attr('binary_sensor.{E}_recipe_ready', 'reason') %}}"
+                f"{{% if r is none %}}{t['preparing']}"
+                f"{{% elif r == 'no_bag' %}}{t['need_bag']}"
+                f"{{% elif r in ['machine_not_found', 'machine_unreachable'] %}}{t['out_of_range']}"
+                f"{{% elif r == 'refused_not_on_home_screen' %}}{t['go_home']}"
+                f"{{% elif r == 'refused_no_water' %}}{t['need_water']}"
+                f"{{% else %}}{t['not_taken']}{{% endif %}}"
+            ), "visibility": [*present(f"select.{E}_recipe"), is_(f"binary_sensor.{E}_recipe_ready", "off")]},
             # Only once the machine holds the picks: a start is then instant.
             press(f"button.{E}_start_brew", grid_options={"columns": 6},
                   visibility=[is_(f"binary_sensor.{E}_recipe_ready", "on")]),
@@ -200,7 +216,8 @@ def brew_view(t: dict) -> dict:
             press(f"button.{E}_refresh_coffee_bags", visibility=[
                 {"condition": "state", "entity": f"button.{E}_refresh_coffee_bags", "state_not": "unavailable"},
             ]),
-            toggle("input_boolean.xbloom_show_advanced", name=t["show_advanced"]),
+            toggle("input_boolean.xbloom_show_advanced", name=t["show_advanced"],
+                   visibility=present(f"select.{E}_recipe")),
         ], at_home()),
         section(t["h_brew"], [
             {"type": "markdown", "text_only": True, "content": t["go_home"]},
@@ -244,11 +261,11 @@ def brew_view(t: dict) -> dict:
                 "{% else %}{{ c | round(0) | int }}°C{% endif %} |\n"
                 f"{{% endfor %}}{{% else %}}_{t['pick_recipe']}_{{% endif %}}"
             )},
-        ], [is_("input_boolean.xbloom_show_advanced", "on"), *at_home()]),
+        ], [is_("input_boolean.xbloom_show_advanced", "on"), *present(f"select.{E}_recipe"), *at_home()]),
         section(t["h_save"], [
             tile(f"text.{E}_new_recipe_name"),
             press(f"button.{E}_save_as_new_recipe"),
-        ], [is_("input_boolean.xbloom_show_advanced", "on"), *at_home()]),
+        ], [is_("input_boolean.xbloom_show_advanced", "on"), *present(f"select.{E}_recipe"), *at_home()]),
         section(t["h_manual"], [
             toggle(manual, name=t["show_manual"]),
             select(f"select.{E}_manual_brewer", visibility=[is_(manual, "on")], grid_options={"columns": 6}),

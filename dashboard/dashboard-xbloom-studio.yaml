@@ -195,12 +195,14 @@ views:
         action: none
       features:
       - type: select-options
-    - type: tile
-      entity: binary_sensor.xbloom_studio_recipe_ready
-      name:
-        type: entity
-      icon_tap_action:
-        action: none
+    - type: markdown
+      text_only: true
+      content: '{% set r = state_attr(''binary_sensor.xbloom_studio_recipe_ready'', ''reason'') %}{% if
+        r is none %}Preparing the recipe.{% elif r == ''no_bag'' %}Pick a bag to prepare this recipe.{%
+        elif r in [''machine_not_found'', ''machine_unreachable''] %}The machine is out of range.{% elif
+        r == ''refused_not_on_home_screen'' %}Return the machine to its home screen to brew a recipe.{%
+        elif r == ''refused_no_water'' %}Fill the water tank.{% else %}The machine did not take the recipe.
+        Pick it again.{% endif %}'
       visibility:
       - condition: state
         entity: select.xbloom_studio_recipe
@@ -208,6 +210,9 @@ views:
       - condition: state
         entity: select.xbloom_studio_recipe
         state_not: unknown
+      - condition: state
+        entity: binary_sensor.xbloom_studio_recipe_ready
+        state: 'off'
     - type: tile
       entity: button.xbloom_studio_start_brew
       name:
@@ -284,6 +289,13 @@ views:
         action: none
       tap_action:
         action: toggle
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_recipe
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_recipe
+        state_not: unknown
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_current_module
@@ -444,6 +456,12 @@ views:
       entity: input_boolean.xbloom_show_advanced
       state: 'on'
     - condition: state
+      entity: select.xbloom_studio_recipe
+      state_not: unavailable
+    - condition: state
+      entity: select.xbloom_studio_recipe
+      state_not: unknown
+    - condition: state
       entity: sensor.xbloom_studio_current_module
       state_not: grinder
     - condition: state
@@ -485,6 +503,12 @@ views:
     - condition: state
       entity: input_boolean.xbloom_show_advanced
       state: 'on'
+    - condition: state
+      entity: select.xbloom_studio_recipe
+      state_not: unavailable
+    - condition: state
+      entity: select.xbloom_studio_recipe
+      state_not: unknown
     - condition: state
       entity: sensor.xbloom_studio_current_module
       state_not: grinder
