@@ -637,10 +637,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             await session.send_prepare(recipe)
         except CommandRefused as err:
             raise _refused(err) from err
-        except (CommandUnanswered, RuntimeError) as err:
+        except Exception as err:  # noqa: BLE001 — unanswered, or the link failing
             raise HomeAssistantError(
                 translation_domain=DOMAIN, translation_key="recipe_not_prepared",
-                translation_placeholders={"reason": str(err)},
+                translation_placeholders={"reason": str(err) or type(err).__name__},
             ) from err
         brew_session["prepared"] = _prepared_key(session, recipe)
         _LOGGER.info("xbloom.prepare_brew: '%s' prepared, waiting for start", recipe_name)

@@ -342,3 +342,19 @@ async def test_what_the_machine_already_holds_is_not_sent_again():
         await entry.runtime_data.preparer._prepare({"dose": 15})
         await entry.runtime_data.preparer._prepare({"dose": 16})
     assert session.sent == ["prepare", "prepare"]
+
+
+async def test_a_link_failing_mid_preparation_is_a_readable_error():
+    # A Bluetooth error reached the caller as an internal server error.
+    from homeassistant.exceptions import HomeAssistantError
+
+    session = _PreparingSession()
+
+    async def _fails(recipe):
+        raise OSError("GATT Protocol Error")
+
+    session.send_prepare = _fails
+    _hass, entry, _handlers = await _handlers_with(session, hass=_make_hass())
+    with _machine_in_range(), pytest.raises(HomeAssistantError) as err:
+        await entry.runtime_data.preparer._prepare({"dose": 15})
+    assert err.value.translation_key == "recipe_not_prepared"
