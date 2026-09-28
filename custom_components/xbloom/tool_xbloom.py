@@ -600,11 +600,19 @@ def _in_range(machine: Machine) -> bool | None:
 
 
 async def brew_status(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
-    return {
+    ready = machine.state("binary_sensor", "xbloom_recipe_ready") == "on"
+    facts = {
         "brew_status": machine.state("sensor", "xbloom_brew_status"),
         "recipe": machine.state("sensor", "xbloom_current_recipe"),
         "in_range": _in_range(machine),
+        # Whether the machine holds a prepared recipe that start_brew starts at once.
+        "recipe_ready": ready,
     }
+    if ready:
+        facts["prepared_recipe"] = machine.state("select", "xbloom_recipe_select")
+    elif reason := machine.attributes("binary_sensor", "xbloom_recipe_ready").get("reason"):
+        facts["not_ready_because"] = reason
+    return facts
 
 
 async def machine_status(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
@@ -791,16 +799,19 @@ ACTIONS: dict[str, Spec] = {
         start_brew,
         "brew a recipe by name, share_url or share_id, or the machine's selected "
         "recipe if none. dose/ratio/grind_size apply to this brew only; "
-        "use_preground skips the grinder. Waits for the machine to take the brew: "
-        "outcome `started`, or `pending` if it has not answered yet — then read "
-        "brew_status",
+        "use_preground skips the grinder. With no recipe named and "
+        "brew_status.recipe_ready, it starts the prepared recipe at once; "
+        "otherwise it sends the whole brew, which takes several seconds. Waits "
+        "for the machine to take the brew: outcome `started`, or `pending` if it "
+        "has not answered yet — then read brew_status",
     ),
     "prepare_brew": Spec(
         prepare_brew,
         "pick a recipe by name, or keep the selected one, with dose/ratio/"
         "grind_size/use_preground, and send it to the machine without starting "
-        "it. Answers once the machine has accepted it; start_brew with no "
-        "recipe then starts it at once",
+        "it — use it when the person wants to start later, at once. Answers once "
+        "the machine has accepted it; start_brew with no recipe then starts it "
+        "at once",
     ),
     "cancel_preparation": Spec(
         partial(_plain, "cancel_preparation"),

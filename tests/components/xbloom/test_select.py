@@ -247,44 +247,14 @@ def _recipe_select(data, last_attributes=None):
 
 
 @pytest.mark.asyncio
-async def test_the_last_recipe_is_picked_again_after_a_restart() -> None:
+async def test_a_restart_starts_with_no_recipe_picked() -> None:
+    # Picking prepares the recipe on the machine, and a restart prepares
+    # nothing, so a pick carried over would be one Start Brew cannot start at
+    # once. The next brew starts from a fresh pick, as after a finished brew.
     entity = _recipe_select(list(_LIBRARY), {"id": "12", "name": "Kenya Hot"})
-    await entity.async_added_to_hass()
-    assert entity.current_option == "Kenya Hot"
-
-
-@pytest.mark.asyncio
-async def test_a_restored_recipe_is_the_same_one_even_when_names_repeat() -> None:
-    entity = _recipe_select(list(_LIBRARY), {"id": "13", "name": "Iced Recipe"})
-    await entity.async_added_to_hass()
-    # The second of that name, and offered as such — the restore is by id.
-    assert entity.current_option == "Iced Recipe (2)"
-    assert entity.extra_state_attributes["dose_g"] == 20
-
-
-@pytest.mark.asyncio
-async def test_a_recipe_gone_from_the_library_is_not_guessed_at() -> None:
-    entity = _recipe_select(list(_LIBRARY), {"id": "99", "name": "Kenya Hot"})
     await entity.async_added_to_hass()
     assert entity.current_option is None
     assert entity.extra_state_attributes is None
-
-
-@pytest.mark.asyncio
-async def test_a_restore_waits_for_a_library_that_has_not_loaded() -> None:
-    entity = _recipe_select(None, {"id": "12", "name": "Kenya Hot"})
-    await entity.async_added_to_hass()
-    assert entity.current_option is None
-    entity.coordinator.data = list(_LIBRARY)
-    entity._handle_coordinator_update()
-    assert entity.current_option == "Kenya Hot"
-
-
-@pytest.mark.asyncio
-async def test_nothing_is_picked_when_nothing_was() -> None:
-    entity = _recipe_select(list(_LIBRARY), {})
-    await entity.async_added_to_hass()
-    assert entity.current_option is None
 
 
 @pytest.mark.asyncio
@@ -339,6 +309,7 @@ async def test_a_finished_brew_or_a_change_of_mind_unpicks_the_recipe() -> None:
     handlers: list = []
     with patch.object(sel, "async_dispatcher_connect", lambda _h, _s, fn: handlers.append(fn)):
         await entity.async_added_to_hass()
+    await entity.async_select_option("Kenya Hot")
     assert entity.current_option == "Kenya Hot"
     handlers[0]()
     assert entity.current_option is None

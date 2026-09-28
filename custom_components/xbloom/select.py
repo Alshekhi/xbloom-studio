@@ -177,7 +177,7 @@ class XBloomArchivedRecipeSelect(CoordinatorEntity, SelectEntity):
         self.async_write_ha_state()
 
 
-class XBloomRecipeSelect(CoordinatorEntity, SelectEntity, RestoreEntity):
+class XBloomRecipeSelect(CoordinatorEntity, SelectEntity):
     """Select entity that lists all recipes from the xBloom library.
 
     Selecting a recipe stores its name as state. The full recipe dict
@@ -188,9 +188,10 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity, RestoreEntity):
     entity state string) to determine which recipe to brew. The entity state
     is the recipe name for human display only.
 
-    The pick survives a restart. It is held by recipe id — two recipes can
-    share a name — and restored from the last state's `id` attribute, never
-    guessed: a recipe no longer in the library leaves nothing picked.
+    The pick is held by recipe id — two recipes can share a name. It does not
+    survive a restart: picking a recipe is what prepares it on the machine,
+    and nothing is prepared at startup, so a restored pick would show a recipe
+    Start Brew could not start at once. A finished brew unpicks it the same way.
     """
 
     _attr_has_entity_name = True
@@ -247,12 +248,7 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity, RestoreEntity):
         return dict(recipe) if recipe else None
 
     async def async_added_to_hass(self) -> None:
-        """Pick the recipe that was picked before the restart."""
         await super().async_added_to_hass()
-        last = await self.async_get_last_state()
-        recipe_id = last.attributes.get("id") if last is not None else None
-        if recipe_id is not None:
-            self._current_id = str(recipe_id)
 
         @callback
         def _unpick() -> None:

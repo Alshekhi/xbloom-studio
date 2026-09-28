@@ -222,6 +222,10 @@ views:
           entity_id: button.xbloom_studio_start_brew
       grid_options:
         columns: 6
+      visibility:
+      - condition: state
+        entity: binary_sensor.xbloom_studio_recipe_ready
+        state: 'on'
     - type: tile
       entity: button.xbloom_studio_cancel_preparation
       name:
