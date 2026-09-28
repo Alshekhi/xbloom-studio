@@ -292,3 +292,41 @@ async def test_a_preparation_is_used_once():
             await frame({"cmd": 40512})
         await entry.tasks[-1]
     assert session.sent == ["prepare", "start", "brew"]
+
+
+async def test_a_preparation_waits_for_the_session_it_turned_on_to_be_ready():
+    # The session takes the link before it subscribes to the machine's
+    # replies and sends its handshake; a recipe sent in between races both.
+    session = _PreparingSession()
+    hass, entry, _handlers = await _handlers_with(None, hass=_make_hass())
+    listeners: dict = {}
+
+    def _listen(event_type, callback):
+        listeners.setdefault(event_type, []).append(callback)
+        return lambda: listeners[event_type].remove(callback)
+
+    hass.bus.async_listen = _listen
+    order: list[str] = []
+
+    async def _hold_link():
+        entry.runtime_data.live_session_listener = session
+        order.append("connect on")
+
+    entry.runtime_data.preparer.async_hold_link = _hold_link
+    real_prepare = session.send_prepare
+
+    async def _prepare(recipe):
+        order.append("prepare")
+        await real_prepare(recipe)
+
+    session.send_prepare = _prepare
+    with _machine_in_range():
+        task = asyncio.ensure_future(entry.runtime_data.preparer._prepare({"dose": 15}))
+        for _ in range(10):
+            await asyncio.sleep(0)
+        assert order == ["connect on"], "nothing is sent before the session is ready"
+        for callback in list(listeners.get("xbloom_connect_ready", [])):
+            callback(MagicMock())
+        await asyncio.wait_for(task, timeout=2)
+    assert order == ["connect on", "prepare"]
+    assert listeners["xbloom_connect_ready"] == [], "listener left behind"

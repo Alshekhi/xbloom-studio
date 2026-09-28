@@ -116,6 +116,10 @@ PLATFORMS = [
 # A start_brew call within this many seconds of the previous dispatch is
 # treated as a duplicate (e.g. a voice-agent HTTP retry) and ignored. A call
 # after the window preempts the earlier session instead — see handle_start_brew.
+
+# How long a preparation waits for a Connect session it turned on to be ready:
+# connected, subscribed to the machine's replies, handshake sent.
+SESSION_READY_TIMEOUT_S = 15.0
 BREW_DUP_WINDOW_S = 20.0
 
 # How long RD_ENJOY has to follow CMD_BREW_END before the brew is called
@@ -593,13 +597,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             raise refuse("no_recipe_selected")
         session = held_session(entry)
         if session is None:
-            await preparer.async_hold_link()
-            for _ in range(60):
-                session = held_session(entry)
-                if session is not None and getattr(session, "_ble", None) is not None:
-                    break
-                await asyncio.sleep(0.25)
-            else:
+            # Wait for the session to say it is ready: it takes the link
+            # before it has subscribed to the machine's replies and sent its
+            # handshake, and a recipe sent in between races both.
+            ready = asyncio.Event()
+
+            @callback
+            def _ready(_event) -> None:
+                ready.set()
+
+            unsubscribe = hass.bus.async_listen("xbloom_connect_ready", _ready)
+            try:
+                await preparer.async_hold_link()
+                await asyncio.wait_for(ready.wait(), SESSION_READY_TIMEOUT_S)
+            except TimeoutError as err:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN, translation_key="machine_unreachable",
+                ) from err
+            finally:
+                unsubscribe()
+            session = held_session(entry)
+            if session is None:
                 raise HomeAssistantError(
                     translation_domain=DOMAIN, translation_key="machine_unreachable",
                 )
