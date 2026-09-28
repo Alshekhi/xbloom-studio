@@ -232,15 +232,50 @@ async def test_connect_turned_on_by_hand_stays_on_after_the_brew(rig_factory):
     assert all(call[1] != "turn_off" for call in rig.hass.calls)
 
 
-async def test_a_brew_that_used_no_coffee_keeps_the_picks_and_prepares_again(rig_factory):
+async def test_a_brew_that_made_no_coffee_unpicks_the_recipe_and_keeps_the_bag(rig_factory):
+    # No beans: refill, pick again. The bag is still the right one, and
+    # Connect stays on so the next preparation does not reconnect first.
     lab = _Lab()
     rig = rig_factory(lab=lab)
+    await rig.preparer.async_hold_link()
     await rig.preparer.async_prepare_now()
     await rig.preparer.async_brew_ended(used_coffee=False)
-    await rig.settle()
-    assert (prep.signal_clear_recipe("e1"),) not in rig.signals
+    assert (prep.signal_clear_recipe("e1"),) in rig.signals
     assert lab.active_bean_id == "bag-1"
-    assert len(rig.prepared) == 2 and rig.ready()
+    assert all(call[1] != "turn_off" for call in rig.hass.calls)
+    assert not rig.ready()
+
+
+async def test_connect_is_let_go_when_nothing_is_picked_after_a_while(rig_factory):
+    rig = rig_factory()
+    await rig.preparer.async_hold_link()
+    await rig.preparer.async_brew_ended(used_coffee=False)
+    rig.hass.states_by_id[prep.RECIPE] = "unknown"
+    assert len(rig.timers) == 1
+    rig.timers.pop()(None)
+    for _ in range(5):
+        await asyncio.sleep(0)
+    assert ("switch", "turn_off", {"entity_id": prep.CONNECT}) in rig.hass.calls
+
+
+async def test_picking_again_keeps_connect_on(rig_factory):
+    rig = rig_factory()
+    await rig.preparer.async_hold_link()
+    await rig.preparer.async_brew_ended(used_coffee=False)
+    rig.change(prep.RECIPE, "Test Recipe", old="unknown")
+    # Only the settle timer for the new pick is left; the release is gone.
+    assert len(rig.timers) == 1
+    await rig.settle()
+    assert all(call[1] != "turn_off" for call in rig.hass.calls)
+    assert rig.ready()
+
+
+async def test_a_session_turned_on_by_hand_is_never_let_go_by_the_timer(rig_factory):
+    rig = rig_factory()
+    rig.hass.states_by_id[prep.CONNECT] = "on"
+    await rig.preparer.async_hold_link()
+    await rig.preparer.async_brew_ended(used_coffee=False)
+    assert rig.timers == []
 
 
 async def test_a_change_of_mind_takes_back_the_recipe_and_keeps_the_bag(rig_factory):

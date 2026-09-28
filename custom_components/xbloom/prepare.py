@@ -12,9 +12,9 @@ It owns three things besides:
     would send.
   * The Connect switch, when it turned it on: it turns it off again once the
     brew is over. A session someone turned on themselves is left as it was.
-  * What happens when a brew ends: coffee made or used clears the recipe and
-    the bag, so the next brew starts from a fresh pick; a brew that failed
-    before using any coffee keeps both and is prepared again.
+  * What happens when a brew ends: the recipe is unpicked, so the next brew
+    starts from a fresh pick. Coffee made or used clears the bag and lets
+    Connect go; a brew that made none keeps both, for picking again at once.
 """
 from __future__ import annotations
 
@@ -39,6 +39,9 @@ IN_RANGE = "binary_sensor.xbloom_studio_in_range"
 BREW_STATUS = "sensor.xbloom_studio_brew_status"
 
 WATCHED = [RECIPE, BAG, DOSE, RATIO, GRIND, USE_GRINDER]
+# After a brew that made no coffee Connect stays on for the next pick; with no
+# pick this long after, it is let go, so the app can have the machine back.
+IDLE_RELEASE_S = 300
 # Dragging a slider changes it many times; prepare once it has settled.
 SETTLE_S = 1.5
 BUSY = ("grinding", "brewing")
@@ -99,6 +102,8 @@ class BrewPreparer:
         self._quiet = False
         # Set while this turns Connect off, so it is not read as an undo.
         self._releasing = False
+        # Lets Connect go if nothing is picked after a brew that made no coffee.
+        self._idle_timer: CALLBACK_TYPE | None = None
 
     # ── Wiring ──────────────────────────────────────────────────────────────
 
@@ -112,6 +117,7 @@ class BrewPreparer:
         @callback
         def _stop() -> None:
             self._cancel_timer()
+            self._cancel_idle_release()
             for unsub in unsubs:
                 unsub()
 
@@ -139,6 +145,8 @@ class BrewPreparer:
             return
         if old.state == new.state and event.data["entity_id"] != RECIPE:
             return
+        if event.data["entity_id"] == RECIPE and new.state not in UNUSABLE:
+            self._cancel_idle_release()
         self._set_ready(False, None)
         self._schedule()
 
@@ -242,6 +250,7 @@ class BrewPreparer:
     @callback
     def async_link_lost(self) -> None:
         """The session ended: what it held is no longer known to be there."""
+        self._cancel_idle_release()
         self.owns_connect = False
         self._sent = False
         self._set_ready(False, None)
@@ -249,15 +258,35 @@ class BrewPreparer:
     # ── Ends ────────────────────────────────────────────────────────────────
 
     async def async_brew_ended(self, used_coffee: bool) -> None:
-        """Clear the picks after coffee was made or used; otherwise prepare again."""
+        """Unpick after every brew; the bag too once coffee was made or used.
+
+        A brew that made no coffee — no beans, a refusal, a stop before
+        grinding — keeps the bag, still the right one, and keeps Connect on:
+        the next thing is refilling and picking the recipe again, and
+        reconnecting would only delay it. Connect is let go after a while if
+        no recipe is picked.
+        """
         self._sent = False
         self._set_ready(False, None)
-        if not used_coffee:
-            if self._missing() is None:
-                self._schedule()
-            return
-        await self._clear_picks()
-        await self._release()
+        await self._clear_picks(bag=used_coffee)
+        if used_coffee:
+            await self._release()
+        elif self.owns_connect:
+            self._cancel_idle_release()
+            self._idle_timer = async_call_later(self._hass, IDLE_RELEASE_S, self._idle_release)
+
+    @callback
+    def _idle_release(self, _now=None) -> None:
+        self._idle_timer = None
+        recipe = self._hass.states.get(RECIPE)
+        if recipe is None or recipe.state in UNUSABLE:
+            self._hass.async_create_task(self._release())
+
+    @callback
+    def _cancel_idle_release(self) -> None:
+        if self._idle_timer is not None:
+            self._idle_timer()
+            self._idle_timer = None
 
     async def async_undo(self) -> None:
         """Connect is being turned off by hand: take back what was sent, unpick.
@@ -308,6 +337,7 @@ class BrewPreparer:
             self._quiet = False
 
     async def _release(self) -> None:
+        self._cancel_idle_release()
         if not self.owns_connect:
             return
         self.owns_connect = False
