@@ -121,3 +121,23 @@ def test_no_entity_hardcodes_its_name():
     for path in COMPONENT.rglob("*.py"):
         assert not re.search(r"^\s*_attr_name = ", path.read_text(), re.M), path.name
 
+
+
+async def test_a_store_that_cannot_be_reached_keeps_the_last_values():
+    from unittest.mock import AsyncMock, MagicMock
+    from homeassistant.exceptions import HomeAssistantError
+
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    await lab.async_select(bag.id)
+    sensor = RemainingSensor(lab)
+    await sensor.async_read()
+    shown = sensor._attr_native_value
+    sensor.entity_id = "sensor.xbloom_studio_coffee_left"
+    sensor.async_write_ha_state = MagicMock()
+    sensor.async_read = AsyncMock(side_effect=HomeAssistantError("Notion timed out"))
+
+    await sensor._async_read_and_write()
+
+    assert sensor._attr_native_value == shown
+    sensor.async_write_ha_state.assert_not_called()

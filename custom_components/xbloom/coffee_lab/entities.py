@@ -6,6 +6,7 @@ dashboard all show at once. Names and states are translation keys.
 """
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 
 from homeassistant.components.button import ButtonEntity
@@ -14,6 +15,7 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import UnitOfMass
 from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
@@ -23,6 +25,8 @@ from . import actions
 from .lab import CoffeeLab
 from .models import Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
+
+_LOGGER = logging.getLogger(__name__)
 
 # The results a count can have, as the last-count sensor's states.
 COUNT_RESULTS = ["counted", "recorded", "skipped", "flagged"]
@@ -65,7 +69,13 @@ class CoffeeLabEntity(Entity):
         self.hass.async_create_task(self._async_read_and_write())
 
     async def _async_read_and_write(self) -> None:
-        await self.async_read()
+        # A store that cannot be reached (Notion answering too slowly, say)
+        # leaves the last values showing until the next read succeeds.
+        try:
+            await self.async_read()
+        except HomeAssistantError as err:
+            _LOGGER.warning("Coffee Lab: could not re-read %s: %s", self.entity_id, err)
+            return
         self.async_write_ha_state()
 
     async def async_read(self) -> None:
