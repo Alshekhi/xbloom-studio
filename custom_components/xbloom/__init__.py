@@ -483,7 +483,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # `client` is the brew's own BLE link while it is held: a one-shot command
     # sent during a brew (pause, resume) travels over it, since a second link
     # to the machine tears the brew's down and nothing is heard after that.
-    brew_session: dict = {"task": None, "started_at": 0.0, "client": None}
+    # `prepared` is the recipe sent ahead over a Connect session, and that
+    # session: a start for the same recipe on the same session sends execute
+    # alone, as the official app does on its second tap.
+    brew_session: dict = {"task": None, "started_at": 0.0, "client": None, "prepared": None}
+
+    def _prepared_key(session, recipe: dict) -> tuple:
+        from xbloom.ble import build_brew_frames
+        return (id(session), b"".join(build_brew_frames(recipe)[1:4]))
 
     async def _cancel_active_brew(reason: str, by: str | None = None) -> None:
         """Cancel the in-flight brew task (if any) and wait for it to unwind.
@@ -508,6 +515,96 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         finally:
             brew_session["task"] = None
             brew_session["cancelled_by"] = None
+
+    async def _brew_recipe(data, log_label: str) -> tuple[dict | None, str | None]:
+        """The recipe a brew sends: resolved, with its per-brew overrides.
+
+        Shared by start_brew and prepare_brew, so a prepared recipe is exactly
+        the one a start would have sent — that is what lets a start send
+        execute alone.
+        """
+        recipe, recipe_name = await _resolve_recipe(
+            share_url=data.get("share_url"),
+            share_id=data.get("share_id"),
+            recipe_name=data.get("recipe_name"),
+            log_label=log_label,
+        )
+        if recipe is None:
+            return None, recipe_name
+
+        # Per-brew grinder override — does NOT modify the stored recipe.
+        # Grinder choice: an explicit use_preground wins; otherwise fall back to
+        # the switch.xbloom_studio_use_grinder toggle (OFF = pre-ground / skip).
+        if "use_preground" in data:
+            use_preground = bool(data["use_preground"])
+        else:
+            grinder_switch = hass.states.get("switch.xbloom_studio_use_grinder")
+            use_preground = (
+                grinder_switch is not None and grinder_switch.state == "off"
+            )
+        if use_preground:
+            recipe = {**recipe, "grinder_size_enabled": 2}
+            _LOGGER.info("%s: grinder skipped (pre-ground override)", log_label)
+
+        # Brew-customizer overrides (one-off; never saved). Rescale the resolved
+        # recipe's pours to the requested dose × ratio and override the grind.
+        _ovr_dose = data.get("dose")
+        _ovr_ratio = data.get("ratio")
+        _ovr_grind = data.get("grind_size")
+        if _ovr_dose is not None or _ovr_ratio is not None or _ovr_grind is not None:
+            from xbloom.brew_scale import scale_recipe
+            recipe = scale_recipe(
+                recipe,
+                dose_g=(float(_ovr_dose) if _ovr_dose is not None
+                        else float(recipe.get("dose_g") or 0)),
+                ratio=(float(_ovr_ratio) if _ovr_ratio is not None
+                       else float(recipe.get("water_ratio") or 16)),
+                grind_size=(int(_ovr_grind) if _ovr_grind is not None else None),
+            )
+            _LOGGER.info(
+                "%s: customizer overrides dose=%s ratio=%s grind=%s",
+                log_label, _ovr_dose, _ovr_ratio, _ovr_grind,
+            )
+        return recipe, recipe_name
+
+    async def handle_prepare_brew(call) -> None:
+        """Send a recipe ahead, over the Connect session, without starting it.
+
+        A later start_brew for the same recipe and settings then sends only
+        execute. The session is opened first when Connect is off.
+        """
+        from xbloom.ble import CommandRefused, CommandUnanswered
+
+        from .ble_entities import held_session
+
+        recipe, recipe_name = await _brew_recipe(call.data, "xbloom.prepare_brew")
+        if recipe is None:
+            raise refuse("recipe_not_found", name=recipe_name or "", available="")
+        session = held_session(entry)
+        if session is None:
+            await hass.services.async_call(
+                "switch", "turn_on", {"entity_id": "switch.xbloom_studio_connect"}, blocking=True,
+            )
+            for _ in range(60):
+                session = held_session(entry)
+                if session is not None and getattr(session, "_ble", None) is not None:
+                    break
+                await asyncio.sleep(0.25)
+            else:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN, translation_key="machine_unreachable",
+                )
+        try:
+            await session.send_prepare(recipe)
+        except CommandRefused as err:
+            raise _refused(err) from err
+        except (CommandUnanswered, RuntimeError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="recipe_not_prepared",
+                translation_placeholders={"reason": str(err)},
+            ) from err
+        brew_session["prepared"] = _prepared_key(session, recipe)
+        _LOGGER.info("xbloom.prepare_brew: '%s' prepared, waiting for start", recipe_name)
 
     async def handle_start_brew(call) -> ServiceResponse:
         """Validate + resolve the recipe, then brew in a background task:
@@ -610,50 +707,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _fire_failed("not_configured", call.data.get("recipe_name"))
             return {"run_id": meta["run_id"]}
 
-        recipe, recipe_name = await _resolve_recipe(
-            share_url=call.data.get("share_url"),
-            share_id=call.data.get("share_id"),
-            recipe_name=call.data.get("recipe_name"),
-            log_label="xbloom.start_brew",
-        )
+        recipe, recipe_name = await _brew_recipe(call.data, "xbloom.start_brew")
         if recipe is None:
             _fire_failed("recipe_not_found", call.data.get("recipe_name"))
             return {"run_id": meta["run_id"]}
-
-
-        # Per-brew grinder override — does NOT modify the stored recipe.
-        # Grinder choice: an explicit use_preground wins; otherwise fall back to
-        # the switch.xbloom_studio_use_grinder toggle (OFF = pre-ground / skip).
-        if "use_preground" in call.data:
-            use_preground = bool(call.data["use_preground"])
-        else:
-            grinder_switch = hass.states.get("switch.xbloom_studio_use_grinder")
-            use_preground = (
-                grinder_switch is not None and grinder_switch.state == "off"
-            )
-        if use_preground:
-            recipe = {**recipe, "grinder_size_enabled": 2}
-            _LOGGER.info("xbloom.start_brew: grinder skipped (pre-ground override)")
-
-        # Brew-customizer overrides (one-off; never saved). Rescale the resolved
-        # recipe's pours to the requested dose × ratio and override the grind.
-        _ovr_dose = call.data.get("dose")
-        _ovr_ratio = call.data.get("ratio")
-        _ovr_grind = call.data.get("grind_size")
-        if _ovr_dose is not None or _ovr_ratio is not None or _ovr_grind is not None:
-            from xbloom.brew_scale import scale_recipe
-            recipe = scale_recipe(
-                recipe,
-                dose_g=(float(_ovr_dose) if _ovr_dose is not None
-                        else float(recipe.get("dose_g") or 0)),
-                ratio=(float(_ovr_ratio) if _ovr_ratio is not None
-                       else float(recipe.get("water_ratio") or 16)),
-                grind_size=(int(_ovr_grind) if _ovr_grind is not None else None),
-            )
-            _LOGGER.info(
-                "xbloom.start_brew: customizer overrides dose=%s ratio=%s grind=%s",
-                _ovr_dose, _ovr_ratio, _ovr_grind,
-            )
 
         # Set when the machine reports it has stopped brewing. This is the
         # signal that survives when RD_ENJOY does not.
@@ -758,8 +815,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 return
             try:
                 if session is not None:
-                    _LOGGER.info("xbloom.start_brew: brewing over the held Connect session …")
-                    ble_client = SessionBrew(hass, entry.entry_id, session, _observe)
+                    prepared = brew_session["prepared"] == _prepared_key(session, recipe)
+                    brew_session["prepared"] = None
+                    _LOGGER.info(
+                        "xbloom.start_brew: brewing over the held Connect session%s …",
+                        " — recipe already prepared, sending start only" if prepared else "",
+                    )
+                    ble_client = SessionBrew(
+                        hass, entry.entry_id, session, _observe, prepared=prepared,
+                    )
                 else:
                     _LOGGER.info("xbloom.start_brew: ✓ found device %s", ble_device.address)
                     _LOGGER.info("xbloom.start_brew: opening BLE connection …")
@@ -1490,6 +1554,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             vol.Optional("notify_progress"): bool,
         }),
     )
+    hass.services.async_register(
+        DOMAIN,
+        "prepare_brew",
+        handle_prepare_brew,
+        schema=vol.Schema({
+            vol.Optional("recipe_name"): str,
+            vol.Optional("share_url"): str,
+            vol.Optional("share_id"): str,
+            vol.Optional("use_preground"): bool,
+            vol.Optional("dose"): vol.Coerce(float),
+            vol.Optional("ratio"): vol.Coerce(float),
+            vol.Optional("grind_size"): vol.Coerce(int),
+        }),
+    )
     hass.services.async_register(DOMAIN, "stop_brew", handle_stop_brew)
     hass.services.async_register(DOMAIN, "ble_connect", handle_ble_connect)
     hass.services.async_register(DOMAIN, "ble_disconnect", handle_ble_disconnect)
@@ -1813,7 +1891,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     )
 
     for svc in (
-        "start_brew", "stop_brew", "ble_connect", "ble_disconnect",
+        "start_brew", "prepare_brew", "stop_brew", "ble_connect", "ble_disconnect",
         "refresh_status",
         "tare", "back_to_home", "brew_pause", "brew_resume",
         "brew_standalone",

@@ -241,3 +241,53 @@ async def test_the_link_probe_leaves_a_held_session_alone():
     with _machine_in_range():
         await handlers["ble_connect"](MagicMock(data={}))
     assert _NoSecondLink.opened == []
+
+
+class _PreparingSession(_BrewingSession):
+    async def send_prepare(self, recipe):
+        self.sent.append("prepare")
+
+    async def send_start(self):
+        self.sent.append("start")
+
+
+async def _brew_after(session, prepare_data: dict, start_data: dict):
+    hass, entry, handlers = await _handlers_with(session, hass=_make_hass())
+    frames, capture = _frames_through_the_session()
+    with capture, _machine_in_range():
+        if prepare_data is not None:
+            await handlers["prepare_brew"](MagicMock(data=prepare_data))
+        await handlers["start_brew"](MagicMock(data=start_data))
+        for _ in range(10):
+            await asyncio.sleep(0)
+        for frame in frames:
+            await frame({"cmd": 40512})
+        await entry.tasks[0]
+    return handlers, entry
+
+
+async def test_a_prepared_recipe_starts_with_execute_alone():
+    session = _PreparingSession()
+    await _brew_after(session, {"dose": 15}, {"dose": 15})
+    assert session.sent == ["prepare", "start"]
+
+
+async def test_different_settings_send_the_whole_brew():
+    # What was prepared is not what is being started, so it cannot be used.
+    session = _PreparingSession()
+    await _brew_after(session, {"dose": 15}, {"dose": 18})
+    assert session.sent == ["prepare", "brew"]
+
+
+async def test_a_preparation_is_used_once():
+    session = _PreparingSession()
+    handlers, entry = await _brew_after(session, {"dose": 15}, {"dose": 15})
+    frames, capture = _frames_through_the_session()
+    with capture, _machine_in_range():
+        await handlers["start_brew"](MagicMock(data={"dose": 15}))
+        for _ in range(10):
+            await asyncio.sleep(0)
+        for frame in frames:
+            await frame({"cmd": 40512})
+        await entry.tasks[-1]
+    assert session.sent == ["prepare", "start", "brew"]

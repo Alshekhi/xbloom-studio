@@ -798,6 +798,9 @@
     },
     "recipe_required": {
       "message": "Name the recipe, or give its id."
+    },
+    "recipe_not_prepared": {
+      "message": "The recipe could not be sent to the xBloom ({reason})."
     }
   },
   "services": {
@@ -1008,6 +1011,40 @@
         "notify_progress": {
           "name": "Send progress",
           "description": "Also send grinding and each pour to the callback target."
+        }
+      }
+    },
+    "prepare_brew": {
+      "name": "Prepare Brew",
+      "description": "Send a recipe to the xBloom Studio without starting it. Start Brew with the same recipe and settings then starts it at once. Turns Connect on if it is off.",
+      "fields": {
+        "recipe_name": {
+          "name": "Recipe name",
+          "description": "Brew this recipe instead of the selected one. Must match a name in select.xbloom_studio_recipe exactly. Leave blank to use the current selection."
+        },
+        "share_url": {
+          "name": "Share URL",
+          "description": "Brew straight from an xBloom app share URL. Fetched fresh — the recipe does not have to be in the library first, and nothing is saved."
+        },
+        "share_id": {
+          "name": "Share ID",
+          "description": "Just the id token (the value after `?id=` in a share URL)."
+        },
+        "use_preground": {
+          "name": "Use pre-ground coffee",
+          "description": "Skip the grinder and go straight to pouring, for this brew only. The recipe's grind settings are not changed. Handy with pre-ground coffee or an external grinder."
+        },
+        "dose": {
+          "name": "Dose override (g)",
+          "description": "One-off coffee dose in grams. The recipe is rescaled to dose × ratio for this brew only. Leave blank to use the recipe's own dose."
+        },
+        "ratio": {
+          "name": "Ratio override (1:N)",
+          "description": "One-off brew ratio N, where water = dose × N. Rescales the pours for this brew only. Leave blank to use the recipe's own ratio."
+        },
+        "grind_size": {
+          "name": "Grind size override",
+          "description": "One-off grind size for this brew only (1–80, lower is finer). Leave blank to use the recipe's own grind size."
         }
       }
     },

@@ -90,9 +90,10 @@ class SessionBrew:
     mid-brew, nothing more can be heard, so the wait for ENJOY ends with it.
     """
 
-    def __init__(self, hass, entry_id: str, session, observe) -> None:
+    def __init__(self, hass, entry_id: str, session, observe, prepared: bool = False) -> None:
         import asyncio
 
+        self._prepared = prepared
         self._hass = hass
         self._entry_id = entry_id
         self._session = session
@@ -118,7 +119,11 @@ class SessionBrew:
             self._enjoy.set()
 
     async def brew(self, recipe: dict) -> None:
-        await self._session.send_brew(recipe)
+        # A recipe sent ahead with prepare_brew needs only execute.
+        if self._prepared:
+            await self._session.send_start()
+        else:
+            await self._session.send_brew(recipe)
 
     async def send_command(self, name: str, frame: bytes, **_kw) -> bool:
         return await self._session.send_confirmed(name, frame)
