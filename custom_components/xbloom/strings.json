@@ -429,6 +429,13 @@
           "on": "In range",
           "off": "Out of range"
         }
+      },
+      "recipe_ready": {
+        "name": "Recipe Ready",
+        "state": {
+          "on": "Ready",
+          "off": "Not ready"
+        }
       }
     },
     "select": {
@@ -680,6 +687,9 @@
       },
       "restore_archived_recipe": {
         "name": "Restore Archived Recipe"
+      },
+      "cancel_preparation": {
+        "name": "Cancel Preparation"
       }
     },
     "text": {
@@ -1016,19 +1026,11 @@
     },
     "prepare_brew": {
       "name": "Prepare Brew",
-      "description": "Send a recipe to the xBloom Studio without starting it. Start Brew with the same recipe and settings then starts it at once. Turns Connect on if it is off.",
+      "description": "Pick a recipe and its settings on the xBloom Studio and send it to the machine without starting it. Start Brew then starts it at once. Turns Connect on if it is off.",
       "fields": {
         "recipe_name": {
           "name": "Recipe name",
           "description": "Brew this recipe instead of the selected one. Must match a name in select.xbloom_studio_recipe exactly. Leave blank to use the current selection."
-        },
-        "share_url": {
-          "name": "Share URL",
-          "description": "Brew straight from an xBloom app share URL. Fetched fresh — the recipe does not have to be in the library first, and nothing is saved."
-        },
-        "share_id": {
-          "name": "Share ID",
-          "description": "Just the id token (the value after `?id=` in a share URL)."
         },
         "use_preground": {
           "name": "Use pre-ground coffee",
@@ -1045,8 +1047,20 @@
         "grind_size": {
           "name": "Grind size override",
           "description": "One-off grind size for this brew only (1–80, lower is finer). Leave blank to use the recipe's own grind size."
+        },
+        "bean_id": {
+          "name": "Bag",
+          "description": "Coffee Lab only: the id of the bag this brew's coffee comes from. Leave blank to use the selected bag."
+        },
+        "unattributed": {
+          "name": "From no bag",
+          "description": "Coffee Lab only: the coffee comes from no bag, as with an xPod."
         }
       }
+    },
+    "cancel_preparation": {
+      "name": "Cancel Preparation",
+      "description": "Take back the recipe sent with Prepare Brew and unpick it. The bag stays picked."
     },
     "stop_brew": {
       "name": "Stop Brew",

@@ -256,7 +256,8 @@ async def _brew_after(session, prepare_data: dict, start_data: dict):
     frames, capture = _frames_through_the_session()
     with capture, _machine_in_range():
         if prepare_data is not None:
-            await handlers["prepare_brew"](MagicMock(data=prepare_data))
+            # What the preparer runs for the dashboard's picks.
+            await entry.runtime_data.preparer._prepare(prepare_data)
         await handlers["start_brew"](MagicMock(data=start_data))
         for _ in range(10):
             await asyncio.sleep(0)

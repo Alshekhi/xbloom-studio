@@ -71,14 +71,6 @@ prepare_brew:
       example: "Ethiopia Yirgacheffe"
       selector:
         text:
-    share_url:
-      required: false
-      selector:
-        text:
-    share_id:
-      required: false
-      selector:
-        text:
     use_preground:
       required: false
       default: false
@@ -109,6 +101,16 @@ prepare_brew:
           min: 1
           max: 80
           step: 1
+    bean_id:
+      required: false
+      selector:
+        text:
+    unattributed:
+      required: false
+      selector:
+        boolean:
+
+cancel_preparation:
 
 stop_brew:
 brew_standalone:

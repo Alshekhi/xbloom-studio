@@ -188,7 +188,11 @@ def brew_view(t: dict) -> dict:
         ], present(bag)[:1]),
         section(t["h_brew"], [
             select(f"select.{E}_recipe"),
+            # On once the machine holds the picked recipe; Start Brew is then instant.
+            tile(f"binary_sensor.{E}_recipe_ready", visibility=present(f"select.{E}_recipe")),
             press(f"button.{E}_start_brew", grid_options={"columns": 6}),
+            press(f"button.{E}_cancel_preparation", grid_options={"columns": 6},
+                  visibility=present(f"select.{E}_recipe")),
             press(f"button.{E}_refresh_recipes", grid_options={"columns": 6}),
             # With Coffee Lab kept in Notion, bags changed there are re-read here.
             press(f"button.{E}_refresh_coffee_bags", visibility=[

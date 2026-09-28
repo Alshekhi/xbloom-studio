@@ -19,10 +19,13 @@ from xbloom.ble import NOTIFY_BREW_PAUSED, NOTIFY_BREW_RESUMED, NOTIFY_ENJOY
 from . import _resolve_ble_name, remember_address
 from .ble_entities import _device_info, signal_brew_lifecycle, signal_event
 from .const import CONF_BLE_ADDRESS, DOMAIN
+from .prepare import signal_prepared
 
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
-    async_add_entities([XBloomInRangeSensor(entry), XBloomBrewPausedSensor(entry)])
+    async_add_entities([
+        XBloomInRangeSensor(entry), XBloomBrewPausedSensor(entry), XBloomRecipeReadySensor(entry),
+    ])
 
 
 class XBloomInRangeSensor(BinarySensorEntity):
@@ -160,4 +163,43 @@ class XBloomBrewPausedSensor(BinarySensorEntity):
             async_dispatcher_connect(
                 self.hass, signal_brew_lifecycle(self._entry.entry_id), _on_lifecycle
             )
+        )
+
+
+class XBloomRecipeReadySensor(BinarySensorEntity):
+    """On while the machine holds the picked recipe, ready to start at once.
+
+    `reason` says why it is not, when something stopped it: no bag picked,
+    the machine refused, a brew running.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "recipe_ready"
+    _attr_unique_id = "xbloom_recipe_ready"
+    _attr_should_poll = False
+
+    def __init__(self, entry) -> None:
+        self._entry = entry
+        self._attr_is_on = False
+        self._attr_extra_state_attributes = {"reason": None}
+
+    @property
+    def device_info(self):
+        return _device_info(self._entry.entry_id)
+
+    @property
+    def icon(self) -> str:
+        return "mdi:coffee-to-go" if self.is_on else "mdi:coffee-outline"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+
+        @callback
+        def _on_prepared(ready: bool, reason: str | None) -> None:
+            self._attr_is_on = ready
+            self._attr_extra_state_attributes = {"reason": reason}
+            self.async_write_ha_state()
+
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, signal_prepared(self._entry.entry_id), _on_prepared)
         )

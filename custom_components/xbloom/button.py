@@ -16,6 +16,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .tool_common import refuse
 from .coordinator import XBloomCoordinator
 from .coffee_lab.entities import entities_for as coffee_lab_entities
 from .tool_common import refuse
@@ -39,6 +40,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         XBloomBackToHomeButton(entry),
         XBloomBrewPauseButton(entry),
         XBloomBrewResumeButton(entry),
+        XBloomCancelPreparationButton(entry),
         # Standalone grind shortcut
         XBloomGrindButton(entry),
         XBloomBrewStandaloneButton(entry),
@@ -244,6 +246,11 @@ class XBloomStartBrewButton(CoordinatorEntity, ButtonEntity):
         if select_state is None or select_state.state in ("unknown", "unavailable", ""):
             _LOGGER.warning("Start Brew pressed but no recipe selected — ignoring")
             return
+        # With Coffee Lab on, the dashboard brews only from a picked bag — the
+        # same rule that decides whether the recipe is prepared at all.
+        lab = getattr(getattr(self._entry, "runtime_data", None), "coffee_lab", None)
+        if lab is not None and lab.active_bean_id is None:
+            raise refuse("bag_required")
         data: dict = {}
         ratio = self._num(self.hass, "number.xbloom_studio_brew_ratio")
         grind = self._num(self.hass, "number.xbloom_studio_brew_grind_size")
@@ -345,6 +352,15 @@ class XBloomBrewPauseButton(_XBloomSimpleCommandButton):
     _attr_unique_id = "xbloom_brew_pause_button"
     _attr_icon = "mdi:pause"
     _service = "brew_pause"
+
+
+class XBloomCancelPreparationButton(_XBloomSimpleCommandButton):
+    """A change of mind before starting: take back the prepared recipe."""
+
+    _attr_translation_key = "cancel_preparation"
+    _attr_unique_id = "xbloom_cancel_preparation_button"
+    _attr_icon = "mdi:undo"
+    _service = "cancel_preparation"
 
 
 class XBloomBrewResumeButton(_XBloomSimpleCommandButton):

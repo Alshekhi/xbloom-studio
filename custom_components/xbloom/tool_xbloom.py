@@ -453,6 +453,26 @@ def _brew_failure(data: dict[str, Any]) -> HomeAssistantError:
     return fail("brew_not_started", reason=reason)
 
 
+async def prepare_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
+    """Pick a recipe and its settings, and send it to the machine unstarted."""
+    data: dict[str, Any] = {}
+    if args.get("name"):
+        data["recipe_name"] = await _resolve_recipe_name(machine, args["name"])
+    for key in ("dose", "ratio", "grind_size", "use_preground"):
+        if args.get(key) is not None:
+            data[key] = args[key]
+    if machine.lab is not None:
+        # The same rule as start_brew: the bag is named, never assumed.
+        if args.get("unattributed"):
+            data["unattributed"] = True
+        else:
+            if not (args.get("bean") or args.get("bean_id")):
+                raise refuse("bag_required")
+            data["bean_id"] = (await resolve_bean(machine.lab, args)).id
+    await machine.call("prepare_brew", data)
+    return {"prepared": True, "recipe": machine.state("select", "xbloom_recipe_select")}
+
+
 async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
     data: dict[str, Any] = _recipe_source(args)
     if not data and args.get("name"):
@@ -774,6 +794,17 @@ ACTIONS: dict[str, Spec] = {
         "use_preground skips the grinder. Waits for the machine to take the brew: "
         "outcome `started`, or `pending` if it has not answered yet — then read "
         "brew_status",
+    ),
+    "prepare_brew": Spec(
+        prepare_brew,
+        "pick a recipe by name, or keep the selected one, with dose/ratio/"
+        "grind_size/use_preground, and send it to the machine without starting "
+        "it. Answers once the machine has accepted it; start_brew with no "
+        "recipe then starts it at once",
+    ),
+    "cancel_preparation": Spec(
+        partial(_plain, "cancel_preparation"),
+        "take back a prepared recipe that has not started, and unpick it",
     ),
     "cancel_brew": Spec(partial(_plain, "stop_brew"), "stop the brew"),
     "pause_brew": Spec(partial(_plain, "brew_pause"), "pause the brew"),

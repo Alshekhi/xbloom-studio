@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .ble_entities import send_brewer_pattern_live, signal_event
 from .const import DOMAIN
 from .coordinator import XBloomCoordinator
+from .prepare import signal_clear_recipe
 from .coffee_lab.entities import entities_for as coffee_lab_entities
 from xbloom import spec
 
@@ -252,6 +253,19 @@ class XBloomRecipeSelect(CoordinatorEntity, SelectEntity, RestoreEntity):
         recipe_id = last.attributes.get("id") if last is not None else None
         if recipe_id is not None:
             self._current_id = str(recipe_id)
+
+        @callback
+        def _unpick() -> None:
+            # A brew over, or a change of mind: the next brew starts from a
+            # fresh pick.
+            self._current_id = None
+            self.async_write_ha_state()
+
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, signal_clear_recipe(self.coordinator.config_entry.entry_id), _unpick,
+            )
+        )
 
     async def async_select_option(self, option: str) -> None:
         """Handle recipe selection from the HA UI or service call.

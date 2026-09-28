@@ -44,6 +44,15 @@ from .coffee_lab.lab import CoffeeLab
 from .coffee_lab.listener import async_count_completed_brews
 from .coffee_lab.notion import Databases, NotionClient, NotionStore
 from .coffee_lab.store import UnknownBean
+from .prepare import (
+    DOSE as PREP_DOSE,
+    GRIND as PREP_GRIND,
+    RATIO as PREP_RATIO,
+    RECIPE as PREP_RECIPE,
+    USE_GRINDER as PREP_USE_GRINDER,
+    BrewPreparer,
+    PrepareRefused,
+)
 from .tool_common import refuse
 from .coffee_lab.history import ChartFeed
 from .coffee_lab.services import async_register_lab_services
@@ -232,6 +241,8 @@ class XBloomRuntimeData:
     coffee_lab: CoffeeLab | None = None
     # Set only while callback targets are configured.
     callbacks: Callbacks | None = None
+    # Keeps the picked recipe prepared on the machine (prepare.py).
+    preparer: object = None
 
 
 type XBloomConfigEntry = ConfigEntry[XBloomRuntimeData]
@@ -567,24 +578,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             )
         return recipe, recipe_name
 
-    async def handle_prepare_brew(call) -> None:
-        """Send a recipe ahead, over the Connect session, without starting it.
+    async def _prepare_picks(data: dict) -> None:
+        """Send the dashboard's picks ahead, over the Connect session.
 
-        A later start_brew for the same recipe and settings then sends only
-        execute. The session is opened first when Connect is off.
+        `data` is what Start Brew would send now, so a later start for the same
+        picks sends only execute. Connect is turned on first when it is off.
         """
         from xbloom.ble import CommandRefused, CommandUnanswered
 
         from .ble_entities import held_session
 
-        recipe, recipe_name = await _brew_recipe(call.data, "xbloom.prepare_brew")
+        recipe, recipe_name = await _brew_recipe(data, "xbloom.prepare_brew")
         if recipe is None:
-            raise refuse("recipe_not_found", name=recipe_name or "", available="")
+            raise refuse("no_recipe_selected")
         session = held_session(entry)
         if session is None:
-            await hass.services.async_call(
-                "switch", "turn_on", {"entity_id": "switch.xbloom_studio_connect"}, blocking=True,
-            )
+            await preparer.async_hold_link()
             for _ in range(60):
                 session = held_session(entry)
                 if session is not None and getattr(session, "_ble", None) is not None:
@@ -594,6 +603,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 raise HomeAssistantError(
                     translation_domain=DOMAIN, translation_key="machine_unreachable",
                 )
+        brew_session["prepared"] = None
         try:
             await session.send_prepare(recipe)
         except CommandRefused as err:
@@ -605,6 +615,70 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             ) from err
         brew_session["prepared"] = _prepared_key(session, recipe)
         _LOGGER.info("xbloom.prepare_brew: '%s' prepared, waiting for start", recipe_name)
+
+    async def _send_quit() -> None:
+        """Drop a recipe that was sent but not started (the app's 8017)."""
+        from xbloom.ble import packet_quit_recipe
+
+        from .ble_entities import held_session
+
+        brew_session["prepared"] = None
+        session = held_session(entry)
+        if session is not None:
+            await session.send_confirmed("quit_recipe", packet_quit_recipe())
+
+    def _brew_running() -> bool:
+        task = brew_session["task"]
+        return task is not None and not task.done()
+
+    preparer = BrewPreparer(hass, entry, _prepare_picks, _brew_running, _send_quit)
+    entry.runtime_data.preparer = preparer
+
+    async def handle_prepare_brew(call) -> None:
+        """Put a recipe and its settings on the dashboard's picks, and prepare them.
+
+        For the AI tools and automations: the same picks the dashboard makes,
+        so a start from anywhere afterwards sends execute alone, and a later
+        change on the dashboard prepares from what was asked here. Answers only
+        once the machine has accepted the recipe.
+        """
+        if name := call.data.get("recipe_name"):
+            recipe_state = hass.states.get(PREP_RECIPE)
+            options = recipe_state.attributes.get("options", []) if recipe_state else []
+            names = [r.get("name") for r in (coordinator.data or [])]
+            if name not in options and name not in names:
+                raise refuse("recipe_not_found", name=name, available=", ".join(options))
+            await hass.services.async_call(
+                "select", "select_option", {"entity_id": PREP_RECIPE, "option": name}, blocking=True,
+            )
+        for key, entity_id in (("dose", PREP_DOSE), ("ratio", PREP_RATIO), ("grind_size", PREP_GRIND)):
+            if call.data.get(key) is not None:
+                await hass.services.async_call(
+                    "number", "set_value", {"entity_id": entity_id, "value": call.data[key]}, blocking=True,
+                )
+        if call.data.get("use_preground") is not None:
+            await hass.services.async_call(
+                "switch", "turn_off" if call.data["use_preground"] else "turn_on",
+                {"entity_id": PREP_USE_GRINDER}, blocking=True,
+            )
+        if (lab := entry.runtime_data.coffee_lab) is not None:
+            if call.data.get("unattributed"):
+                preparer.unattributed = True
+            elif bean_id := call.data.get("bean_id"):
+                await lab.async_select(bean_id)
+        try:
+            await preparer.async_prepare_now()
+        except PrepareRefused as err:
+            raise refuse({
+                "no_recipe": "no_recipe_selected",
+                "no_bag": "bag_required",
+                "brewing": "refused_machine_busy",
+                "machine_not_found": "machine_unreachable",
+            }[err.reason]) from err
+
+    async def handle_cancel_preparation(call) -> None:
+        """Change of mind: drop the prepared recipe and unpick it; the bag stays."""
+        await preparer.async_cancel()
 
     async def handle_start_brew(call) -> ServiceResponse:
         """Validate + resolve the recipe, then brew in a background task:
@@ -652,6 +726,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 "xbloom.start_brew: previous session still active after "
                 "%.0fs — preempting it", elapsed,
             )
+
+        # A start must never send execute for a recipe older than the picks:
+        # finish a preparation that is waiting or under way first.
+        await preparer.async_settled()
 
         # Carried by every event of this brew, so a consumer can tell them
         # apart and route each back to whoever started it. The machine issues
@@ -788,6 +866,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             # must not deduct the same dose twice. So mint one per run.
             started_at = datetime.now(timezone.utc).isoformat()
             started = False
+            # How the picks are left afterwards: coffee made or used clears
+            # them; a brew that used none keeps them, prepared again.
+            ending: dict = {"used": False, "report": True}
 
             # The lifecycle signal arms the entities now — it is internal, and a
             # brew frame can arrive in the same instant the machine accepts the
@@ -853,6 +934,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                         ble_client, brew_end_seen, went_home, fault_stopped, stopped_home,
                     )
                 completed = outcome == "confirmed"
+                ending["used"] = outcome in ("confirmed", "presumed", None) or ground.is_set()
                 _LOGGER.info(
                     "xbloom.start_brew: '%s' over BLE '%s' (%s)",
                     recipe_name, ble_name,
@@ -939,10 +1021,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 by = brew_session.get("cancelled_by")
                 if started and by:
                     hass.bus.async_fire("xbloom_brew_stopped", _stopped(by))
+                ending["used"] = ground.is_set()
+                # A newer brew takes over the picks; an unload leaves them.
+                ending["report"] = by not in (None, "superseded")
                 raise
             finally:
                 brew_session["client"] = None
                 async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "ended")
+                if ending["report"]:
+                    hass.async_create_task(preparer.async_brew_ended(ending["used"]))
 
         # Preempt any still-running (stale/wedged) session now that we're
         # committed to dispatching a new brew. No-op on the normal path.
@@ -1560,14 +1647,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         handle_prepare_brew,
         schema=vol.Schema({
             vol.Optional("recipe_name"): str,
-            vol.Optional("share_url"): str,
-            vol.Optional("share_id"): str,
             vol.Optional("use_preground"): bool,
             vol.Optional("dose"): vol.Coerce(float),
             vol.Optional("ratio"): vol.Coerce(float),
             vol.Optional("grind_size"): vol.Coerce(int),
+            vol.Optional("bean_id"): str,
+            vol.Optional("unattributed"): bool,
         }),
     )
+    hass.services.async_register(DOMAIN, "cancel_preparation", handle_cancel_preparation)
     hass.services.async_register(DOMAIN, "stop_brew", handle_stop_brew)
     hass.services.async_register(DOMAIN, "ble_connect", handle_ble_connect)
     hass.services.async_register(DOMAIN, "ble_disconnect", handle_ble_disconnect)
@@ -1891,7 +1979,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     )
 
     for svc in (
-        "start_brew", "prepare_brew", "stop_brew", "ble_connect", "ble_disconnect",
+        "start_brew", "prepare_brew", "cancel_preparation", "stop_brew", "ble_connect", "ble_disconnect",
         "refresh_status",
         "tare", "back_to_home", "brew_pause", "brew_resume",
         "brew_standalone",
@@ -1912,6 +2000,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
     _LOGGER.debug("xbloom: loading platforms %s", PLATFORMS)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # The picks are kept prepared from here on, and a session that ends takes
+    # what it held with it.
+    entry.async_on_unload(preparer.async_start())
+
+    @callback
+    def _link_lost(_event) -> None:
+        brew_session["prepared"] = None
+        preparer.async_link_lost()
+
+    for phase in ("stopped", "auto_stopped", "failed"):
+        entry.async_on_unload(hass.bus.async_listen(f"xbloom_connect_{phase}", _link_lost))
 
     # After the platforms: callbacks follow the brew's entities by id.
     if targets := targets_from(entry.data.get(CONF_CALLBACK_TARGETS, {})):

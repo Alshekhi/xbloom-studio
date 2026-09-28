@@ -51,7 +51,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     runtime.live_session_listener = live_listener
 
     async_add_entities([
-        XBloomConnectSwitch(live_listener),
+        XBloomConnectSwitch(live_listener, entry),
         XBloomUseGrinderSwitch(),
     ])
 
@@ -101,8 +101,9 @@ class XBloomConnectSwitch(SwitchEntity):
     _attr_unique_id = "xbloom_connect_switch"
     _attr_icon = "mdi:bluetooth-connect"
 
-    def __init__(self, listener: LiveSessionListener) -> None:
+    def __init__(self, listener: LiveSessionListener, entry=None) -> None:
         self._listener = listener
+        self._entry = entry
         self._attr_is_on = False
 
     @property
@@ -163,6 +164,11 @@ class XBloomConnectSwitch(SwitchEntity):
         self.async_write_ha_state()
 
     async def async_turn_off(self, **_kwargs) -> None:
+        # Turned off by hand while a recipe is picked: that is an undo. The
+        # prepared recipe is taken back while the session can still say so.
+        preparer = getattr(getattr(self._entry, "runtime_data", None), "preparer", None)
+        if preparer is not None and not preparer.releasing:
+            await preparer.async_undo()
         await self._listener.stop()
         self._attr_is_on = False
         self.async_write_ha_state()

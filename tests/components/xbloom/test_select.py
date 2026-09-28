@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import pathlib
 import re
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -231,6 +231,8 @@ def _recipe_select(data, last_attributes=None):
     coordinator.data = data
     entity = XBloomRecipeSelect(coordinator)
     entity.coordinator = coordinator
+    entity.hass = MagicMock()
+    entity.async_on_remove = MagicMock()
     entity.async_write_ha_state = MagicMock()
 
     async def _last_state():
@@ -327,3 +329,16 @@ async def test_a_unique_name_is_offered_unchanged() -> None:
     entity = _recipe_select(list(_LIBRARY))
     await entity.async_select_option("Kenya Hot")
     assert (entity._current_id, entity.current_option) == ("12", "Kenya Hot")
+
+
+@pytest.mark.asyncio
+async def test_a_finished_brew_or_a_change_of_mind_unpicks_the_recipe() -> None:
+    import custom_components.xbloom.select as sel
+
+    entity = _recipe_select(list(_LIBRARY), {"id": "12", "name": "Kenya Hot"})
+    handlers: list = []
+    with patch.object(sel, "async_dispatcher_connect", lambda _h, _s, fn: handlers.append(fn)):
+        await entity.async_added_to_hass()
+    assert entity.current_option == "Kenya Hot"
+    handlers[0]()
+    assert entity.current_option is None
