@@ -170,8 +170,9 @@ def brew_view(t: dict) -> dict:
                 f"{{% set s = states('sensor.{E}_brew_time') | int(0) %}}"
                 f"**{t['brew_time']} {{{{ s // 60 }}}}:{{{{ '%02d' % (s % 60) }}}}**"
             ), "visibility": present(f"sensor.{E}_brew_time")},
-            press(f"button.{E}_pause_brew"),
-            press(f"button.{E}_resume_brew"),
+            # One of the two, by whether the machine reports the brew paused.
+            press(f"button.{E}_pause_brew", visibility=[is_(f"binary_sensor.{E}_brew_paused", "off")]),
+            press(f"button.{E}_resume_brew", visibility=[is_(f"binary_sensor.{E}_brew_paused", "on")]),
             press(f"button.{E}_cancel_brew", t["confirm_stop"]),
         ], [{"condition": "or", "conditions": [is_(f"sensor.{E}_brew_status", s) for s in BUSY]}]),
         section(t["h_bag"], [

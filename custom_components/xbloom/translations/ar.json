@@ -416,6 +416,13 @@
   },
   "entity": {
     "binary_sensor": {
+      "brew_paused": {
+        "name": "التحضير متوقف مؤقتا",
+        "state": {
+          "on": "متوقف مؤقتا",
+          "off": "غير متوقف"
+        }
+      },
       "in_range": {
         "name": "في النطاق",
         "state": {

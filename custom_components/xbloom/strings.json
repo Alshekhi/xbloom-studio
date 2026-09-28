@@ -416,6 +416,13 @@
   },
   "entity": {
     "binary_sensor": {
+      "brew_paused": {
+        "name": "Brew Paused",
+        "state": {
+          "on": "Paused",
+          "off": "Not paused"
+        }
+      },
       "in_range": {
         "name": "In Range",
         "state": {

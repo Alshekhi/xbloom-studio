@@ -98,6 +98,10 @@ views:
         perform_action: button.press
         target:
           entity_id: button.xbloom_studio_pause_brew
+      visibility:
+      - condition: state
+        entity: binary_sensor.xbloom_studio_brew_paused
+        state: 'off'
     - type: tile
       entity: button.xbloom_studio_resume_brew
       name:
@@ -110,6 +114,10 @@ views:
         perform_action: button.press
         target:
           entity_id: button.xbloom_studio_resume_brew
+      visibility:
+      - condition: state
+        entity: binary_sensor.xbloom_studio_brew_paused
+        state: 'on'
     - type: tile
       entity: button.xbloom_studio_cancel_brew
       name:

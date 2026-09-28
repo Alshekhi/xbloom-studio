@@ -13,13 +13,16 @@ from homeassistant.components import bluetooth
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from xbloom.ble import NOTIFY_BREW_PAUSED, NOTIFY_BREW_RESUMED, NOTIFY_ENJOY
 
 from . import _resolve_ble_name, remember_address
+from .ble_entities import _device_info, signal_brew_lifecycle, signal_event
 from .const import CONF_BLE_ADDRESS, DOMAIN
 
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
-    async_add_entities([XBloomInRangeSensor(entry)])
+    async_add_entities([XBloomInRangeSensor(entry), XBloomBrewPausedSensor(entry)])
 
 
 class XBloomInRangeSensor(BinarySensorEntity):
@@ -101,3 +104,60 @@ class XBloomInRangeSensor(BinarySensorEntity):
     def _on_gone(self, _service_info) -> None:
         self._attr_is_on = False
         self.async_write_ha_state()
+
+
+class XBloomBrewPausedSensor(BinarySensorEntity):
+    """On while a recipe brew is paused.
+
+    The machine reports both sides itself: a paused brew sends 40515 and a
+    resumed one 40516. Anything that ends the brew, or starts the next, also
+    ends the pause, so it never outlives the brew it belongs to.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "brew_paused"
+    _attr_unique_id = "xbloom_brew_paused"
+    _attr_should_poll = False
+
+    def __init__(self, entry) -> None:
+        self._entry = entry
+        self._attr_is_on = False
+
+    @property
+    def device_info(self):
+        return _device_info(self._entry.entry_id)
+
+    @property
+    def icon(self) -> str:
+        return "mdi:pause-circle" if self.is_on else "mdi:play-circle"
+
+    @callback
+    def _set(self, paused: bool) -> None:
+        if self._attr_is_on != paused:
+            self._attr_is_on = paused
+            self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+
+        @callback
+        def _on_signal(decoded: dict) -> None:
+            cmd = decoded.get("cmd")
+            if cmd == NOTIFY_BREW_PAUSED:
+                self._set(True)
+            elif cmd in (NOTIFY_BREW_RESUMED, NOTIFY_ENJOY):
+                self._set(False)
+
+        @callback
+        def _on_lifecycle(_phase: str) -> None:
+            # Started or ended, a pause does not carry over.
+            self._set(False)
+
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, signal_event(self._entry.entry_id), _on_signal)
+        )
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, signal_brew_lifecycle(self._entry.entry_id), _on_lifecycle
+            )
+        )
