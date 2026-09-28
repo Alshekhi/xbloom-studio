@@ -13,14 +13,20 @@ views:
       content: '## الآن'
     - type: tile
       entity: sensor.xbloom_studio_brew_status
+      name:
+        type: entity
       icon_tap_action:
         action: none
     - type: tile
       entity: binary_sensor.xbloom_studio_in_range
+      name:
+        type: entity
       icon_tap_action:
         action: none
     - type: tile
       entity: select.xbloom_studio_coffee_bag
+      name:
+        type: entity
       icon_tap_action:
         action: none
       visibility:
@@ -32,6 +38,8 @@ views:
         state_not: unknown
     - type: tile
       entity: sensor.xbloom_studio_coffee_left
+      name:
+        type: entity
       icon_tap_action:
         action: none
       visibility:
@@ -48,6 +56,8 @@ views:
       content: '## تحضير جار'
     - type: tile
       entity: sensor.xbloom_studio_current_recipe
+      name:
+        type: entity
       icon_tap_action:
         action: none
       visibility:
@@ -65,9 +75,10 @@ views:
       - condition: numeric_state
         entity: sensor.xbloom_studio_current_pour
         above: 0
-    - type: entities
-      entities:
-      - sensor.xbloom_studio_brew_time
+    - type: markdown
+      text_only: true
+      content: '{% set s = states(''sensor.xbloom_studio_brew_time'') | int(0) %}**زمن التحضير {{ s //
+        60 }}:{{ ''%02d'' % (s % 60) }}**'
       visibility:
       - condition: state
         entity: sensor.xbloom_studio_brew_time
@@ -77,6 +88,8 @@ views:
         state_not: unknown
     - type: tile
       entity: button.xbloom_studio_pause_brew
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -87,6 +100,8 @@ views:
           entity_id: button.xbloom_studio_pause_brew
     - type: tile
       entity: button.xbloom_studio_resume_brew
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -97,6 +112,8 @@ views:
           entity_id: button.xbloom_studio_resume_brew
     - type: tile
       entity: button.xbloom_studio_cancel_brew
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -123,6 +140,8 @@ views:
       content: '## الكيس الحالي'
     - type: tile
       entity: select.xbloom_studio_coffee_bag
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -143,6 +162,8 @@ views:
         state_not: unknown
     - type: tile
       entity: sensor.xbloom_studio_last_brew_counted
+      name:
+        type: entity
       icon_tap_action:
         action: none
       visibility:
@@ -160,12 +181,16 @@ views:
       content: '## التحضير بماكينة xBloom'
     - type: tile
       entity: select.xbloom_studio_recipe
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
       - type: select-options
     - type: tile
       entity: button.xbloom_studio_start_brew
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -178,6 +203,8 @@ views:
         columns: 6
     - type: tile
       entity: button.xbloom_studio_refresh_recipes
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -190,6 +217,8 @@ views:
         columns: 6
     - type: tile
       entity: button.xbloom_studio_refresh_coffee_bags
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -204,11 +233,11 @@ views:
         state_not: unavailable
     - type: tile
       entity: input_boolean.xbloom_show_advanced
+      name: إظهار تعديلات التحضير
       icon_tap_action:
         action: none
       tap_action:
         action: toggle
-      name: إظهار تعديلات التحضير
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_current_module
@@ -258,12 +287,16 @@ views:
       content: '## تعديل هذا التحضير'
     - type: tile
       entity: switch.xbloom_studio_use_grinder
+      name:
+        type: entity
       icon_tap_action:
         action: none
       tap_action:
         action: toggle
     - type: tile
       entity: number.xbloom_studio_brew_grind_size
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -275,6 +308,8 @@ views:
         state: 'on'
     - type: tile
       entity: number.xbloom_studio_brew_ratio
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -282,6 +317,8 @@ views:
         style: slider
     - type: tile
       entity: number.xbloom_studio_brew_dose
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -318,11 +355,11 @@ views:
         {% endif %}- **النسبة:** 1:{{ ratio | round(1) }}'
     - type: tile
       entity: input_boolean.xbloom_show_per_pour
+      name: إظهار كل صبة
       icon_tap_action:
         action: none
       tap_action:
         action: toggle
-      name: إظهار كل صبة
     - type: markdown
       visibility:
       - condition: state
@@ -382,10 +419,14 @@ views:
       content: '## حفظ كوصفة جديدة'
     - type: tile
       entity: text.xbloom_studio_new_recipe_name
+      name:
+        type: entity
       icon_tap_action:
         action: none
     - type: tile
       entity: button.xbloom_studio_save_as_new_recipe
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -420,13 +461,15 @@ views:
       content: '## تحضير يدوي'
     - type: tile
       entity: input_boolean.xbloom_show_manual_brew
+      name: إظهار التحضير اليدوي
       icon_tap_action:
         action: none
       tap_action:
         action: toggle
-      name: إظهار التحضير اليدوي
     - type: tile
       entity: select.xbloom_studio_manual_brewer
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -439,6 +482,8 @@ views:
         columns: 6
     - type: tile
       entity: number.xbloom_studio_manual_brew_dose
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -452,6 +497,8 @@ views:
         columns: 6
     - type: tile
       entity: button.xbloom_studio_record_manual_brew
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -468,6 +515,8 @@ views:
         state: 'on'
     - type: tile
       entity: sensor.xbloom_studio_last_brew_counted
+      name:
+        type: entity
       icon_tap_action:
         action: none
       visibility:
@@ -497,12 +546,16 @@ views:
       content: '## إحصاءات القهوة'
     - type: tile
       entity: select.xbloom_studio_stats_period
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
       - type: select-options
     - type: tile
       entity: sensor.xbloom_studio_brews
+      name:
+        type: entity
       icon_tap_action:
         action: none
     - type: markdown
@@ -605,12 +658,16 @@ views:
         {% else %}لا توجد أكياس مفتوحة أو غير مفتوحة.{% endfor %}'
     - type: tile
       entity: select.xbloom_studio_coffee_bag
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
       - type: select-options
     - type: tile
       entity: button.xbloom_studio_refresh_coffee_bags
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -643,12 +700,16 @@ views:
       content: '## الاتصال والحالة'
     - type: tile
       entity: switch.xbloom_studio_connect
+      name:
+        type: entity
       icon_tap_action:
         action: none
       tap_action:
         action: toggle
     - type: tile
       entity: button.xbloom_studio_refresh_status
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -659,18 +720,26 @@ views:
           entity_id: button.xbloom_studio_refresh_status
     - type: tile
       entity: sensor.xbloom_studio_status_updated
+      name:
+        type: entity
       icon_tap_action:
         action: none
     - type: tile
       entity: sensor.xbloom_studio_brew_status
+      name:
+        type: entity
       icon_tap_action:
         action: none
     - type: tile
       entity: sensor.xbloom_studio_machine_status
+      name:
+        type: entity
       icon_tap_action:
         action: none
     - type: tile
       entity: sensor.xbloom_studio_current_module
+      name:
+        type: entity
       icon_tap_action:
         action: none
       visibility:
@@ -703,6 +772,8 @@ views:
       content: '## الوحدات'
     - type: tile
       entity: button.xbloom_studio_go_to_grinder
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -713,6 +784,8 @@ views:
           entity_id: button.xbloom_studio_go_to_grinder
     - type: tile
       entity: button.xbloom_studio_go_to_brewer
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -723,6 +796,8 @@ views:
           entity_id: button.xbloom_studio_go_to_brewer
     - type: tile
       entity: button.xbloom_studio_go_to_scale
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -759,6 +834,8 @@ views:
     - &id002
       type: tile
       entity: button.xbloom_studio_back_to_home
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -769,6 +846,8 @@ views:
           entity_id: button.xbloom_studio_back_to_home
     - type: tile
       entity: number.xbloom_studio_grind_size
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -776,6 +855,8 @@ views:
         style: slider
     - type: tile
       entity: number.xbloom_studio_grind_speed
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -783,6 +864,8 @@ views:
         style: slider
     - type: tile
       entity: button.xbloom_studio_grind
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -810,6 +893,8 @@ views:
     - *id002
     - type: tile
       entity: number.xbloom_studio_brew_temperature
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -817,12 +902,16 @@ views:
         style: slider
     - type: tile
       entity: select.xbloom_studio_brew_pattern
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
       - type: select-options
     - type: tile
       entity: number.xbloom_studio_brew_volume
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -830,6 +919,8 @@ views:
         style: slider
     - type: tile
       entity: number.xbloom_studio_brew_flow_rate
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -837,12 +928,16 @@ views:
         style: slider
     - type: tile
       entity: select.xbloom_studio_water_source
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
       - type: select-options
     - type: tile
       entity: button.xbloom_studio_brew_standalone
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -870,6 +965,8 @@ views:
     - *id002
     - type: tile
       entity: sensor.xbloom_studio_scale_weight
+      name:
+        type: entity
       icon_tap_action:
         action: none
       visibility:
@@ -881,6 +978,8 @@ views:
         state_not: unknown
     - type: tile
       entity: button.xbloom_studio_tare_scale
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -907,18 +1006,24 @@ views:
       content: '## مكتبة الوصفات'
     - type: tile
       entity: select.xbloom_studio_recipe
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
       - type: select-options
     - type: tile
       entity: select.xbloom_studio_recipe_action
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
       - type: select-options
     - type: tile
       entity: button.xbloom_studio_run_recipe_action
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -949,18 +1054,24 @@ views:
       content: '## الإعدادات'
     - type: tile
       entity: select.xbloom_studio_mode
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
       - type: select-options
     - type: tile
       entity: select.xbloom_studio_temperature_unit
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
       - type: select-options
     - type: tile
       entity: select.xbloom_studio_weight_unit
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -972,6 +1083,8 @@ views:
       content: '## أدوات الاتصال'
     - type: tile
       entity: button.xbloom_studio_ble_connect
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -982,6 +1095,8 @@ views:
           entity_id: button.xbloom_studio_ble_connect
     - type: tile
       entity: button.xbloom_studio_ble_disconnect
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -992,6 +1107,8 @@ views:
           entity_id: button.xbloom_studio_ble_disconnect
     - type: tile
       entity: button.xbloom_studio_back_to_home
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true
@@ -1007,33 +1124,33 @@ views:
       content: '## الإعلانات الصوتية'
     - type: tile
       entity: automation.xbloom_brew_announcements
+      name: إعلان سير التحضير
       icon_tap_action:
         action: none
       tap_action:
         action: toggle
-      name: إعلان سير التحضير
       visibility:
       - condition: state
         entity: automation.xbloom_brew_announcements
         state_not: unavailable
     - type: tile
       entity: automation.xbloom_machine_fault_announcements
+      name: إعلان أعطال الماكينة
       icon_tap_action:
         action: none
       tap_action:
         action: toggle
-      name: إعلان أعطال الماكينة
       visibility:
       - condition: state
         entity: automation.xbloom_machine_fault_announcements
         state_not: unavailable
     - type: tile
       entity: automation.xbloom_live_control_announcements
+      name: إعلان القراءات المباشرة
       icon_tap_action:
         action: none
       tap_action:
         action: toggle
-      name: إعلان القراءات المباشرة
       visibility:
       - condition: state
         entity: automation.xbloom_live_control_announcements
@@ -1057,6 +1174,8 @@ views:
       content: '## التحديثات'
     - type: tile
       entity: update.xbloom_studio_update
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -1067,6 +1186,8 @@ views:
         state_not: unavailable
     - type: tile
       entity: update.xbloom_studio_firmware
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
@@ -1096,12 +1217,16 @@ views:
     cards:
     - type: tile
       entity: select.xbloom_studio_archived_recipe
+      name:
+        type: entity
       icon_tap_action:
         action: none
       features:
       - type: select-options
     - type: tile
       entity: button.xbloom_studio_restore_archived_recipe
+      name:
+        type: entity
       icon_tap_action:
         action: none
       hide_state: true

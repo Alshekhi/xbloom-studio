@@ -34,7 +34,7 @@ TEXT = {
         "add_recipes": "Add or edit recipes", "add_bags": "Add or edit bags",
         "h_archive": "Archived recipes",
         "this_brew": "This brew", "coffee": "Coffee", "water": "Water", "ratio": "Ratio",
-        "pour": "Pour", "of": "of", "temp": "Temp", "pick_recipe": "Pick a recipe to see its pours.",
+        "pour": "Pour", "of": "of", "brew_time": "Brew time", "temp": "Temp", "pick_recipe": "Pick a recipe to see its pours.",
         "coffee_used": "Coffee used", "water_brewed": "Water brewed",
         "previous": "Brews in the period before", "other": "Other",
         "h_charts": "Brew history", "brews_daily": "Brews per day", "brews_monthly": "Brews per month",
@@ -63,7 +63,7 @@ TEXT = {
         "add_recipes": "إضافة الوصفات أو تعديلها", "add_bags": "إضافة الأكياس أو تعديلها",
         "h_archive": "الوصفات المؤرشفة",
         "this_brew": "هذا التحضير", "coffee": "القهوة", "water": "الماء", "ratio": "النسبة",
-        "pour": "الصبة", "of": "من", "temp": "الحرارة", "pick_recipe": "اختر وصفة لعرض صباتها.",
+        "pour": "الصبة", "of": "من", "brew_time": "زمن التحضير", "temp": "الحرارة", "pick_recipe": "اختر وصفة لعرض صباتها.",
         "coffee_used": "القهوة المستخدمة", "water_brewed": "الماء المستخدم",
         "previous": "التحضيرات في الفترة السابقة", "other": "أخرى",
         "h_charts": "سجل التحضير", "brews_daily": "التحضيرات يوميا", "brews_monthly": "التحضيرات شهريا",
@@ -91,7 +91,9 @@ def heading(text: str) -> dict:
 
 
 def tile(entity: str, **extra) -> dict:
-    card = {"type": "tile", "entity": entity, "icon_tap_action": {"action": "none"}}
+    # The entity's own name, without the device's in front of it: "Start Brew",
+    # not "xBloom Studio Start Brew". Still the translated name.
+    card = {"type": "tile", "entity": entity, "name": {"type": "entity"}, "icon_tap_action": {"action": "none"}}
     card.update(extra)
     return card
 
@@ -163,8 +165,11 @@ def brew_view(t: dict) -> dict:
                 f"{{% set p = 'sensor.{E}_current_pour' %}}{{% set total = state_attr(p, 'total_pours') %}}"
                 f"**{t['pour']} {{{{ states(p) }}}}{{% if total %}} {t['of']} {{{{ total }}}}{{% endif %}}**"
             ), "visibility": [{"condition": "numeric_state", "entity": f"sensor.{E}_current_pour", "above": 0}]},
-            {"type": "entities", "entities": [f"sensor.{E}_brew_time"],
-             "visibility": present(f"sensor.{E}_brew_time")},
+            # Minutes and seconds, "2:28"; it re-renders as the sensor ticks.
+            {"type": "markdown", "text_only": True, "content": (
+                f"{{% set s = states('sensor.{E}_brew_time') | int(0) %}}"
+                f"**{t['brew_time']} {{{{ s // 60 }}}}:{{{{ '%02d' % (s % 60) }}}}**"
+            ), "visibility": present(f"sensor.{E}_brew_time")},
             press(f"button.{E}_pause_brew"),
             press(f"button.{E}_resume_brew"),
             press(f"button.{E}_cancel_brew", t["confirm_stop"]),
