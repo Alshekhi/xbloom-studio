@@ -64,6 +64,17 @@ blueprint:
         entity:
           domain: media_player
           multiple: true
+    pour_speakers:
+      name: Speakers for pours
+      description: >
+        Optional. Where each pour is announced, when "Announce each pour" is
+        on — one speaker is usually enough for a line that comes every minute.
+        Leave empty to use the speakers above.
+      default: []
+      selector:
+        entity:
+          domain: media_player
+          multiple: true
     tts_engine:
       name: TTS engine
       description: >
@@ -182,9 +193,15 @@ variables:
   # means "this trigger should not announce" and the condition below drops it —
   # which keeps the delivery block a single action instead of one per branch.
   # Alexa's announce mode plays a chime before speaking; its tts mode speaks
-  # at once. A pour comes every minute or so, and a chime before each one is
-  # more noise than news, so pours are spoken plainly.
-  alexa_type: "{{ 'tts' if trigger.id == 'pour' else 'announce' }}"
+  # at once. The lines that come and go during a brew — the pours, pouring
+  # started, paused and resumed — are more noise than news with a chime before
+  # each, so they are spoken plainly; the start, the end and anything wrong keep
+  # it.
+  alexa_type: "{{ 'tts' if trigger.id in ['pour', 'pouring', 'paused', 'resumed'] else 'announce' }}"
+  all_speakers: !input speakers
+  pour_speakers: !input pour_speakers
+  targets: >-
+    {{ pour_speakers if trigger.id == 'pour' and pour_speakers | length > 0 else all_speakers }}
   message: >-
     {%- if trigger.id == 'started' -%}
       {%- if lang == 'ar' -%}
@@ -317,7 +334,7 @@ action:
         sequence:
           - action: notify.alexa_media
             data:
-              target: !input speakers
+              target: "{{ targets }}"
               data:
                 type: "{{ alexa_type }}"
               message: "{{ message }}"
@@ -327,7 +344,7 @@ action:
             target:
               entity_id: "{{ tts_engine }}"
             data:
-              media_player_entity_id: !input speakers
+              media_player_entity_id: "{{ targets }}"
               message: "{{ message }}"
       - conditions: "{{ method == 'notify' }}"
         sequence:
