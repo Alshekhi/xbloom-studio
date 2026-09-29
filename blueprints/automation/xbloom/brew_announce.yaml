@@ -126,20 +126,19 @@ variables:
   # language. A code not listed here still announces, generically.
   failure: >-
     {%- set reasons = {
-      'machine_not_found': ('the machine could not be found', 'تعذر العثور على الماكينة'),
+      'machine_not_found': ('the machine could not be found', 'تعذر العثور على الجهاز'),
       'bluetooth_error': ('the Bluetooth connection failed', 'فشل الاتصال عبر البلوتوث'),
       'recipe_not_found': ('the recipe could not be found', 'تعذر العثور على الوصفة'),
-      'not_configured': ('no machine is set up', 'لا توجد ماكينة معدة'),
-      'machine_busy': ('the machine is busy', 'الماكينة مشغولة'),
+      'not_configured': ('no machine is set up', 'لا يوجد جهاز مُعد'),
+      'machine_busy': ('the machine is busy', 'الآلة مشغولة'),
       'not_ready': ('the machine is not ready after a power cut — put it back on its standby screen',
-                    'الماكينة غير جاهزة بعد انقطاع الكهرباء، أعدها إلى شاشة الانتظار'),
+                    'الآلة غير جاهزة بعد انقطاع الكهرباء، أعدها إلى شاشة الانتظار'),
       'restore_incomplete': ('the machine has not finished recovering — put it back on its standby screen',
-                             'لم تكمل الماكينة استعادة حالتها، أعدها إلى شاشة الانتظار'),
-      'not_on_home_screen': ('the machine is not on its standby screen', 'الماكينة ليست على شاشة الانتظار'),
-      'no_water': ('the tank needs water', 'الخزان يحتاج ماء'),
-      'recipe_rejected': ('the machine did not accept the recipe', 'لم تقبل الماكينة الوصفة'),
-      'no_reply': ('the machine did not answer', 'لم ترد الماكينة'),
-      'no_beans': ('the grinder found no beans', 'لا توجد حبوب في المطحنة'),
+                             'لم تكمل الآلة استعادة حالتها، أعدها إلى شاشة الانتظار'),
+      'not_on_home_screen': ('the machine is not on its standby screen', 'الآلة ليست على شاشة الانتظار'),
+      'no_water': ('the tank needs water', 'الخزان يحتاج إلى ماء'),
+      'recipe_rejected': ('the machine did not accept the recipe', 'لم تقبل الآلة الوصفة'),
+      'no_reply': ('the machine did not answer', 'لم يرد الجهاز'),
     } -%}
     {%- set reason = trigger.event.data.get('reason', '') if trigger.id == 'failed' else '' -%}
     {%- if reason in reasons -%}
@@ -158,9 +157,9 @@ variables:
         {%- if announce_recipe and recipe_name %}Started preparing {{ recipe_name }}{% else %}Starting your coffee{% endif -%}
       {%- endif -%}
     {%- elif trigger.id == 'pouring' -%}
-      {%- if lang == 'ar' %}بدأ صب القهوة{% else %}Pouring started{% endif -%}
+      {%- if lang == 'ar' %}بدأ الصب{% else %}Pouring started{% endif -%}
     {%- elif trigger.id == 'done_simple' and not announce_recipe -%}
-      {%- if lang == 'ar' %}قهوتك في انتظارك{% else %}Your coffee is ready{% endif -%}
+      {%- if lang == 'ar' %}قهوتك جاهزة{% else %}Your coffee is ready{% endif -%}
     {%- elif trigger.id == 'done_recipe' and announce_recipe
             and trigger.to_state.attributes.get('event_type') == 'brew_done' -%}
       {%- if lang == 'ar' -%}
@@ -168,9 +167,12 @@ variables:
       {%- else -%}
         {%- if recipe_name %}Finished preparing {{ recipe_name }}{% else %}Your coffee is ready{% endif -%}
       {%- endif -%}
-    {%- elif trigger.id == 'failed' -%}
+    {#- An empty grinder is the machine's own fault: the fault blueprint speaks
+        it the moment the machine reports it, so saying it again here as a
+        failed brew would announce one empty hopper twice. -#}
+    {%- elif trigger.id == 'failed' and trigger.event.data.get('reason') != 'no_beans' -%}
       {%- if lang == 'ar' -%}
-        {%- if announce_recipe and recipe_name %}تعذر تحضير {{ recipe_name }}: {{ failure }}{% else %}تعذر تحضير قهوتك: {{ failure }}{% endif -%}
+        {%- if announce_recipe and recipe_name %}تعذر تحضير {{ recipe_name }}، {{ failure }}{% else %}تعذر تحضير قهوتك، {{ failure }}{% endif -%}
       {%- else -%}
         {%- if announce_recipe and recipe_name %}Could not brew {{ recipe_name }}: {{ failure }}{% else %}Could not brew your coffee: {{ failure }}{% endif -%}
       {%- endif -%}

@@ -113,13 +113,13 @@ variables:
   message: >-
     {%- if lang == 'ar' -%}
       {%- if ev == 'xbloom_connect_connecting' -%}
-        جاري الاتصال بـ إكس بلوم
+        جارٍ الاتصال بإكس بلوم
       {%- elif ev == 'xbloom_connect_ready' -%}
-        تم الاتصال بـ إكس بلوم
+        إكس بلوم متصلة
       {%- elif ev == 'xbloom_connect_failed' -%}
-        فشل الاتصال بـ إكس بلوم{% if reason == 'machine_not_found' %}، لم يتم العثور على الجهاز{% elif reason == 'machine_busy' %}، الجهاز مشغول{% elif reason == 'connection_lost' %}، انقطع الاتصال{% endif %}
+        تعذر الاتصال بإكس بلوم{% if reason == 'machine_not_found' %}، تعذر العثور على الجهاز{% elif reason == 'machine_busy' %}، الجهاز مشغول{% elif reason == 'connection_lost' %}، انقطع الاتصال{% endif %}
       {%- elif ev == 'xbloom_connect_auto_stopped' -%}
-        انتهت مهلة الاتصال بـ إكس بلوم
+        أُغلق الاتصال بإكس بلوم
       {%- elif ev == 'xbloom_scale_weight_stable' -%}
         الوزن {{ weight }} جرام
       {%- elif ev == 'xbloom_grinder_knob_changed' -%}
@@ -127,13 +127,13 @@ variables:
       {%- elif ev == 'xbloom_brewer_setting_changed' -%}
         {% if setting == 'temperature' %}{% if value_name == 'RT' %}درجة حرارة الغرفة{% elif value_name == 'BP' %}درجة الغليان{% else %}درجة الحرارة {% if states('select.xbloom_studio_temperature_unit') == 'f' %}{{ (value | float * 1.8 + 32) | round(0) | int }} فهرنهايت{% else %}{{ value }} مئوية{% endif %}{% endif %}{% elif setting == 'pattern' %}نمط الصب {{ pattern_ar }}{% elif setting == 'size' %}درجة الطحن {{ value }}{% elif setting == 'speed' %}سرعة الطحن {{ value }}{% elif setting == 'ratio' %}النسبة {{ ratio_fmt }}{% endif %}
       {%- elif ev == 'xbloom_module_entered' -%}
-        {% if module == 'scale' %}الميزان{% elif module == 'grinder' %}المطحنة{% elif module == 'brewer' %}الغلاية{% elif module == 'home' %}الشاشة الرئيسية{% elif module == 'auto' %}الوضع التلقائي{% endif %}
+        {% if module == 'scale' %}الميزان{% elif module == 'grinder' %}المطحنة{% elif module == 'brewer' %}وحدة الصب{% elif module == 'home' %}الشاشة الرئيسية{% elif module == 'auto' %}الوضع التلقائي{% endif %}
       {%- elif ev == 'xbloom_mode_changed' -%}
         {% if mode == 'auto' %}الوضع التلقائي{% elif mode == 'pro' %}الوضع الاحترافي{% endif %}
       {%- elif ev == 'xbloom_scale_tared' -%}
-        تم التصفير
+        الميزان على الصفر
       {%- elif ev == 'xbloom_recipe_card_scanned' -%}
-        تم مسح بطاقة الوصفة
+        قُرئت بطاقة الوصفة
       {%- endif -%}
     {%- else -%}
       {%- if ev == 'xbloom_connect_connecting' -%}

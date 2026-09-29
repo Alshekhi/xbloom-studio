@@ -91,13 +91,13 @@ variables:
   message: >-
     {%- if lang == 'ar' -%}
       {%- if ev == 'error_no_water' -%}
-        الماكينة بحاجة إلى ماء، أضف ماءً إلى الخزان
+        الخزان فارغ، أضف ماءً
       {%- elif ev == 'error_no_beans' -%}
-        لا توجد حبوب في المطحنة
+        المطحنة فارغة، أضف البن
       {%- elif ev == 'error_dose_water' -%}
-        خطأ في كمية الماء أو الجرعة
+        كمية الماء أو البن غير مناسبة
       {%- elif ev == 'error_gear_position' -%}
-        خطأ في موضع المطحنة
+        المطحنة ليست في موضعها
       {%- endif -%}
     {%- else -%}
       {%- if ev == 'error_no_water' -%}
