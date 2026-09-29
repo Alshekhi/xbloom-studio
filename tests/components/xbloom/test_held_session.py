@@ -382,3 +382,18 @@ async def test_a_recipe_the_machine_refused_is_not_announced():
     with _machine_in_range(), pytest.raises(HomeAssistantError):
         await entry.runtime_data.preparer._prepare({"dose": 15})
     assert _fired(hass, "xbloom_recipe_prepared") == []
+
+
+async def test_a_recipe_the_machine_refused_says_why():
+    # A recipe picked on the dashboard has no caller to raise to; its failure
+    # is announced as its arrival would have been.
+    session = _PreparingSession()
+
+    async def _refuses(recipe):
+        raise ble.CommandRefused("recipe", "machine_busy")
+
+    session.send_prepare = _refuses
+    hass, entry, _handlers = await _handlers_with(session, hass=_make_hass())
+    with _machine_in_range(), pytest.raises(HomeAssistantError):
+        await entry.runtime_data.preparer._prepare({"dose": 15})
+    assert [e["reason"] for e in _fired(hass, "xbloom_recipe_not_prepared")] == ["machine_busy"]

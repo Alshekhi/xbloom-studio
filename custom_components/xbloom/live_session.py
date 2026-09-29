@@ -248,8 +248,21 @@ class LiveSessionListener(XBloomModeListener):
     def _fire_lifecycle(self, phase: str, payload: dict) -> None:
         """Bridge the listener's lifecycle transitions onto the HA event bus as
         ``xbloom_connect_<phase>`` (consumed by switch.py + the
-        live_control_announce blueprint)."""
+        live_control_announce blueprint).
+
+        A session opened only to send a picked recipe says so, so the
+        announcement of the recipe arriving need not follow two about
+        connecting."""
+        if phase in ("connecting", "ready") and self._opened_for_recipe():
+            payload = {**payload, "for_recipe": True}
         self.hass.bus.async_fire(f"xbloom_{self.mode_name}_{phase}", payload)
+
+    def _opened_for_recipe(self) -> bool:
+        if self._entry_id is None:
+            return False
+        entry = self.hass.config_entries.async_get_entry(self._entry_id)
+        preparer = getattr(getattr(entry, "runtime_data", None), "preparer", None)
+        return getattr(preparer, "owns_connect", False) is True
 
     def _make_background_task(self, coro, name):
         """Spawn the library's run loop via HA's background-task helper — the

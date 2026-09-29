@@ -116,3 +116,23 @@ async def test_a_start_from_home_assistant_is_not_followed_a_second_time():
     assert [t for t in tasks if t.get_coro().__name__ == "_start_brew"] == []
     assert session.sent == ["prepare", "start"]
     assert len(_fired(hass, "xbloom_brew_started")) == 1
+
+
+async def test_a_brew_from_the_machines_own_slots_is_announced_without_a_name():
+    # Nothing prepared: the machine brews a recipe Home Assistant never sent.
+    hass, _entry, _handlers, _session, followers, tasks = await _rig()
+    _hear(followers, {"cmd": 8023, "activity": 65}, BUTTON, BUTTON)
+    await _settle()
+    assert tasks == []
+    assert _fired(hass, "xbloom_machine_brew_started") == [{}]
+
+
+async def test_a_followed_brew_is_not_also_announced_as_a_slot_brew():
+    hass, entry, _handlers, _session, followers, tasks = await _rig()
+    with _machine_in_range():
+        await entry.runtime_data.preparer._prepare({"dose": 15})
+        _hear(followers, RECIPE_SCREEN, BUTTON, BUTTON)
+        await _settle()
+    assert _fired(hass, "xbloom_machine_brew_started") == []
+    for task in (*tasks, *entry.tasks):
+        task.cancel()

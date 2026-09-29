@@ -5,7 +5,7 @@ blueprint:
     (`switch.xbloom_studio_connect`) is open: scale weight, grinder knob
     (size / speed), brewer knob (pattern / temperature / grind / ratio), which
     module you entered on the machine, recipe-card scans, and a picked recipe
-    reaching the machine — plus the connection lifecycle. Bilingual (English /
+    reaching the machine or failing to — plus the connection lifecycle. Bilingual (English /
     Arabic).
 
     Speaks through Alexa, any TTS engine and speaker, or any notify service —
@@ -61,6 +61,15 @@ blueprint:
       default: ""
       selector:
         text:
+    quiet_connect_for_recipe:
+      name: Quiet connecting when a recipe is picked
+      description: >
+        When on, a connection opened only to send a picked recipe is not
+        announced; the recipe reaching the machine is. Connecting with the
+        Connect switch is always announced.
+      default: true
+      selector:
+        boolean: {}
     language:
       name: Announcement language
       description: English or Arabic.
@@ -74,6 +83,9 @@ blueprint:
 variables:
   lang: !input language
   method: !input delivery_method
+  quiet_connect_for_recipe: !input quiet_connect_for_recipe
+  quiet_for_recipe: >-
+    {{ (trigger.event.data.for_recipe | default(false)) and quiet_connect_for_recipe }}
   notify_service: !input notify_service
   # Carried as a variable, not used as `!input` directly in `target:`. Home
   # Assistant validates every `choose` branch at config load, including ones
@@ -86,6 +98,21 @@ variables:
   recipe_name: "{{ trigger.event.data.recipe_name | default('') }}"
   reason: "{{ trigger.event.data.reason | default('') }}"
   reason_pretty: "{{ reason | replace('_', ' ') }}"
+  # Why a picked recipe did not reach the machine, in one short phrase. The
+  # same reason codes as a brew that could not start.
+  not_prepared: >-
+    {%- set reasons = {
+      'machine_not_found': ('the device could not be found', 'تعذر العثور على الجهاز'),
+      'bluetooth_error': ('the Bluetooth connection failed', 'فشل الاتصال عبر البلوتوث'),
+      'machine_busy': ('the machine is busy', 'الآلة مشغولة'),
+      'not_ready': ('the machine is not ready after a power cut', 'الآلة غير جاهزة بعد انقطاع الكهرباء'),
+      'restore_incomplete': ('the machine has not finished recovering', 'لم تكمل الآلة استعادة حالتها'),
+      'not_on_home_screen': ('the machine is not on its standby screen', 'الآلة ليست على شاشة الانتظار'),
+      'no_water': ('the tank needs water', 'الخزان يحتاج إلى ماء'),
+      'recipe_rejected': ('the machine did not accept the recipe', 'لم تقبل الآلة الوصفة'),
+      'no_reply': ('the device did not answer', 'لم يرد الجهاز'),
+    } -%}
+    {%- if reason in reasons -%}{{ reasons[reason][1] if lang == 'ar' else reasons[reason][0] }}{%- endif -%}
   # weight
   weight: "{{ trigger.event.data.weight_g | default(0) | round(1) }}"
   # grinder knob
@@ -114,7 +141,8 @@ variables:
     {% set r = value | float %}{{ (r | round(0) | int) if r == (r | round(0)) else (r | round(1)) }}
   message: >-
     {%- if lang == 'ar' -%}
-      {%- if ev == 'xbloom_connect_connecting' -%}
+      {%- if ev in ['xbloom_connect_connecting', 'xbloom_connect_ready'] and quiet_for_recipe -%}
+      {%- elif ev == 'xbloom_connect_connecting' -%}
         جارٍ الاتصال بإكس بلوم
       {%- elif ev == 'xbloom_connect_ready' -%}
         إكس بلوم متصلة
@@ -138,9 +166,12 @@ variables:
         قُرئت بطاقة الوصفة
       {%- elif ev == 'xbloom_recipe_prepared' -%}
         {% if recipe_name %}وصلت وصفة {{ recipe_name }} إلى الآلة{% else %}وصلت الوصفة إلى الآلة{% endif %}
+      {%- elif ev == 'xbloom_recipe_not_prepared' -%}
+        تعذر إرسال الوصفة إلى الآلة{% if not_prepared %}، {{ not_prepared }}{% endif %}
       {%- endif -%}
     {%- else -%}
-      {%- if ev == 'xbloom_connect_connecting' -%}
+      {%- if ev in ['xbloom_connect_connecting', 'xbloom_connect_ready'] and quiet_for_recipe -%}
+      {%- elif ev == 'xbloom_connect_connecting' -%}
         Connecting to xBloom
       {%- elif ev == 'xbloom_connect_ready' -%}
         Connected to xBloom
@@ -164,6 +195,8 @@ variables:
         Recipe card scanned
       {%- elif ev == 'xbloom_recipe_prepared' -%}
         {% if recipe_name %}{{ recipe_name }} is ready on the machine{% else %}The recipe is ready on the machine{% endif %}
+      {%- elif ev == 'xbloom_recipe_not_prepared' -%}
+        Could not send the recipe to the machine{% if not_prepared %}: {{ not_prepared }}{% endif %}
       {%- endif -%}
     {%- endif -%}
 
@@ -183,6 +216,7 @@ trigger:
       - xbloom_recipe_card_scanned
       # Fired once the machine has accepted a recipe sent ahead of its start.
       - xbloom_recipe_prepared
+      - xbloom_recipe_not_prepared
 
 condition:
   - condition: template

@@ -1,9 +1,9 @@
 blueprint:
   name: "xBloom — Brew announcements"
   description: >
-    Announces the xBloom brew lifecycle: the brew starting, pouring started, and
-    coffee ready. Optionally names the recipe at both ends. Bilingual
-    (English / Arabic).
+    Announces the xBloom brew lifecycle: the brew starting, pouring started,
+    paused and resumed, cancelled, and coffee ready — and optionally each pour
+    by number. Optionally names the recipe. Bilingual (English / Arabic).
 
     Speaks through Alexa, any TTS engine and speaker, or any notify service —
     pick one under "How to announce".
@@ -15,9 +15,9 @@ blueprint:
     after a power cut, says nothing instead of announcing a brew that never
     ran. The failure is announced instead, with its reason in your language —
     "the machine is not ready after a power cut", "the tank needs water" — so
-    a brew that goes quiet is never a mystery. A brew started
-    physically at the machine emits no such event, so it announces from
-    "pouring" onward rather than at the start.
+    a brew that goes quiet is never a mystery. A recipe Home Assistant sent
+    ahead and the machine's button started is announced the same way; one of
+    the machine's own recipe slots is announced as started, without a name.
   domain: automation
   author: xbloom-studio-controler
   input:
@@ -92,6 +92,35 @@ blueprint:
       default: false
       selector:
         boolean: {}
+    announce_pours:
+      name: Announce each pour
+      description: >
+        When on, each pour after the first is announced with its number — "pour
+        2 of 3". The first is already announced as the pouring starting.
+      default: false
+      selector:
+        boolean: {}
+    paused_entity:
+      name: xBloom Brew Paused Sensor
+      description: >
+        The brew paused sensor (domain: binary_sensor) created by the
+        integration — typically binary_sensor.xbloom_studio_brew_paused. Drives
+        the paused and resumed announcements, whether the brew was paused on
+        the machine or from Home Assistant.
+      default: binary_sensor.xbloom_studio_brew_paused
+      selector:
+        entity:
+          domain: binary_sensor
+    pour_entity:
+      name: xBloom Current Pour Sensor
+      description: >
+        The current pour sensor (domain: sensor) created by the integration —
+        typically sensor.xbloom_studio_current_pour. Only used when "Announce
+        each pour" is on.
+      default: sensor.xbloom_studio_current_pour
+      selector:
+        entity:
+          domain: sensor
     language:
       name: Announcement language
       description: English or Arabic.
@@ -105,6 +134,8 @@ blueprint:
 variables:
   lang: !input language
   announce_recipe: !input announce_recipe
+  announce_pours: !input announce_pours
+  status_entity: !input xbloom_status_entity
   method: !input delivery_method
   notify_service: !input notify_service
   # Carried as a variable, not used as `!input` directly in `target:`. Home
@@ -117,7 +148,7 @@ variables:
   recipe_name: >-
     {%- if trigger.id == 'done_recipe' -%}
       {{ trigger.to_state.attributes.get('recipe_name', '') }}
-    {%- elif trigger.id in ['started', 'failed'] -%}
+    {%- elif trigger.id in ['started', 'failed', 'stopped'] -%}
       {{ trigger.event.data.get('recipe_name', '') }}
     {%- else -%}
     {%- endif -%}
@@ -176,6 +207,38 @@ variables:
       {%- else -%}
         {%- if announce_recipe and recipe_name %}Could not brew {{ recipe_name }}: {{ failure }}{% else %}Could not brew your coffee: {{ failure }}{% endif -%}
       {%- endif -%}
+    {%- elif trigger.id == 'machine_started' -%}
+      {%- if lang == 'ar' %}بدأ التحضير{% else %}Brew started{% endif -%}
+    {%- elif trigger.id == 'paused' -%}
+      {%- if lang == 'ar' %}التحضير متوقف مؤقتا{% else %}Brew paused{% endif -%}
+    {#- The pause also ends when the brew does; only a brew still running
+        was resumed. -#}
+    {%- elif trigger.id == 'resumed' and states(status_entity) in ['grinding', 'brewing'] -%}
+      {%- if lang == 'ar' %}عاد التحضير{% else %}Brew resumed{% endif -%}
+    {#- A brew replaced by a newer start is not a cancellation anyone asked
+        for; the new brew announces itself. -#}
+    {%- elif trigger.id == 'stopped' and trigger.event.data.get('by') != 'superseded' -%}
+      {%- if lang == 'ar' -%}
+        {%- if announce_recipe and recipe_name %}أُلغي تحضير {{ recipe_name }}{% else %}أُلغي التحضير{% endif -%}
+      {%- else -%}
+        {%- if announce_recipe and recipe_name %}Cancelled {{ recipe_name }}{% else %}Brew cancelled{% endif -%}
+      {%- endif -%}
+    {%- elif trigger.id == 'timeout' -%}
+      {%- if lang == 'ar' %}لم تعلن الآلة انتهاء التحضير{% else %}The machine never said the brew finished{% endif -%}
+    {%- elif trigger.id == 'pour' and announce_pours
+            and trigger.to_state.state | int(0) >= 2
+            and trigger.to_state.state | int(0) > trigger.from_state.state | int(0) -%}
+      {%- set n = trigger.to_state.state | int(0) -%}
+      {%- set total = trigger.to_state.attributes.get('total_pours') | int(0) -%}
+      {%- if lang == 'ar' -%}
+        {%- set ordinals = ['', 'الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة',
+                            'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'] -%}
+        {%- set counts = ['', 'واحدة', 'اثنتين', 'ثلاث', 'أربع', 'خمس',
+                          'ست', 'سبع', 'ثمان', 'تسع', 'عشر'] -%}
+        الصبة {{ ordinals[n] if n <= 10 else n }}{% if 0 < total <= 10 %} من {{ counts[total] }}{% elif total > 10 %} من {{ total }}{% endif %}
+      {%- else -%}
+        Pour {{ n }}{% if total %} of {{ total }}{% endif %}
+      {%- endif -%}
     {%- endif -%}
 
 trigger:
@@ -202,6 +265,32 @@ trigger:
   - platform: event
     event_type: xbloom_brew_failed
     id: failed
+  # A brew started from one of the machine's own recipe slots: Home Assistant
+  # does not know the recipe, so it is announced without a name.
+  - platform: event
+    event_type: xbloom_machine_brew_started
+    id: machine_started
+  - platform: state
+    entity_id: !input paused_entity
+    to: "on"
+    id: paused
+  - platform: state
+    entity_id: !input paused_entity
+    from: "on"
+    to: "off"
+    id: resumed
+  # Stopped on the machine or with Cancel Brew: not a failure, but without
+  # this the brew would end in silence.
+  - platform: event
+    event_type: xbloom_brew_stopped
+    id: stopped
+  - platform: event
+    event_type: xbloom_brew_timeout
+    id: timeout
+  - platform: state
+    entity_id: !input pour_entity
+    to: ~
+    id: pour
 
 condition:
   - condition: template

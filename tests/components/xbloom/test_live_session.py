@@ -401,3 +401,12 @@ def test_background_task_uses_ha_helper_when_available() -> None:
     coro = MagicMock()
     listener._make_background_task(coro, "n")
     listener.hass.async_create_background_task.assert_called_once_with(coro, name="n")
+
+
+@pytest.mark.parametrize("phase, marked", [("connecting", True), ("ready", True), ("failed", False)])
+def test_a_session_opened_for_a_picked_recipe_says_so(phase: str, marked: bool) -> None:
+    # So the announcements can let the recipe's arrival speak for it.
+    listener = _listener()
+    listener.hass.config_entries.async_get_entry.return_value.runtime_data.preparer.owns_connect = True
+    listener._fire_lifecycle(phase, {})
+    assert _fired(listener) == [(f"xbloom_connect_{phase}", {"for_recipe": True} if marked else {})]

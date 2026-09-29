@@ -143,6 +143,10 @@ BREW_END_GRACE_S = 120.0
 # stop decided at once would drop it.
 BREW_STOP_GRACE_S = 10.0
 
+# A second grinder-start frame this soon after one that began a brew belongs to
+# the same press: no brew is started again that quickly.
+MACHINE_START_REPEAT_S = 30.0
+
 # How often Coffee Lab's entities re-read a Notion store. One query every ten
 # minutes is far below any rate limit worth worrying about.
 NOTION_REFRESH = timedelta(minutes=10)
@@ -603,6 +607,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         recipe, recipe_name = await _brew_recipe(data, "xbloom.prepare_brew")
         if recipe is None:
             raise refuse("no_recipe_selected")
+
+        def _not_prepared(reason: str) -> None:
+            # Said out loud as well as raised: a recipe picked on the dashboard
+            # has no caller to raise to, and its arrival is announced, so its
+            # failure must be too. The same reason codes as xbloom_brew_failed.
+            hass.bus.async_fire(
+                "xbloom_recipe_not_prepared", {"reason": reason, "recipe_name": recipe_name},
+            )
+
         session = held_session(entry)
         if session is None:
             # Wait for the session to say it is ready: it takes the link
@@ -619,6 +632,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 await preparer.async_hold_link()
                 await asyncio.wait_for(ready.wait(), SESSION_READY_TIMEOUT_S)
             except TimeoutError as err:
+                _not_prepared("machine_not_found")
                 raise HomeAssistantError(
                     translation_domain=DOMAIN, translation_key="machine_unreachable",
                 ) from err
@@ -626,6 +640,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 unsubscribe()
             session = held_session(entry)
             if session is None:
+                _not_prepared("machine_not_found")
                 raise HomeAssistantError(
                     translation_domain=DOMAIN, translation_key="machine_unreachable",
                 )
@@ -638,8 +653,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         try:
             await session.send_prepare(recipe)
         except CommandRefused as err:
+            _not_prepared(err.reason)
             raise _refused(err) from err
         except Exception as err:  # noqa: BLE001 — unanswered, or the link failing
+            _not_prepared("no_reply" if isinstance(err, CommandUnanswered) else "bluetooth_error")
             raise HomeAssistantError(
                 translation_domain=DOMAIN, translation_key="recipe_not_prepared",
                 translation_placeholders={"reason": str(err) or type(err).__name__},
@@ -1171,28 +1188,41 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         CMD_GRINDER_START,
         CMD_MACHINE_ACTIVITY,
         held_session,
+        module_screen_after,
     )
 
-    machine_screen: dict = {"activity": None}
+    machine_screen: dict = {"activity": None, "module": False, "followed_at": None}
 
     @callback
     def _follow_machine_start(decoded: dict) -> None:
         cmd = decoded.get("cmd")
+        machine_screen["module"] = module_screen_after(decoded, machine_screen["module"])
         if cmd == CMD_MACHINE_ACTIVITY:
             machine_screen["activity"] = decoded.get("activity")
             return
-        if cmd != CMD_GRINDER_START or machine_screen["activity"] != ACTIVITY_RECIPE_READY:
+        if cmd != CMD_GRINDER_START or _brew_running() or machine_screen["module"]:
             return
+        # One press can reach here more than once before the brew following
+        # it has started running.
+        followed_at = machine_screen["followed_at"]
+        if followed_at is not None and hass.loop.time() - followed_at < MACHINE_START_REPEAT_S:
+            return
+        machine_screen["followed_at"] = hass.loop.time()
         prepared = brew_session["prepared_brew"]
         session = held_session(entry)
         if (
-            prepared is None or session is None or _brew_running()
-            or brew_session["prepared"] != _prepared_key(session, prepared[0])
+            machine_screen["activity"] == ACTIVITY_RECIPE_READY
+            and prepared is not None and session is not None
+            and brew_session["prepared"] == _prepared_key(session, prepared[0])
         ):
+            brew_session["prepared_brew"] = None
+            data = {"unattributed": True} if preparer.unattributed else {}
+            hass.async_create_task(_start_brew(data, adopted=prepared))
             return
-        brew_session["prepared_brew"] = None
-        data = {"unattributed": True} if preparer.unattributed else {}
-        hass.async_create_task(_start_brew(data, adopted=prepared))
+        # A recipe Home Assistant did not send — one of the machine's own
+        # slots: it cannot be followed, since what it brews is unknown here,
+        # but that it started can still be said.
+        hass.bus.async_fire("xbloom_machine_brew_started", {})
 
     entry.async_on_unload(
         async_dispatcher_connect(hass, _signal_event(entry.entry_id), _follow_machine_start)

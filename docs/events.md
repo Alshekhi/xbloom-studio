@@ -11,6 +11,7 @@ can your own automations or a service outside Home Assistant.
 | `xbloom_brew_failed` | The brew could not start, or the machine gave up on it | `reason`, `recipe_name`, sometimes `step` / `error` |
 | `xbloom_brew_stopped` | Someone stopped the brew | `by`, `recipe_name`, `ground` (whether the grinder had run), `dose_g` |
 | `xbloom_brew_timeout` | Ten minutes passed with no ending heard from the machine | `recipe_name` |
+| `xbloom_machine_brew_started` | A brew started from one of the machine's own recipe slots, which Home Assistant did not send and so cannot follow | |
 
 **Every event of one brew also carries its `run_id`**, the same on each, so a
 consumer can tell brews apart and handle a repeated event once. `start_brew`
@@ -127,7 +128,7 @@ change and test `trigger.to_state.attributes.event_type`:
 | Event | Fired when | Data |
 |---|---|---|
 | `xbloom_brew_started` | the machine accepts the brew (also fires with Connect off); a refused brew fires `xbloom_brew_failed` instead | `recipe_name`, `total_pours` |
-| `xbloom_connect_ready` / `_connecting` / `_failed` / `_stopped` / `_auto_stopped` | the live session changes state | `reason` on failures and stops |
+| `xbloom_connect_ready` / `_connecting` / `_failed` / `_stopped` / `_auto_stopped` | the live session changes state | `reason` on failures and stops; `for_recipe: true` on connecting and ready when the session was opened only to send a picked recipe |
 | `xbloom_scale_weight_stable` | the weight settles while you're on the scale | `weight_g`, `unit` |
 | `xbloom_grinder_knob_changed` | a grinder knob is turned | `parameter`, `value` |
 | `xbloom_brewer_setting_changed` | a brewer setting is changed | `setting`, `value`, `value_name` |
@@ -136,3 +137,4 @@ change and test `trigger.to_state.attributes.event_type`:
 | `xbloom_scale_tared` | the scale is tared | |
 | `xbloom_recipe_card_scanned` | an xPod card is read | `pod_id` |
 | `xbloom_recipe_prepared` | the machine has accepted a recipe sent ahead of its start, so its button or Start Brew begins it at once | `recipe_name` |
+| `xbloom_recipe_not_prepared` | a picked recipe could not be sent to the machine | `reason` (the same codes as `xbloom_brew_failed`), `recipe_name` |
