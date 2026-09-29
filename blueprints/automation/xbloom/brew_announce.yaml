@@ -18,6 +18,7 @@ blueprint:
     A brew that cannot start says why, such as "the tank needs water".
   domain: automation
   author: xbloom-studio-controler
+  source_url: https://github.com/Alshekhi/xbloom-studio/blob/main/blueprints/automation/xbloom/brew_announce.yaml
   homeassistant:
     min_version: 2024.6.0
   input:

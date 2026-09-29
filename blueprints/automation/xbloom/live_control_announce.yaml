@@ -1,84 +1,77 @@
 blueprint:
   name: "xBloom — Live-session announcements"
   description: >
-    Speaks every live reading from the xBloom Studio while a **Connect** session
-    (`switch.xbloom_studio_connect`) is open: scale weight, grinder knob
-    (size / speed), brewer knob (pattern / temperature / grind / ratio), which
-    module you entered on the machine, recipe-card scans, and a picked recipe
-    reaching the machine or failing to — plus the connection lifecycle. Bilingual (English /
-    Arabic).
-
-    Speaks through Alexa, any TTS engine and speaker, or any notify service —
-    pick one under "How to announce".
-
-    This is the companion to the integration's live-session listener: the
-    integration fires the events (voice-agnostic — they also drive sensors and
-    the dashboard), and this blueprint turns them into speech on the speaker(s)
-    you choose. Import it once, pick how to announce and a language.
+    Speaks what happens at the machine while Connect is on, in English or
+    Arabic: the knobs you turn, the screen you move to, the scale weight, a
+    recipe card read, a picked recipe reaching the machine, and the connection
+    itself.
   domain: automation
   author: xbloom-studio-controler
+  source_url: https://github.com/Alshekhi/xbloom-studio/blob/main/blueprints/automation/xbloom/live_control_announce.yaml
+  homeassistant:
+    min_version: 2024.6.0
   input:
-    delivery_method:
+    delivery:
       name: How to announce
-      description: >
-        Alexa — uses the Alexa Media Player integration's TTS mode.
-        Speaker (TTS) — speaks through a TTS engine on the speakers you pick.
-        Notify service — sends the text to any notify service, such as a phone.
-        Fill in only the fields for the method you choose; the rest are ignored.
-      default: alexa
-      selector:
-        select:
-          options:
-            - { value: alexa, label: Alexa }
-            - { value: tts, label: Speaker (TTS) }
-            - { value: notify, label: Notify service }
-    speakers:
-      name: Speakers
-      description: >
-        Used by the Alexa and Speaker (TTS) methods. The media players that
-        should speak the readings. Leave empty for the Notify service method.
-      default: []
-      selector:
-        entity:
-          domain: media_player
-          multiple: true
-    tts_engine:
-      name: TTS engine
-      description: >
-        Used by the Speaker (TTS) method only — the TTS entity to speak with,
-        for example tts.google_translate_en_com or tts.piper. Leave empty for
-        the other methods.
-      default: ""
-      selector:
-        entity:
-          domain: tts
-    notify_service:
-      name: Notify service
-      description: >
-        Used by the Notify service method only — the full service name to call,
-        for example notify.mobile_app_my_phone or notify.persistent_notification.
-        Leave empty for the other methods.
-      default: ""
-      selector:
-        text:
-    quiet_connect_for_recipe:
-      name: Quiet connecting when a recipe is picked
-      description: >
-        When on, a connection opened only to send a picked recipe is not
-        announced; the recipe reaching the machine is. Connecting with the
-        Connect switch is always announced.
-      default: true
-      selector:
-        boolean: {}
-    language:
-      name: Announcement language
-      description: English or Arabic.
-      default: en
-      selector:
-        select:
-          options:
-            - { value: en, label: English }
-            - { value: ar, label: Arabic }
+      icon: mdi:bullhorn
+      input:
+        delivery_method:
+          name: Announce with
+          description: >
+            Alexa uses the Alexa Media Player integration. Speaker (TTS) speaks
+            through a TTS engine. Notification sends the text to a notify
+            service, such as a phone. Fill in only the fields for the one you
+            choose.
+          default: alexa
+          selector:
+            select:
+              options:
+                - { value: alexa, label: Alexa }
+                - { value: tts, label: Speaker (TTS) }
+                - { value: notify, label: Notification }
+        speakers:
+          name: Speakers
+          description: Where the readings are spoken.
+          default: []
+          selector:
+            entity:
+              domain: media_player
+              multiple: true
+        tts_engine:
+          name: TTS engine
+          description: For Speaker (TTS) only, for example tts.piper.
+          default: ""
+          selector:
+            entity:
+              domain: tts
+        notify_service:
+          name: Notify service
+          description: >
+            For Notification only, for example notify.mobile_app_my_phone.
+          default: ""
+          selector:
+            text:
+    content:
+      name: What to announce
+      icon: mdi:text-box-outline
+      input:
+        language:
+          name: Language
+          default: en
+          selector:
+            select:
+              options:
+                - { value: en, label: English }
+                - { value: ar, label: Arabic }
+        quiet_connect_for_recipe:
+          name: Stay quiet about connecting for a picked recipe
+          description: >
+            Only the recipe reaching the machine is announced, not the
+            connection opened to send it. Turning Connect on yourself is
+            always announced.
+          default: true
+          selector:
+            boolean: {}
 
 variables:
   lang: !input language
