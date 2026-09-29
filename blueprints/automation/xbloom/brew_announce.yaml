@@ -181,6 +181,10 @@ variables:
   # Everything the automation might say, resolved to one line. An empty result
   # means "this trigger should not announce" and the condition below drops it —
   # which keeps the delivery block a single action instead of one per branch.
+  # Alexa's announce mode plays a chime before speaking; its tts mode speaks
+  # at once. A pour comes every minute or so, and a chime before each one is
+  # more noise than news, so pours are spoken plainly.
+  alexa_type: "{{ 'tts' if trigger.id == 'pour' else 'announce' }}"
   message: >-
     {%- if trigger.id == 'started' -%}
       {%- if lang == 'ar' -%}
@@ -315,7 +319,7 @@ action:
             data:
               target: !input speakers
               data:
-                type: announce
+                type: "{{ alexa_type }}"
               message: "{{ message }}"
       - conditions: "{{ method == 'tts' }}"
         sequence:
