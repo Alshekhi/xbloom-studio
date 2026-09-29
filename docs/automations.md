@@ -14,7 +14,7 @@ edit.
 
 | Blueprint | What it does | Import |
 |---|---|---|
-| **Brew announcements** | Announces the brew starting, the coffee ready, and a brew that could not start or was cancelled on your speakers; pouring, each pour, and pauses can go to a speaker of their own. Optionally names the recipe. | [Import][bp-brew] |
+| **Brew announcements** | Announces the coffee ready, or a brew that could not start, to the whole home; the brew starting, each step of it, and a cancellation can go to a speaker by the machine, the only one that says the recipe name. | [Import][bp-brew] |
 | **Live-session announcements** | Speaks live feedback while you turn the machine's knobs — weight, grind size, temperature, which module you're on. Needs the **Connect** switch on. | [Import][bp-live] |
 | **Machine fault announcements** | Speaks up when the machine runs out of water or beans, or reports a dose or gear problem. | [Import][bp-fault] |
 

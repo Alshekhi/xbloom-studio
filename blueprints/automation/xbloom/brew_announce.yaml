@@ -5,14 +5,15 @@ blueprint:
     speaker with a TTS engine, or a notification.
 
 
-    **Important announcements** — the brew starting, the coffee ready, a brew
-    that could not start or was cancelled — go to your speakers, with Alexa's
-    announcement chime.
+    **For the whole home** — the coffee ready, a brew that could not start —
+    go to every speaker you choose, with Alexa's announcement chime. When
+    speakers by the machine are chosen, the rest of the home does not hear
+    the recipe name.
 
 
-    **Progress updates** — pouring started, each pour, paused and resumed —
-    are spoken without the chime, and can go to a speaker of their own, such
-    as the one by the machine.
+    **By the machine** — the brew starting, pouring, each pour, paused,
+    resumed, cancelled — can go to a speaker of their own, where the recipe
+    name is said too.
 
 
     A brew that cannot start says why, such as "the tank needs water".
@@ -41,20 +42,22 @@ blueprint:
                 - { value: tts, label: Speaker (TTS) }
                 - { value: notify, label: Notification }
         speakers:
-          name: Speakers
+          name: Speakers for the whole home
           description: >
-            Where the important announcements are spoken, and the progress
-            updates too unless you pick speakers for them below.
+            Where the coffee being ready, and a brew that could not start, are
+            announced. Everything else too, unless you pick speakers by the
+            machine below — then these hear no recipe name.
           default: []
           selector:
             entity:
               domain: media_player
               multiple: true
         progress_speakers:
-          name: Speakers for progress updates
+          name: Speakers by the machine
           description: >
-            Optional. Where pouring, each pour, and pauses are spoken. Leave
-            empty to use the speakers above.
+            Optional. Where the brew starting, each step of it, and a
+            cancellation are announced, and where the recipe name is said.
+            Leave empty to announce everything on the speakers above.
           default: []
           selector:
             entity:
@@ -178,17 +181,10 @@ variables:
     {%- elif reason -%}
       {%- if lang == 'ar' %}توقف التحضير{% else %}the brew stopped{% endif -%}
     {%- endif -%}
-  # Progress updates are the lines that come and go during a brew. A chime
-  # before each is more noise than news, and they matter most by the machine,
-  # so they are spoken without Alexa's announce chime (its tts mode) and can
-  # go to speakers of their own. The start, the end and anything wrong keep
-  # the chime and go everywhere.
-  progress: "{{ trigger.id in ['pour', 'pouring', 'paused', 'resumed'] }}"
-  alexa_type: "{{ 'tts' if progress else 'announce' }}"
   all_speakers: !input speakers
-  progress_speakers: !input progress_speakers
-  targets: >-
-    {{ progress_speakers if progress and progress_speakers | length > 0 else all_speakers }}
+  nearby_speakers_input: !input progress_speakers
+  nearby_speakers: >-
+    {{ nearby_speakers_input if nearby_speakers_input | length > 0 else all_speakers }}
   # Everything the automation might say, resolved to one line. An empty result
   # means "this trigger should not announce" and the condition below drops it —
   # which keeps the delivery block a single action instead of one per branch.
@@ -262,6 +258,30 @@ variables:
         {%- endif -%}
       {%- endif -%}
     {%- endif -%}
+  # Who hears what. Only the coffee being ready, and a brew that could not
+  # start or never ended, concern the whole home: whoever asked for it may be
+  # anywhere. Everything else concerns whoever is at the machine. The whole
+  # home hears no recipe name — a guest need not know what was made — while
+  # the speakers by the machine hear it in full.
+  whole_home: "{{ trigger.id in ['done_simple', 'done_recipe', 'failed', 'timeout'] }}"
+  separate_nearby: "{{ nearby_speakers_input | length > 0 }}"
+  home_message: >-
+    {%- if trigger.id in ['done_simple', 'done_recipe'] -%}
+      {%- if lang == 'ar' %}قهوتك جاهزة{% else %}Your coffee is ready{% endif -%}
+    {%- elif trigger.id == 'failed' -%}
+      {%- if lang == 'ar' %}تعذر تحضير قهوتك، {{ failure }}{% else %}Could not brew your coffee: {{ failure }}{% endif -%}
+    {%- else -%}
+      {{ message }}
+    {%- endif -%}
+  first_targets: >-
+    {{ nearby_speakers if not whole_home or separate_nearby else all_speakers }}
+  rest_targets: >-
+    {{ all_speakers | reject('in', nearby_speakers_input) | list
+       if whole_home and separate_nearby else [] }}
+  # Alexa's announce mode plays a chime before speaking; its tts mode speaks
+  # at once. The lines that come and go during a brew are more noise than news
+  # with a chime before each, so they are spoken plainly.
+  alexa_type: "{{ 'tts' if trigger.id in ['pour', 'pouring', 'paused', 'resumed'] else 'announce' }}"
 
 trigger:
   # Fired by xbloom.start_brew once the machine has accepted every step,
@@ -319,28 +339,43 @@ condition:
     value_template: "{{ message | trim != '' }}"
 
 action:
-  - choose:
-      - conditions: "{{ method == 'alexa' }}"
-        sequence:
-          - action: notify.alexa_media
-            data:
-              target: "{{ targets }}"
-              data:
-                type: "{{ alexa_type }}"
-              message: "{{ message }}"
-      - conditions: "{{ method == 'tts' }}"
-        sequence:
-          - action: tts.speak
-            target:
-              entity_id: "{{ tts_engine }}"
-            data:
-              media_player_entity_id: "{{ targets }}"
-              message: "{{ message }}"
-      - conditions: "{{ method == 'notify' }}"
-        sequence:
-          - action: "{{ notify_service }}"
-            data:
-              message: "{{ message }}"
+  # The message in full to its speakers, then — for the whole home, when the
+  # speakers by the machine are set apart — the plain one to the rest.
+  - repeat:
+      for_each: ["first", "rest"]
+      sequence:
+        - variables:
+            to: "{{ first_targets if repeat.item == 'first' else rest_targets }}"
+            text: "{{ message if repeat.item == 'first' else home_message }}"
+        - if:
+            - condition: template
+              value_template: >-
+                {{ text | trim != '' and (
+                     (method == 'notify' and repeat.item == 'first')
+                     or (method != 'notify' and to | length > 0)) }}
+          then:
+            - choose:
+                - conditions: "{{ method == 'alexa' }}"
+                  sequence:
+                    - action: notify.alexa_media
+                      data:
+                        target: "{{ to }}"
+                        data:
+                          type: "{{ alexa_type }}"
+                        message: "{{ text }}"
+                - conditions: "{{ method == 'tts' }}"
+                  sequence:
+                    - action: tts.speak
+                      target:
+                        entity_id: "{{ tts_engine }}"
+                      data:
+                        media_player_entity_id: "{{ to }}"
+                        message: "{{ text }}"
+                - conditions: "{{ method == 'notify' }}"
+                  sequence:
+                    - action: "{{ notify_service }}"
+                      data:
+                        message: "{{ text }}"
 
 mode: queued
 max: 5
