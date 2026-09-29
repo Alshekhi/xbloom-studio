@@ -209,6 +209,12 @@ def _inject_global_stubs() -> None:
     storage = _stub_mod("homeassistant.helpers.storage")
     storage.Store = _base_class("Store")
 
+    issues = _stub_mod("homeassistant.helpers.issue_registry")
+    issues.async_create_issue = MagicMock()
+    issues.async_delete_issue = MagicMock()
+    issues.IssueSeverity = type("IssueSeverity", (), {"WARNING": "warning"})
+    helpers.issue_registry = issues
+
     # The LLM API: real classes, because the integration subclasses them and a
     # MagicMock base turns the subclass into a mock.
     llm = _stub_mod("homeassistant.helpers.llm")

@@ -6,7 +6,7 @@ blueprint:
     the grinder out of position.
   domain: automation
   author: xbloom-studio-controler
-  source_url: https://github.com/Alshekhi/xbloom-studio/blob/main/blueprints/automation/xbloom/machine_fault_announce.yaml
+  source_url: https://github.com/Alshekhi/xbloom-studio/blob/main/custom_components/xbloom/blueprints/machine_fault_announce.yaml
   homeassistant:
     min_version: 2024.6.0
   input:

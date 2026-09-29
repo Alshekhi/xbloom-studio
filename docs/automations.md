@@ -1,16 +1,22 @@
 # Automations
 
-There are two ways to get spoken brew announcements: import a ready-made
-blueprint, or write your own automation. Most people want the blueprints.
+There are two ways to get spoken brew announcements: create an automation
+from a ready-made blueprint, or write your own. Most people want the
+blueprints.
 
 The events and states an automation can trigger on are listed in
 [Events](events.md).
 
 ## Ready-made blueprints
 
-Three blueprints ship with the integration. Each one is configured entirely
-through form fields — pick a speaker, pick a language, done — with no YAML to
-edit.
+Three blueprints come with the integration and are installed with it: open
+**Settings → Automations & Scenes → Blueprints**, pick one, and choose
+**Create automation**. Each is set up entirely through its form — pick your
+speakers and a language — with no YAML to edit.
+
+Updating the integration updates the blueprints too, and the automations built
+on them keep their settings. A blueprint you have edited yourself is left as
+it is; Home Assistant shows a repair notice when a newer one is available.
 
 | Blueprint | What it does | Import |
 |---|---|---|
@@ -18,15 +24,13 @@ edit.
 | **Live-session announcements** | Speaks live feedback while you turn the machine's knobs — weight, grind size, temperature, which module you're on. Needs the **Connect** switch on. | [Import][bp-live] |
 | **Machine fault announcements** | Speaks up when the machine runs out of water or beans, or reports a dose or gear problem. | [Import][bp-fault] |
 
-[bp-brew]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fblueprints%2Fautomation%2Fxbloom%2Fbrew_announce.yaml
-[bp-live]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fblueprints%2Fautomation%2Fxbloom%2Flive_control_announce.yaml
-[bp-fault]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fblueprints%2Fautomation%2Fxbloom%2Fmachine_fault_announce.yaml
+[bp-brew]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Fbrew_announce.yaml
+[bp-live]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Flive_control_announce.yaml
+[bp-fault]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Fmachine_fault_announce.yaml
 
-Each **Import** link opens the blueprint straight in your own Home Assistant. If
-a link doesn't work, the files are in
-[`blueprints/automation/xbloom/`](../blueprints/automation/xbloom/) — copy them into
-`config/blueprints/automation/`, or paste the raw URL into **Settings →
-Automations & Scenes → Blueprints → Import Blueprint**.
+The **Import** links are only needed without the integration installed, for
+example to try a blueprint elsewhere. The files are in
+[`custom_components/xbloom/blueprints/`](../custom_components/xbloom/blueprints/).
 
 **Every blueprint speaks through whatever you have.** The **How to announce**
 field offers three choices:

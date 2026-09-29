@@ -2,6 +2,7 @@
   "domain": "xbloom",
   "name": "xBloom Studio",
   "after_dependencies": [
+    "automation",
     "recorder"
   ],
   "bluetooth": [

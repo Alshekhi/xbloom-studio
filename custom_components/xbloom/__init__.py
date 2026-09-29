@@ -40,6 +40,7 @@ from .const import (
     CONF_PRODUCT_ID, DEFAULT_BREWERS, DOMAIN,
     SIGNAL_COFFEE_LAB_UPDATED,
 )
+from .blueprint_install import async_install_blueprints
 from .callbacks import Callbacks, targets_from
 from .coffee_lab.lab import CoffeeLab
 from .coffee_lab.listener import async_count_completed_brews
@@ -2204,7 +2205,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         entry.runtime_data.callbacks = callbacks
         entry.async_on_unload(callbacks.async_listen())
         entry.async_create_background_task(hass, callbacks.async_run(), "xbloom callbacks")
+
+    # Off the setup path: Home Assistant's blueprint store and the automations
+    # it reloads need not be ready for the machine to be.
+    entry.async_create_background_task(hass, _install_blueprints(hass), "xbloom blueprints")
     return True
+
+
+async def _install_blueprints(hass: HomeAssistant) -> None:
+    try:
+        await async_install_blueprints(hass)
+    except Exception:  # noqa: BLE001 — the integration works without them
+        _LOGGER.exception("xbloom: the announcement blueprints were not installed")
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bool:

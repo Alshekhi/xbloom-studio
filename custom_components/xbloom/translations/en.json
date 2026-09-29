@@ -1355,5 +1355,18 @@
         "notion": "Notion"
       }
     }
+  },
+  "issues": {
+    "blueprint_outdated": {
+      "title": "An xBloom blueprint has an update",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Replace the blueprint",
+            "description": "The integration brought a newer version of this blueprint, but yours at {path} has changes of your own, so it was left as it is.\n\nReplacing it puts the new version in its place. Your changes to the blueprint are lost; the automations built on it keep their settings."
+          }
+        }
+      }
+    }
   }
 }

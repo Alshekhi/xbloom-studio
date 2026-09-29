@@ -76,7 +76,10 @@ class _Entry:
 
     def async_create_background_task(self, hass, coro, name=None, **_kw):
         task = asyncio.get_event_loop().create_task(coro)
-        self.tasks.append(task)
+        # `tasks` is the brews a test waits on; installing the blueprints at
+        # setup is not one of them.
+        if name != "xbloom blueprints":
+            self.tasks.append(task)
         return task
 
 

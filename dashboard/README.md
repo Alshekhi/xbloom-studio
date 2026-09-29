@@ -24,8 +24,8 @@ from data such as the bag list.
 3. New dashboard → **Edit dashboard** → three-dot menu → **Raw configuration
    editor** → paste the file for your language → **Save**.
 
-Optional: import the blueprints in `../blueprints/automation/xbloom/` to get the
-**Voice announcements** toggles. That section stays hidden until at least one
+Optional: create automations from the announcement blueprints the integration
+installs to get the **Voice announcements** toggles. That section stays hidden until at least one
 of those automations exists.
 
 ## Coffee Lab
