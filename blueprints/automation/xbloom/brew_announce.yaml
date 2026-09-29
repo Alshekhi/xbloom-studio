@@ -96,7 +96,8 @@ blueprint:
       name: Announce each pour
       description: >
         When on, each pour after the first is announced with its number — "pour
-        2 of 3". The first is already announced as the pouring starting.
+        2 of 4" — and the final one as the last pour. The first is already
+        announced as the pouring starting.
       default: false
       selector:
         boolean: {}
@@ -235,9 +236,19 @@ variables:
                             'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'] -%}
         {%- set counts = ['', 'واحدة', 'اثنتين', 'ثلاث', 'أربع', 'خمس',
                           'ست', 'سبع', 'ثمان', 'تسع', 'عشر'] -%}
-        الصبة {{ ordinals[n] if n <= 10 else n }}{% if 0 < total <= 10 %} من {{ counts[total] }}{% elif total > 10 %} من {{ total }}{% endif %}
+        {#- The last pour is the news — the coffee is nearly ready — so it is
+            said as the last rather than by number. Unknown totals never guess. -#}
+        {%- if total and n == total -%}
+          الصبة الأخيرة
+        {%- else -%}
+          الصبة {{ ordinals[n] if n <= 10 else n }}{% if 0 < total <= 10 %} من {{ counts[total] }}{% elif total > 10 %} من {{ total }}{% endif %}
+        {%- endif -%}
       {%- else -%}
-        Pour {{ n }}{% if total %} of {{ total }}{% endif %}
+        {%- if total and n == total -%}
+          Last pour
+        {%- else -%}
+          Pour {{ n }}{% if total %} of {{ total }}{% endif %}
+        {%- endif -%}
       {%- endif -%}
     {%- endif -%}
 
