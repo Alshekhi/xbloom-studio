@@ -381,3 +381,38 @@ async def test_brew_time_gives_up_on_a_brew_that_never_ends(clock) -> None:
     assert entity._attr_native_value == 900
     clock.advance(1)
     assert entity._attr_native_value is None and clock.tick is None
+
+
+# A brew stopped at the machine runs no Home Assistant brew task and sends no
+# ENJOY: a pour frame as it stopped, then 40513 and the home screen. Brew Time
+# and the pour counted on from that pour until the next brew.
+STOPPED_AT_THE_MACHINE = [
+    {"cmd": CMD_BLOOM, "pour_index": 0}, {"cmd": 40513}, {"cmd": 8023, "activity": 1},
+]
+
+
+@pytest.mark.asyncio
+async def test_brew_time_clears_for_a_brew_stopped_at_the_machine(clock) -> None:
+    entity = _make(XBloomBrewTimeSensor)
+    handlers = await _wire(entity)
+    for frame in STOPPED_AT_THE_MACHINE:
+        handlers.signals[0](frame)
+    assert entity._attr_native_value is None and clock.tick is None
+
+
+@pytest.mark.asyncio
+async def test_the_pour_clears_for_a_brew_stopped_at_the_machine() -> None:
+    entity = _make(XBloomCurrentPourSensor)
+    handlers = await _wire(entity)
+    for frame in STOPPED_AT_THE_MACHINE:
+        handlers.signals[0](frame)
+    assert entity._attr_native_value == 0
+
+
+@pytest.mark.asyncio
+async def test_the_next_brew_starts_from_no_pour() -> None:
+    entity = _make(XBloomCurrentPourSensor)
+    handlers = await _wire(entity)
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 3})
+    handlers.signals[0]({"cmd": 40502})
+    assert entity._attr_native_value == 0

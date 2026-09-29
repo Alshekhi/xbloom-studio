@@ -61,3 +61,33 @@ async def test_other_frames_leave_it_alone():
     on_frame({"cmd": PAUSED})
     assert entity._attr_is_on is True
     assert entity.async_write_ha_state.call_count == writes
+
+
+GRINDER_PAUSED, BREWER_PAUSED, MACHINE_RESUMED, ABANDONED = 9009, 9010, 9011, 40513
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("pause", [GRINDER_PAUSED, BREWER_PAUSED])
+async def test_a_pause_made_at_the_machine_is_followed_too(pause):
+    # The machine's own knob sends its own frames, not 40515 and 40516.
+    entity, on_frame, _ = await _wired()
+    on_frame({"cmd": pause})
+    assert entity._attr_is_on is True
+    on_frame({"cmd": MACHINE_RESUMED})
+    assert entity._attr_is_on is False
+
+
+@pytest.mark.asyncio
+async def test_a_paused_brew_left_for_the_home_screen_is_not_paused():
+    entity, on_frame, _ = await _wired()
+    on_frame({"cmd": BREWER_PAUSED})
+    on_frame({"cmd": ABANDONED})
+    assert entity._attr_is_on is False
+
+
+@pytest.mark.asyncio
+async def test_the_standalone_grinder_stopping_is_not_a_brew_paused():
+    entity, on_frame, _ = await _wired()
+    on_frame({"cmd": 8023, "activity": 2})    # grinder screen
+    on_frame({"cmd": GRINDER_PAUSED})
+    assert entity._attr_is_on is False

@@ -44,14 +44,18 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .ble_entities import (
+    ACTIVITY_HOME_STATES,
     CMD_BLOOM,
     CMD_ENJOY,
+    CMD_GRINDER_START,
+    CMD_MACHINE_ACTIVITY,
     _device_info,
     module_screen_after,
     signal_brew_lifecycle,
     signal_event,
 )
 from xbloom import spec
+from xbloom.ble import NOTIFY_BREW_ABANDONED
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,6 +65,20 @@ EV_BREWER_SETTING = "xbloom_brewer_setting_changed"
 EV_MODULE_ENTERED = "xbloom_module_entered"
 EV_RECIPE_CARD = "xbloom_recipe_card_scanned"
 EV_BREW_STARTED = "xbloom_brew_started"
+
+
+def brew_over(decoded: dict) -> bool:
+    """The frame says no brew is running any more, however it was started.
+
+    A brew started at the machine runs no Home Assistant brew task, so no
+    "ended" follows it; a brew left for the home screen does not send ENJOY
+    either. The home screen cannot show mid-brew, and 40513 comes only with a
+    brew abandoned.
+    """
+    return decoded.get("cmd") == NOTIFY_BREW_ABANDONED or (
+        decoded.get("cmd") == CMD_MACHINE_ACTIVITY
+        and decoded.get("activity") in ACTIVITY_HOME_STATES
+    )
 
 
 class _XBloomReadingSensor(RestoreSensor, SensorEntity):
@@ -282,6 +300,14 @@ class XBloomCurrentPourSensor(SensorEntity):
             if decoded.get("cmd") == CMD_BLOOM and "pour_index" in decoded:
                 self._attr_native_value = int(decoded["pour_index"]) + 1
                 self.async_write_ha_state()
+            elif decoded.get("cmd") == CMD_GRINDER_START or brew_over(decoded):
+                # A brew beginning has poured nothing yet; one that is over
+                # leaves no pour standing.
+                if brew_over(decoded):
+                    self._total_pours = None
+                if self._attr_native_value != 0:
+                    self._attr_native_value = 0
+                    self.async_write_ha_state()
 
         @callback
         def _on_lifecycle(phase: str) -> None:
@@ -391,9 +417,10 @@ class XBloomBrewTimeSensor(SensorEntity):
             cmd = decoded.get("cmd")
             if cmd == CMD_BLOOM and self._first_pour is None:
                 self._start()
-            elif cmd == CMD_ENJOY:
-                # The machine's own end: a brew started at the machine runs no
-                # Home Assistant brew task, so no "ended" follows it.
+            elif cmd in (CMD_ENJOY, CMD_GRINDER_START) or brew_over(decoded):
+                # The machine's own end, or the next brew beginning: a brew
+                # started at the machine runs no Home Assistant brew task, so
+                # no "ended" follows it.
                 self._clear()
 
         @callback

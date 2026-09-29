@@ -507,7 +507,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # `prepared` is the recipe sent ahead over a Connect session, and that
     # session: a start for the same recipe on the same session sends execute
     # alone, as the official app does on its second tap.
-    brew_session: dict = {"task": None, "started_at": 0.0, "client": None, "prepared": None}
+    brew_session: dict = {
+        "task": None, "started_at": 0.0, "client": None, "prepared": None, "prepared_brew": None,
+    }
 
     def _prepared_key(session, recipe: dict) -> tuple:
         from xbloom.ble import build_brew_frames
@@ -643,6 +645,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 translation_placeholders={"reason": str(err) or type(err).__name__},
             ) from err
         brew_session["prepared"] = _prepared_key(session, recipe)
+        # What the machine's own button would start, for following that brew.
+        brew_session["prepared_brew"] = (recipe, recipe_name)
         _LOGGER.info("xbloom.prepare_brew: '%s' prepared, waiting for start", recipe_name)
 
     async def _send_quit() -> None:
@@ -717,7 +721,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         """Change of mind: drop the prepared recipe and unpick it; the bag stays."""
         await preparer.async_cancel()
 
-    async def handle_start_brew(call) -> ServiceResponse:
+    async def _start_brew(data: dict, adopted: tuple[dict, str] | None = None) -> ServiceResponse:
         """Validate + resolve the recipe, then brew in a background task:
         open BLE → send the brew frames → stream notifications → disconnect
         when RD_ENJOY arrives (or after 10 min as a safety net).
@@ -727,6 +731,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
           2. share_id    — same, with the raw token
           3. recipe_name — lookup in coordinator data (locally stored)
           4. fallback    — current state of `select.xbloom_studio_recipe`
+
+        `adopted` is a brew the machine's own button started on a prepared
+        recipe — (recipe, name) as it was prepared. Nothing is sent: the brew
+        is already running, and this follows it as if Home Assistant had
+        started it, so it is announced, recorded and can be paused or
+        cancelled the same way.
         """
         from homeassistant.helpers.dispatcher import async_dispatcher_send
 
@@ -743,12 +753,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             signal_brew_lifecycle,
             signal_event,
         )
-        from xbloom.ble import CommandRefused, CommandUnanswered, XBloomBleClient
+        from xbloom.ble import (
+            NOTIFY_GRINDER_PAUSED,
+            NOTIFY_MACHINE_RESUMED,
+            CommandRefused,
+            CommandUnanswered,
+            XBloomBleClient,
+        )
 
         from .ble_entities import SessionBrew, held_session
 
         active = brew_session["task"]
-        if active is not None and not active.done():
+        if active is not None and not active.done() and adopted is None:
             elapsed = hass.loop.time() - brew_session["started_at"]
             if elapsed < BREW_DUP_WINDOW_S:
                 _LOGGER.warning(
@@ -766,20 +782,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             )
 
         # A start must never send execute for a recipe older than the picks:
-        # finish a preparation that is waiting or under way first.
-        await preparer.async_settled()
+        # finish a preparation that is waiting or under way first. A brew
+        # already running needs nothing sent, and re-preparing would be refused.
+        if adopted is None:
+            await preparer.async_settled()
 
         # Carried by every event of this brew, so a consumer can tell them
         # apart and route each back to whoever started it. The machine issues
         # no brew identifier, and a completion must be counted once, so one is
         # minted per call — here, so even a failure before the brew runs has it.
         meta: dict = {"run_id": uuid.uuid4().hex}
-        if call.data.get("context") is not None:
-            meta["context"] = call.data["context"]
+        if data.get("context") is not None:
+            meta["context"] = data["context"]
 
         # A callback is checked and armed before anything can fire, so a brew
         # refused at once still reaches its caller.
-        if target := call.data.get("notify_target"):
+        if target := data.get("notify_target"):
             callbacks = entry.runtime_data.callbacks
             if callbacks is None:
                 raise refuse("callback_targets_none")
@@ -790,15 +808,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 )
             callbacks.arm(
                 meta["run_id"], target, meta.get("context"),
-                bool(call.data.get("notify_progress")),
+                bool(data.get("notify_progress")),
             )
 
         # Coffee Lab: the bag is fixed now, as the brew starts. Choosing another
         # bag while it runs must not recharge this brew to it.
         if (lab := entry.runtime_data.coffee_lab) is not None:
-            if call.data.get("unattributed"):
+            if data.get("unattributed"):
                 meta["unattributed"] = True
-            elif bean_id := call.data.get("bean_id") or lab.active_bean_id:
+            elif bean_id := data.get("bean_id") or lab.active_bean_id:
                 meta["bean_id"] = bean_id
                 try:
                     meta["bean_name"] = (await lab.store.async_get_bean(bean_id)).name
@@ -820,12 +838,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             _LOGGER.error(
                 "xbloom.start_brew: BLE name unknown — set ble_name or product_id"
             )
-            _fire_failed("not_configured", call.data.get("recipe_name"))
+            _fire_failed("not_configured", data.get("recipe_name"))
             return {"run_id": meta["run_id"]}
 
-        recipe, recipe_name = await _brew_recipe(call.data, "xbloom.start_brew")
+        if adopted is not None:
+            recipe, recipe_name = adopted
+        else:
+            recipe, recipe_name = await _brew_recipe(data, "xbloom.start_brew")
         if recipe is None:
-            _fire_failed("recipe_not_found", call.data.get("recipe_name"))
+            _fire_failed("recipe_not_found", data.get("recipe_name"))
             return {"run_id": meta["run_id"]}
 
         # Set when the machine reports it has stopped brewing. This is the
@@ -868,7 +889,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             activity = decoded.get("activity")
             if decoded.get("cmd") == CMD_GRINDER_START:
                 grind.setdefault("start", time.monotonic())
-            elif decoded.get("cmd") == CMD_GRINDER_STOP and "start" in grind:
+            elif decoded.get("cmd") == NOTIFY_GRINDER_PAUSED:
+                # The grinder stopping next is the pause, not the grind done.
+                grind["paused"] = True
+            elif decoded.get("cmd") == NOTIFY_MACHINE_RESUMED:
+                grind.pop("paused", None)
+            elif (
+                decoded.get("cmd") == CMD_GRINDER_STOP and "start" in grind
+                and not grind.get("paused")
+            ):
                 grind.setdefault("stop", time.monotonic())
             moment = {CMD_BLOOM: "first_pour", CMD_BREW_END: "brew_end", CMD_ENJOY: "enjoy"}.get(
                 decoded.get("cmd"))
@@ -899,6 +928,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             await _observe(decoded)
             async_dispatcher_send(hass, signal_event(entry.entry_id), decoded)
 
+        if adopted is not None:
+            # The press that started it has already been heard, before this
+            # brew was listening.
+            grind["start"] = time.monotonic()
+            brew_running.set()
+
         total_pours = len(recipe.get("pours", []) or [])
 
         def _stopped(by: str) -> dict:
@@ -923,8 +958,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             # The lifecycle signal arms the entities now — it is internal, and a
             # brew frame can arrive in the same instant the machine accepts the
             # last step. The public `xbloom_brew_started` waits until the
-            # machine has taken the brew: see where it is fired below.
-            async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "started")
+            # machine has taken the brew: see where it is fired below. A brew
+            # the machine started is already under way, and the entities have
+            # followed it from its first frame: resetting them now would put
+            # Brew Status back to idle mid-grind.
+            if adopted is None:
+                async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "started")
 
             # While Connect holds the link the brew runs over it: the machine
             # takes one connection at a time, and closing the session to open
@@ -932,6 +971,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             # first step. Without a session the brew opens a link of its own.
             session = held_session(entry)
             ble_device = None
+            if session is None and adopted is not None:
+                # The session that heard the button is gone. A link of its own
+                # would send the whole brew on top of the one running.
+                _LOGGER.warning("xbloom: the brew started at the machine could not be followed")
+                async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "ended")
+                return
             if session is None:
                 _LOGGER.info("xbloom.start_brew: looking up %r in HA bluetooth …", ble_name)
                 ble_device = await _resolve_ble_device(hass, entry, ble_name)
@@ -948,12 +993,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 if session is not None:
                     prepared = brew_session["prepared"] == _prepared_key(session, recipe)
                     brew_session["prepared"] = None
-                    _LOGGER.info(
-                        "xbloom.start_brew: brewing over the held Connect session%s …",
-                        " — recipe already prepared, sending start only" if prepared else "",
-                    )
+                    if adopted is not None:
+                        _LOGGER.info(
+                            "xbloom: following '%s', started at the machine", recipe_name,
+                        )
+                    else:
+                        _LOGGER.info(
+                            "xbloom.start_brew: brewing over the held Connect session%s …",
+                            " — recipe already prepared, sending start only" if prepared else "",
+                        )
                     ble_client = SessionBrew(
                         hass, entry.entry_id, session, _observe, prepared=prepared,
+                        running=adopted is not None,
                     )
                 else:
                     _LOGGER.info("xbloom.start_brew: ✓ found device %s", ble_device.address)
@@ -1100,6 +1151,49 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         )
         # Which brew this was, so a caller can pick its events off the bus.
         return {"run_id": meta["run_id"]}
+
+    async def handle_start_brew(call) -> ServiceResponse:
+        return await _start_brew(call.data)
+
+    # ------------------------------------------------------------------ #
+    # A brew started with the machine's own button                        #
+    # ------------------------------------------------------------------ #
+    # On a prepared recipe the machine waits on its recipe screen (activity
+    # 31), and its button starts it with 40502 — the same frame a start from
+    # here produces. Nothing of Home Assistant's runs for that brew unless it
+    # is followed, so it would go unannounced, unrecorded, and out of reach of
+    # Pause and Cancel.
+    from .ble_entities import (
+        ACTIVITY_RECIPE_READY,
+        CMD_GRINDER_START,
+        CMD_MACHINE_ACTIVITY,
+        held_session,
+    )
+
+    machine_screen: dict = {"activity": None}
+
+    @callback
+    def _follow_machine_start(decoded: dict) -> None:
+        cmd = decoded.get("cmd")
+        if cmd == CMD_MACHINE_ACTIVITY:
+            machine_screen["activity"] = decoded.get("activity")
+            return
+        if cmd != CMD_GRINDER_START or machine_screen["activity"] != ACTIVITY_RECIPE_READY:
+            return
+        prepared = brew_session["prepared_brew"]
+        session = held_session(entry)
+        if (
+            prepared is None or session is None or _brew_running()
+            or brew_session["prepared"] != _prepared_key(session, prepared[0])
+        ):
+            return
+        brew_session["prepared_brew"] = None
+        data = {"unattributed": True} if preparer.unattributed else {}
+        hass.async_create_task(_start_brew(data, adopted=prepared))
+
+    entry.async_on_unload(
+        async_dispatcher_connect(hass, _signal_event(entry.entry_id), _follow_machine_start)
+    )
 
     # ------------------------------------------------------------------ #
     # Service: xbloom.stop_brew                                          #

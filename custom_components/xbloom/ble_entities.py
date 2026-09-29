@@ -41,6 +41,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from xbloom import spec
+from xbloom.ble import NOTIFY_GRINDER_PAUSED, NOTIFY_MACHINE_RESUMED
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,10 +91,14 @@ class SessionBrew:
     mid-brew, nothing more can be heard, so the wait for ENJOY ends with it.
     """
 
-    def __init__(self, hass, entry_id: str, session, observe, prepared: bool = False) -> None:
+    def __init__(
+        self, hass, entry_id: str, session, observe, prepared: bool = False, running: bool = False,
+    ) -> None:
         import asyncio
 
         self._prepared = prepared
+        # Started by the machine's own button: nothing is left to send.
+        self._running = running
         self._hass = hass
         self._entry_id = entry_id
         self._session = session
@@ -120,6 +125,8 @@ class SessionBrew:
 
     async def brew(self, recipe: dict) -> None:
         # A recipe sent ahead with prepare_brew needs only execute.
+        if self._running:
+            return
         if self._prepared:
             await self._session.send_start()
         else:
@@ -234,6 +241,10 @@ def module_screen_after(decoded: dict, on_module_screen: bool) -> bool:
     return on_module_screen
 ACTIVITY_BREWING    = 34
 ACTIVITY_BREW_DONE  = 36
+# The recipe screen: a recipe sent and waiting for its start, or a recipe brew
+# paused. Seen before every start with the machine's button, and after every
+# pause made at the machine.
+ACTIVITY_RECIPE_READY = 31
 
 
 def _device_info(entry_id: str) -> DeviceInfo:
@@ -273,6 +284,9 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
         # (or a brew Home Assistant starts) ends it: a pour shows the same
         # "pouring" activity (35) as a recipe brew does.
         self._on_module_screen = False
+        # The grinder was paused at the machine: the grinder stopping that
+        # follows is the pause, not the grind done, and no pour is next.
+        self._grind_paused = False
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -333,7 +347,12 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
                     # show something is happening.
                     new_state = "grinding"
             elif cmd == CMD_GRINDER_START:
+                self._grind_paused = False
                 new_state = "grinding"
+            elif cmd == NOTIFY_GRINDER_PAUSED:
+                self._grind_paused = True
+            elif cmd == NOTIFY_MACHINE_RESUMED:
+                self._grind_paused = False
             elif (fault := spec.FAULTS.get(cmd)) and fault[0] in BREW_STOPPING_FAULTS:
                 # The machine has given up on this brew. Saying so here is what
                 # keeps the grinder stopping half a second later from reading
@@ -344,7 +363,7 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
                     new_state = "idle"
             elif cmd == CMD_GRINDER_STOP:
                 # Grinder finished — transition to brewing (pours next)
-                if self._attr_native_value == "grinding":
+                if self._attr_native_value == "grinding" and not self._grind_paused:
                     new_state = "brewing"
             elif cmd == CMD_BREWER_START:
                 # 40506 fires ~3 s after grind start — it's the water heater

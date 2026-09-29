@@ -14,10 +14,18 @@ from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from xbloom.ble import NOTIFY_BREW_PAUSED, NOTIFY_BREW_RESUMED, NOTIFY_ENJOY
+from xbloom.ble import (
+    NOTIFY_BREW_ABANDONED,
+    NOTIFY_BREW_PAUSED,
+    NOTIFY_BREW_RESUMED,
+    NOTIFY_BREWER_PAUSED,
+    NOTIFY_ENJOY,
+    NOTIFY_GRINDER_PAUSED,
+    NOTIFY_MACHINE_RESUMED,
+)
 
 from . import _resolve_ble_name, remember_address
-from .ble_entities import _device_info, signal_brew_lifecycle, signal_event
+from .ble_entities import _device_info, module_screen_after, signal_brew_lifecycle, signal_event
 from .const import CONF_BLE_ADDRESS, DOMAIN
 from .prepare import signal_prepared
 
@@ -112,9 +120,11 @@ class XBloomInRangeSensor(BinarySensorEntity):
 class XBloomBrewPausedSensor(BinarySensorEntity):
     """On while a recipe brew is paused.
 
-    The machine reports both sides itself: a paused brew sends 40515 and a
-    resumed one 40516. Anything that ends the brew, or starts the next, also
-    ends the pause, so it never outlives the brew it belongs to.
+    The machine reports both sides itself, differently for who paused it: a
+    pause sent from here brings 40515 and its resume 40516; a pause made at the
+    machine brings 9009 (grinding) or 9010 (pouring) and its resume 9011.
+    Anything that ends the brew, or starts the next, also ends the pause, so it
+    never outlives the brew it belongs to.
     """
 
     _attr_has_entity_name = True
@@ -125,6 +135,9 @@ class XBloomBrewPausedSensor(BinarySensorEntity):
     def __init__(self, entry) -> None:
         self._entry = entry
         self._attr_is_on = False
+        # The standalone grinder sends 9009 when it stops too: see
+        # module_screen_after.
+        self._on_module_screen = False
 
     @property
     def device_info(self):
@@ -145,15 +158,23 @@ class XBloomBrewPausedSensor(BinarySensorEntity):
 
         @callback
         def _on_signal(decoded: dict) -> None:
+            self._on_module_screen = module_screen_after(decoded, self._on_module_screen)
+            if self._on_module_screen:
+                self._set(False)
+                return
             cmd = decoded.get("cmd")
-            if cmd == NOTIFY_BREW_PAUSED:
+            if cmd in (NOTIFY_BREW_PAUSED, NOTIFY_GRINDER_PAUSED, NOTIFY_BREWER_PAUSED):
                 self._set(True)
-            elif cmd in (NOTIFY_BREW_RESUMED, NOTIFY_ENJOY):
+            elif cmd in (
+                NOTIFY_BREW_RESUMED, NOTIFY_MACHINE_RESUMED, NOTIFY_ENJOY, NOTIFY_BREW_ABANDONED,
+            ):
                 self._set(False)
 
         @callback
-        def _on_lifecycle(_phase: str) -> None:
+        def _on_lifecycle(phase: str) -> None:
             # Started or ended, a pause does not carry over.
+            if phase == "started":
+                self._on_module_screen = False
             self._set(False)
 
         self.async_on_remove(

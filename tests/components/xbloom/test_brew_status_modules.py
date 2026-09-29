@@ -179,3 +179,16 @@ async def test_a_standalone_pour_does_not_move_the_pour_counter():
     assert sensor._attr_native_value == before
     _feed(on_signal, _activity(1), {"cmd": CMD_BLOOM, "pour_index": 0})
     assert sensor._attr_native_value == 1
+
+
+@pytest.mark.asyncio
+async def test_a_grinder_paused_at_the_machine_is_not_the_grind_finished():
+    # A pause sends 9009 then 40507; read as the grind done, it went to
+    # `brewing` and announced "pouring started" with the grinder stopped.
+    sensor, on_event, _ = await _sensor()
+    _feed(on_event, _activity(31), {"cmd": CMD_GRINDER_START}, _activity(30), _activity(34),
+          {"cmd": 9009}, {"cmd": CMD_GRINDER_STOP}, _activity(31))
+    assert sensor._attr_native_value == "grinding"
+    # Resumed, and this time the grind really finishes.
+    _feed(on_event, {"cmd": 9011}, _activity(34), {"cmd": CMD_GRINDER_STOP}, _activity(16))
+    assert sensor._attr_native_value == "brewing"
