@@ -4,8 +4,9 @@ blueprint:
     Speaks every live reading from the xBloom Studio while a **Connect** session
     (`switch.xbloom_studio_connect`) is open: scale weight, grinder knob
     (size / speed), brewer knob (pattern / temperature / grind / ratio), which
-    module you entered on the machine, and recipe-card scans — plus the
-    connection lifecycle. Bilingual (English / Arabic).
+    module you entered on the machine, recipe-card scans, and a picked recipe
+    reaching the machine — plus the connection lifecycle. Bilingual (English /
+    Arabic).
 
     Speaks through Alexa, any TTS engine and speaker, or any notify service —
     pick one under "How to announce".
@@ -82,6 +83,7 @@ variables:
   # resolved at runtime, so the unused branch stays inert.
   tts_engine: !input tts_engine
   ev: "{{ trigger.event.event_type }}"
+  recipe_name: "{{ trigger.event.data.recipe_name | default('') }}"
   reason: "{{ trigger.event.data.reason | default('') }}"
   reason_pretty: "{{ reason | replace('_', ' ') }}"
   # weight
@@ -134,6 +136,8 @@ variables:
         الميزان على الصفر
       {%- elif ev == 'xbloom_recipe_card_scanned' -%}
         قُرئت بطاقة الوصفة
+      {%- elif ev == 'xbloom_recipe_prepared' -%}
+        {% if recipe_name %}وصلت وصفة {{ recipe_name }} إلى الآلة{% else %}وصلت الوصفة إلى الآلة{% endif %}
       {%- endif -%}
     {%- else -%}
       {%- if ev == 'xbloom_connect_connecting' -%}
@@ -158,6 +162,8 @@ variables:
         Scale zeroed
       {%- elif ev == 'xbloom_recipe_card_scanned' -%}
         Recipe card scanned
+      {%- elif ev == 'xbloom_recipe_prepared' -%}
+        {% if recipe_name %}{{ recipe_name }} is ready on the machine{% else %}The recipe is ready on the machine{% endif %}
       {%- endif -%}
     {%- endif -%}
 
@@ -175,6 +181,8 @@ trigger:
       - xbloom_mode_changed
       - xbloom_scale_tared
       - xbloom_recipe_card_scanned
+      # Fired once the machine has accepted a recipe sent ahead of its start.
+      - xbloom_recipe_prepared
 
 condition:
   - condition: template

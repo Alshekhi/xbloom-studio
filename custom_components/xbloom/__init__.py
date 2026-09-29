@@ -647,6 +647,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         brew_session["prepared"] = _prepared_key(session, recipe)
         # What the machine's own button would start, for following that brew.
         brew_session["prepared_brew"] = (recipe, recipe_name)
+        # Only once the machine has accepted it: this is what says the recipe
+        # is on the machine, ready for its button or Start Brew.
+        hass.bus.async_fire("xbloom_recipe_prepared", {"recipe_name": recipe_name})
         _LOGGER.info("xbloom.prepare_brew: '%s' prepared, waiting for start", recipe_name)
 
     async def _send_quit() -> None:

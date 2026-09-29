@@ -135,3 +135,4 @@ change and test `trigger.to_state.attributes.event_type`:
 | `xbloom_mode_changed` | Auto/Pro is switched | `mode` |
 | `xbloom_scale_tared` | the scale is tared | |
 | `xbloom_recipe_card_scanned` | an xPod card is read | `pod_id` |
+| `xbloom_recipe_prepared` | the machine has accepted a recipe sent ahead of its start, so its button or Start Brew begins it at once | `recipe_name` |

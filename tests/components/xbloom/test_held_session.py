@@ -358,3 +358,27 @@ async def test_a_link_failing_mid_preparation_is_a_readable_error():
     with _machine_in_range(), pytest.raises(HomeAssistantError) as err:
         await entry.runtime_data.preparer._prepare({"dose": 15})
     assert err.value.translation_key == "recipe_not_prepared"
+
+
+async def test_a_recipe_the_machine_accepted_is_announced_once():
+    # The live-session announcements say the picked recipe has reached the
+    # machine; a second identical preparation sends nothing and says nothing.
+    session = _PreparingSession()
+    hass, entry, _handlers = await _handlers_with(session, hass=_make_hass())
+    with _machine_in_range():
+        await entry.runtime_data.preparer._prepare({"dose": 15})
+        await entry.runtime_data.preparer._prepare({"dose": 15})
+    assert [e["recipe_name"] for e in _fired(hass, "xbloom_recipe_prepared")] == ["Test Recipe One"]
+
+
+async def test_a_recipe_the_machine_refused_is_not_announced():
+    session = _PreparingSession()
+
+    async def _refuses(recipe):
+        raise ble.CommandRefused("recipe", "machine_busy")
+
+    session.send_prepare = _refuses
+    hass, entry, _handlers = await _handlers_with(session, hass=_make_hass())
+    with _machine_in_range(), pytest.raises(HomeAssistantError):
+        await entry.runtime_data.preparer._prepare({"dose": 15})
+    assert _fired(hass, "xbloom_recipe_prepared") == []
