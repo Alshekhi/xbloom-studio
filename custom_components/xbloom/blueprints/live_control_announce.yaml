@@ -112,9 +112,9 @@ variables:
     {%- endif -%}
     {%- if 'use_grinder' in c -%}
       {%- if c.use_grinder.now -%}
-        {%- set parts.items = parts.items + ['استخدام المطحنة' if lang == 'ar' else 'using the grinder'] -%}
+        {%- set parts.items = parts.items + ['المطحنة تعمل' if lang == 'ar' else 'grinder on'] -%}
       {%- else -%}
-        {%- set parts.items = parts.items + ['عدم استخدام المطحنة' if lang == 'ar' else 'not using the grinder'] -%}
+        {%- set parts.items = parts.items + ['المطحنة متوقفة' if lang == 'ar' else 'grinder off'] -%}
       {%- endif -%}
     {%- endif -%}
     {%- if lang == 'ar' -%}
