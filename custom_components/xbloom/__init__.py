@@ -611,13 +611,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         if recipe is None:
             raise refuse("no_recipe_selected")
 
-        def _not_prepared(reason: str) -> None:
-            # Said out loud as well as raised: a recipe picked on the dashboard
-            # has no caller to raise to, and its arrival is announced, so its
-            # failure must be too. The same reason codes as xbloom_brew_failed.
-            hass.bus.async_fire(
-                "xbloom_recipe_not_prepared", {"reason": reason, "recipe_name": recipe_name},
-            )
+        def _not_prepared(reason: str, error: HomeAssistantError) -> HomeAssistantError:
+            # Carried on the error for the preparer, which says it out loud
+            # once the picks settle: a recipe picked on the dashboard has no
+            # caller to raise to, but an attempt the next one replaces is not
+            # news. The same reason codes as xbloom_brew_failed.
+            error.not_prepared = {"reason": reason, "recipe_name": recipe_name}
+            return error
 
         session = held_session(entry)
         if session is None:
@@ -635,18 +635,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 await preparer.async_hold_link()
                 await asyncio.wait_for(ready.wait(), SESSION_READY_TIMEOUT_S)
             except TimeoutError as err:
-                _not_prepared("machine_not_found")
-                raise HomeAssistantError(
+                raise _not_prepared("machine_not_found", HomeAssistantError(
                     translation_domain=DOMAIN, translation_key="machine_unreachable",
-                ) from err
+                )) from err
             finally:
                 unsubscribe()
             session = held_session(entry)
             if session is None:
-                _not_prepared("machine_not_found")
-                raise HomeAssistantError(
+                raise _not_prepared("machine_not_found", HomeAssistantError(
                     translation_domain=DOMAIN, translation_key="machine_unreachable",
-                )
+                ))
         # Already on the machine, over this connection: sending it again only
         # makes a start wait for a round trip the machine does not need.
         if brew_session["prepared"] == _prepared_key(session, recipe):
@@ -656,13 +654,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         try:
             await session.send_prepare(recipe)
         except CommandRefused as err:
-            _not_prepared(err.reason)
-            raise _refused(err) from err
+            raise _not_prepared(err.reason, _refused(err)) from err
         except Exception as err:  # noqa: BLE001 — unanswered, or the link failing
-            _not_prepared("no_reply" if isinstance(err, CommandUnanswered) else "bluetooth_error")
-            raise HomeAssistantError(
-                translation_domain=DOMAIN, translation_key="recipe_not_prepared",
-                translation_placeholders={"reason": str(err) or type(err).__name__},
+            raise _not_prepared(
+                "no_reply" if isinstance(err, CommandUnanswered) else "bluetooth_error",
+                HomeAssistantError(
+                    translation_domain=DOMAIN, translation_key="recipe_not_prepared",
+                    translation_placeholders={"reason": str(err) or type(err).__name__},
+                ),
             ) from err
         brew_session["prepared"] = _prepared_key(session, recipe)
         # What the machine's own button would start, for following that brew.

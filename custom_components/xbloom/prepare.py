@@ -50,6 +50,7 @@ SETTLE_S = 1.5
 # other is announced once, with all of them, rather than after each.
 ANNOUNCE_SETTLE_S = 4
 EV_PREPARED = "xbloom_recipe_prepared"
+EV_NOT_PREPARED = "xbloom_recipe_not_prepared"
 BUSY = ("grinding", "brewing")
 UNUSABLE = ("unknown", "unavailable", "")
 
@@ -147,6 +148,7 @@ class BrewPreparer:
         # — and the announcement of it, waiting for the picks to settle.
         self._sent_info: dict | None = None
         self._announce_timer: CALLBACK_TYPE | None = None
+        self._pending_announcement: tuple[str, dict] | None = None
 
     # ── Wiring ──────────────────────────────────────────────────────────────
 
@@ -238,6 +240,7 @@ class BrewPreparer:
                 key = getattr(err, "translation_key", None) or type(err).__name__
                 _LOGGER.warning("xbloom: the picked recipe was not prepared: %s", err)
                 self._set_ready(False, key)
+                self._announce_failure(err)
                 return
             self._set_ready(True, None)
             self._announce_soon(info)
@@ -274,6 +277,7 @@ class BrewPreparer:
                 info = await self._prepare(dashboard_brew(self._hass))
             except Exception as err:
                 self._set_ready(False, getattr(err, "translation_key", None) or type(err).__name__)
+                self._announce_failure(err)
                 raise
             self._set_ready(True, None)
             self._announce_soon(info)
@@ -431,26 +435,49 @@ class BrewPreparer:
         """
         if info is not None:
             self._sent_info = info
-        if self._sent_info is None:
-            return
+        if self._sent_info is not None:
+            self._announce_later(EV_PREPARED, self._sent_info)
+
+    @callback
+    def _announce_failure(self, err: Exception) -> None:
+        """Announce a recipe the machine did not take, if it stays that way.
+
+        An attempt the next one replaces — the link answering late, the picks
+        still changing — is not news.
+        """
+        if (detail := getattr(err, "not_prepared", None)) is not None:
+            self._announce_later(EV_NOT_PREPARED, detail)
+
+    @callback
+    def _announce_later(self, event: str, data: dict) -> None:
         self._cancel_announce()
+        self._pending_announcement = (event, data)
         self._announce_timer = async_call_later(self._hass, ANNOUNCE_SETTLE_S, self._announce)
 
     @callback
     def _announce(self, _now=None) -> None:
         self._announce_timer = None
+        pending, self._pending_announcement = self._pending_announcement, None
+        if pending is None:
+            return
+        event, data = pending
         # A brew started meanwhile announces itself.
         status = self._hass.states.get(BREW_STATUS)
-        if not self.ready or self._brew_running() or (status is not None and status.state in BUSY):
+        if self._brew_running() or (status is not None and status.state in BUSY):
             return
-        if self._sent_info is not None:
-            self._hass.bus.async_fire(EV_PREPARED, self._sent_info)
+        # Still true once the picks have settled, or it is not said.
+        if event == EV_PREPARED and not self.ready:
+            return
+        if event == EV_NOT_PREPARED and (self.ready or self.preparing):
+            return
+        self._hass.bus.async_fire(event, data)
 
     @callback
     def _cancel_announce(self) -> None:
         if self._announce_timer is not None:
             self._announce_timer()
             self._announce_timer = None
+        self._pending_announcement = None
 
     # ── State ───────────────────────────────────────────────────────────────
 

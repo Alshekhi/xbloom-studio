@@ -62,6 +62,14 @@ class _Lab:
         self.active_bean_id = bean_id
 
 
+class _NotSent(Exception):
+    """A preparation the machine did not take, as the integration raises it."""
+
+    def __init__(self, reason: str = "no_reply"):
+        super().__init__(reason)
+        self.not_prepared = {"reason": reason, "recipe_name": "Test Recipe"}
+
+
 class _Rig:
     """A preparer with everything it reaches recorded."""
 
@@ -72,11 +80,12 @@ class _Rig:
         self.running = False
         self.signals: list[tuple] = []
         self.timers: list = []
+        self.fail = fail
         entry = SimpleNamespace(entry_id="e1", runtime_data=SimpleNamespace(coffee_lab=lab))
 
         async def _prepare(data):
-            if fail is not None:
-                raise fail
+            if self.fail is not None:
+                raise self.fail
             if self.prepared and self.prepared[-1] == data:
                 return None  # the machine already holds it: nothing sent
             self.prepared.append(data)
@@ -457,3 +466,29 @@ def test_pre_ground_coffee_is_a_change():
     assert prep.changes_from_recipe(saved, 20, 16, 50, False) == {
         "use_grinder": {"saved": True, "now": False},
     }
+
+
+def _failures(rig):
+    return [data for event, data in rig.hass.fired if event == prep.EV_NOT_PREPARED]
+
+
+async def test_a_failure_is_announced_only_if_it_stays_failed(rig_factory):
+    rig = rig_factory(fail=_NotSent("no_reply"))
+    rig.change(prep.DOSE, "18.0")
+    await rig.settle()           # the attempt failed; nothing said yet
+    assert _failures(rig) == []
+    await rig.settle()           # left alone, still failed: said
+    assert [f["reason"] for f in _failures(rig)] == ["no_reply"]
+
+
+async def test_a_failure_the_next_attempt_replaces_is_not_announced(rig_factory):
+    # Adjusting while the link answers late: one attempt fails, the next works.
+    rig = rig_factory(fail=_NotSent("no_reply"))
+    rig.change(prep.DOSE, "18.0")
+    await rig.settle()
+    rig.fail = None
+    rig.change(prep.DOSE, "17.0")
+    await rig.settle()
+    await rig.settle()
+    assert _failures(rig) == []
+    assert [a["changes"]["dose"]["now"] for a in _announced(rig)] == [17.0]
