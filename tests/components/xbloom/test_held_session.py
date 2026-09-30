@@ -360,15 +360,18 @@ async def test_a_link_failing_mid_preparation_is_a_readable_error():
     assert err.value.translation_key == "recipe_not_prepared"
 
 
-async def test_a_recipe_the_machine_accepted_is_announced_once():
-    # The live-session announcements say the picked recipe has reached the
-    # machine; a second identical preparation sends nothing and says nothing.
+async def test_what_was_sent_is_handed_back_with_what_differs_from_the_recipe():
+    # The preparer announces it once the picks settle; a second identical
+    # preparation sends nothing and hands back nothing new.
     session = _PreparingSession()
-    hass, entry, _handlers = await _handlers_with(session, hass=_make_hass())
+    _hass, entry, _handlers = await _handlers_with(session, hass=_make_hass())
     with _machine_in_range():
-        await entry.runtime_data.preparer._prepare({"dose": 15})
-        await entry.runtime_data.preparer._prepare({"dose": 15})
-    assert [e["recipe_name"] for e in _fired(hass, "xbloom_recipe_prepared")] == ["Test Recipe One"]
+        first = await entry.runtime_data.preparer._prepare({"dose": 15})
+        second = await entry.runtime_data.preparer._prepare({"dose": 15})
+    assert first == {
+        "recipe_name": "Test Recipe One", "changes": {"dose": {"saved": 20, "now": 15.0}},
+    }
+    assert second is None
 
 
 async def test_a_recipe_the_machine_refused_is_not_announced():

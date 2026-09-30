@@ -42,6 +42,8 @@ class _Hass:
                 self.states_by_id[prep.CONNECT] = "off"
 
         self.services = SimpleNamespace(async_call=_call)
+        self.fired: list[tuple[str, dict]] = []
+        self.bus = SimpleNamespace(async_fire=lambda event, data: self.fired.append((event, data)))
 
     def _get(self, entity_id):
         if entity_id not in self.states_by_id:
@@ -75,7 +77,10 @@ class _Rig:
         async def _prepare(data):
             if fail is not None:
                 raise fail
+            if self.prepared and self.prepared[-1] == data:
+                return None  # the machine already holds it: nothing sent
             self.prepared.append(data)
+            return {"recipe_name": "Test Recipe", "changes": {"dose": {"saved": 20, "now": data.get("dose")}}}
 
         async def _quit():
             self.quits += 1
@@ -340,7 +345,8 @@ async def test_clearing_its_own_picks_is_not_a_new_request(rig_factory):
     rig.preparer._quiet = True
     rig.change(prep.RECIPE, "unknown", old="Test Recipe")
     rig.preparer._quiet = False
-    assert rig.timers == []
+    # Nothing new to prepare; the announcement of what was sent may still wait.
+    assert [t for t in rig.timers if t != rig.preparer._announce] == []
 
 
 async def test_closing_a_session_that_prepared_nothing_leaves_the_picks(rig_factory):
@@ -389,3 +395,65 @@ async def test_a_change_of_mind_puts_the_grinder_back_too(rig_factory):
     rig.preparer.grinder_before = "on"
     await rig.preparer.async_cancel()
     assert ("switch", "turn_on", {"entity_id": prep.USE_GRINDER}) in rig.hass.calls
+
+
+# ── Announcing what reached the machine ─────────────────────────────────────
+
+def _announced(rig):
+    return [data for event, data in rig.hass.fired if event == prep.EV_PREPARED]
+
+
+async def test_what_reached_the_machine_is_announced_once_the_picks_settle(rig_factory):
+    rig = rig_factory()
+    rig.change(prep.DOSE, "18.0")
+    await rig.settle()          # prepared; the announcement now waits
+    assert _announced(rig) == []
+    await rig.settle()          # left alone: announced
+    assert _announced(rig) == [
+        {"recipe_name": "Test Recipe", "changes": {"dose": {"saved": 20, "now": 18.0}}},
+    ]
+
+
+async def test_adjusting_again_while_it_waits_announces_only_the_last(rig_factory):
+    rig = rig_factory()
+    rig.change(prep.DOSE, "18.0")
+    await rig.settle()
+    rig.change(prep.DOSE, "17.0")   # before the announcement: it starts over
+    await rig.settle()
+    await rig.settle()
+    assert [a["changes"]["dose"]["now"] for a in _announced(rig)] == [17.0]
+
+
+async def test_a_brew_started_before_it_settles_is_not_announced_as_arrived(rig_factory):
+    rig = rig_factory()
+    rig.change(prep.DOSE, "18.0")
+    await rig.settle()
+    rig.hass.states_by_id[prep.BREW_STATUS] = "grinding"
+    await rig.settle()
+    assert _announced(rig) == []
+
+
+async def test_a_change_that_sends_nothing_still_announces_what_the_machine_holds(rig_factory):
+    # Picking the bag again prepares nothing new; what was sent is still there.
+    rig = rig_factory()
+    rig.change(prep.DOSE, "18.0")
+    await rig.settle()
+    rig.change(prep.BAG, "Other Bag")
+    await rig.settle()
+    await rig.settle()
+    assert [a["changes"]["dose"]["now"] for a in _announced(rig)] == [18.0]
+
+
+def test_the_water_is_given_whenever_the_dose_or_ratio_changes():
+    saved = {"dose_g": 20, "water_ratio": 16, "grinder_size": 50}
+    assert prep.changes_from_recipe(saved, 15, 16, 50, True) == {
+        "dose": {"saved": 20, "now": 15}, "water": {"saved": 320, "now": 240},
+    }
+    assert prep.changes_from_recipe(saved, 20, 16, 50, True) == {}
+
+
+def test_pre_ground_coffee_is_a_change():
+    saved = {"dose_g": 20, "water_ratio": 16, "grinder_size": 50, "grinder_size_enabled": 1}
+    assert prep.changes_from_recipe(saved, 20, 16, 50, False) == {
+        "use_grinder": {"saved": True, "now": False},
+    }

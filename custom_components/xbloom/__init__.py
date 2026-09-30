@@ -47,6 +47,7 @@ from .coffee_lab.listener import async_count_completed_brews
 from .coffee_lab.notion import Databases, NotionClient, NotionStore
 from .coffee_lab.store import UnknownBean
 from .prepare import (
+    changes_from_recipe,
     DOSE as PREP_DOSE,
     GRIND as PREP_GRIND,
     RATIO as PREP_RATIO,
@@ -544,12 +545,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             brew_session["task"] = None
             brew_session["cancelled_by"] = None
 
-    async def _brew_recipe(data, log_label: str) -> tuple[dict | None, str | None]:
+    async def _brew_recipe(data, log_label: str) -> tuple[dict | None, str | None, dict | None]:
         """The recipe a brew sends: resolved, with its per-brew overrides.
 
         Shared by start_brew and prepare_brew, so a prepared recipe is exactly
         the one a start would have sent — that is what lets a start send
-        execute alone.
+        execute alone. Also returns the recipe as saved, before the overrides.
         """
         recipe, recipe_name = await _resolve_recipe(
             share_url=data.get("share_url"),
@@ -558,7 +559,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             log_label=log_label,
         )
         if recipe is None:
-            return None, recipe_name
+            return None, recipe_name, None
+        saved = recipe
 
         # Per-brew grinder override — does NOT modify the stored recipe.
         # Grinder choice: an explicit use_preground wins; otherwise fall back to
@@ -593,9 +595,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 "%s: customizer overrides dose=%s ratio=%s grind=%s",
                 log_label, _ovr_dose, _ovr_ratio, _ovr_grind,
             )
-        return recipe, recipe_name
+        return recipe, recipe_name, saved
 
-    async def _prepare_picks(data: dict) -> None:
+    async def _prepare_picks(data: dict) -> dict | None:
         """Send the dashboard's picks ahead, over the Connect session.
 
         `data` is what Start Brew would send now, so a later start for the same
@@ -605,7 +607,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
         from .ble_entities import held_session
 
-        recipe, recipe_name = await _brew_recipe(data, "xbloom.prepare_brew")
+        recipe, recipe_name, saved = await _brew_recipe(data, "xbloom.prepare_brew")
         if recipe is None:
             raise refuse("no_recipe_selected")
 
@@ -649,7 +651,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         # makes a start wait for a round trip the machine does not need.
         if brew_session["prepared"] == _prepared_key(session, recipe):
             _LOGGER.info("xbloom.prepare_brew: '%s' is already prepared", recipe_name)
-            return
+            return None
         brew_session["prepared"] = None
         try:
             await session.send_prepare(recipe)
@@ -665,10 +667,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         brew_session["prepared"] = _prepared_key(session, recipe)
         # What the machine's own button would start, for following that brew.
         brew_session["prepared_brew"] = (recipe, recipe_name)
-        # Only once the machine has accepted it: this is what says the recipe
-        # is on the machine, ready for its button or Start Brew.
-        hass.bus.async_fire("xbloom_recipe_prepared", {"recipe_name": recipe_name})
         _LOGGER.info("xbloom.prepare_brew: '%s' prepared, waiting for start", recipe_name)
+        # What the machine now holds, for announcing once the picks settle.
+        return {
+            "recipe_name": recipe_name,
+            "changes": changes_from_recipe(
+                saved, recipe.get("dose_g"), recipe.get("water_ratio"), recipe.get("grinder_size"),
+                recipe.get("grinder_size_enabled") != 2,
+            ),
+        }
 
     async def _send_quit() -> None:
         """Drop a recipe that was sent but not started (the app's 8017)."""
@@ -865,7 +872,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         if adopted is not None:
             recipe, recipe_name = adopted
         else:
-            recipe, recipe_name = await _brew_recipe(data, "xbloom.start_brew")
+            recipe, recipe_name, _saved = await _brew_recipe(data, "xbloom.start_brew")
         if recipe is None:
             _fire_failed("recipe_not_found", data.get("recipe_name"))
             return {"run_id": meta["run_id"]}

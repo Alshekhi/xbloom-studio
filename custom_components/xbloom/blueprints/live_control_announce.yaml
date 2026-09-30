@@ -89,6 +89,39 @@ variables:
   tts_engine: !input tts_engine
   ev: "{{ trigger.event.event_type }}"
   recipe_name: "{{ trigger.event.data.recipe_name | default('') }}"
+  # How the recipe that reached the machine differs from it as saved, as one
+  # phrase of only the new values: "dose 15 grams, water 248 millilitres".
+  changes_said: >-
+    {%- set c = trigger.event.data.changes | default({}) if ev == 'xbloom_recipe_prepared' else {} -%}
+    {%- macro num(v) -%}{{ (v | float | int) if (v | float) == (v | float | int) else (v | float | round(1)) }}{%- endmacro -%}
+    {%- set parts = namespace(items=[]) -%}
+    {%- if 'dose' in c -%}
+      {%- set d = c.dose.now | float -%}
+      {#- Three to ten whole grams take the plural, as Arabic counts. -#}
+      {%- set unit = ' جرامات' if d == d | int and 3 <= d <= 10 else ' جرام' -%}
+      {%- set parts.items = parts.items + [('الجرعة ' ~ num(d) ~ unit) if lang == 'ar' else ('dose ' ~ num(d) ~ ' grams')] -%}
+    {%- endif -%}
+    {%- if 'water' in c -%}
+      {%- set parts.items = parts.items + [('الماء ' ~ num(c.water.now) ~ ' مليلتر') if lang == 'ar' else ('water ' ~ num(c.water.now) ~ ' millilitres')] -%}
+    {%- endif -%}
+    {%- if 'ratio' in c -%}
+      {%- set parts.items = parts.items + [('النسبة 1 إلى ' ~ num(c.ratio.now)) if lang == 'ar' else ('ratio 1 to ' ~ num(c.ratio.now))] -%}
+    {%- endif -%}
+    {%- if 'grind_size' in c -%}
+      {%- set parts.items = parts.items + [('الطحن ' ~ num(c.grind_size.now)) if lang == 'ar' else ('grind ' ~ num(c.grind_size.now))] -%}
+    {%- endif -%}
+    {%- if 'use_grinder' in c -%}
+      {%- if c.use_grinder.now -%}
+        {%- set parts.items = parts.items + ['استخدام المطحنة' if lang == 'ar' else 'using the grinder'] -%}
+      {%- else -%}
+        {%- set parts.items = parts.items + ['عدم استخدام المطحنة' if lang == 'ar' else 'not using the grinder'] -%}
+      {%- endif -%}
+    {%- endif -%}
+    {%- if lang == 'ar' -%}
+      {{ parts.items[:1] | join('') }}{% for p in parts.items[1:] %}، و{{ p }}{% endfor %}
+    {%- else -%}
+      {{ parts.items | join(', ') }}
+    {%- endif -%}
   reason: "{{ trigger.event.data.reason | default('') }}"
   reason_pretty: "{{ reason | replace('_', ' ') }}"
   # Why a picked recipe did not reach the machine, in one short phrase. The
@@ -158,7 +191,7 @@ variables:
       {%- elif ev == 'xbloom_recipe_card_scanned' -%}
         قُرئت بطاقة الوصفة
       {%- elif ev == 'xbloom_recipe_prepared' -%}
-        {% if recipe_name %}وصلت وصفة {{ recipe_name }} إلى الآلة{% else %}وصلت الوصفة إلى الآلة{% endif %}
+        {% if recipe_name and changes_said %}وصلت وصفة {{ recipe_name }}، {{ changes_said }}{% elif recipe_name %}وصلت وصفة {{ recipe_name }} إلى الآلة{% elif changes_said %}وصلت الوصفة، {{ changes_said }}{% else %}وصلت الوصفة إلى الآلة{% endif %}
       {%- elif ev == 'xbloom_recipe_not_prepared' -%}
         تعذر إرسال الوصفة إلى الآلة{% if not_prepared %}، {{ not_prepared }}{% endif %}
       {%- endif -%}
@@ -187,7 +220,7 @@ variables:
       {%- elif ev == 'xbloom_recipe_card_scanned' -%}
         Recipe card scanned
       {%- elif ev == 'xbloom_recipe_prepared' -%}
-        {% if recipe_name %}{{ recipe_name }} is ready on the machine{% else %}The recipe is ready on the machine{% endif %}
+        {% if recipe_name %}{{ recipe_name }} is ready on the machine{% else %}The recipe is ready on the machine{% endif %}{% if changes_said %}: {{ changes_said }}{% endif %}
       {%- elif ev == 'xbloom_recipe_not_prepared' -%}
         Could not send the recipe to the machine{% if not_prepared %}: {{ not_prepared }}{% endif %}
       {%- endif -%}

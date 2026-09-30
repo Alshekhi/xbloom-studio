@@ -497,4 +497,7 @@ async def test_the_assistant_is_told_what_differs_from_the_saved_recipe():
         "number.xbloom_brew_grind": "50.0",
     })
     facts = await ACTIONS["brew_status"].run(_machine(hass), {})
-    assert facts["preparation"]["changed_from_recipe"] == {"dose": {"saved": 20, "now": 18.0}}
+    # The water follows the dose, and is what changes in the cup.
+    assert facts["preparation"]["changed_from_recipe"] == {
+        "dose": {"saved": 20, "now": 18.0}, "water": {"saved": 320, "now": 288},
+    }

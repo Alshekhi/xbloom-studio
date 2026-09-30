@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
+from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -44,6 +45,11 @@ WATCHED = [RECIPE, BAG, DOSE, RATIO, GRIND, USE_GRINDER]
 IDLE_RELEASE_S = 300
 # Dragging a slider changes it many times; prepare once it has settled.
 SETTLE_S = 1.5
+# A recipe reaching the machine is announced once the picks have been left
+# alone this long, so adjusting the dose, the ratio and the grind one after the
+# other is announced once, with all of them, rather than after each.
+ANNOUNCE_SETTLE_S = 4
+EV_PREPARED = "xbloom_recipe_prepared"
 BUSY = ("grinding", "brewing")
 UNUSABLE = ("unknown", "unavailable", "")
 
@@ -51,6 +57,34 @@ UNUSABLE = ("unknown", "unavailable", "")
 def signal_prepared(entry_id: str) -> str:
     """Recipe Ready changed: payload (ready, reason, preparing)."""
     return f"xbloom_prepared_{entry_id}"
+
+
+def changes_from_recipe(
+    saved: Mapping[str, Any], dose: float | None, ratio: float | None,
+    grind_size: int | None, use_grinder: bool | None,
+) -> dict[str, dict[str, Any]]:
+    """What a brew changes from the recipe as saved: {field: {saved, now}}.
+
+    The water is not a setting of its own — it follows the dose and the ratio —
+    but it is what changes in the cup, so it is given whenever either does.
+    """
+    changes: dict[str, dict[str, Any]] = {}
+    for key, attr, now in (
+        ("dose", "dose_g", dose), ("ratio", "water_ratio", ratio), ("grind_size", "grinder_size", grind_size),
+    ):
+        if now is not None and saved.get(attr) is not None and float(saved[attr]) != float(now):
+            changes[key] = {"saved": saved[attr], "now": now}
+    if ("dose" in changes or "ratio" in changes) and saved.get("dose_g") and saved.get("water_ratio"):
+        changes["water"] = {
+            "saved": round(float(saved["dose_g"]) * float(saved["water_ratio"])),
+            "now": round(float(dose if dose is not None else saved["dose_g"])
+                         * float(ratio if ratio is not None else saved["water_ratio"])),
+        }
+    # A recipe marks pre-ground coffee as grinder_size_enabled 2.
+    saved_grinder = saved.get("grinder_size_enabled") != 2
+    if use_grinder is not None and use_grinder != saved_grinder:
+        changes["use_grinder"] = {"saved": saved_grinder, "now": use_grinder}
+    return changes
 
 
 def dashboard_brew(hass: HomeAssistant) -> dict:
@@ -76,7 +110,7 @@ class BrewPreparer:
         self,
         hass: HomeAssistant,
         entry,
-        prepare: Callable[[dict], Awaitable[None]],
+        prepare: Callable[[dict], Awaitable[dict | None]],
         brew_running: Callable[[], bool],
         send_quit: Callable[[], Awaitable[None]],
     ) -> None:
@@ -109,6 +143,10 @@ class BrewPreparer:
         self._releasing = False
         # Lets Connect go if nothing is picked after a brew that made no coffee.
         self._idle_timer: CALLBACK_TYPE | None = None
+        # What the machine was last sent — the recipe and what differs from it
+        # — and the announcement of it, waiting for the picks to settle.
+        self._sent_info: dict | None = None
+        self._announce_timer: CALLBACK_TYPE | None = None
 
     # ── Wiring ──────────────────────────────────────────────────────────────
 
@@ -123,6 +161,7 @@ class BrewPreparer:
         def _stop() -> None:
             self._cancel_timer()
             self._cancel_idle_release()
+            self._cancel_announce()
             for unsub in unsubs:
                 unsub()
 
@@ -194,13 +233,14 @@ class BrewPreparer:
                 return
             self._sent = True
             try:
-                await self._prepare(dashboard_brew(self._hass))
+                info = await self._prepare(dashboard_brew(self._hass))
             except Exception as err:  # noqa: BLE001 — the reason is shown, not raised
                 key = getattr(err, "translation_key", None) or type(err).__name__
                 _LOGGER.warning("xbloom: the picked recipe was not prepared: %s", err)
                 self._set_ready(False, key)
                 return
             self._set_ready(True, None)
+            self._announce_soon(info)
 
     @callback
     def async_prepare_soon(self) -> None:
@@ -231,11 +271,12 @@ class BrewPreparer:
             self._set_ready(False, None, preparing=True)
             self._sent = True
             try:
-                await self._prepare(dashboard_brew(self._hass))
+                info = await self._prepare(dashboard_brew(self._hass))
             except Exception as err:
                 self._set_ready(False, getattr(err, "translation_key", None) or type(err).__name__)
                 raise
             self._set_ready(True, None)
+            self._announce_soon(info)
 
     async def async_settled(self, timeout: float = 20.0) -> None:
         """Finish a preparation that is waiting or under way, for a start.
@@ -274,6 +315,7 @@ class BrewPreparer:
         self._cancel_idle_release()
         self.owns_connect = False
         self._sent = False
+        self._sent_info = None
         self._set_ready(False, None)
 
     # ── Ends ────────────────────────────────────────────────────────────────
@@ -288,6 +330,7 @@ class BrewPreparer:
         no recipe is picked.
         """
         self._sent = False
+        self._sent_info = None
         self._set_ready(False, None)
         await self._clear_picks(bag=used_coffee)
         if used_coffee:
@@ -343,6 +386,7 @@ class BrewPreparer:
                 except Exception as err:  # noqa: BLE001 — unpicking goes ahead regardless
                     _LOGGER.warning("xbloom: the prepared recipe was not taken back: %s", err)
             self._sent = False
+            self._sent_info = None
             self._set_ready(False, None)
 
     async def _clear_picks(self, bag: bool = True) -> None:
@@ -376,6 +420,38 @@ class BrewPreparer:
         finally:
             self._releasing = False
 
+    # ── Announcing ──────────────────────────────────────────────────────────
+
+    @callback
+    def _announce_soon(self, info: dict | None) -> None:
+        """Announce what the machine holds once the picks have settled.
+
+        `info` is None when nothing had to be sent — the machine already held
+        it — and then what was last sent is still what it holds.
+        """
+        if info is not None:
+            self._sent_info = info
+        if self._sent_info is None:
+            return
+        self._cancel_announce()
+        self._announce_timer = async_call_later(self._hass, ANNOUNCE_SETTLE_S, self._announce)
+
+    @callback
+    def _announce(self, _now=None) -> None:
+        self._announce_timer = None
+        # A brew started meanwhile announces itself.
+        status = self._hass.states.get(BREW_STATUS)
+        if not self.ready or self._brew_running() or (status is not None and status.state in BUSY):
+            return
+        if self._sent_info is not None:
+            self._hass.bus.async_fire(EV_PREPARED, self._sent_info)
+
+    @callback
+    def _cancel_announce(self) -> None:
+        if self._announce_timer is not None:
+            self._announce_timer()
+            self._announce_timer = None
+
     # ── State ───────────────────────────────────────────────────────────────
 
     @callback
@@ -386,6 +462,10 @@ class BrewPreparer:
 
     @callback
     def _set_ready(self, ready: bool, reason: str | None, preparing: bool = False) -> None:
+        if not ready:
+            # Picks changing again, or anything else that stops it being
+            # ready, starts the wait over.
+            self._cancel_announce()
         if (ready, reason, preparing) == (self.ready, self.reason, self.preparing):
             return
         self.ready, self.reason, self.preparing = ready, reason, preparing

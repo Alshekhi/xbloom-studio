@@ -41,6 +41,7 @@ from xbloom.recipe_validate import normalize_recipe
 from .coffee_lab.actions import resolve_bean
 from .coffee_lab.lab import CoffeeLab
 from .const import DOMAIN
+from .prepare import changes_from_recipe
 from .tool_common import Spec, check_arguments as _check, describe as _describe, fail, refuse
 
 DEFAULT_HISTORY_DAYS = 7
@@ -471,12 +472,10 @@ def _preparation(machine: Machine) -> dict[str, Any]:
             facts[key] = int(float(value)) if key == "grind_size" else float(value)
     facts["use_grinder"] = machine.state("switch", "xbloom_use_grinder") != "off"
     # What this brew changes from the saved recipe, so the assistant can say so.
-    saved = machine.attributes("select", "xbloom_recipe_select")
-    changed = {
-        key: {"saved": saved[attr], "now": facts[key]}
-        for key, attr in (("dose", "dose_g"), ("ratio", "water_ratio"), ("grind_size", "grinder_size"))
-        if key in facts and saved.get(attr) is not None and float(saved[attr]) != float(facts[key])
-    }
+    changed = changes_from_recipe(
+        machine.attributes("select", "xbloom_recipe_select"),
+        facts.get("dose"), facts.get("ratio"), facts.get("grind_size"), facts["use_grinder"],
+    )
     if changed:
         facts["changed_from_recipe"] = changed
     if machine.lab is not None:
