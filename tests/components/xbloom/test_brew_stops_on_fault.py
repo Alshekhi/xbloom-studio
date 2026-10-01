@@ -103,14 +103,15 @@ async def test_a_water_fault_leaves_the_brew_running():
     sensor = await _sensor_with_frames(
         {"cmd": CMD_GRINDER_START},
         {"cmd": CMD_GRINDER_STOP},
+        {"cmd": 40510, "pour_index": 0},
         {"cmd": CMD_NO_WATER},
     )
     assert sensor._attr_native_value == "brewing"
 
 
 @pytest.mark.asyncio
-async def test_the_grind_still_finishes_normally_into_brewing():
+async def test_the_brew_still_goes_on_into_the_pouring():
     sensor = await _sensor_with_frames(
-        {"cmd": CMD_GRINDER_START}, {"cmd": CMD_GRINDER_STOP}
+        {"cmd": CMD_GRINDER_START}, {"cmd": CMD_GRINDER_STOP}, {"cmd": 40510, "pour_index": 0},
     )
     assert sensor._attr_native_value == "brewing"

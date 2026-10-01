@@ -25,7 +25,16 @@ from xbloom.ble import (
 )
 
 from . import _resolve_ble_name, remember_address
-from .ble_entities import _device_info, module_screen_after, signal_brew_lifecycle, signal_event
+from .ble_entities import (
+    ACTIVITY_HOME_STATES,
+    ACTIVITY_RECIPE_READY,
+    CMD_GRINDER_START,
+    CMD_MACHINE_ACTIVITY,
+    _device_info,
+    module_screen_after,
+    signal_brew_lifecycle,
+    signal_event,
+)
 from .const import CONF_BLE_ADDRESS, DOMAIN
 from .prepare import signal_prepared
 
@@ -120,11 +129,17 @@ class XBloomInRangeSensor(BinarySensorEntity):
 class XBloomBrewPausedSensor(BinarySensorEntity):
     """On while a recipe brew is paused.
 
-    The machine reports both sides itself, differently for who paused it: a
-    pause sent from here brings 40515 and its resume 40516; a pause made at the
-    machine brings 9009 (grinding) or 9010 (pouring) and its resume 9011.
-    Anything that ends the brew, or starts the next, also ends the pause, so it
-    never outlives the brew it belongs to.
+    The machine's screen is what says so: a paused brew shows the recipe screen
+    (activity 31) and leaves it the moment it goes on — 34 grinding, 35
+    pouring. That holds whoever paused it and whichever phase it paused in,
+    seen live on V12.0D.500 (2026-09-28 to 10-01). The frames that come with a
+    pause do not: one from here during grinding sends only the command's echo,
+    and a resume from here was answered with 40516 once and without it once.
+    They are still taken when they come, as the screen report can trail them.
+
+    The recipe screen also shows a recipe waiting for its start, so only a
+    brew under way counts — from its grinder starting to its end. Anything
+    that ends the brew, or starts the next, ends the pause with it.
     """
 
     _attr_has_entity_name = True
@@ -138,6 +153,7 @@ class XBloomBrewPausedSensor(BinarySensorEntity):
         # The standalone grinder sends 9009 when it stops too: see
         # module_screen_after.
         self._on_module_screen = False
+        self._brew_running = False
 
     @property
     def device_info(self):
@@ -163,11 +179,22 @@ class XBloomBrewPausedSensor(BinarySensorEntity):
                 self._set(False)
                 return
             cmd = decoded.get("cmd")
-            if cmd in (NOTIFY_BREW_PAUSED, NOTIFY_GRINDER_PAUSED, NOTIFY_BREWER_PAUSED):
+            if cmd == CMD_GRINDER_START:
+                self._brew_running = True
+                self._set(False)
+            elif cmd == CMD_MACHINE_ACTIVITY:
+                activity = decoded.get("activity")
+                if activity in ACTIVITY_HOME_STATES:
+                    self._brew_running = False
+                    self._set(False)
+                elif self._brew_running:
+                    self._set(activity == ACTIVITY_RECIPE_READY)
+            elif cmd in (NOTIFY_BREW_PAUSED, NOTIFY_GRINDER_PAUSED, NOTIFY_BREWER_PAUSED):
                 self._set(True)
-            elif cmd in (
-                NOTIFY_BREW_RESUMED, NOTIFY_MACHINE_RESUMED, NOTIFY_ENJOY, NOTIFY_BREW_ABANDONED,
-            ):
+            elif cmd in (NOTIFY_BREW_RESUMED, NOTIFY_MACHINE_RESUMED):
+                self._set(False)
+            elif cmd in (NOTIFY_ENJOY, NOTIFY_BREW_ABANDONED):
+                self._brew_running = False
                 self._set(False)
 
         @callback
@@ -175,6 +202,8 @@ class XBloomBrewPausedSensor(BinarySensorEntity):
             # Started or ended, a pause does not carry over.
             if phase == "started":
                 self._on_module_screen = False
+            else:
+                self._brew_running = False
             self._set(False)
 
         self.async_on_remove(

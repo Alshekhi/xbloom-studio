@@ -91,3 +91,44 @@ async def test_the_standalone_grinder_stopping_is_not_a_brew_paused():
     on_frame({"cmd": 8023, "activity": 2})    # grinder screen
     on_frame({"cmd": GRINDER_PAUSED})
     assert entity._attr_is_on is False
+
+
+# Seen live 2026-10-01: a pause from Home Assistant during grinding brought only
+# the command's echo (40518) and the pause screen, and the resume after a pause
+# during pouring brought the echo (40524) and the pouring screen, but no 40516.
+PAUSE_ECHO, RESUME_ECHO = 40518, 40524
+
+
+def _screen(code):
+    return {"cmd": 8023, "activity": code}
+
+
+@pytest.mark.asyncio
+async def test_the_pause_screen_during_a_brew_is_a_pause_whoever_paused_it():
+    entity, on_frame, _ = await _wired()
+    for frame in ({"cmd": 40502}, _screen(30), _screen(34), {"cmd": PAUSE_ECHO}, {"cmd": 40507}):
+        on_frame(frame)
+    assert entity._attr_is_on is False
+    on_frame(_screen(31))
+    assert entity._attr_is_on is True
+    on_frame(_screen(34))           # resumed, grinding again
+    assert entity._attr_is_on is False
+
+
+@pytest.mark.asyncio
+async def test_a_resume_without_40516_still_ends_the_pause():
+    entity, on_frame, _ = await _wired()
+    for frame in ({"cmd": 40502}, _screen(35), {"cmd": PAUSE_ECHO}, {"cmd": PAUSED}, _screen(31)):
+        on_frame(frame)
+    assert entity._attr_is_on is True
+    on_frame({"cmd": RESUME_ECHO})
+    on_frame(_screen(35))
+    assert entity._attr_is_on is False
+
+
+@pytest.mark.asyncio
+async def test_a_recipe_waiting_for_its_start_is_not_paused():
+    # The same recipe screen shows a prepared recipe before any brew.
+    entity, on_frame, _ = await _wired()
+    on_frame(_screen(31))
+    assert entity._attr_is_on is False

@@ -109,7 +109,10 @@ async def test_a_recipe_brew_is_unchanged():
     sensor, on_event, _ = await _sensor()
     _feed(on_event, _activity(1), {"cmd": CMD_GRINDER_START})
     assert sensor._attr_native_value == "grinding"
-    _feed(on_event, {"cmd": CMD_BREWER_START}, {"cmd": CMD_GRINDER_STOP})
+    # The grinder stopping is not the pouring: only the first pour is.
+    _feed(on_event, {"cmd": CMD_BREWER_START}, {"cmd": CMD_GRINDER_STOP}, _activity(16))
+    assert sensor._attr_native_value == "grinding"
+    _feed(on_event, _activity(35), {"cmd": CMD_BLOOM, "pour_index": 0})
     assert sensor._attr_native_value == "brewing"
     _feed(on_event, {"cmd": CMD_ENJOY})
     assert sensor._attr_native_value == "done"
@@ -182,13 +185,14 @@ async def test_a_standalone_pour_does_not_move_the_pour_counter():
 
 
 @pytest.mark.asyncio
-async def test_a_grinder_paused_at_the_machine_is_not_the_grind_finished():
-    # A pause sends 9009 then 40507; read as the grind done, it went to
-    # `brewing` and announced "pouring started" with the grinder stopped.
-    sensor, on_event, _ = await _sensor()
-    _feed(on_event, _activity(31), {"cmd": CMD_GRINDER_START}, _activity(30), _activity(34),
-          {"cmd": 9009}, {"cmd": CMD_GRINDER_STOP}, _activity(31))
-    assert sensor._attr_native_value == "grinding"
-    # Resumed, and this time the grind really finishes.
-    _feed(on_event, {"cmd": 9011}, _activity(34), {"cmd": CMD_GRINDER_STOP}, _activity(16))
-    assert sensor._attr_native_value == "brewing"
+async def test_a_grinder_paused_is_not_the_pouring():
+    # A pause stops the grinder: from the machine (9009 first) or from Home
+    # Assistant (only the command's echo, 40518). Neither is the pouring.
+    for frames in ([{"cmd": 9009}, {"cmd": CMD_GRINDER_STOP}], [{"cmd": 40518}, {"cmd": CMD_GRINDER_STOP}]):
+        sensor, on_event, _ = await _sensor()
+        _feed(on_event, _activity(31), {"cmd": CMD_GRINDER_START}, _activity(30), _activity(34),
+              *frames, _activity(31))
+        assert sensor._attr_native_value == "grinding"
+        _feed(on_event, {"cmd": 9011}, _activity(34), {"cmd": CMD_GRINDER_STOP}, _activity(16),
+              _activity(35), {"cmd": CMD_BLOOM, "pour_index": 0})
+        assert sensor._attr_native_value == "brewing"

@@ -41,7 +41,6 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from xbloom import spec
-from xbloom.ble import NOTIFY_GRINDER_PAUSED, NOTIFY_MACHINE_RESUMED
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -284,9 +283,6 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
         # (or a brew Home Assistant starts) ends it: a pour shows the same
         # "pouring" activity (35) as a recipe brew does.
         self._on_module_screen = False
-        # The grinder was paused at the machine: the grinder stopping that
-        # follows is the pause, not the grind done, and no pour is next.
-        self._grind_paused = False
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -347,34 +343,18 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
                     # show something is happening.
                     new_state = "grinding"
             elif cmd == CMD_GRINDER_START:
-                self._grind_paused = False
                 new_state = "grinding"
-            elif cmd == NOTIFY_GRINDER_PAUSED:
-                self._grind_paused = True
-            elif cmd == NOTIFY_MACHINE_RESUMED:
-                self._grind_paused = False
             elif (fault := spec.FAULTS.get(cmd)) and fault[0] in BREW_STOPPING_FAULTS:
-                # The machine has given up on this brew. Saying so here is what
-                # keeps the grinder stopping half a second later from reading
-                # as "the grind finished, pours next" — which announced a brew
-                # that had already failed, and left the dashboard showing one
-                # in progress.
+                # The machine has given up on this brew, so none is in
+                # progress any more.
                 if self._attr_native_value in ("grinding", "brewing"):
                     new_state = "idle"
-            elif cmd == CMD_GRINDER_STOP:
-                # Grinder finished — transition to brewing (pours next)
-                if self._attr_native_value == "grinding" and not self._grind_paused:
-                    new_state = "brewing"
-            elif cmd == CMD_BREWER_START:
-                # 40506 fires ~3 s after grind start — it's the water heater
-                # spinning up in parallel with the grind, NOT the pours
-                # (verified on live frames: brewer_started at +3 s, grinder ran
-                # 41 s, first pour at +52 s). Ignore it mid-grind so the
-                # "pouring" announcement doesn't fire while grinding; the
-                # grinding → brewing transition comes from CMD_GRINDER_STOP.
-                if self._attr_native_value != "grinding":
-                    new_state = "brewing"
             elif cmd == CMD_BLOOM:
+                # The pouring starts with the first pour, and only that says
+                # so. The grinder stopping is not it: a pause stops the grinder
+                # too, and the grinder screen sends the same frames. Nor is the
+                # "brewer started" frame, which comes with the grind as the
+                # water heats.
                 new_state = "brewing"
             elif cmd == CMD_ENJOY:
                 new_state = "done"
