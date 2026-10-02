@@ -300,10 +300,11 @@ class XBloomCurrentPourSensor(SensorEntity):
             if decoded.get("cmd") == CMD_BLOOM and "pour_index" in decoded:
                 self._attr_native_value = int(decoded["pour_index"]) + 1
                 self.async_write_ha_state()
-            elif decoded.get("cmd") == CMD_GRINDER_START or brew_over(decoded):
-                # A brew beginning has poured nothing yet; one that is over
+            elif decoded.get("cmd") in (CMD_GRINDER_START, CMD_ENJOY) or brew_over(decoded):
+                # A brew beginning has poured nothing yet; one that is over —
+                # ENJOY included, for a brew no Home Assistant brew follows —
                 # leaves no pour standing.
-                if brew_over(decoded):
+                if decoded.get("cmd") == CMD_ENJOY or brew_over(decoded):
                     self._total_pours = None
                 if self._attr_native_value != 0:
                     self._attr_native_value = 0

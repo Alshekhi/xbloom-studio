@@ -401,3 +401,46 @@ async def test_a_recipe_the_machine_refused_says_why():
         await entry.runtime_data.preparer._prepare({"dose": 15})
     # The preparer announces it, if it is still so once the picks settle.
     assert err.value.not_prepared == {"reason": "machine_busy", "recipe_name": "Test Recipe One"}
+
+
+class _LateStartSession(_PreparingSession):
+    """Execute's answer does not come in time; the machine may start anyway."""
+
+    async def send_start(self):
+        self.sent.append("start")
+        raise ble.CommandUnanswered("execute")
+
+
+async def _late_start(start_frames: bool):
+    session = _LateStartSession()
+    hass, entry, handlers = await _handlers_with(session, hass=_make_hass())
+    frames, capture = _frames_through_the_session()
+    with capture, _machine_in_range(), patch("custom_components.xbloom.EXECUTE_LATE_S", 0.2):
+        await entry.runtime_data.preparer._prepare({"dose": 15})
+        await handlers["start_brew"](MagicMock(data={"dose": 15}))
+        for _ in range(10):
+            await asyncio.sleep(0)
+        if start_frames:
+            for frame in frames:
+                await frame({"cmd": 40502})
+            for _ in range(10):
+                await asyncio.sleep(0)
+            for frame in frames:
+                await frame({"cmd": 40512})
+        await asyncio.wait_for(entry.tasks[0], timeout=5)
+    return hass
+
+
+async def test_a_start_answered_late_that_runs_is_followed_as_started():
+    # The answer to execute came after the wait ran out and the grinder
+    # started a second later; the brew was declared not started.
+    hass = await _late_start(start_frames=True)
+    assert _fired(hass, "xbloom_brew_failed") == []
+    assert len(_fired(hass, "xbloom_brew_started")) == 1
+    assert [e["outcome"] for e in _fired(hass, "xbloom_brew_completed")] == ["confirmed"]
+
+
+async def test_a_start_that_never_shows_itself_still_fails():
+    hass = await _late_start(start_frames=False)
+    assert [e["reason"] for e in _fired(hass, "xbloom_brew_failed")] == ["no_reply"]
+    assert _fired(hass, "xbloom_brew_started") == []

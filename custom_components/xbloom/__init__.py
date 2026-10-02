@@ -149,6 +149,11 @@ BREW_STOP_GRACE_S = 10.0
 # the same press: no brew is started again that quickly.
 MACHINE_START_REPEAT_S = 30.0
 
+# How long a start the machine did not answer is given to show itself. Over a
+# slow link the answer to execute has come after the wait for it ran out, with
+# the grinder starting a second later (2026-10-02): unanswered is not refused.
+EXECUTE_LATE_S = 15.0
+
 # How often Coffee Lab's entities re-read a Notion store. One query every ten
 # minutes is far below any rate limit worth worrying about.
 NOTION_REFRESH = timedelta(minutes=10)
@@ -1040,7 +1045,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 async with ble_client:
                     brew_session["client"] = ble_client
                     _LOGGER.info("xbloom.start_brew: ✓ connected, sending brew frames …")
-                    await ble_client.brew(recipe)
+                    try:
+                        await ble_client.brew(recipe)
+                    except CommandUnanswered as err:
+                        # Every step before execute was accepted, so the
+                        # machine holds the recipe: if it starts, the brew is
+                        # running whether or not its answer came in time.
+                        if err.step != "execute":
+                            raise
+                        try:
+                            await asyncio.wait_for(brew_running.wait(), EXECUTE_LATE_S)
+                        except TimeoutError:
+                            raise err from None
+                        _LOGGER.info(
+                            "xbloom.start_brew: execute went unanswered, but the brew started",
+                        )
                     _LOGGER.info(
                         "xbloom.start_brew: ✓ frames sent, waiting for RD_ENJOY (≤10min) …"
                     )
