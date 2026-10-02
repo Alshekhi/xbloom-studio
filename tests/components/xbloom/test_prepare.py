@@ -80,6 +80,7 @@ class _Rig:
         self.running = False
         self.signals: list[tuple] = []
         self.timers: list = []
+        self.delays: list = []
         self.fail = fail
         entry = SimpleNamespace(entry_id="e1", runtime_data=SimpleNamespace(coffee_lab=lab))
 
@@ -129,7 +130,8 @@ def rig_factory():
     def make(**kw) -> _Rig:
         rig = _Rig(**kw)
 
-        def _later(_hass, _delay, action):
+        def _later(_hass, delay, action):
+            rig.delays.append(delay)
             rig.timers.append(action)
             return lambda: rig.timers.remove(action) if action in rig.timers else None
 
@@ -492,3 +494,41 @@ async def test_a_failure_the_next_attempt_replaces_is_not_announced(rig_factory)
     await rig.settle()
     assert _failures(rig) == []
     assert [a["changes"]["dose"]["now"] for a in _announced(rig)] == [17.0]
+
+
+
+async def test_a_change_during_a_send_drops_that_send_for_the_latest(rig_factory):
+    # Over a slow link a send takes 6-10 s; finishing one for picks that have
+    # since changed only delays the one that matters.
+    rig = rig_factory()
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def _slow_prepare(data):
+        rig.prepared.append(data)
+        started.set()
+        await release.wait()
+        return {"recipe_name": "Test Recipe", "changes": {}}
+
+    rig.preparer._prepare = _slow_prepare
+    rig.change(prep.DOSE, "18.0")
+    await rig.settle()
+    await asyncio.wait_for(started.wait(), 1)
+    sending = rig.preparer._task
+    rig.change(prep.DOSE, "17.0")
+    await asyncio.sleep(0)
+    assert sending.cancelled()
+    release.set()
+    await rig.settle()
+    assert rig.prepared[-1]["dose"] == 17.0
+    # Every send waits only the short settle; 0 is the announcement's turn.
+    assert set(rig.delays) - {0} == {prep.SETTLE_S}
+
+
+async def test_a_start_announces_itself_not_what_it_sent(rig_factory):
+    # Start pressed with an adjustment still waiting: it is sent at once, and
+    # the brew's own start is what is said.
+    rig = rig_factory()
+    rig.change(prep.DOSE, "18.0")
+    await rig.preparer.async_settled()
+    await rig.settle()
+    assert _announced(rig) == []

@@ -43,12 +43,9 @@ WATCHED = [RECIPE, BAG, DOSE, RATIO, GRIND, USE_GRINDER]
 # After a brew that made no coffee Connect stays on for the next pick; with no
 # pick this long after, it is let go, so the app can have the machine back.
 IDLE_RELEASE_S = 300
-# Dragging a slider changes it many times; prepare once it has settled.
-SETTLE_S = 1.5
-# A recipe reaching the machine is announced once the picks have been left
-# alone this long, so adjusting the dose, the ratio and the grind one after the
-# other is announced once, with all of them, rather than after each.
-ANNOUNCE_SETTLE_S = 4
+# A pick or an adjustment is sent after this — just long enough to gather the
+# sliders, which reset to the recipe's values in the moment it is picked.
+SETTLE_S = 0.5
 EV_PREPARED = "xbloom_recipe_prepared"
 EV_NOT_PREPARED = "xbloom_recipe_not_prepared"
 BUSY = ("grinding", "brewing")
@@ -144,6 +141,8 @@ class BrewPreparer:
         self._releasing = False
         # Lets Connect go if nothing is picked after a brew that made no coffee.
         self._idle_timer: CALLBACK_TYPE | None = None
+        # A start is under way: it announces itself, not what it sent.
+        self._starting = False
         # What the machine was last sent — the recipe and what differs from it
         # — and the announcement of it, waiting for the picks to settle.
         self._sent_info: dict | None = None
@@ -200,6 +199,11 @@ class BrewPreparer:
         self._set_ready(False, None, preparing=True)
         if self._timer is not None:
             self._timer()
+        # A send still under way is for picks that have since changed: over a
+        # slow link one takes 6-10 s, and finishing it only delays the one
+        # that matters. Not while a start waits on it.
+        if self._task is not None and not self._task.done() and not self._starting:
+            self._task.cancel()
         self._timer = async_call_later(self._hass, SETTLE_S, self._fire)
 
     @callback
@@ -286,16 +290,23 @@ class BrewPreparer:
         """Finish a preparation that is waiting or under way, for a start.
 
         A start must never send execute for a recipe older than the picks.
+        What it finishes is not announced as arrived: the start announces
+        itself an instant later.
         """
-        if self._timer is not None:
-            self._cancel_timer()
-            self._task = self._hass.async_create_task(self._prepare_picks())
-        task = self._task
-        if task is not None and not task.done():
-            try:
-                await asyncio.wait_for(asyncio.shield(task), timeout)
-            except TimeoutError:
-                _LOGGER.warning("xbloom: preparation still running at start — sending the whole brew")
+        self._starting = True
+        try:
+            if self._timer is not None:
+                self._cancel_timer()
+                self._task = self._hass.async_create_task(self._prepare_picks())
+            task = self._task
+            if task is not None and not task.done():
+                try:
+                    await asyncio.wait_for(asyncio.shield(task), timeout)
+                except TimeoutError:
+                    _LOGGER.warning("xbloom: preparation still running at start — sending the whole brew")
+        finally:
+            self._cancel_announce()
+            self._starting = False
 
     # ── Connect ─────────────────────────────────────────────────────────────
 
@@ -452,7 +463,9 @@ class BrewPreparer:
     def _announce_later(self, event: str, data: dict) -> None:
         self._cancel_announce()
         self._pending_announcement = (event, data)
-        self._announce_timer = async_call_later(self._hass, ANNOUNCE_SETTLE_S, self._announce)
+        # On the next turn of the loop, not this instant: a start finishing
+        # this preparation cancels it first.
+        self._announce_timer = async_call_later(self._hass, 0, self._announce)
 
     @callback
     def _announce(self, _now=None) -> None:
@@ -463,9 +476,9 @@ class BrewPreparer:
         event, data = pending
         # A brew started meanwhile announces itself.
         status = self._hass.states.get(BREW_STATUS)
-        if self._brew_running() or (status is not None and status.state in BUSY):
+        if self._starting or self._brew_running() or (status is not None and status.state in BUSY):
             return
-        # Still true once the picks have settled, or it is not said.
+        # Still true when it is said, or it is not said.
         if event == EV_PREPARED and not self.ready:
             return
         if event == EV_NOT_PREPARED and (self.ready or self.preparing):
