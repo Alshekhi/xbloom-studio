@@ -111,8 +111,11 @@ variables:
     {%- endif -%}
 
 trigger:
+  # Not out of `unavailable`: the event entity comes back from a restart holding
+  # its last event, and replaying a fault from before the restart is noise.
   - platform: state
     entity_id: !input brew_event_entity
+    not_from: "unavailable"
 
 condition:
   - condition: template

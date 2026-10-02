@@ -22,3 +22,7 @@ aiohttp>=3.9
 # coordinator.py imports cloud unconditionally. HA core ships it; without it
 # here, tests/conftest.py stubs it.
 cryptography>=42
+
+# Reads the bundled blueprints in test_blueprint_restart_guard.py. HA core
+# ships it, so the integration itself needs nothing new.
+PyYAML>=6
