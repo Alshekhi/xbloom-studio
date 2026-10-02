@@ -7,6 +7,13 @@ description names, per action, the arguments that action needs, and lists the
 bags on hand. Results are facts for the assistant to put into words in its own
 language; a refused call says why, in Home Assistant's language.
 
+`prepare_brew` makes the machine ready for a recipe and its settings without
+starting it, and answers once the machine has accepted it; calling it again
+with new values adjusts what is prepared, and `brew_status` reports what is
+prepared and how it differs from the saved recipe, and `cancel_preparation`
+takes it back. `start_brew` then starts exactly what was prepared, preparing
+first if nothing matching is ready.
+
 `start_brew` waits for the machine to accept or refuse the brew before it
 answers. With Coffee Lab on, it needs the bag the coffee comes from, or
 `unattributed`. With `notify_target`, the caller is told how the brew ends by

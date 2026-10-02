@@ -32,16 +32,45 @@ The **Import** links are only needed without the integration installed, for
 example to try a blueprint elsewhere. The files are in
 [`custom_components/xbloom/blueprints/`](../custom_components/xbloom/blueprints/).
 
-**Every blueprint speaks through whatever you have.** The **How to announce**
-field offers three choices:
+**Every blueprint speaks through whatever you have.** Under **How to
+announce**, **Announce with** offers three choices:
 
 - **Alexa** — via the [Alexa Media Player](https://github.com/alandtse/alexa_media_player) custom integration.
 - **Speaker (TTS)** — any TTS engine (Piper, Google Translate, Cloud) on any media player.
-- **Notify service** — any `notify.*` service, so the text arrives as a phone notification instead of speech.
+- **Notification** — any `notify.*` service, so the text arrives as a phone notification instead of speech.
 
 All three are **bilingual, English or Arabic**, chosen per automation. You can
-import a blueprint more than once — for example, English on the kitchen speaker
-and Arabic on another.
+create more than one automation from a blueprint — for example, English on one
+speaker and Arabic on another. Each blueprint's entities are filled in for you
+under **xBloom entities**, collapsed.
+
+### What the brew announcements say, and where
+
+The brew blueprint has two sets of speakers:
+
+- **Speakers for the whole home** hear the coffee being ready, a brew that
+  could not start (with the reason, such as the tank needing water), and a
+  brew whose ending never came. With Alexa these play with its announcement
+  chime.
+- **Speakers by the machine** — optional — hear the brew starting, the
+  pouring starting, each pour, a pause and a resume, and a cancelled brew.
+  These speakers are the only ones that say the recipe name; the rest of the
+  home hears that the coffee is ready, not which one. With Alexa, the pouring,
+  the pours and pauses play without the chime. Leave this empty to announce
+  everything on the whole-home speakers.
+
+Under **What to announce**, **Say the recipe name** names it at the start and
+the end, and **Announce each pour** adds "pour 2 of 4" for each pour after the
+first, with the final one said as the last pour.
+
+### The live-session announcements
+
+While Connect is on, they speak the knobs you turn, the screen you move to, the
+scale weight and a recipe card being read — and, when you pick a recipe, that
+it reached the machine, naming only what you changed from the saved recipe
+("dose 15 grams, water 240 millilitres"), or that it could not be sent and why.
+**Stay quiet about connecting for a picked recipe** keeps the connection itself
+unannounced when picking a recipe opened it.
 
 ## Write your own
 
