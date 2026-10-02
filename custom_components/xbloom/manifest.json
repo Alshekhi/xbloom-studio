@@ -24,7 +24,7 @@
     "xbloom"
   ],
   "requirements": [
-    "xbloom-py==0.3.2"
+    "xbloom-py==0.4.0"
   ],
-  "version": "5.0.0"
+  "version": "5.1.0"
 }
