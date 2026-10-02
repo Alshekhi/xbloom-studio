@@ -290,16 +290,23 @@ trigger:
   - platform: event
     event_type: xbloom_brew_started
     id: started
+  # The state triggers below skip a change out of `unavailable`. The entities
+  # are only unavailable while Home Assistant starts or the integration
+  # reloads, and then come back holding their last value, so without this a
+  # restart replays the last brew: "Your coffee is ready" with nobody brewing.
   - platform: state
     entity_id: !input xbloom_status_entity
+    not_from: "unavailable"
     to: "brewing"
     id: pouring
   - platform: state
     entity_id: !input xbloom_status_entity
+    not_from: "unavailable"
     to: "done"
     id: done_simple
   - platform: state
     entity_id: !input brew_event_entity
+    not_from: "unavailable"
     id: done_recipe
   # A brew that never ran: the machine refused a step, or Home Assistant could
   # not reach it. Nothing else speaks this — the fault blueprint announces the
@@ -314,6 +321,7 @@ trigger:
     id: machine_started
   - platform: state
     entity_id: !input paused_entity
+    not_from: "unavailable"
     to: "on"
     id: paused
   - platform: state
@@ -331,6 +339,7 @@ trigger:
     id: timeout
   - platform: state
     entity_id: !input pour_entity
+    not_from: "unavailable"
     to: ~
     id: pour
 
