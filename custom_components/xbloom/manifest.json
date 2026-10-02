@@ -3,6 +3,7 @@
   "name": "xBloom Studio",
   "after_dependencies": [
     "automation",
+    "blueprint",
     "recorder"
   ],
   "bluetooth": [
