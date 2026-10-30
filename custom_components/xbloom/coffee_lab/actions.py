@@ -101,6 +101,10 @@ def _brew_facts(brew: Brew, names: dict[str, str]) -> dict[str, Any]:
         "brewer": brew.brewer,
         "dripper": brew.dripper,
         "outcome": brew.outcome,
+        "water_ml": brew.water_ml,
+        # How it was brewed — grind, ratio, temperature_c, flow_rate, and
+        # duration_s from the first pour to the end — as the record holds it.
+        **brew.settings,
     }
     if brew.review is not None:
         facts["needs_review"] = {"reason": brew.review.reason, **brew.review.detail}

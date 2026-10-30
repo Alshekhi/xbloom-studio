@@ -213,3 +213,15 @@ async def test_the_same_stop_twice_is_recorded_once():
     for _ in range(2):
         await bus.fire("xbloom_brew_stopped", {**STOPPED, "ground": True})
     assert len(await lab.store.async_list_brews()) == 1
+
+
+# ── History ──────────────────────────────────────────────────────────────────
+
+
+async def test_history_says_how_each_brew_was_made_and_how_long_it_took():
+    lab, bus, _stop = await _listening()
+    await bus.fire("xbloom_brew_completed", {**COMPLETION, "duration_s": 165.7})
+    [brew] = (await actions.brew_history(lab, {}))["brews"]
+    assert brew["duration_s"] == 165.7
+    assert (brew["grind"], brew["ratio"], brew["water_ml"]) == (55, 16.0, 288.0)
+    assert "temperature_c" not in brew       # unknown is left out, not guessed

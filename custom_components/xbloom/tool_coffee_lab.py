@@ -25,7 +25,8 @@ ACTIONS: dict[str, Spec] = {
     "active_bean": Spec(actions.active_bean, "the bag the xBloom draws from when none is named"),
     "brew_history": Spec(
         actions.brew_history,
-        "what was brewed, newest first — recipe, bag, dose, brewer (limit, days)",
+        "what was brewed, newest first — recipe, bag, dose, brewer, and how: grind, "
+        "ratio, temperature, flow rate, seconds from first pour to end (limit, days)",
     ),
     "stats": Spec(
         actions.stats,
