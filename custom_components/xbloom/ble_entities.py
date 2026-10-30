@@ -656,6 +656,9 @@ class XBloomBrewEventBleEntity(EventEntity):
         self._brew_started_fired = False
         self._brew_done_fired = False
         self._last_recipe_name: str | None = None
+        # When this brew's first pour began, so `brew_done` can say how long it
+        # took — counted the way the recorded brew time is, first pour to end.
+        self._first_pour_at = None
         # On a grinder, brewer or scale screen: see module_screen_after.
         self._on_module_screen = False
         # Faults currently asserted. The machine reports a fault for as long as
@@ -705,7 +708,11 @@ class XBloomBrewEventBleEntity(EventEntity):
             # then stay silent for every brew after it.
             if cmd in (CMD_GRINDER_START, CMD_BREWER_START):
                 self._brew_done_fired = False
+                self._first_pour_at = None
                 self._active_faults.clear()
+
+            if cmd == CMD_BLOOM and self._first_pour_at is None:
+                self._first_pour_at = dt_util.utcnow()
 
             # Aggregate `brew_started` — first pour after the brew started
             if cmd == CMD_BLOOM and not self._brew_started_fired:
@@ -720,10 +727,17 @@ class XBloomBrewEventBleEntity(EventEntity):
             # Aggregate `brew_done` — RD_ENJOY
             if cmd == CMD_ENJOY and not self._brew_done_fired:
                 self._brew_done_fired = True
+                duration_s = None
+                if self._first_pour_at is not None:
+                    duration_s = round(
+                        (dt_util.utcnow() - self._first_pour_at).total_seconds(), 1
+                    )
                 self._trigger_event(
                     "brew_done",
-                    {"recipe_name": self._last_recipe_name or ""},
+                    {"recipe_name": self._last_recipe_name or "",
+                     "duration_s": duration_s},
                 )
+                self._first_pour_at = None
                 self._last_recipe_name = None
                 self._brew_started_fired = False
                 self.async_write_ha_state()
@@ -746,8 +760,10 @@ class XBloomBrewEventBleEntity(EventEntity):
             self._trigger_event(
                 "brew_done",
                 {"recipe_name": event.data.get("recipe_name")
-                 or self._last_recipe_name or ""},
+                 or self._last_recipe_name or "",
+                 "duration_s": event.data.get("duration_s")},
             )
+            self._first_pour_at = None
             self._last_recipe_name = None
             self._brew_started_fired = False
             self.async_write_ha_state()
@@ -771,6 +787,7 @@ class XBloomBrewEventBleEntity(EventEntity):
             if phase == "started":
                 self._brew_started_fired = False
                 self._brew_done_fired = False
+                self._first_pour_at = None
                 # A brew Home Assistant starts is a recipe brew wherever the
                 # machine was last seen.
                 self._on_module_screen = False

@@ -115,7 +115,7 @@ change and test `trigger.to_state.attributes.event_type`:
 | `event_type` | When | Attributes |
 |---|---|---|
 | `brew_started` | the first pour begins | `recipe_name` |
-| `brew_done` | the cup is ready | `recipe_name` |
+| `brew_done` | the cup is ready | `recipe_name`, `duration_s` (first pour to the end; empty when the first pour went unheard) |
 | `grinder_started` / `grinder_stopped` | the burrs start and stop | |
 | `brewer_started` | the brewer takes over | |
 | `pour_started` | each pour begins | `pour_index` (0-based) |

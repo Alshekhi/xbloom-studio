@@ -13,7 +13,7 @@ blueprint:
 
     **By the machine** — the brew starting, pouring, each pour, paused,
     resumed, cancelled — can go to a speaker of their own, where the recipe
-    name is said too.
+    name and how long the brew took are said too.
 
 
     A brew that cannot start says why, such as "the tank needs water".
@@ -104,6 +104,14 @@ blueprint:
           default: false
           selector:
             boolean: {}
+        announce_duration:
+          name: Say how long the brew took
+          description: >
+            "Finished preparing Morning V60. It took 3 minutes and 12
+            seconds", counted from the first pour.
+          default: false
+          selector:
+            boolean: {}
     entities:
       name: xBloom entities
       icon: mdi:coffee-maker-outline
@@ -139,6 +147,7 @@ variables:
   lang: !input language
   announce_recipe: !input announce_recipe
   announce_pours: !input announce_pours
+  announce_duration: !input announce_duration
   status_entity: !input xbloom_status_entity
   method: !input delivery_method
   notify_service: !input notify_service
@@ -181,6 +190,38 @@ variables:
     {%- elif reason -%}
       {%- if lang == 'ar' %}توقف التحضير{% else %}the brew stopped{% endif -%}
     {%- endif -%}
+  # How long the brew took: "3 minutes and 12 seconds". Empty when the brew event carries no duration —
+  # its first pour went unheard — so the announcement never guesses.
+  duration: >-
+    {%- set secs = trigger.to_state.attributes.get('duration_s')
+         if trigger.id == 'done_recipe' and announce_duration else none -%}
+    {%- if secs is number and secs > 0 -%}
+      {%- set total = secs | round | int -%}
+      {%- set m = total // 60 -%}
+      {%- set s = total % 60 -%}
+      {%- if lang == 'ar' -%}
+        {#- The counted noun follows the number: 1 and 2 are said by the noun
+            alone, 3–10 take the plural, 11 and above the singular. -#}
+        {%- set counts = ['', '', '', 'ثلاث', 'أربع', 'خمس', 'ست', 'سبع', 'ثمان', 'تسع', 'عشر'] -%}
+        {%- set parts = [] -%}
+        {%- if m == 1 -%}{%- set parts = parts + ['دقيقة'] -%}
+        {%- elif m == 2 -%}{%- set parts = parts + ['دقيقتين'] -%}
+        {%- elif 3 <= m <= 10 -%}{%- set parts = parts + [counts[m] ~ ' دقائق'] -%}
+        {%- elif m > 10 -%}{%- set parts = parts + [m ~ ' دقيقة'] -%}
+        {%- endif -%}
+        {%- if s == 1 -%}{%- set parts = parts + ['ثانية'] -%}
+        {%- elif s == 2 -%}{%- set parts = parts + ['ثانيتين'] -%}
+        {%- elif 3 <= s <= 10 -%}{%- set parts = parts + [counts[s] ~ ' ثوانٍ'] -%}
+        {%- elif s > 10 -%}{%- set parts = parts + [s ~ ' ثانية'] -%}
+        {%- endif -%}
+        {{ parts | join(' و') }}
+      {%- else -%}
+        {%- set parts = [] -%}
+        {%- if m -%}{%- set parts = parts + [m ~ (' minute' if m == 1 else ' minutes')] -%}{%- endif -%}
+        {%- if s -%}{%- set parts = parts + [s ~ (' second' if s == 1 else ' seconds')] -%}{%- endif -%}
+        {{ parts | join(' and ') }}
+      {%- endif -%}
+    {%- endif -%}
   all_speakers: !input speakers
   nearby_speakers_input: !input progress_speakers
   nearby_speakers: >-
@@ -197,14 +238,17 @@ variables:
       {%- endif -%}
     {%- elif trigger.id == 'pouring' -%}
       {%- if lang == 'ar' %}بدأ الصب{% else %}Pouring started{% endif -%}
-    {%- elif trigger.id == 'done_simple' and not announce_recipe -%}
+    {#- The brew event carries the recipe name and the duration, so it speaks
+        the finish whenever either is wanted; the status sensor otherwise. -#}
+    {%- elif trigger.id == 'done_simple' and not announce_recipe and not announce_duration -%}
       {%- if lang == 'ar' %}قهوتك جاهزة{% else %}Your coffee is ready{% endif -%}
-    {%- elif trigger.id == 'done_recipe' and announce_recipe
+    {%- elif trigger.id == 'done_recipe' and (announce_recipe or announce_duration)
             and trigger.to_state.attributes.get('event_type') == 'brew_done' -%}
+      {%- set name = recipe_name if announce_recipe else '' -%}
       {%- if lang == 'ar' -%}
-        {%- if recipe_name %}انتهى تحضير {{ recipe_name }}{% else %}انتهى تحضير قهوتك{% endif -%}
+        {%- if name %}انتهى تحضير {{ name }}{% else %}انتهى تحضير قهوتك{% endif %}{% if duration %}، واستغرق {{ duration }}{% endif -%}
       {%- else -%}
-        {%- if recipe_name %}Finished preparing {{ recipe_name }}{% else %}Your coffee is ready{% endif -%}
+        {%- if name %}Finished preparing {{ name }}{% else %}Your coffee is ready{% endif %}{% if duration %}. It took {{ duration }}{% endif -%}
       {%- endif -%}
     {#- An empty grinder is the machine's own fault: the fault blueprint speaks
         it the moment the machine reports it, so saying it again here as a

@@ -119,3 +119,56 @@ async def test_latch_resets_from_machine_frames_not_only_the_ha_task():
         bus["xbloom_brew_completed"](MagicMock(data={"outcome": "presumed"}))
 
         assert _fired(ent).count("brew_done") == 2
+
+
+CMD_BLOOM = 40510
+
+
+def _at(*seconds):
+    """Patch the clock to return each of `seconds` past a fixed start in turn."""
+    from datetime import datetime, timedelta, timezone
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    return patch(
+        "custom_components.xbloom.ble_entities.dt_util.utcnow",
+        side_effect=[start + timedelta(seconds=s) for s in seconds],
+    )
+
+
+@pytest.mark.asyncio
+async def test_enjoy_carries_the_time_from_the_first_pour():
+    async with _entity() as (ent, bus, on_event, _on_lifecycle):
+        with _at(10, 205.5):
+            on_event({"cmd": CMD_BLOOM})
+            on_event({"cmd": CMD_BLOOM})      # a later pour does not restart it
+            on_event({"cmd": CMD_ENJOY})
+        payload = ent._trigger_event.call_args_list[-1].args[1]
+        assert payload["duration_s"] == 195.5
+
+
+@pytest.mark.asyncio
+async def test_enjoy_without_a_heard_first_pour_has_no_duration():
+    async with _entity() as (ent, bus, on_event, _on_lifecycle):
+        on_event({"cmd": CMD_ENJOY})
+        assert ent._trigger_event.call_args_list[-1].args[1]["duration_s"] is None
+
+
+@pytest.mark.asyncio
+async def test_completion_passes_on_its_recorded_duration():
+    async with _entity() as (ent, bus, _on_event, _on_lifecycle):
+        bus["xbloom_brew_completed"](
+            MagicMock(data={"outcome": "presumed", "duration_s": 193.2})
+        )
+        assert ent._trigger_event.call_args_list[-1].args[1]["duration_s"] == 193.2
+
+
+@pytest.mark.asyncio
+async def test_a_new_brew_counts_from_its_own_first_pour():
+    """A brew cancelled after pouring must not lend its start to the next one."""
+    CMD_GRINDER_START = 40502
+    async with _entity() as (ent, bus, on_event, _on_lifecycle):
+        with _at(0, 300, 480):
+            on_event({"cmd": CMD_BLOOM})            # cancelled brew pours
+            on_event({"cmd": CMD_GRINDER_START})    # next brew begins
+            on_event({"cmd": CMD_BLOOM})
+            on_event({"cmd": CMD_ENJOY})
+        assert ent._trigger_event.call_args_list[-1].args[1]["duration_s"] == 180
