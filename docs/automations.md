@@ -61,7 +61,9 @@ The brew blueprint has two sets of speakers:
 
 Under **What to announce**, **Say the recipe name** names it at the start and
 the end, and **Announce each pour** adds "pour 2 of 4" for each pour after the
-first, with the final one said as the last pour.
+first, with the final one said as the last pour. **Say how long the brew took**
+adds the time from the first pour to the end — "It took 3 minutes and 12
+seconds" — to the coffee being ready, on the speakers by the machine only.
 
 ### The live-session announcements
 
