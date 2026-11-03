@@ -56,7 +56,7 @@ from .prepare import (
     BrewPreparer,
     PrepareRefused,
 )
-from .tool_common import refuse
+from .tool_common import refuse, require_machine_control
 from .coffee_lab.history import ChartFeed
 from .coffee_lab.services import async_register_lab_services
 from .coordinator import XBloomCoordinator
@@ -264,6 +264,8 @@ class XBloomRuntimeData:
     callbacks: Callbacks | None = None
     # Keeps the picked recipe prepared on the machine (prepare.py).
     preparer: object = None
+    # Off: commands that set the machine going are refused (switch.py).
+    machine_control: bool = True
 
 
 type XBloomConfigEntry = ConfigEntry[XBloomRuntimeData]
@@ -612,6 +614,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
         from .ble_entities import held_session
 
+        require_machine_control(entry)
         recipe, recipe_name, saved = await _brew_recipe(data, "xbloom.prepare_brew")
         if recipe is None:
             raise refuse("no_recipe_selected")
@@ -1825,10 +1828,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             )
         _LOGGER.info("xbloom.refresh_status: ✓ refreshed from heartbeat")
 
+    def _machine(handler):
+        """The handler, refused while Machine Control is off."""
+        async def guarded(call):
+            require_machine_control(entry)
+            return await handler(call)
+        return guarded
+
     hass.services.async_register(
         DOMAIN,
         "start_brew",
-        handle_start_brew,
+        _machine(handle_start_brew),
         supports_response=SupportsResponse.OPTIONAL,
         schema=vol.Schema({
             vol.Optional("recipe_name"): str,
@@ -1852,7 +1862,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     hass.services.async_register(
         DOMAIN,
         "prepare_brew",
-        handle_prepare_brew,
+        _machine(handle_prepare_brew),
         schema=vol.Schema({
             vol.Optional("recipe_name"): str,
             vol.Optional("use_preground"): bool,
@@ -1868,17 +1878,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     )
     hass.services.async_register(DOMAIN, "cancel_preparation", handle_cancel_preparation)
     hass.services.async_register(DOMAIN, "stop_brew", handle_stop_brew)
-    hass.services.async_register(DOMAIN, "ble_connect", handle_ble_connect)
+    hass.services.async_register(DOMAIN, "ble_connect", _machine(handle_ble_connect))
     hass.services.async_register(DOMAIN, "ble_disconnect", handle_ble_disconnect)
     hass.services.async_register(DOMAIN, "refresh_status", handle_refresh_status)
-    hass.services.async_register(DOMAIN, "tare", handle_tare)
-    hass.services.async_register(DOMAIN, "back_to_home", handle_back_to_home)
+    hass.services.async_register(DOMAIN, "tare", _machine(handle_tare))
+    hass.services.async_register(DOMAIN, "back_to_home", _machine(handle_back_to_home))
     hass.services.async_register(DOMAIN, "brew_pause", handle_brew_pause)
-    hass.services.async_register(DOMAIN, "brew_resume", handle_brew_resume)
+    hass.services.async_register(DOMAIN, "brew_resume", _machine(handle_brew_resume))
 
     # Standalone grind + mode/source/unit setters
     hass.services.async_register(
-        DOMAIN, "grind", handle_grind,
+        DOMAIN, "grind", _machine(handle_grind),
         schema=vol.Schema({
             vol.Optional("size", default=63): vol.All(
                 vol.Coerce(int),
@@ -1899,27 +1909,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             ),
         }),
     )
-    hass.services.async_register(DOMAIN, "brew_standalone", handle_brew_standalone)
+    hass.services.async_register(DOMAIN, "brew_standalone", _machine(handle_brew_standalone))
     hass.services.async_register(
-        DOMAIN, "set_mode", handle_set_mode,
+        DOMAIN, "set_mode", _machine(handle_set_mode),
         schema=vol.Schema({vol.Required("mode"): vol.In(list(spec.MODES))}),
     )
     hass.services.async_register(
-        DOMAIN, "set_water_source", handle_set_water_source,
+        DOMAIN, "set_water_source", _machine(handle_set_water_source),
         schema=vol.Schema({vol.Required("source"): vol.In(list(spec.WATER_SOURCE_CODES))}),
     )
     hass.services.async_register(
-        DOMAIN, "set_temp_unit", handle_set_temp_unit,
+        DOMAIN, "set_temp_unit", _machine(handle_set_temp_unit),
         schema=vol.Schema({vol.Required("unit"): vol.In(list(spec.TEMP_UNIT_CODES))}),
     )
     hass.services.async_register(
-        DOMAIN, "set_weight_unit", handle_set_weight_unit,
+        DOMAIN, "set_weight_unit", _machine(handle_set_weight_unit),
         schema=vol.Schema({vol.Required("unit"): vol.In(list(spec.WEIGHT_UNIT_CODES))}),
     )
 
     # Easy Mode slot writer
     hass.services.async_register(
-        DOMAIN, "write_slot", handle_write_slot,
+        DOMAIN, "write_slot", _machine(handle_write_slot),
         schema=vol.Schema({
             vol.Required("slot"): vol.In(list(spec.SLOTS)),
             vol.Optional("recipe_name"): str,

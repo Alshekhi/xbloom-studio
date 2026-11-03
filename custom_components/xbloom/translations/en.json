@@ -586,6 +586,9 @@
       "use_grinder": {
         "name": "Use Grinder"
       },
+      "machine_control": {
+        "name": "Machine control"
+      },
       "connect": {
         "name": "Connect"
       }
@@ -766,6 +769,9 @@
     },
     "no_recipes": {
       "message": "There are no recipes in the library."
+    },
+    "machine_control_off": {
+      "message": "Machine control is off."
     },
     "bag_required": {
       "message": "Coffee Lab is on, so a brew needs the bag its coffee comes from, or to be marked as from no bag."

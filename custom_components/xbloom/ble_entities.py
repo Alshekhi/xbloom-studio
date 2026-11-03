@@ -63,9 +63,12 @@ async def send_live_frame(entry, frame: bytes) -> bool:
     for actions that only make sense while Connected (e.g. the module-enter
     navigation buttons). Fire-and-forget; the machine echoes but we don't gate.
     """
+    from .tool_common import require_machine_control
+
     listener = held_session(entry)
     if listener is None:
         return False
+    require_machine_control(entry)
     return await listener.send_live(frame)
 
 

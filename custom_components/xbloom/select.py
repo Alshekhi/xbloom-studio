@@ -19,6 +19,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .ble_entities import send_brewer_pattern_live, signal_event
+from .tool_common import require_machine_control
 from .const import DOMAIN
 from .coordinator import XBloomCoordinator
 from .prepare import signal_clear_recipe
@@ -513,6 +514,8 @@ class XBloomBrewPatternSelect(_XBloomSettingSelect):
                 self._attr_unique_id, option, self._attr_options,
             )
             return
+        if self._live_listener() is not None:   # would drive the machine
+            require_machine_control(self._entry)
         self._current_option = option
         self.async_write_ha_state()
 

@@ -30,6 +30,7 @@ from homeassistant.helpers.event import (
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .ble_entities import send_brewer_temp_live, signal_event
+from .tool_common import require_machine_control
 from .const import DOMAIN
 from .coffee_lab.entities import entities_for as coffee_lab_entities
 from xbloom import spec
@@ -178,6 +179,8 @@ class _XBloomGrinderNumber(_XBloomNumberBase):
         self._drive_unsub = None
 
     async def async_set_native_value(self, value: float) -> None:
+        if self._live_listener() is not None:   # would drive the machine
+            require_machine_control(self._entry)
         await super().async_set_native_value(value)   # store + write state
         self._schedule_drive()
 
@@ -323,6 +326,8 @@ class XBloomBrewTemperatureNumber(_XBloomNumberBase):
         return None
 
     async def async_set_native_value(self, value: float) -> None:
+        if self._live_listener() is not None:   # would drive the machine
+            require_machine_control(self._entry)
         await super().async_set_native_value(value)   # store + write state
         self._schedule_drive()
 

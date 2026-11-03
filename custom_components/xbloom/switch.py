@@ -24,6 +24,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import CONF_IDLE_TIMEOUT, DOMAIN
 from .live_session import LiveSessionListener
+from .tool_common import require_machine_control
 from xbloom.mode_listener import IDLE_TIMEOUT_SEC
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     async_add_entities([
         XBloomConnectSwitch(live_listener, entry),
         XBloomUseGrinderSwitch(),
+        XBloomMachineControlSwitch(entry),
     ])
 
 
@@ -88,6 +90,45 @@ class XBloomUseGrinderSwitch(SwitchEntity, RestoreEntity):
 
     async def async_turn_off(self, **_kwargs) -> None:
         self._attr_is_on = False
+        self.async_write_ha_state()
+
+
+class XBloomMachineControlSwitch(SwitchEntity, RestoreEntity):
+    """Whether Home Assistant may set the machine going (ON) or not (OFF).
+
+    OFF refuses every command that starts, prepares or changes something on
+    the machine, from any caller: services, buttons, the AI tools. Stop, pause,
+    cancel and disconnect stay allowed, as does all recipe and data work.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "machine_control"
+    _attr_unique_id = "xbloom_machine_control"
+    _attr_icon = "mdi:remote"
+
+    def __init__(self, entry) -> None:
+        self._entry = entry
+        self._attr_is_on = True
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return _device_info()
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_state()) is not None:
+            self._attr_is_on = last.state == "on"
+        self._entry.runtime_data.machine_control = self._attr_is_on
+
+    async def async_turn_on(self, **_kwargs) -> None:
+        self._set(True)
+
+    async def async_turn_off(self, **_kwargs) -> None:
+        self._set(False)
+
+    def _set(self, on: bool) -> None:
+        self._entry.runtime_data.machine_control = on
+        self._attr_is_on = on
         self.async_write_ha_state()
 
 
@@ -159,6 +200,7 @@ class XBloomConnectSwitch(SwitchEntity):
         await self._listener.stop()
 
     async def async_turn_on(self, **_kwargs) -> None:
+        require_machine_control(self._entry)
         await self._listener.start()
         self._attr_is_on = True
         self.async_write_ha_state()

@@ -36,6 +36,17 @@ def fail(key: str, **placeholders: Any) -> HomeAssistantError:
     )
 
 
+def require_machine_control(entry) -> None:
+    """Refuse a command to the machine while Machine Control is off.
+
+    Stopping, pausing and disconnecting stay allowed, and so does everything
+    that only reads or edits recipes: those never set the machine going.
+    """
+    runtime = getattr(entry, "runtime_data", None)
+    if not getattr(runtime, "machine_control", True):
+        raise fail("machine_control_off")
+
+
 @dataclass(frozen=True)
 class Spec:
     """One action: its handler, what it does, and what it cannot run without."""
