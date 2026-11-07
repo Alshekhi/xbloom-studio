@@ -22,6 +22,17 @@ from .const import DOMAIN
 
 API_ID = DOMAIN
 
+# Home Assistant 2026.10 added `ToolResult`, and from 2027.11 a tool must
+# return one. The integration supports 2026.8 on, where a tool returns its
+# facts as they are, so a result is wrapped only where there is something to
+# wrap it in.
+_TOOL_RESULT = getattr(llm, "ToolResult", None)
+
+
+def _result(facts: JsonObjectType) -> Any:
+    return _TOOL_RESULT(data=facts) if _TOOL_RESULT is not None else facts
+
+
 API_PROMPT = (
     "Use the xbloom tool to control the xBloom Studio coffee machine. Its "
     "results are facts for you to put into words; a refused call says why."
@@ -32,6 +43,9 @@ class XBloomTool(llm.Tool):
     """The machine: recipes, brewing, and every module on its own."""
 
     name = "xbloom"
+    # Which integration provides the tool, as Home Assistant 2026.10 and later
+    # asks every tool to say (required from 2027.10). Older versions ignore it.
+    integration = DOMAIN
 
     def __init__(self, lab: CoffeeLab | None = None, targets: tuple[str, ...] = ()) -> None:
         self._lab = lab
@@ -40,7 +54,7 @@ class XBloomTool(llm.Tool):
 
     async def async_call(
         self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
-    ) -> JsonObjectType:
+    ) -> Any:
         # Home Assistant does not validate a tool's arguments before calling
         # it, so the schema is applied here: types coerced, unknown keys
         # refused, then what the action itself cannot run without.
@@ -48,13 +62,14 @@ class XBloomTool(llm.Tool):
         action = args.pop("action")
         tool_xbloom.check_arguments(action, args)
         machine = tool_xbloom.Machine(hass, llm_context.context, self._lab)
-        return await tool_xbloom.ACTIONS[action].run(machine, args)
+        return _result(await tool_xbloom.ACTIONS[action].run(machine, args))
 
 
 class CoffeeLabTool(llm.Tool):
     """The bags of coffee, and what was brewed from them."""
 
     name = "coffee_lab"
+    integration = DOMAIN
 
     def __init__(self, lab: CoffeeLab, description: str) -> None:
         self._lab = lab
@@ -63,10 +78,10 @@ class CoffeeLabTool(llm.Tool):
 
     async def async_call(
         self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
-    ) -> JsonObjectType:
+    ) -> Any:
         args: dict[str, Any] = self.parameters(tool_input.tool_args)
         action = args.pop("action")
-        return await tool_coffee_lab.run(self._lab, action, args)
+        return _result(await tool_coffee_lab.run(self._lab, action, args))
 
 
 class XBloomAPI(llm.API):
