@@ -51,6 +51,8 @@ SECRET_PREFIX = "whsec_"
 # Seconds before each retry. A receiver restarting is the common case; one gone
 # for minutes is not coming back for a brew.
 RETRY_DELAYS = (2.0, 10.0, 30.0)
+# How many completed brews' callers are remembered, for their rating message.
+KEEP_COMPLETED = 20
 TIMEOUT_S = 10
 
 # The endings, each carrying the brew's run_id. After one, nothing more is sent.
@@ -173,6 +175,9 @@ class Callbacks:
         self._running: str | None = None
         self._queue: asyncio.Queue[Message] = asyncio.Queue()
         self._send = send
+        # Who started each brew that completed: the brew's rating, asked
+        # later in a message of its own, goes back to the same caller.
+        self._completed: dict[str, tuple[str, Any]] = {}
 
     # -- arming ------------------------------------------------------------
 
@@ -209,10 +214,37 @@ class Callbacks:
             self._running = run_id
             return
         pending.recipe = pending.recipe or event.data.get("recipe_name")
+        if FINAL[event.event_type] == "completed":
+            self._completed[run_id] = (pending.target, pending.context)
+            while len(self._completed) > KEEP_COMPLETED:
+                del self._completed[next(iter(self._completed))]
         self._enqueue(run_id, pending, FINAL[event.event_type], True, dict(event.data))
         del self._pending[run_id]
         if self._running == run_id:
             self._running = None
+
+    def caller_of(self, run_id: str | None) -> tuple[str, Any] | None:
+        """The target and context a completed brew was started with, if any."""
+        return self._completed.get(run_id) if run_id else None
+
+    def send_rating_due(self, target: str, context: Any, question: dict[str, Any]) -> None:
+        """Ask the caller how a brew was: once it can have been tasted.
+
+        A message of its own, after the brew's ending, so the coffee is not
+        asked about in the call that says it is ready. Facts only, as every
+        callback; the receiver asks the person and keeps the answer with the
+        coffee_lab tool's rate_brew.
+        """
+        self._queue.put_nowait(Message(target, {
+            "type": "xbloom.rating.due",
+            "timestamp": dt_util.utcnow().isoformat(),
+            "data": {
+                "event": "rating_due", "final": False, "run_id": question.get("run_id"),
+                "brew_id": question["brew_id"], "recipe": question["recipe"],
+                "bag": question["bag"], "changes": question.get("changes") or [],
+            },
+            "context": context,
+        }))
 
     def _current(self) -> tuple[str, Pending] | None:
         if self._running is None or self._running not in self._pending:

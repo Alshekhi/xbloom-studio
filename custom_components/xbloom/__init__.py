@@ -44,6 +44,7 @@ from .const import (
 )
 from .blueprint_install import async_install_blueprints
 from .callbacks import Callbacks, targets_from
+from .rating_calls import RatingAsker
 from .coffee_lab.lab import CoffeeLab
 from .coffee_lab.listener import async_count_completed_brews
 from .coffee_lab.notion import Databases, NotionClient, NotionStore
@@ -2390,6 +2391,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         entry.runtime_data.callbacks = callbacks
         entry.async_on_unload(callbacks.async_listen())
         entry.async_create_background_task(hass, callbacks.async_run(), "xbloom callbacks")
+        # A brew a caller started is asked about later, in a message of its
+        # own, once it can have been tasted (rating_calls.py).
+        if entry.runtime_data.coffee_lab is not None:
+            asker = RatingAsker(hass, entry.runtime_data.coffee_lab, callbacks)
+            asker.start()
+            entry.async_on_unload(asker.stop)
 
     # Off the setup path: Home Assistant's blueprint store and the automations
     # it reloads need not be ready for the machine to be.

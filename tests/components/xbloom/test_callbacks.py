@@ -119,3 +119,13 @@ async def test_the_service_refuses_an_unknown_target_before_anything_fires():
     assert caught.value.translation_key == "callback_targets_none"
     assert not [c for c in hass.bus.async_fire.call_args_list if c.args and "brew" in c.args[0]]
 
+
+
+def test_a_completed_brew_s_caller_is_remembered_for_its_rating():
+    cb = _callbacks()
+    cb.arm("r1", "receiver", {"member": "m"}, progress=False)
+    cb.arm("r2", "receiver", None, progress=False)
+    cb.on_event(_event("xbloom_brew_completed", run_id="r1", outcome="confirmed"))
+    cb.on_event(_event("xbloom_brew_failed", run_id="r2", reason="no_water"))
+    assert cb.caller_of("r1") == ("receiver", {"member": "m"})
+    assert cb.caller_of("r2") is None, "only a brew that made coffee is asked about"

@@ -101,6 +101,15 @@ the form `{"type": "xbloom.brew.<event>", "timestamp", "data": {"event",
 as the event and `context` is what `start_brew` was given. A caller names a
 target; it can never supply a URL.
 
+With Coffee Lab on, a brew that completed and is worth asking about gets one
+more message, later and on its own: `xbloom.rating.due`, sent when the
+question about it falls due (a quarter of an hour after the brew, when the
+dashboard's card appears too), and only if it is still unanswered. Its `data`
+is `{"event": "rating_due", "final": false, "run_id", "brew_id", "recipe",
+"bag", "changes"}` and its `context` is the brew's. The receiver asks the
+person how it was and keeps the answer with the `coffee_lab` tool's
+`rate_brew`, which closes the card; left unanswered, the card stays.
+
 ## Event reference
 
 Most automations only need `sensor.xbloom_studio_brew_status`

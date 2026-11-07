@@ -176,6 +176,9 @@ class CoffeeLab:
         # The saved recipe of a name, from the integration's library: what the
         # question compares a brew's grind, ratio and dose against.
         self.recipe_lookup: Callable[[str], dict[str, Any] | None] = lambda name: None
+        # Told of each question opened, so it can be asked of whoever started
+        # the brew once it is due (rating_calls.py).
+        self.on_question: Callable[[dict[str, Any]], None] = lambda question: None
         # One brew at a time: two deliveries of one completion, handled
         # together, would both pass the duplicate check while the first waits
         # on the store, and subtract twice.
@@ -294,6 +297,12 @@ class CoffeeLab:
             return None
         return dict(question)
 
+    async def async_note_question(self, brew_id: str, **changes: Any) -> None:
+        """Keep something about the open question, if it is still this brew's."""
+        question = self._state.get("rating_question")
+        if question and question.get("brew_id") == brew_id:
+            await self._async_set_state(rating_question={**question, **changes})
+
     def rating_question_due(self, now: datetime | None = None) -> dict[str, Any] | None:
         question = self.rating_question
         if question is None:
@@ -301,7 +310,7 @@ class CoffeeLab:
         due = dt_util.parse_datetime(question["due_at"])
         return question if due is None or (now or dt_util.utcnow()) >= due else None
 
-    async def _async_maybe_ask(self, args: dict[str, Any], done: Consumption) -> None:
+    async def _async_maybe_ask(self, run_id: str, args: dict[str, Any], done: Consumption) -> None:
         """Open the question for this brew, when it is one worth asking about.
 
         Never lets counting fail: whatever goes wrong here is logged and the
@@ -325,14 +334,16 @@ class CoffeeLab:
                     return
             bean = await self.store.async_get_bean(done.bean_id)
             now = dt_util.utcnow()
-            await self._async_set_state(rating_question={
-                "brew_id": done.brew_id, "recipe": args["recipe"],
+            question = {
+                "brew_id": done.brew_id, "run_id": run_id, "recipe": args["recipe"],
                 "bean_id": done.bean_id, "bag": bean.name, "version": version,
                 "changes": version_changes(version, self.recipe_lookup(args["recipe"])),
                 "brewed_at": args.get("brewed_at"),
                 "due_at": (now + QUESTION_DELAY).isoformat(),
                 "expires_at": (now + QUESTION_LAPSE).isoformat(),
-            })
+            }
+            await self._async_set_state(rating_question=question)
+            self.on_question(question)
         except Exception:  # noqa: BLE001 — asking must never undo a count
             _LOGGER.exception("Coffee Lab: could not open the question for brew %s", done.brew_id)
 
@@ -497,7 +508,7 @@ class CoffeeLab:
                 continue
             await self.pending.async_remove(entry["run_id"])
             if entry["kind"] == "brew":
-                await self._async_maybe_ask(entry["args"], done)
+                await self._async_maybe_ask(entry["run_id"], entry["args"], done)
             if entry["run_id"] == wanted:
                 result = done
             elif (self.last_count or {}).get("run_id") == entry["run_id"]:
