@@ -241,6 +241,90 @@ get_recipe:
       selector:
         text:
 
+search_community:
+  fields:
+    keyword:
+      example: "Yirgacheffe"
+      selector:
+        text:
+    machine:
+      default: "Studio"
+      selector:
+        text:
+    kind:
+      selector:
+        select:
+          translation_key: community_kind
+          options:
+            - coffee
+            - tea
+    source:
+      selector:
+        select:
+          translation_key: community_source
+          options:
+            - official
+            - community
+    origins:
+      example: "Ethiopia"
+      selector:
+        text:
+          multiple: true
+    varietals:
+      selector:
+        text:
+          multiple: true
+    processes:
+      example: "Natural"
+      selector:
+        text:
+          multiple: true
+    roasts:
+      selector:
+        text:
+          multiple: true
+    flavors:
+      selector:
+        text:
+          multiple: true
+    cup_types:
+      selector:
+        text:
+          multiple: true
+    sort:
+      default: date
+      selector:
+        select:
+          translation_key: community_sort
+          options:
+            - date
+            - likes
+    page:
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 1000
+          mode: box
+    page_size:
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: box
+
+get_community_recipe:
+  fields:
+    recipe_id:
+      required: true
+      example: 686619
+      selector:
+        number:
+          min: 1
+          max: 100000000
+          mode: box
+
 build_recipe:
   fields:
     name:

@@ -26,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 
 import json
 
+import aiohttp
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceResponse, SupportsResponse, callback
@@ -63,6 +64,14 @@ from .coordinator import XBloomCoordinator
 from . import llm_api
 from xbloom.client import XBloomClient
 from xbloom.cloud import XBloomCloudClient, language_type_for
+from xbloom.community import (
+    DEFAULT_PAGE_SIZE as COMMUNITY_PAGE_SIZE,
+    KINDS as COMMUNITY_KINDS,
+    SORTS as COMMUNITY_SORTS,
+    SOURCES as COMMUNITY_SOURCES,
+    XBloomCommunityClient,
+)
+from xbloom.exceptions import XBloomAPIError
 from xbloom import recipe_build, spec
 from xbloom.recipe_validate import normalize_recipe, validate_recipe
 
@@ -362,6 +371,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     cloud = XBloomCloudClient(
         session, language_type=language_type_for(hass.config.language)
     )
+    # The community hub needs no account; its filter names come back in the
+    # HA language, so callers search with the names they are shown.
+    community = XBloomCommunityClient(session, language=hass.config.language)
 
     coordinator = XBloomCoordinator(hass, entry, cloud)
     await coordinator.async_config_entry_first_refresh()
@@ -1954,6 +1966,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         )
         return {"recipe": recipe}
 
+    # -- Community hub: recipes others shared, read without an account ----- #
+    # A hub recipe is brewed or slotted through its share_url, which the brew
+    # services already take, so nothing here writes to the machine.
+
+    async def handle_search_community(call) -> dict:
+        filters = {
+            arg: call.data[arg]
+            for arg in (
+                "keyword", "machine", "kind", "source", "origins", "varietals",
+                "processes", "roasts", "flavors", "cup_types", "sort", "page", "page_size",
+            )
+            if arg in call.data
+        }
+        try:
+            result = await community.search(**filters)
+        except ValueError as err:  # a filter name the hub does not list
+            return {"ok": False, "error": str(err)}
+        except (XBloomAPIError, aiohttp.ClientError) as err:
+            _LOGGER.warning("xbloom.search_community: %s", err)
+            return {"ok": False, "error": str(err)}
+        return {"ok": True, **result}
+
+    async def handle_get_community_recipe(call) -> dict:
+        try:
+            recipe = await community.detail(call.data["recipe_id"])
+        except (XBloomAPIError, aiohttp.ClientError) as err:
+            _LOGGER.warning("xbloom.get_community_recipe: %s", err)
+            return {"ok": False, "error": str(err)}
+        return {"ok": True, "recipe": recipe}
+
     async def handle_build_recipe(call) -> dict:
         """Snap loose recipe fields onto the machine's grid, then validate.
 
@@ -2152,6 +2194,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         schema=vol.Schema({vol.Required("name"): str}),
         supports_response=SupportsResponse.ONLY,
     )
+
+    def _names(value) -> list[str]:
+        """A list of hub names, from a list or one comma-separated string."""
+        items = value if isinstance(value, list) else str(value).split(",")
+        return [str(v).strip() for v in items if str(v).strip()]
+
+    hass.services.async_register(
+        DOMAIN, "search_community", handle_search_community,
+        schema=vol.Schema({
+            vol.Optional("keyword"): str,
+            # This integration drives the Studio, so its recipes come first;
+            # an empty value searches every machine.
+            vol.Optional("machine", default="Studio"): vol.Any(None, str),
+            vol.Optional("kind"): vol.In(list(COMMUNITY_KINDS)),
+            vol.Optional("source"): vol.In(list(COMMUNITY_SOURCES)),
+            **{
+                vol.Optional(arg): _names
+                for arg in ("origins", "varietals", "processes", "roasts", "flavors", "cup_types")
+            },
+            vol.Optional("sort", default="date"): vol.In(list(COMMUNITY_SORTS)),
+            vol.Optional("page", default=1): vol.All(vol.Coerce(int), vol.Range(min=1)),
+            vol.Optional("page_size", default=COMMUNITY_PAGE_SIZE): vol.All(
+                vol.Coerce(int), vol.Range(min=1, max=50),
+            ),
+        }),
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register(
+        DOMAIN, "get_community_recipe", handle_get_community_recipe,
+        schema=vol.Schema({vol.Required("recipe_id"): vol.Coerce(int)}),
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
         DOMAIN, "build_recipe", handle_build_recipe,
         # `name` is deliberately Optional here: the builder reports a missing
@@ -2210,6 +2284,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         "build_recipe",
         "list_recipes", "get_recipe", "add_recipe", "update_recipe", "delete_recipe",
         "archive_recipe", "restore_recipe", "list_archived_recipes",
+        "search_community", "get_community_recipe",
         "save_scaled_recipe",
     ):
         entry.async_on_unload(

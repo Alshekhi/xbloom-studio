@@ -1203,6 +1203,74 @@
         }
       }
     },
+    "search_community": {
+      "name": "Search Community Recipes",
+      "description": "Search the recipes people share on the xBloom community hub. Returns a page of matches as response data, each with its share_url: pass that to start_brew or write_slot to brew it. Filters take the names the hub lists, in the language Home Assistant uses; a name it does not know comes back as an error listing the ones it does.",
+      "fields": {
+        "keyword": {
+          "name": "Keyword",
+          "description": "Words in the recipe name."
+        },
+        "machine": {
+          "name": "Machine",
+          "description": "Studio or Original. Leave empty for every machine."
+        },
+        "kind": {
+          "name": "Coffee or tea",
+          "description": "Only coffee recipes, or only tea."
+        },
+        "source": {
+          "name": "Shared by",
+          "description": "Only xBloom's own recipes, or only the community's."
+        },
+        "origins": {
+          "name": "Origins",
+          "description": "Countries the coffee was grown in."
+        },
+        "varietals": {
+          "name": "Varietals",
+          "description": "Coffee varietals."
+        },
+        "processes": {
+          "name": "Processes",
+          "description": "Natural, Washed, Honey and the like."
+        },
+        "roasts": {
+          "name": "Roasts",
+          "description": "Roast levels, such as Light Roast."
+        },
+        "flavors": {
+          "name": "Flavors",
+          "description": "Tasting notes."
+        },
+        "cup_types": {
+          "name": "Cup types",
+          "description": "xPod, Omni, Other."
+        },
+        "sort": {
+          "name": "Sort by",
+          "description": "Newest or most liked first."
+        },
+        "page": {
+          "name": "Page",
+          "description": "Which page of results."
+        },
+        "page_size": {
+          "name": "Page size",
+          "description": "Recipes per page."
+        }
+      }
+    },
+    "get_community_recipe": {
+      "name": "Get Community Recipe",
+      "description": "Return one community hub recipe with its description and pours, by the id search_community gives.",
+      "fields": {
+        "recipe_id": {
+          "name": "Recipe id",
+          "description": "The id from search_community."
+        }
+      }
+    },
     "build_recipe": {
       "name": "Build Recipe",
       "description": "Turn loose recipe fields into a brewable recipe. Every value is snapped onto the machine's grid rather than rejected — a ratio of 1:16.3 becomes 1:16.5, a 105 °C pour becomes 98 °C — and the response lists each change in plain language, so a caller can tell the user what was adapted. Made for callers working from a recipe as a person described it (a web recipe, a spoken request) rather than a validated form. Only faults that cannot be snapped away — a missing name, more pours than the machine accepts, a single pour over 240 ml — come back as errors. The response carries ok, recipe, adjustments and errors. With save: true the recipe is stored in the same call: it replaces the recipe named by id when one is given, and adds a new one otherwise.",
@@ -1359,6 +1427,24 @@
       "options": {
         "local": "Home Assistant",
         "notion": "Notion"
+      }
+    },
+    "community_kind": {
+      "options": {
+        "coffee": "Coffee",
+        "tea": "Tea"
+      }
+    },
+    "community_source": {
+      "options": {
+        "official": "xBloom",
+        "community": "Community"
+      }
+    },
+    "community_sort": {
+      "options": {
+        "date": "Newest",
+        "likes": "Most liked"
       }
     }
   },
