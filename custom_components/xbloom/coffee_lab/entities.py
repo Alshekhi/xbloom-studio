@@ -29,7 +29,7 @@ from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
 _LOGGER = logging.getLogger(__name__)
 
 # The results a count can have, as the last-count sensor's states.
-COUNT_RESULTS = ["counted", "recorded", "skipped", "flagged"]
+COUNT_RESULTS = ["counted", "recorded", "skipped", "flagged", "queued"]
 
 
 def bag_labels(beans: list[Bean]) -> dict[str, str]:
@@ -174,6 +174,23 @@ class StatsSensor(CoffeeLabEntity, SensorEntity):
         self._attr_extra_state_attributes = facts
 
 
+class WaitingBrewsSensor(CoffeeLabEntity, SensorEntity):
+    """How many brews wait for the store; the oldest's error as an attribute."""
+
+    _attr_icon = "mdi:cloud-upload-outline"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "waiting_brews")
+
+    async def async_read(self) -> None:
+        self._attr_native_value = len(self.lab.pending)
+        oldest = self.lab.pending.oldest
+        self._attr_extra_state_attributes = (
+            {"oldest_queued_at": oldest["queued_at"], "error": oldest.get("last_error")}
+            if oldest else {}
+        )
+
+
 class LastCountSensor(CoffeeLabEntity, SensorEntity):
     """What the last brew did to the inventory; `flagged` needs a look."""
 
@@ -262,7 +279,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
         return []
     makers: dict[str, list[Callable[[CoffeeLab], Entity]]] = {
         "select": [ActiveBagSelect, StatsPeriodSelect, ManualBrewerSelect],
-        "sensor": [RemainingSensor, BagsSensor, StatsSensor, LastCountSensor],
+        "sensor": [RemainingSensor, BagsSensor, StatsSensor, LastCountSensor, WaitingBrewsSensor],
         "number": [ManualDoseNumber],
         "button": [RecordManualBrewButton],
     }

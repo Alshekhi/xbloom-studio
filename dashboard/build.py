@@ -205,6 +205,9 @@ def brew_view(t: dict) -> dict:
             tile(f"binary_sensor.{E}_in_range"),
             tile(bag, visibility=present(bag)),
             tile(f"sensor.{E}_coffee_left", visibility=present(f"sensor.{E}_coffee_left")),
+            # Only while a brew could not be saved; it is retried by itself.
+            tile(f"sensor.{E}_waiting_brews", visibility=[
+                {"condition": "numeric_state", "entity": f"sensor.{E}_waiting_brews", "above": 0}]),
         ]),
         section(t["h_in_progress"], [
             tile(f"sensor.{E}_current_recipe", visibility=present(f"sensor.{E}_current_recipe")),

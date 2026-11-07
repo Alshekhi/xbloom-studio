@@ -35,6 +35,12 @@ brews, stats — appear only while Coffee Lab is switched on (**Configure →
 Coffee Lab**). With it off, the dashboard is the machine alone. **Refresh
 Coffee Bags** appears only when Coffee Lab is kept in Notion.
 
+
+A brew that cannot be saved — Coffee Lab kept in Notion, and Notion cannot be
+reached — is kept in Home Assistant and saved by itself once it can be.
+**Waiting brews** appears on the Brew tab only while one is waiting, and a
+repair appears if one has waited more than an hour.
+
 ## The views
 
 - **Brew** — what is happening now, the bag in use, a recipe for that bag,

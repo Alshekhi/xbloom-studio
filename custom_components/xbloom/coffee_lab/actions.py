@@ -17,8 +17,10 @@ from typing import Any
 
 from homeassistant.util import dt as dt_util
 
+from homeassistant.exceptions import ServiceValidationError
+
 from ..tool_common import refuse
-from .lab import CoffeeLab, Consumption
+from .lab import STORE_UNREACHABLE, CoffeeLab, Consumption
 from .models import Bean, Brew
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER, Totals
 from .store import UnknownBean
@@ -68,6 +70,26 @@ async def resolve_bean(
     if len(matches) > 1:
         raise refuse("bag_ambiguous", name=name)
     return matches[0]
+
+
+async def _bag_for_counting(lab: CoffeeLab, args: dict[str, Any]) -> tuple[str, Bean | None]:
+    """The bag a brew is counted against: its id, and the bag when it can be read.
+
+    A store that cannot be reached must not stop a brew from being queued,
+    or the brew is lost before the queue ever sees it. When the id is known —
+    given, or the bag in use — the brew is queued against it unread, and the
+    bag is checked when the brew is counted. A refusal (no such bag) is still
+    a refusal.
+    """
+    try:
+        bean = await resolve_bean(lab, args)
+    except ServiceValidationError:
+        raise
+    except STORE_UNREACHABLE:
+        if not args.get("bean_id"):
+            raise
+        return args["bean_id"], None
+    return bean.id, bean
 
 
 def _consumption_facts(result: Consumption, bean: Bean | None) -> dict[str, Any]:
@@ -160,9 +182,9 @@ async def consume(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     An xBloom brew counts itself when it completes; reporting it here too
     would take its coffee twice.
     """
-    bean = await resolve_bean(lab, args)
+    bean_id, bean = await _bag_for_counting(lab, args)
     result = await lab.async_consume(
-        bean_id=bean.id, grams=args["grams"],
+        bean_id=bean_id, grams=args["grams"],
         # No brewer named is recorded as none, never as the xBloom.
         brewer=args.get("brewer"), recipe_source=args.get("source"),
     )
@@ -220,11 +242,19 @@ async def record_manual_brew(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, 
     """
     if lab.manual_dose_g is None:
         raise refuse("manual_dose_required")
-    bean = await lab.async_active_bean()
-    if bean is None:
+    # The bag in use is known here even when the store cannot be reached.
+    if lab.active_bean_id is None:
         raise refuse("bag_required")
+    try:
+        bean = await lab.async_active_bean()
+    except STORE_UNREACHABLE:
+        bean = None
+    else:
+        if bean is None:  # finished or removed since it was chosen
+            raise refuse("bag_required")
     result = await lab.async_consume(
-        bean_id=bean.id, grams=lab.manual_dose_g, run_id=f"manual-{uuid.uuid4().hex}",
+        bean_id=bean.id if bean else lab.active_bean_id,
+        grams=lab.manual_dose_g, run_id=f"manual-{uuid.uuid4().hex}",
         # `other` is recorded as no brewer, which the stats count as other.
         brewer=lab.manual_brewer if lab.manual_brewer != OTHER_BREWER else None,
         recipe_source="dashboard",

@@ -49,6 +49,16 @@ views:
       - condition: state
         entity: sensor.xbloom_studio_coffee_left
         state_not: unknown
+    - type: tile
+      entity: sensor.xbloom_studio_waiting_brews
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      visibility:
+      - condition: numeric_state
+        entity: sensor.xbloom_studio_waiting_brews
+        above: 0
   - type: grid
     cards:
     - type: markdown

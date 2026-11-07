@@ -28,6 +28,7 @@ import json
 
 import aiohttp
 import voluptuous as vol
+from homeassistant.util import dt as dt_util
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceResponse, SupportsResponse, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -250,6 +251,29 @@ async def _await_brew_outcome(
                 task.cancel()
 
 
+# How often brews waiting for the store are retried, and how long one may
+# wait before a repair says so.
+PENDING_RETRY = timedelta(minutes=5)
+PENDING_REPAIR_AFTER = timedelta(hours=1)
+PENDING_ISSUE = "brews_waiting"
+
+
+def _report_waiting(hass: HomeAssistant, lab: CoffeeLab, waiting: int) -> None:
+    """A repair while a brew has waited too long; gone once none waits."""
+    from homeassistant.helpers import issue_registry as ir
+
+    oldest = lab.pending.oldest
+    queued = dt_util.parse_datetime(oldest["queued_at"]) if oldest else None
+    if waiting and queued and dt_util.utcnow() - queued >= PENDING_REPAIR_AFTER:
+        ir.async_create_issue(
+            hass, DOMAIN, PENDING_ISSUE, is_fixable=False, severity=ir.IssueSeverity.WARNING,
+            translation_key=PENDING_ISSUE,
+            translation_placeholders={"count": str(waiting), "error": oldest.get("last_error") or ""},
+        )
+    elif not waiting:
+        ir.async_delete_issue(hass, DOMAIN, PENDING_ISSUE)
+
+
 @dataclass
 class XBloomRuntimeData:
     """Runtime data stored on the config entry."""
@@ -413,6 +437,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         lab.on_change = lambda: async_dispatcher_send(hass, SIGNAL_COFFEE_LAB_UPDATED)
         entry.runtime_data.coffee_lab = lab
         entry.async_on_unload(async_count_completed_brews(hass, lab))
+        # Brews that could not reach the store wait in Home Assistant and are
+        # retried here, at startup and every few minutes (coffee_lab/pending.py).
+        async def _retry_pending(_now=None) -> None:
+            try:
+                waiting = await lab.async_retry_pending()
+            except Exception:  # noqa: BLE001 — a fault here must not stop the timer
+                _LOGGER.exception("Coffee Lab: retrying waiting brews failed")
+                return
+            _report_waiting(hass, lab, waiting)
+
+        entry.async_on_unload(async_track_time_interval(hass, _retry_pending, PENDING_RETRY))
+        entry.async_create_background_task(hass, _retry_pending(), "xbloom coffee lab pending")
         entry.async_on_unload(async_register_lab_services(hass, lab))
         if store is not None:
             # Nothing tells Home Assistant of a bag added or edited in Notion

@@ -592,7 +592,8 @@
           "counted": "Taken from the bag",
           "recorded": "Recorded",
           "skipped": "Not counted",
-          "flagged": "Needs review"
+          "flagged": "Needs review",
+          "queued": "Waiting to be saved"
         }
       },
       "brew_time": {
@@ -603,6 +604,9 @@
       },
       "recipe_suggestions": {
         "name": "Recipe Suggestions"
+      },
+      "coffee_lab_waiting_brews": {
+        "name": "Waiting brews"
       }
     },
     "switch": {
@@ -1523,6 +1527,10 @@
           }
         }
       }
+    },
+    "brews_waiting": {
+      "title": "Coffee Lab brews are waiting to be saved",
+      "description": "Some brews could not be saved to Coffee Lab's store, so Home Assistant is keeping them and trying again every few minutes. Nothing needs doing for them to be saved once the store can be reached.\n\nNumber waiting: {count}\n\nLast error: {error}"
     }
   }
 }

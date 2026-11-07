@@ -7,12 +7,16 @@ inventory rules exist in one place.
 from __future__ import annotations
 
 import asyncio
+import logging
+import uuid
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
+import aiohttp
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
@@ -21,13 +25,21 @@ from xbloom import spec
 from ..const import DOMAIN
 from .inventory import Deduct, Flag, Skip, decide_consumption, is_xpod
 from .models import SELECTABLE, Bean, Brew, Review
+from .pending import PendingBrews
 from .stats import DEFAULT_PERIOD, PERIODS, Report, earliest_needed, period_report
 from .store import (
     STORAGE_VERSION, CoffeeLabStore, ProcessedRuns, Storage, UnknownBean,
     async_local_store, async_processed_runs,
 )
 
+_LOGGER = logging.getLogger(__name__)
+
 STATE_KEY = f"{DOMAIN}.coffee_lab_state"
+PENDING_KEY = f"{DOMAIN}.coffee_lab_pending"
+
+# What a store that cannot be reached raises. Anything else is a fault in
+# this code, not a reason to wait and try again.
+STORE_UNREACHABLE = (HomeAssistantError, aiohttp.ClientError, asyncio.TimeoutError, OSError)
 
 # What an xBloom brew is recorded as in a brew's `brewer`: the product's name.
 XBLOOM_BREWER = "xBloom Studio"
@@ -44,7 +56,9 @@ class Consumption:
 
     `result` is `counted` (subtracted from the bag), `recorded` (the brew is in
     the record but nothing was subtracted), `skipped` (nothing written — a
-    duplicate) or `flagged` (recorded for review, the bag left alone).
+    duplicate), `flagged` (recorded for review, the bag left alone) or
+    `queued` (the store could not be reached; the brew waits in Home
+    Assistant and is counted once it can be, `reason` saying why).
     """
 
     result: str
@@ -78,8 +92,10 @@ class CoffeeLab:
         self, store: CoffeeLabStore, runs: ProcessedRuns, state: Storage,
         on_change: Callable[[], None] = lambda: None,
         brewers: tuple[str, ...] = (),
+        pending: PendingBrews | None = None,
     ) -> None:
         self.store = store
+        self.pending = pending if pending is not None else PendingBrews(_MemoryStorage())
         # What the manual-brew picker offers besides `other`.
         self.brewers = brewers
         self._runs = runs
@@ -97,11 +113,14 @@ class CoffeeLab:
         cls, hass: HomeAssistant, brewers: tuple[str, ...] = (),
         store: CoffeeLabStore | None = None,
     ) -> CoffeeLab:
+        pending = PendingBrews(Store(hass, STORAGE_VERSION, PENDING_KEY))
+        await pending.async_load()
         lab = cls(
             store or await async_local_store(hass),
             await async_processed_runs(hass),
             Store(hass, STORAGE_VERSION, STATE_KEY),
             brewers=brewers,
+            pending=pending,
         )
         await lab.async_load_state()
         return lab
@@ -193,20 +212,90 @@ class CoffeeLab:
         recipe_source: str | None = None, outcome: str | None = None,
         settings: dict[str, Any] | None = None, unattributed: bool = False,
     ) -> Consumption:
-        """Apply one brew to its bag and the record."""
+        """Apply one brew to its bag and the record.
+
+        The brew is queued first and counted from the queue, so a store that
+        cannot be reached leaves it waiting rather than lost; see pending.py.
+        """
+        return await self._async_queue_and_count("brew", run_id, {
+            "bean_id": bean_id, "grams": grams, "cup_type": cup_type, "recipe": recipe,
+            "brewer": brewer, "brewed_at": brewed_at, "recipe_source": recipe_source,
+            "outcome": outcome, "settings": settings, "unattributed": unattributed,
+        })
+
+    async def _async_queue_and_count(
+        self, kind: str, run_id: str | None, args: dict[str, Any],
+    ) -> Consumption:
+        # A brew reported with no id of its own gets one, so its row can be
+        # found again and a retry cannot write it twice.
+        run_id = run_id or f"lab-{uuid.uuid4().hex}"
+        # When it happened is fixed now, not when a retry finally writes it.
+        args = {**args, "brewed_at": args.get("brewed_at") or dt_util.utcnow().isoformat()}
         async with self._counting:
-            result = await self._async_consume(
-                bean_id=bean_id, grams=grams, run_id=run_id, cup_type=cup_type,
-                recipe=recipe, brewer=brewer, brewed_at=brewed_at,
-                recipe_source=recipe_source, outcome=outcome, settings=settings,
-                unattributed=unattributed,
-            )
-            # Kept so a flagged brew stays visible after a restart. Also
-            # tells the entities to re-read.
+            if self.pending.contains(run_id):
+                result = Consumption("skipped", reason="already_queued")
+            else:
+                await self.pending.async_add(run_id, kind, args, dt_util.utcnow().isoformat())
+                result = await self._async_drain(run_id)
+            # Kept so a flagged or queued brew stays visible after a restart.
+            # Also tells the entities to re-read.
             await self._async_set_state(last_count={
-                **asdict(result), "at": dt_util.utcnow().isoformat(),
+                **asdict(result), "run_id": run_id, "at": dt_util.utcnow().isoformat(),
             })
             return result
+
+    async def async_retry_pending(self) -> int:
+        """Count what is waiting, oldest first; how many are still waiting."""
+        if not len(self.pending):
+            return 0
+        async with self._counting:
+            await self._async_drain(None)
+        self.on_change()
+        return len(self.pending)
+
+    async def _async_drain(self, wanted: str | None) -> Consumption:
+        """Count the queue in order, stopping at the first that cannot be.
+
+        Order is kept because each subtraction reads the bag the one before it
+        left. `wanted` is the run whose result is returned; it is `queued`
+        when it, or a brew ahead of it, could not reach the store.
+        """
+        result = Consumption("queued")
+        for entry in self.pending.entries:
+            try:
+                if entry["kind"] == "stopped":
+                    done = await self._async_stopped(entry["run_id"], **entry["args"])
+                else:
+                    done = await self._async_consume(entry["run_id"], entry, **entry["args"])
+            except STORE_UNREACHABLE as err:
+                reason = str(err) or type(err).__name__
+                await self.pending.async_update(
+                    entry["run_id"], attempts=entry["attempts"] + 1, last_error=reason,
+                )
+                if wanted is not None:
+                    result = Consumption("queued", reason=reason)
+                break
+            except Exception as err:  # noqa: BLE001
+                # A fault in this code, not the store: kept and tried again
+                # later, but stepped past, so one brew that cannot be counted
+                # does not hold back every brew after it.
+                _LOGGER.exception("Coffee Lab: brew %s could not be counted", entry["run_id"])
+                reason = f"{type(err).__name__}: {err}"
+                await self.pending.async_update(
+                    entry["run_id"], attempts=entry["attempts"] + 1, last_error=reason,
+                )
+                if entry["run_id"] == wanted:
+                    result = Consumption("queued", reason=reason)
+                continue
+            await self.pending.async_remove(entry["run_id"])
+            if entry["run_id"] == wanted:
+                result = done
+            elif (self.last_count or {}).get("run_id") == entry["run_id"]:
+                # The last brew shown as waiting is saved now: show what it did.
+                await self._async_set_state(last_count={
+                    **asdict(done), "run_id": entry["run_id"], "at": dt_util.utcnow().isoformat(),
+                })
+        return result
 
     @property
     def last_count(self) -> dict[str, Any] | None:
@@ -214,11 +303,38 @@ class CoffeeLab:
         return self._state.get("last_count")
 
     async def _async_consume(
-        self, *, bean_id: str | None, grams: Any, run_id: str | None,
+        self, run_id: str, entry: dict[str, Any], *, bean_id: str | None, grams: Any,
         cup_type: Any, recipe: str | None, brewer: str | None,
         brewed_at: str | None, recipe_source: str | None, outcome: str | None,
         settings: dict[str, Any] | None, unattributed: bool,
     ) -> Consumption:
+        def record(bag: str | None, review: Review | None = None) -> Brew:
+            return Brew(
+                id="",
+                brewed_at=brewed_at or dt_util.utcnow().isoformat(),
+                recorded_at=dt_util.utcnow().isoformat(),
+                # An xPod or unattributed brew may arrive with no dose.
+                dose_g=_grams(grams), brewer=brewer, bean_id=bag,
+                water_ml=_grams((settings or {}).get("water_ml")),
+                dripper=cup_label(cup_type), recipe=recipe,
+                recipe_source=recipe_source, outcome=outcome, run_id=run_id,
+                settings={k: v for k, v in (settings or {}).items() if v is not None},
+                review=review,
+            )
+
+        # The bag was taken from on an earlier try and only the row is
+        # missing: finish that, without deciding the subtraction again.
+        if entry.get("bag"):
+            bag = entry["bag"]
+            if not await self.store.async_has_run(run_id):
+                await self.store.async_create_brew(record(bag["bean_id"]))
+            await self._runs.async_add(run_id)
+            self.on_change()
+            return Consumption(
+                "counted", bean_id=bag["bean_id"], grams=bag["grams"],
+                remaining_g=bag["remaining_g"], opened=bag["opened"], finished=bag["finished"],
+            )
+
         # Read the bag fresh: a cached amount is exactly what must not be stale
         # when subtracting from it.
         bean: Bean | None = None
@@ -237,27 +353,12 @@ class CoffeeLab:
             already_processed=already, unattributed=unattributed,
         )
 
-        def record(bag: str | None, review: Review | None = None) -> Brew:
-            return Brew(
-                id="",
-                brewed_at=brewed_at or dt_util.utcnow().isoformat(),
-                recorded_at=dt_util.utcnow().isoformat(),
-                # An xPod or unattributed brew may arrive with no dose.
-                dose_g=_grams(grams), brewer=brewer, bean_id=bag,
-                water_ml=_grams((settings or {}).get("water_ml")),
-                dripper=cup_label(cup_type), recipe=recipe,
-                recipe_source=recipe_source, outcome=outcome, run_id=run_id,
-                settings={k: v for k, v in (settings or {}).items() if v is not None},
-                review=review,
-            )
-
         if isinstance(decision, Skip):
             # A skipped subtraction is not a skipped brew: an untracked bag's
             # brew still happened, with a real dose, against a real bag.
             if decision.record_brew:
                 await self.store.async_create_brew(record(decision.bean_id))
-            # Marked after writing: had the write failed, a retry could still
-            # record it.
+            # Marked after writing: had the write failed, the queue retries it.
             await self._runs.async_add(run_id)
             self.on_change()
             return Consumption(
@@ -278,16 +379,22 @@ class CoffeeLab:
             )
 
         assert isinstance(decision, Deduct)
-        # Marked before writing. A duplicate that slips through subtracts
-        # twice; a failure between these lines loses one subtraction, which is
-        # visible in the bag and fixable. The asymmetry is deliberate.
-        await self._runs.async_add(run_id)
         await self.store.async_apply_bean_update(
             decision.bean_id, remaining_g=decision.new_remaining_g,
             open_bag=decision.open_bag, finish=decision.finish,
             today=dt_util.now().date().isoformat(),
         )
+        # Noted at once, so a retry after a failed row write does not take
+        # from the bag again.
+        await self.pending.async_update(run_id, bag={
+            "bean_id": decision.bean_id, "grams": decision.grams,
+            "remaining_g": decision.new_remaining_g,
+            "opened": decision.open_bag, "finished": decision.finish,
+        })
         await self.store.async_create_brew(record(decision.bean_id))
+        # Marked once both writes are in; until then the queue holds the run,
+        # and a second delivery of it is refused there.
+        await self._runs.async_add(run_id)
         self.on_change()
         return Consumption(
             "counted", bean_id=decision.bean_id, grams=decision.grams,
@@ -304,33 +411,34 @@ class CoffeeLab:
 
         Recorded for someone to decide, with the bag left as it is — whether
         the grounds were brewed some other way or thrown out is not something
-        the machine can say.
+        the machine can say. Queued like a finished brew.
         """
-        async with self._counting:
-            if self._runs.contains(run_id) or bool(
-                run_id and await self.store.async_has_run(run_id)
-            ):
-                result = Consumption("skipped", reason="already_counted")
-            elif unattributed or is_xpod(cup_type):
-                # No bag to put right: the coffee was in a pod, or came from none.
-                result = Consumption("skipped", reason="no_bag_used")
-            else:
-                await self.store.async_create_brew(Brew(
-                    id="", brewed_at=brewed_at or dt_util.utcnow().isoformat(),
-                    recorded_at=dt_util.utcnow().isoformat(), dose_g=_grams(grams),
-                    brewer=XBLOOM_BREWER, bean_id=bean_id, dripper=cup_label(cup_type),
-                    recipe=recipe, outcome="stopped", run_id=run_id,
-                    review=Review("stopped_after_grinding", {"grams": _grams(grams)}),
-                ))
-                await self._runs.async_add(run_id)
-                result = Consumption(
-                    "flagged", reason="stopped_after_grinding",
-                    detail={"grams": _grams(grams)}, bean_id=bean_id,
-                )
-            await self._async_set_state(last_count={
-                **asdict(result), "at": dt_util.utcnow().isoformat(),
-            })
-            return result
+        return await self._async_queue_and_count("stopped", run_id, {
+            "bean_id": bean_id, "grams": grams, "cup_type": cup_type,
+            "recipe": recipe, "brewed_at": brewed_at, "unattributed": unattributed,
+        })
+
+    async def _async_stopped(
+        self, run_id: str, *, bean_id: str | None, grams: Any, cup_type: Any,
+        recipe: str | None, brewed_at: str | None, unattributed: bool,
+    ) -> Consumption:
+        if self._runs.contains(run_id) or await self.store.async_has_run(run_id):
+            return Consumption("skipped", reason="already_counted")
+        if unattributed or is_xpod(cup_type):
+            # No bag to put right: the coffee was in a pod, or came from none.
+            return Consumption("skipped", reason="no_bag_used")
+        await self.store.async_create_brew(Brew(
+            id="", brewed_at=brewed_at or dt_util.utcnow().isoformat(),
+            recorded_at=dt_util.utcnow().isoformat(), dose_g=_grams(grams),
+            brewer=XBLOOM_BREWER, bean_id=bean_id, dripper=cup_label(cup_type),
+            recipe=recipe, outcome="stopped", run_id=run_id,
+            review=Review("stopped_after_grinding", {"grams": _grams(grams)}),
+        ))
+        await self._runs.async_add(run_id)
+        return Consumption(
+            "flagged", reason="stopped_after_grinding",
+            detail={"grams": _grams(grams)}, bean_id=bean_id,
+        )
 
     async def async_start_tracking(self, bean_id: str, remaining_g: float) -> Bean:
         """Count a bag down from an amount someone measured.
@@ -370,3 +478,16 @@ class CoffeeLab:
         # be the next day locally.
         since = earliest_needed(period, now) - timedelta(days=1)
         return period_report(await self.store.async_list_brews(since=since), period, now)
+
+
+class _MemoryStorage:
+    """Storage that lives only in memory: for a lab built without Home Assistant."""
+
+    def __init__(self) -> None:
+        self._data: Any = None
+
+    async def async_load(self) -> Any:
+        return self._data
+
+    async def async_save(self, data: Any) -> None:
+        self._data = data
