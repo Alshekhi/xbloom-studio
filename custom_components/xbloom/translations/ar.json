@@ -535,6 +535,14 @@
           "fine": "لا بأس بها",
           "not_again": "لن أكرّرها"
         }
+      },
+      "coffee_lab_buy_again": {
+        "name": "الشراء مرة أخرى",
+        "state": {
+          "yes": "نعم",
+          "maybe": "ربما",
+          "no": "لا"
+        }
       }
     },
     "sensor": {
@@ -618,6 +626,15 @@
       },
       "coffee_lab_rating_question": {
         "name": "تحضير لتقييمه"
+      },
+      "next_change": {
+        "name": "التعديل القادم"
+      },
+      "version_to_keep": {
+        "name": "النسخة المراد حفظها"
+      },
+      "coffee_lab_bag_question": {
+        "name": "كيس منتهٍ"
       }
     },
     "switch": {
@@ -749,6 +766,15 @@
       },
       "add_and_use_community_recipe": {
         "name": "أضف وصفة المجتمع واستخدمها"
+      },
+      "use_next_change": {
+        "name": "استخدم التعديل القادم"
+      },
+      "make_version_the_recipe": {
+        "name": "اجعل هذه النسخة هي الوصفة"
+      },
+      "save_version_as_new": {
+        "name": "احفظ النسخة كوصفة جديدة"
       }
     },
     "text": {
@@ -888,6 +914,12 @@
     },
     "brew_not_found": {
       "message": "لا يوجد تحضير بالمعرّف {brew}."
+    },
+    "next_change_none": {
+      "message": "لا يوجد تعديل قادم لهذه الوصفة وهذا الكيس."
+    },
+    "version_none": {
+      "message": "لا توجد نسخة تنتظر الحفظ."
     }
   },
   "services": {

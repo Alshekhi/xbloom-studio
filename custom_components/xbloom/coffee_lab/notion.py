@@ -15,6 +15,7 @@ it.
 from __future__ import annotations
 
 import asyncio
+import re
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
@@ -24,7 +25,7 @@ import aiohttp
 from ..tool_common import fail
 from .models import TASTE_SCALES, REVIEW_REASONS, SELECTABLE, Bean, Brew, Review
 from .stats import moment
-from .store import CoffeeLabStore, UnknownBean, _check_changes
+from .store import UnknownBrew, CoffeeLabStore, UnknownBean, _check_changes
 
 API = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
@@ -69,6 +70,9 @@ SETTINGS = {
 # to set Coffee Lab up: a column a database lacks is added the first time a
 # brew is rated (`_ensure_columns`), so an older database keeps working.
 RATING = "Rating"
+BUY_AGAIN_COLUMN = "Buy Again"
+# A Notion page id: 32 hex digits, with or without its dashes.
+_PAGE_ID = re.compile(r"[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}")
 NEXT_CHANGE = "Next Change"
 TASTE_COLUMNS = {
     "body": "Body", "acidity": "Acidity", "sweetness": "Sweetness", "clarity": "Clarity",
@@ -171,6 +175,7 @@ def bean_from_page(page: dict) -> Bean:
         roaster_notes=_plain(props.get("Roaster Notes")),
         opened_on=_date(props.get("Opened Date")),
         finished_on=_date(props.get("Finished Date")),
+        buy_again=(_select(props.get(BUY_AGAIN_COLUMN)) or "").lower(),
     )
 
 
@@ -188,6 +193,10 @@ def bean_properties(values: dict[str, Any]) -> dict[str, Any]:
             out["Remaining g" if key == "remaining_g" else "Bag Size g"] = {"number": value}
         elif key == "process":
             out["Process"] = _choice(value or None)
+        elif key == "buy_again":
+            # Added to the database with its option the first time it is
+            # written (`_ensure_options`), so an older database needs nothing.
+            out[BUY_AGAIN_COLUMN] = _choice(value.capitalize() if value else None)
         elif key in ("opened_on", "finished_on"):
             label = "Opened Date" if key == "opened_on" else "Finished Date"
             out[label] = {"date": {"start": value} if value else None}
@@ -559,6 +568,21 @@ class NotionStore(CoffeeLabStore):
         self, brew_id: str, *, rating: int | None = None,
         tasting: dict[str, str] | None = None, next_change: str | None = None,
     ) -> Brew:
+        # The id can come from an AI tool, so it goes into a page path only once
+        # it is known to be a page id, and is written to only once that page is
+        # a row of this Brews database: never a bag, or any other page the
+        # integration can reach.
+        if not _PAGE_ID.fullmatch(brew_id or ""):
+            raise UnknownBrew(brew_id)
+        try:
+            page = await self._client.call("GET", f"/pages/{brew_id}")
+        except NotionError as err:
+            if err.status in (400, 404):
+                raise UnknownBrew(brew_id) from None
+            raise fail("notion_failed", error=str(err)) from err
+        parent = (page.get("parent") or {}).get("database_id") or ""
+        if parent.replace("-", "") != self._db.brews.replace("-", "") or page.get("archived"):
+            raise UnknownBrew(brew_id)
         props = rating_properties(rating, tasting, next_change)
         await self._ensure_columns(self._db.brews, props)
         await self._ensure_options(self._db.brews, props)

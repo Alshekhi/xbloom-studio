@@ -55,6 +55,7 @@ FINISH_BELOW_G = 20.0
 QUESTION_DELAY = timedelta(minutes=15)
 QUESTION_LAPSE = timedelta(days=1)
 QUESTION_LOOKBACK = timedelta(days=365)
+BAG_QUESTION_LAPSE = timedelta(days=7)
 
 
 def _rounded(value: Any, digits: int) -> float | None:
@@ -92,6 +93,19 @@ def version_changes(version: dict[str, Any], saved: dict[str, Any] | None) -> li
         for key, value in version.items()
         if value is not None and saved_version[key] is not None and value != saved_version[key]
     ]
+
+
+def change_label(changes: list[dict[str, Any]]) -> str:
+    """What a version changed, in a few words: "grind 52, ratio 1:15"."""
+    def number(value: Any) -> str:
+        return f"{float(value):g}"
+
+    words = {
+        "grind": lambda v: f"grind {number(v)}",
+        "ratio": lambda v: f"ratio 1:{number(v)}",
+        "dose_g": lambda v: f"{number(v)} g",
+    }
+    return ", ".join(words[c["setting"]](c["value"]) for c in changes if c["setting"] in words)
 
 
 def normalize_ratio(recipe: dict[str, Any]) -> float | None:
@@ -342,9 +356,60 @@ class CoffeeLab:
             tasting=tasting, next_change=next_change,
         )
         if question and question["brew_id"] == target and verdict:
-            await self._async_set_state(rating_question=None)
+            changes = question.get("changes") or []
+            # A changed version liked enough to brew again is offered to keep,
+            # as the recipe or beside it; the saved recipe is never changed
+            # without being asked.
+            keep = (
+                {"recipe": question["recipe"], "version": question["version"],
+                 "changes": changes, "label": change_label(changes)}
+                if verdict == "again" and changes else None
+            )
+            await self._async_set_state(rating_question=None, version_to_keep=keep)
         self.on_change()
         return brew
+
+    @property
+    def version_to_keep(self) -> dict[str, Any] | None:
+        """A changed version rated Again, until it is kept or another replaces it."""
+        keep = self._state.get("version_to_keep")
+        return dict(keep) if keep else None
+
+    async def async_clear_version_to_keep(self) -> None:
+        await self._async_set_state(version_to_keep=None)
+
+    # The one question a bag gets, when it is finished: would it be bought
+    # again. Open for a week, and replaced by the next bag finished.
+
+    @property
+    def bag_question(self) -> dict[str, Any] | None:
+        question = self._state.get("bag_question")
+        if not question:
+            return None
+        expires = dt_util.parse_datetime(question["expires_at"])
+        if expires is not None and dt_util.utcnow() >= expires:
+            return None
+        return dict(question)
+
+    async def _async_ask_about_bag(self, bean: Bean) -> None:
+        if bean.buy_again:
+            return
+        await self._async_set_state(bag_question={
+            "bean_id": bean.id, "name": bean.name,
+            "expires_at": (dt_util.utcnow() + BAG_QUESTION_LAPSE).isoformat(),
+        })
+
+    async def async_rate_bag(self, answer: str, bean_id: str | None = None) -> Bean:
+        """Would this coffee be bought again: the finished bag's, unless named."""
+        question = self.bag_question
+        target = bean_id or (question or {}).get("bean_id")
+        if target is None:
+            raise UnknownBean("")
+        bean = await self.store.async_update_bean(target, buy_again=answer)
+        if question and question["bean_id"] == target:
+            await self._async_set_state(bag_question=None)
+        self.on_change()
+        return bean
 
     # ── Counting ─────────────────────────────────────────────────────────
 
@@ -544,6 +609,8 @@ class CoffeeLab:
         # Marked once both writes are in; until then the queue holds the run,
         # and a second delivery of it is refused there.
         await self._runs.async_add(run_id)
+        if decision.finish and bean is not None:
+            await self._async_ask_about_bag(bean)
         self.on_change()
         return Consumption(
             "counted", bean_id=decision.bean_id, grams=decision.grams,
@@ -616,6 +683,7 @@ class CoffeeLab:
         bean = await self.store.async_finish_bag(bean_id, dt_util.now().date().isoformat())
         if self.active_bean_id == bean_id:
             await self._async_set_state(active_bean_id=None)
+        await self._async_ask_about_bag(bean)
         self.on_change()
         return bean
 

@@ -340,7 +340,8 @@ class CommunityBrowser:
 
     def own_facts(self) -> list[dict[str, Any]]:
         return [
-            {"name": o.name, "brews": o.brews, "matched": o.matched, "last_brewed": o.last_brewed}
+            {"name": o.name, "brews": o.brews, "matched": o.matched,
+             "last_brewed": o.last_brewed, "versions": o.versions}
             for o in self.own or []
         ]
 

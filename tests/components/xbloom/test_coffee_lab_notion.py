@@ -233,3 +233,46 @@ async def test_databases_inside_a_column_are_found_but_not_those_in_sub_pages():
     assert await async_find_or_create(notion, PAGE) == Databases("b", "r")
     assert not [c for c in notion.calls if c[1].startswith("/blocks/sub")]
 
+
+
+# ── Rating a brew: only a row of this Brews database is written ──────────────
+
+BREWS_DB = "11111111222233334444555555555555"
+ROW = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
+
+def _rating_store(page):
+    from custom_components.xbloom.coffee_lab.notion import Databases, NotionStore
+
+    notion = FakeNotion({
+        ("GET", f"/pages/{ROW}"): page,
+        ("GET", f"/databases/{BREWS_DB}"): {"properties": {"Rating": {"type": "number"}}},
+        ("PATCH", f"/pages/{ROW}"): {"id": ROW, "properties": {"Rating": {"number": 3}}},
+    })
+    return notion, NotionStore(notion, Databases("b", BREWS_DB))
+
+
+@pytest.mark.parametrize("bad_id", ["", "../databases/x", "beans", ROW + "/archive"])
+async def test_a_brew_id_that_is_not_a_page_id_is_never_sent(bad_id):
+    from custom_components.xbloom.coffee_lab.store import UnknownBrew
+
+    notion, store = _rating_store({})
+    with pytest.raises(UnknownBrew):
+        await store.async_rate_brew(bad_id, rating=3)
+    assert notion.calls == []
+
+
+async def test_a_page_outside_the_brews_database_is_not_written():
+    from custom_components.xbloom.coffee_lab.store import UnknownBrew
+
+    notion, store = _rating_store({"id": ROW, "parent": {"database_id": "a-bag-database"}})
+    with pytest.raises(UnknownBrew):
+        await store.async_rate_brew(ROW, rating=3)
+    assert not any(method == "PATCH" for method, _, _ in notion.calls)
+
+
+async def test_a_row_of_the_brews_database_is_rated():
+    notion, store = _rating_store({"id": ROW, "parent": {"database_id": "11111111-2222-3333-4444-555555555555"}})
+    brew = await store.async_rate_brew(ROW, rating=3)
+    assert brew.rating == 3
+    assert ("PATCH", f"/pages/{ROW}", {"properties": {"Rating": {"number": 3}}}) in notion.calls

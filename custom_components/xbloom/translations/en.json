@@ -535,6 +535,14 @@
           "fine": "Fine",
           "not_again": "Not again"
         }
+      },
+      "coffee_lab_buy_again": {
+        "name": "Buy again",
+        "state": {
+          "yes": "Yes",
+          "maybe": "Maybe",
+          "no": "No"
+        }
       }
     },
     "sensor": {
@@ -618,6 +626,15 @@
       },
       "coffee_lab_rating_question": {
         "name": "Brew to rate"
+      },
+      "next_change": {
+        "name": "Next Change"
+      },
+      "version_to_keep": {
+        "name": "Version to Keep"
+      },
+      "coffee_lab_bag_question": {
+        "name": "Finished bag"
       }
     },
     "switch": {
@@ -749,6 +766,15 @@
       },
       "add_and_use_community_recipe": {
         "name": "Add and Use Community Recipe"
+      },
+      "use_next_change": {
+        "name": "Use Next Change"
+      },
+      "make_version_the_recipe": {
+        "name": "Make Version the Recipe"
+      },
+      "save_version_as_new": {
+        "name": "Save Version as New Recipe"
       }
     },
     "text": {
@@ -888,6 +914,12 @@
     },
     "brew_not_found": {
       "message": "There is no brew with id {brew}."
+    },
+    "next_change_none": {
+      "message": "There is no next change to use for this recipe and bag."
+    },
+    "version_none": {
+      "message": "There is no version waiting to be kept."
     }
   },
   "services": {

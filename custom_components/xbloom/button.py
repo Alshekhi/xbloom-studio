@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .community_entities import entities_for as community_entities
+from .versions import entities_for as version_entities
 from .tool_common import refuse
 from .coordinator import XBloomCoordinator
 from .coffee_lab.entities import entities_for as coffee_lab_entities
@@ -59,6 +60,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     # Coffee Lab's, only while it is switched on.
     async_add_entities(coffee_lab_entities(entry.runtime_data.coffee_lab, "button"))
     async_add_entities(community_entities(entry, "button"))
+    async_add_entities(version_entities(entry, "button"))
 
 
 class XBloomRefreshButton(CoordinatorEntity, ButtonEntity):

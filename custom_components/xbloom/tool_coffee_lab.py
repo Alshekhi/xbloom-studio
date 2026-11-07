@@ -14,7 +14,7 @@ import voluptuous as vol
 
 from .coffee_lab import actions
 from .coffee_lab.lab import CoffeeLab
-from .coffee_lab.models import STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS, Bean
+from .coffee_lab.models import BUY_AGAIN, STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS, Bean
 from .coffee_lab.stats import PERIODS
 from .tool_common import Spec, check_arguments as _check, describe as _describe
 
@@ -24,14 +24,21 @@ ACTIONS: dict[str, Spec] = {
     "list_beans": Spec(actions.list_beans, "every open or unopened bag, with what is left"),
     "active_bean": Spec(
         actions.active_bean,
-        "the bag the xBloom draws from when none is named, and rating_question "
-        "when a brew is waiting for its verdict",
+        "the bag the xBloom draws from when none is named; rating_question when a "
+        "brew is waiting for its verdict, bag_question when a finished bag is",
     ),
     "brew_history": Spec(
         actions.brew_history,
         "what was brewed, newest first — recipe, bag, dose, brewer, and how: grind, "
         "ratio, temperature, flow rate, seconds from first pour to end, and the "
         "verdict, tasting and next_change when given (limit, days)",
+    ),
+    "rate_bag": Spec(
+        actions.rate_bag,
+        "whether the person would buy a coffee again (buy_again: yes, maybe, no): "
+        "the bag in bag_question unless bean or bean_id. Ask only about a bag in "
+        "bag_question, once",
+        ("buy_again",),
     ),
     "rate_brew": Spec(
         actions.rate_brew,
@@ -111,6 +118,7 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
     "process": (str, "How it was processed, such as washed or natural."),
     "roaster_notes": (str, "The roaster's tasting notes."),
     "verdict": (vol.In(list(VERDICTS)), "For rate_brew: again, fine or not_again."),
+    "buy_again": (vol.In(list(BUY_AGAIN)), "For rate_bag: yes, maybe or no."),
     "brew_id": (str, "For rate_brew: the brew, by the id brew_history gives."),
     **{
         key: (vol.In(list(scale)), f"For rate_brew: {key.replace('_', ' ')}, {'/'.join(scale)}.")

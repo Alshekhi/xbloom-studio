@@ -15,6 +15,7 @@ from .ble_entities import (
 from .reading_sensors import READING_SENSORS
 from .coffee_lab.entities import entities_for as coffee_lab_entities
 from .community_entities import entities_for as community_entities
+from .versions import entities_for as version_entities
 
 PARALLEL_UPDATES = 0  # event-driven; no polling
 
@@ -30,3 +31,4 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     # Coffee Lab's, only while it is switched on.
     async_add_entities(coffee_lab_entities(entry.runtime_data.coffee_lab, "sensor"))
     async_add_entities(community_entities(entry, "sensor"))
+    async_add_entities(version_entities(entry, "sensor"))

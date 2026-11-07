@@ -246,7 +246,8 @@ async def test_suggest_for_bag_offers_your_own_and_a_community_one():
     own = [cm.OwnSuggestion("Mine", 3, "this_bag", "2026-11-01")]
     with patch.object(cm, "async_own_suggestions", AsyncMock(return_value=own)):
         await browser.async_suggest_for_bag(_bag())
-    assert browser.own_facts() == [{"name": "Mine", "brews": 3, "matched": "this_bag", "last_brewed": "2026-11-01"}]
+    assert browser.own_facts() == [{"name": "Mine", "brews": 3, "matched": "this_bag",
+                                    "last_brewed": "2026-11-01", "versions": []}]
     assert browser.picked_id == 4021
 
 

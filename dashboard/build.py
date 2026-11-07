@@ -60,6 +60,15 @@ TEXT = {
         "c_added": "Added to your recipes as **{name}**. Pick it on the Brew tab.",
         "c_suggest": "Suggest a recipe",
         "h_how_was": "How was it?", "r_verdict": "Verdict",
+        "v_wanted": "Last time you wanted: {text}.", "v_use": "Use that change",
+        "h_keep": "Keep this version?", "v_keep": "**{recipe}** {changes} is worth brewing again.",
+        "v_make": "Make it the recipe", "v_new": "Save as a new recipe",
+        "v_confirm_make": "Replace the saved recipe with this version?",
+        "v_versions": "Versions with this bag:", "k_grind": "grind {value}", "k_ratio": "1:{value}",
+        "k_dose": "{value} g", "verdict_again": "Again", "verdict_fine": "Fine",
+        "verdict_not_again": "Not again",
+        "h_buy_again": "Buy it again?", "b_question": "Would you buy **{bag}** again?",
+        "b_answer": "Buy again",
         "r_question": "How was **{recipe}** with {bag}{changes}?", "r_at": ", at ",
         "r_grind": "grind {value} instead of {saved}", "r_ratio": "ratio 1:{value} instead of 1:{saved}",
         "r_dose": "{value} g instead of {saved} g",
@@ -117,6 +126,15 @@ TEXT = {
         "c_added": "أضيفت إلى وصفاتك باسم **{name}**. اخترها من تبويب التحضير.",
         "c_suggest": "اقترح وصفة",
         "h_how_was": "كيف كانت؟", "r_verdict": "الحكم",
+        "v_wanted": "في المرة السابقة أردت: {text}.", "v_use": "استخدم هذا التعديل",
+        "h_keep": "هل تحفظ هذه النسخة؟", "v_keep": "**{recipe}** {changes} تستحق التكرار.",
+        "v_make": "اجعلها الوصفة", "v_new": "احفظها كوصفة جديدة",
+        "v_confirm_make": "استبدال الوصفة المحفوظة بهذه النسخة؟",
+        "v_versions": "النسخ مع هذا الكيس:", "k_grind": "درجة طحن {value}", "k_ratio": "1:{value}",
+        "k_dose": "{value} غ", "verdict_again": "أكرّرها", "verdict_fine": "لا بأس بها",
+        "verdict_not_again": "لن أكرّرها",
+        "h_buy_again": "هل تشتريها مجددًا؟", "b_question": "هل تشتري **{bag}** مرة أخرى؟",
+        "b_answer": "الشراء مرة أخرى",
         "r_question": "كيف كانت **{recipe}** مع {bag}{changes}؟", "r_at": "، ",
         "r_grind": "بدرجة طحن {value} بدل {saved}", "r_ratio": "بنسبة 1:{value} بدل 1:{saved}",
         "r_dose": "بجرعة {value} غ بدل {saved} غ",
@@ -222,6 +240,16 @@ def brew_view(t: dict) -> dict:
             {"type": "markdown", "text_only": True, "content": rating_card(t)},
             select(f"select.{E}_verdict", name=t["r_verdict"]),
         ], [*present(f"sensor.{E}_brew_to_rate"), *not_busy()]),
+        section(t["h_buy_again"], [
+            {"type": "markdown", "text_only": True, "content": ESCAPE + t["b_question"].replace(
+                "{bag}", f"{{{{ e(states('sensor.{E}_finished_bag')) }}}}")},
+            select(f"select.{E}_buy_again", name=t["b_answer"]),
+        ], [*present(f"sensor.{E}_finished_bag"), *not_busy()]),
+        section(t["h_keep"], [
+            {"type": "markdown", "text_only": True, "content": keep_card(t)},
+            press(f"button.{E}_make_version_the_recipe", t["v_confirm_make"], name=t["v_make"]),
+            press(f"button.{E}_save_version_as_new_recipe", name=t["v_new"]),
+        ], [*present(f"sensor.{E}_version_to_keep"), *not_busy()]),
         section(t["h_in_progress"], [
             tile(f"sensor.{E}_current_recipe", visibility=present(f"sensor.{E}_current_recipe")),
             # "Pour 2 of 3", once the pours have begun.
@@ -263,6 +291,12 @@ def brew_view(t: dict) -> dict:
         ], [*present(bag), *at_home()]),
         section(t["h_brew"], [
             select(f"select.{E}_recipe"),
+            # What was asked for last time with this bag; one press sets it as
+            # this brew's adjustment, the saved recipe untouched.
+            {"type": "markdown", "text_only": True, "content": next_change_card(t),
+             "visibility": present(f"sensor.{E}_next_change")},
+            press(f"button.{E}_use_next_change", name=t["v_use"],
+                  visibility=present(f"sensor.{E}_next_change")),
             # While a picked recipe is not yet ready: that it is being prepared,
             # or what stops it. Plain text, not a button; once ready it gives
             # way to Start Brew.
@@ -572,6 +606,39 @@ def picked_card(t: dict, picker: str) -> str:
     )
 
 
+def _num(expr: str) -> str:
+    return "{{ (" + expr + " | float) | round(1) | string | replace('.0', '') }}"
+
+
+def version_words(t: dict, var: str) -> str:
+    """One version in a few words: "grind 52 · 1:15 · 18 g", only what it has."""
+    parts = []
+    for key, text in (("grind", "k_grind"), ("ratio", "k_ratio"), ("dose_g", "k_dose")):
+        before, after = t[text].split("{value}")
+        number = f"(({var}.{key} | float) | round(1) | string | replace('.0', ''))"
+        parts.append(f"(('{before}' ~ {number} ~ '{after}') if {var}.{key} is not none else '')")
+    return "{{ [" + ", ".join(parts) + "] | select | join(' · ') }}"
+
+
+def keep_card(t: dict) -> str:
+    k = f"sensor.{E}_version_to_keep"
+    change = (
+        "{% if c.setting == 'grind' %}" + t["k_grind"]
+        + "{% elif c.setting == 'ratio' %}" + t["k_ratio"]
+        + "{% else %}" + t["k_dose"] + "{% endif %}"
+    ).replace("{value}", _num("c.value"))
+    changes = (
+        f"{{% for c in state_attr('{k}', 'changes') or [] %}}" + change
+        + "{% if not loop.last %}" + t["sep"] + "{% endif %}{% endfor %}"
+    )
+    return ESCAPE + t["v_keep"].replace("{recipe}", f"{{{{ e(states('{k}')) }}}}").replace("{changes}", changes)
+
+
+def next_change_card(t: dict) -> str:
+    n = f"sensor.{E}_next_change"
+    return ESCAPE + t["v_wanted"].replace("{text}", f"**{{{{ e(states('{n}')) }}}}**")
+
+
 def rating_card(t: dict) -> str:
     """The question: which recipe with which bag, and what was changed."""
     q = f"sensor.{E}_brew_to_rate"
@@ -614,11 +681,21 @@ def suggestion_card(t: dict, bag: str) -> str:
         "{names}", "{% for x in rest %}{{ e(x.name) }}{% if not loop.last %}" + t["sep"] + "{% endif %}{% endfor %}")
     by = "{{ 'xBloom' if (state_attr('" + hub + "', 'picked') or {}).get('official') else e((state_attr('" + hub + "', 'picked') or {}).get('author')) }}"
     hub_line = t["s_hub"].replace("{name}", "{{ e(states('" + hub + "')) }}").replace("{by}", by)
+    verdicts = (
+        "{% if v.verdict == 'again' %}" + t["verdict_again"]
+        + "{% elif v.verdict == 'fine' %}" + t["verdict_fine"]
+        + "{% else %}" + t["verdict_not_again"] + "{% endif %}"
+    )
+    versions = (
+        "{% if o.versions %}\n\n" + t["v_versions"] + " "
+        + "{% for v in o.versions %}" + version_words(t, "v") + " — " + verdicts
+        + "{% if not loop.last %}; {% endif %}{% endfor %}.{% endif %}"
+    )
     return (
         ESCAPE
         + f"{{% set own = state_attr('{sugg}', 'own') or [] %}}"
         + "{% if own %}{% set o = own[0] %}{% set rest = own[1:] %}" + own
-        + "{% if rest %} " + also + "{% endif %}"
+        + "{% if rest %} " + also + "{% endif %}" + versions
         + "{% else %}" + t["s_none"] + "{% endif %}"
         + f"{{% if state_attr('{hub}', 'suggested') and states('{hub}') not in ['unknown', 'unavailable'] %}}\n\n"
         + hub_line + "{% endif %}"

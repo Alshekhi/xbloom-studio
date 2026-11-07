@@ -25,7 +25,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from ..const import DOMAIN, SIGNAL_COFFEE_LAB_UPDATED
 from . import actions
 from .lab import CoffeeLab
-from .models import VERDICTS, Bean
+from .models import BUY_AGAIN, VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
 
 _LOGGER = logging.getLogger(__name__)
@@ -226,6 +226,33 @@ class RateBrewSelect(CoffeeLabEntity, SelectEntity):
         await self.lab.async_rate(verdict=option)
 
 
+class BagQuestionSensor(CoffeeLabEntity, SensorEntity):
+    """A finished bag waiting to be asked about: its name, for a week."""
+
+    _attr_icon = "mdi:sack-outline"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "bag_question")
+
+    async def async_read(self) -> None:
+        question = self.lab.bag_question
+        self._attr_native_value = question["name"] if question else None
+
+
+class BuyAgainSelect(CoffeeLabEntity, SelectEntity):
+    """Would the finished bag's coffee be bought again; picking one answers it."""
+
+    _attr_icon = "mdi:cart-outline"
+    _attr_options = list(BUY_AGAIN)
+    _attr_current_option = None
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "buy_again")
+
+    async def async_select_option(self, option: str) -> None:
+        await self.lab.async_rate_bag(option)
+
+
 class WaitingBrewsSensor(CoffeeLabEntity, SensorEntity):
     """How many brews wait for the store; the oldest's error as an attribute."""
 
@@ -330,10 +357,10 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
     if lab is None:
         return []
     makers: dict[str, list[Callable[[CoffeeLab], Entity]]] = {
-        "select": [ActiveBagSelect, StatsPeriodSelect, ManualBrewerSelect, RateBrewSelect],
+        "select": [ActiveBagSelect, StatsPeriodSelect, ManualBrewerSelect, RateBrewSelect, BuyAgainSelect],
         "sensor": [
             RemainingSensor, BagsSensor, StatsSensor, LastCountSensor, WaitingBrewsSensor,
-            RatingQuestionSensor,
+            RatingQuestionSensor, BagQuestionSensor,
         ],
         "number": [ManualDoseNumber],
         "button": [RecordManualBrewButton],

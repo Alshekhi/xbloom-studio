@@ -62,6 +62,7 @@ from .tool_common import refuse, require_machine_control
 from .coffee_lab.history import ChartFeed
 from .coffee_lab.services import async_register_lab_services
 from .coordinator import XBloomCoordinator
+from .versions import VersionDesk
 from .community import (
     CommunityBrowser, NotForThisMachine, active_bag, bag_remaining_g, studio_recipe, suggest,
 )
@@ -304,6 +305,8 @@ class XBloomRuntimeData:
     machine_control: bool = True
     # The dashboard's community hub search (community.py).
     community: CommunityBrowser | None = None
+    # The Next Change and the version to keep (versions.py), with Coffee Lab.
+    versions: object = None
 
 
 type XBloomConfigEntry = ConfigEntry[XBloomRuntimeData]
@@ -435,6 +438,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             hass, tuple(entry.data.get(CONF_BREWERS, DEFAULT_BREWERS)), store
         )
         lab.on_change = lambda: async_dispatcher_send(hass, SIGNAL_COFFEE_LAB_UPDATED)
+        entry.runtime_data.versions = VersionDesk(hass, entry.entry_id, lab, coordinator)
         # The question about a brew names what was changed from the saved recipe.
         lab.recipe_lookup = lambda name: next(
             (r for r in coordinator.data or [] if r.get("name") == name), None,

@@ -49,3 +49,29 @@ def test_the_count_said_is_the_closest_matchs_alone():
     brews = [brew("Alpha", "bag")] + [brew("Alpha", "twin") for _ in range(4)]
     [only] = rank(BAG, BEANS, brews, LIBRARY)
     assert (only.matched, only.brews) == ("this_bag", 1)
+
+
+def rated(recipe, bean, rating, when="2026-10-01"):
+    from dataclasses import replace
+
+    return replace(brew(recipe, bean, when=when), rating=rating)
+
+
+def test_a_recipe_rated_again_rises_above_one_brewed_as_often():
+    brews = [brew("Alpha", "bag", when="2026-10-05"), rated("Beta", "bag", 3)]
+    assert [s.name for s in rank(BAG, BEANS, brews, LIBRARY)] == ["Beta", "Alpha"]
+
+
+def test_not_again_with_this_bag_keeps_a_recipe_out():
+    brews = [rated("Alpha", "bag", 1, when="2026-10-05"), rated("Alpha", "bag", 3, when="2026-10-01")]
+    assert rank(BAG, BEANS, brews, LIBRARY) == []
+
+
+def test_a_later_again_brings_it_back():
+    brews = [rated("Alpha", "bag", 3, when="2026-10-05"), rated("Alpha", "bag", 1, when="2026-10-01")]
+    assert [s.name for s in rank(BAG, BEANS, brews, LIBRARY)] == ["Alpha"]
+
+
+def test_not_again_with_another_bag_only_lowers_it():
+    brews = [rated("Alpha", "twin", 1), brew("Beta", "cousin")]
+    assert [s.name for s in rank(BAG, BEANS, brews, LIBRARY)] == ["Alpha", "Beta"]

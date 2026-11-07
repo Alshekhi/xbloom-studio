@@ -25,6 +25,8 @@ SELECTABLE: tuple[Status, ...] = ("open", "unopened")
 # it is kept as in a store's Rating column.
 VERDICTS: dict[str, int] = {"again": 3, "fine": 2, "not_again": 1}
 VERDICT_OF: dict[int, str] = {n: v for v, n in VERDICTS.items()}
+# The question asked of a bag once it is finished.
+BUY_AGAIN: tuple[str, ...] = ("yes", "maybe", "no")
 
 # What a person may say about how a brew tasted: each one never asked for,
 # kept when given. The scales are the Brews database's own options; the
@@ -61,6 +63,8 @@ class Bean:
     roaster_notes: str = ""
     opened_on: str = ""   # YYYY-MM-DD
     finished_on: str = ""   # YYYY-MM-DD
+    # Asked once, when the bag is finished: would it be bought again.
+    buy_again: str = ""   # one of BUY_AGAIN, or "" until answered
 
 
 @dataclass(frozen=True)

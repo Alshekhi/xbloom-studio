@@ -44,6 +44,7 @@ def bean_facts(bean: Bean) -> dict[str, Any]:
         "bag_size_g": bean.bag_size_g,
         "opened_on": bean.opened_on or None,
         "finished_on": bean.finished_on or None,
+        "buy_again": bean.buy_again or None,
     }
     facts.update({key: getattr(bean, key) for key in DESCRIPTIVE if getattr(bean, key)})
     return facts
@@ -111,7 +112,21 @@ async def active_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     facts: dict[str, Any] = {"bag": bean_facts(bean) if bean else None}
     if (question := lab.rating_question_due()) is not None:
         facts["rating_question"] = question_facts(question)
+    if (bag := lab.bag_question) is not None:
+        facts["bag_question"] = {"bean_id": bag["bean_id"], "bag": bag["name"]}
     return facts
+
+
+async def rate_bag(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
+    """Would this coffee be bought again: the finished bag in question, unless named."""
+    bean_id = None
+    if args.get("bean") or args.get("bean_id"):
+        bean_id = (await resolve_bean(lab, args, selectable_only=False)).id
+    try:
+        bean = await lab.async_rate_bag(args["buy_again"], bean_id)
+    except UnknownBean:
+        raise refuse("bag_required") from None
+    return {"bag": bean_facts(bean)}
 
 
 def question_facts(question: dict[str, Any]) -> dict[str, Any]:

@@ -177,3 +177,54 @@ def test_the_question_sensor_ticks_in_home_assistants_event_loop():
     tree = ast.parse(inspect.getsource(entities.RatingQuestionSensor))
     tick = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_tick")
     assert any(isinstance(d, ast.Name) and d.id == "callback" for d in tick.decorator_list)
+
+
+# ── Buy again: one question per bag, when it is finished ─────────────────────
+
+
+async def test_finishing_a_bag_asks_whether_to_buy_it_again():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=10.0)
+    await lab.async_finish(bag.id)
+    assert lab.bag_question["name"] == "Kenya"
+    bean = await lab.async_rate_bag("yes")
+    assert bean.buy_again == "yes" and lab.bag_question is None
+
+
+async def test_a_brew_that_empties_the_bag_asks_too():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=15.0)
+    await _brew(lab, bag, "run-1", grams=15)
+    assert lab.bag_question["bean_id"] == bag.id
+
+
+async def test_a_bag_already_answered_is_not_asked_again():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=10.0, buy_again="no")
+    await lab.async_finish(bag.id)
+    assert lab.bag_question is None
+
+
+async def test_the_bag_question_lapses_after_a_week():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=10.0)
+    await lab.async_finish(bag.id)
+    with _at(lab, 60 * 24 * 8):
+        assert lab.bag_question is None
+
+
+async def test_rate_bag_reaches_the_finished_bag_and_an_agent_sees_the_question():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=10.0)
+    await lab.async_finish(bag.id)
+    assert (await actions.active_bean(lab, {}))["bag_question"]["bag"] == "Kenya"
+    facts = await actions.rate_bag(lab, {"buy_again": "maybe"})
+    assert facts["bag"]["buy_again"] == "maybe"
+
+
+def test_notion_keeps_buy_again_in_its_own_column():
+    from custom_components.xbloom.coffee_lab.notion import bean_from_page, bean_properties
+
+    assert bean_properties({"buy_again": "maybe"}) == {"Buy Again": {"select": {"name": "Maybe"}}}
+    page = {"id": "b", "properties": {"Buy Again": {"select": {"name": "Maybe"}}}}
+    assert bean_from_page(page).buy_again == "maybe"

@@ -100,6 +100,87 @@ views:
     cards:
     - type: markdown
       text_only: true
+      content: '## هل تشتريها مجددًا؟'
+    - type: markdown
+      text_only: true
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}هل تشتري **{{ e(states(''sensor.xbloom_studio_finished_bag'')) }}**
+        مرة أخرى؟'
+    - type: tile
+      entity: select.xbloom_studio_buy_again
+      name: الشراء مرة أخرى
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_finished_bag
+      state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_finished_bag
+      state_not: unknown
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: grinding
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: brewing
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## هل تحفظ هذه النسخة؟'
+    - type: markdown
+      text_only: true
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}**{{ e(states(''sensor.xbloom_studio_version_to_keep'')) }}** {%
+        for c in state_attr(''sensor.xbloom_studio_version_to_keep'', ''changes'') or [] %}{% if c.setting
+        == ''grind'' %}درجة طحن {{ (c.value | float) | round(1) | string | replace(''.0'', '''') }}{%
+        elif c.setting == ''ratio'' %}1:{{ (c.value | float) | round(1) | string | replace(''.0'', '''')
+        }}{% else %}{{ (c.value | float) | round(1) | string | replace(''.0'', '''') }} غ{% endif %}{%
+        if not loop.last %}، {% endif %}{% endfor %} تستحق التكرار.'
+    - type: tile
+      entity: button.xbloom_studio_make_version_the_recipe
+      name: اجعلها الوصفة
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_make_version_the_recipe
+        confirmation:
+          text: استبدال الوصفة المحفوظة بهذه النسخة؟
+    - type: tile
+      entity: button.xbloom_studio_save_version_as_new_recipe
+      name: احفظها كوصفة جديدة
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_save_version_as_new_recipe
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_version_to_keep
+      state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_version_to_keep
+      state_not: unknown
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: grinding
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: brewing
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
       content: '## تحضير جار'
     - type: tile
       entity: sensor.xbloom_studio_current_recipe
@@ -255,9 +336,18 @@ views:
         ''country'')) }} بمعالجة {{ e(state_attr(''select.xbloom_studio_coffee_bag'', ''process'')) }}{%
         else %}مع قهوة من {{ e(state_attr(''select.xbloom_studio_coffee_bag'', ''country'')) }}{% endif
         %}.{% if rest %} وأيضًا: {% for x in rest %}{{ e(x.name) }}{% if not loop.last %}، {% endif %}{%
-        endfor %}.{% endif %}{% else %}لم تُحضَّر أي وصفة من وصفاتك بقهوة مثل هذه.{% endif %}{% if state_attr(''select.xbloom_studio_community_recipe'',
-        ''suggested'') and states(''select.xbloom_studio_community_recipe'') not in [''unknown'', ''unavailable'']
-        %}
+        endfor %}.{% endif %}{% if o.versions %}
+
+
+        النسخ مع هذا الكيس: {% for v in o.versions %}{{ [((''درجة طحن '' ~ ((v.grind | float) | round(1)
+        | string | replace(''.0'', '''')) ~ '''') if v.grind is not none else ''''), ((''1:'' ~ ((v.ratio
+        | float) | round(1) | string | replace(''.0'', '''')) ~ '''') if v.ratio is not none else ''''),
+        (('''' ~ ((v.dose_g | float) | round(1) | string | replace(''.0'', '''')) ~ '' غ'') if v.dose_g
+        is not none else '''')] | select | join('' · '') }} — {% if v.verdict == ''again'' %}أكرّرها{%
+        elif v.verdict == ''fine'' %}لا بأس بها{% else %}لن أكرّرها{% endif %}{% if not loop.last %};
+        {% endif %}{% endfor %}.{% endif %}{% else %}لم تُحضَّر أي وصفة من وصفاتك بقهوة مثل هذه.{% endif
+        %}{% if state_attr(''select.xbloom_studio_community_recipe'', ''suggested'') and states(''select.xbloom_studio_community_recipe'')
+        not in [''unknown'', ''unavailable''] %}
 
 
         لتجربة جديدة من المجتمع: **{{ e(states(''select.xbloom_studio_community_recipe'')) }}**، شاركها
@@ -347,6 +437,36 @@ views:
         action: none
       features:
       - type: select-options
+    - type: markdown
+      text_only: true
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}في المرة السابقة أردت: **{{ e(states(''sensor.xbloom_studio_next_change''))
+        }}**.'
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_next_change
+        state_not: unavailable
+      - condition: state
+        entity: sensor.xbloom_studio_next_change
+        state_not: unknown
+    - type: tile
+      entity: button.xbloom_studio_use_next_change
+      name: استخدم هذا التعديل
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_use_next_change
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_next_change
+        state_not: unavailable
+      - condition: state
+        entity: sensor.xbloom_studio_next_change
+        state_not: unknown
     - type: markdown
       text_only: true
       content: '{% set r = state_attr(''binary_sensor.xbloom_studio_recipe_ready'', ''reason'') %}{% if
