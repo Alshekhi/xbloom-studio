@@ -39,8 +39,11 @@ def entities_for(entry, platform: str) -> list:
             CommunitySearchButton(browser),
             CommunitySuggestButton(browser, entry),
             CommunityAddButton(browser),
+            SuggestRecipeButton(browser, entry),
+            UseSuggestedRecipeButton(browser),
+            AddAndUseCommunityRecipeButton(browser),
         ],
-        "sensor": [CommunityMatchesSensor(browser)],
+        "sensor": [CommunityMatchesSensor(browser), RecipeSuggestionsSensor(browser)],
     }.get(platform, [])
 
 
@@ -217,3 +220,64 @@ class CommunityMatchesSensor(_CommunityEntity, SensorEntity):
     @property
     def native_value(self) -> int | None:
         return None if self._browser.failed else self._browser.matches
+
+
+
+# ── The Brew tab: a recipe for the bag in use ────────────────────────────────
+
+
+class SuggestRecipeButton(_CommunityEntity, ButtonEntity):
+    """Your own recipes for the bag in use, and a community one beside them."""
+
+    _attr_translation_key = "suggest_recipe"
+    _attr_unique_id = "xbloom_suggest_recipe"
+    _attr_icon = "mdi:lightbulb-on-outline"
+
+    def __init__(self, browser: CommunityBrowser, entry) -> None:
+        super().__init__(browser)
+        self._entry = entry
+
+    async def async_press(self) -> None:
+        await self._browser.async_suggest_for_bag(getattr(self._entry.runtime_data, "coffee_lab", None))
+
+
+class UseSuggestedRecipeButton(_CommunityEntity, ButtonEntity):
+    """Pick your best-matching recipe in the recipe picker."""
+
+    _attr_translation_key = "use_suggested_recipe"
+    _attr_unique_id = "xbloom_use_suggested_recipe"
+    _attr_icon = "mdi:check"
+
+    async def async_press(self) -> None:
+        await self._browser.async_use_own()
+
+
+class AddAndUseCommunityRecipeButton(_CommunityEntity, ButtonEntity):
+    """Add the community recipe to the library and pick it in one press."""
+
+    _attr_translation_key = "add_and_use_community_recipe"
+    _attr_unique_id = "xbloom_add_and_use_community_recipe"
+    _attr_icon = "mdi:playlist-check"
+
+    async def async_press(self) -> None:
+        await self._browser.async_add_and_use()
+
+
+class RecipeSuggestionsSensor(_CommunityEntity, SensorEntity):
+    """How many of your own recipes suit the bag in use; unknown until asked.
+
+    `own` lists them best first, with how many brews counted and the closest
+    match among them: this_bag, origin_process or origin.
+    """
+
+    _attr_translation_key = "recipe_suggestions"
+    _attr_unique_id = "xbloom_recipe_suggestions"
+    _attr_icon = "mdi:lightbulb-on-outline"
+
+    @property
+    def native_value(self) -> int | None:
+        return None if self._browser.own is None else len(self._browser.own)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"own": self._browser.own_facts(), "bag": self._browser.suggested_for}

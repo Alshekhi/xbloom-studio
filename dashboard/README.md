@@ -37,8 +37,12 @@ Coffee Bags** appears only when Coffee Lab is kept in Notion.
 
 ## The views
 
-- **Brew** — what is happening now, the bag in use, brewing a recipe, one-off
-  adjustments, saving a new recipe, and manual brews.
+- **Brew** — what is happening now, the bag in use, a recipe for that bag,
+  brewing a recipe, one-off adjustments, saving a new recipe, and manual brews.
+  **Suggest a recipe** names your own recipe most brewed with this bag, or
+  with coffee of the same origin and process, and a community recipe to try;
+  **Use my recipe** or **Add and use the community recipe** then picks it for
+  brewing. Asking for a suggestion sends nothing to the machine.
 - **Stats** — brews and coffee over a chosen period, brews per brewer, and
   charts of the brew history: brews per day and per month, coffee used and
   water brewed per week. The charts read statistics the integration keeps

@@ -22,6 +22,8 @@ from typing import Any
 
 import aiohttp
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from xbloom import spec
@@ -30,6 +32,7 @@ from xbloom.community import XBloomCommunityClient
 from xbloom.exceptions import XBloomAPIError
 
 from .const import COMMUNITY_MACHINE, DOMAIN
+from .suggestions import OwnSuggestion, async_own_suggestions
 from .tool_common import fail
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,6 +45,8 @@ SHARE_PREFIX = "https://share-h5.xbloom.com/?"
 RESULTS_SHOWN = 20
 # The origin option that means "no origin filter".
 ANY_ORIGIN = "any"
+# The Brew tab's recipe picker, by unique id.
+RECIPE_SELECT = "xbloom_recipe_select"
 
 
 def hub_text(value: Any, limit: int = HUB_SHORT) -> str | None:
@@ -87,11 +92,23 @@ SUGGEST_POOL = 20
 SUGGESTIONS = 5
 
 
+def library_cup_types(library: list[dict[str, Any]]) -> set[int]:
+    """The drippers the library's recipes are made for."""
+    cups = set()
+    for recipe in library:
+        try:
+            cups.add(int(recipe.get("cup_type")))
+        except (TypeError, ValueError):
+            pass
+    return cups
+
+
 async def suggest(
     client: XBloomCommunityClient,
     library: list[dict[str, Any]],
     country: str | None,
     process: str | None,
+    remaining_g: float | None = None,
 ) -> dict[str, Any]:
     """Community recipes worth trying for a coffee of this origin and process.
 
@@ -100,8 +117,13 @@ async def suggest(
     new is left: origin and process, then origin alone, then any. A name the
     hub does not list (a bag's process of "Other") counts as nothing found.
     `origin` and `process` in the answer say what was matched.
+
+    Two fits narrow it further. A recipe needing more coffee than the bag has
+    left (`remaining_g`, when the bag is counted down) is left out. Recipes
+    for the drippers the library already uses come first, the rest after.
     """
     have = {str(r.get("name") or "").casefold() for r in library}
+    cups = library_cup_types(library)
     country = (country or "").strip() or None
     process = (process or "").strip() or None
     tried: list[tuple[str | None, str | None]] = []
@@ -123,10 +145,20 @@ async def suggest(
         fresh = [
             r for r in page["recipes"]
             if (hub_text(r.get("name")) or "").casefold() not in have
+            and (remaining_g is None or (r.get("dose_g") or 0) <= remaining_g)
         ]
+        # Stable, so the download order holds within each group.
+        fresh.sort(key=lambda r: r.get("cup_type") not in cups)
         if fresh:
             return {"origin": origin, "process": proc, "recipes": fresh[:SUGGESTIONS]}
     return {"origin": None, "process": None, "recipes": []}
+
+
+def bag_remaining_g(bag: Any) -> float | None:
+    """What is left in the bag, only when it is counted down."""
+    if bag is None or not getattr(bag, "tracked", False):
+        return None
+    return getattr(bag, "remaining_g", None)
 
 
 async def active_bag(lab: Any) -> Any:
@@ -173,6 +205,9 @@ class CommunityBrowser:
         self.suggested = False
         self.suggested_for: str | None = None
         self.basis: dict[str, str | None] = {}
+        # The Brew tab's suggestion: your own recipes for the bag, best first.
+        # None until one is asked for.
+        self.own: list[OwnSuggestion] | None = None
 
     @callback
     def _changed(self) -> None:
@@ -244,6 +279,7 @@ class CommunityBrowser:
             found = await suggest(
                 self._client, self._coordinator.data or [],
                 getattr(bag, "country", None), getattr(bag, "process", None),
+                bag_remaining_g(bag),
             )
         except (XBloomAPIError, aiohttp.ClientError) as err:
             _LOGGER.warning("xbloom community suggestion: %s", err)
@@ -262,6 +298,51 @@ class CommunityBrowser:
         if self.results:
             label, _ = random.choice(self.labelled())
             await self.async_pick(label)
+
+    async def async_suggest_for_bag(self, lab: Any) -> None:
+        """Your own recipes for the bag in use, and a community one beside them.
+
+        Your own come from the brew record and need no network. The community
+        suggestion is asked for too; when the hub cannot be reached, your own
+        are still offered and the failure is logged, not raised, since half an
+        answer is still an answer here.
+        """
+        bag = await active_bag(lab)
+        self.own = await async_own_suggestions(lab, bag, self._coordinator.data or [])
+        self._changed()
+        try:
+            await self.async_suggest(lab)
+        except HomeAssistantError as err:
+            if not self.own:
+                raise
+            _LOGGER.warning("xbloom suggestion: only your own recipes: %s", err)
+
+    async def async_use(self, name: str) -> None:
+        """Pick a library recipe in the Brew tab's recipe picker.
+
+        Picking it is what prepares it on the machine, so this is only ever
+        done on a press that says so.
+        """
+        entity_id = er.async_get(self._hass).async_get_entity_id("select", DOMAIN, RECIPE_SELECT)
+        if entity_id is None:
+            raise fail("entity_missing", entity=f"select.{RECIPE_SELECT}")
+        await self._hass.services.async_call(
+            "select", "select_option", {"entity_id": entity_id, "option": name}, blocking=True,
+        )
+
+    async def async_use_own(self) -> None:
+        if not self.own:
+            raise fail("suggestion_none")
+        await self.async_use(self.own[0].name)
+
+    async def async_add_and_use(self) -> None:
+        await self.async_use(await self.async_add_picked())
+
+    def own_facts(self) -> list[dict[str, Any]]:
+        return [
+            {"name": o.name, "brews": o.brews, "matched": o.matched, "last_brewed": o.last_brewed}
+            for o in self.own or []
+        ]
 
     def labelled(self) -> list[tuple[str, dict[str, Any]]]:
         """Each result with the label its picker offers it under."""

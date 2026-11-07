@@ -600,6 +600,9 @@
       },
       "community_matches": {
         "name": "Community Matches"
+      },
+      "recipe_suggestions": {
+        "name": "Recipe Suggestions"
       }
     },
     "switch": {
@@ -722,6 +725,15 @@
       },
       "suggest_community_recipe": {
         "name": "Suggest Community Recipe"
+      },
+      "suggest_recipe": {
+        "name": "Suggest Recipe"
+      },
+      "use_suggested_recipe": {
+        "name": "Use Suggested Recipe"
+      },
+      "add_and_use_community_recipe": {
+        "name": "Add and Use Community Recipe"
       }
     },
     "text": {
@@ -855,6 +867,9 @@
     },
     "community_none_picked": {
       "message": "Pick a community recipe first."
+    },
+    "suggestion_none": {
+      "message": "There is no suggested recipe of your own for this bag."
     }
   },
   "services": {

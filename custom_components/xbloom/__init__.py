@@ -61,7 +61,9 @@ from .tool_common import refuse, require_machine_control
 from .coffee_lab.history import ChartFeed
 from .coffee_lab.services import async_register_lab_services
 from .coordinator import XBloomCoordinator
-from .community import CommunityBrowser, NotForThisMachine, active_bag, studio_recipe, suggest
+from .community import (
+    CommunityBrowser, NotForThisMachine, active_bag, bag_remaining_g, studio_recipe, suggest,
+)
 from . import llm_api
 from xbloom.client import XBloomClient
 from xbloom.cloud import XBloomCloudClient, language_type_for
@@ -2016,6 +2018,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         try:
             found = await suggest(
                 community, entry.runtime_data.coordinator.data or [], country, process,
+                bag_remaining_g(bag),
             )
         except (XBloomAPIError, aiohttp.ClientError) as err:
             _LOGGER.warning("xbloom.suggest_community: %s", err)

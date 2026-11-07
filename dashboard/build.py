@@ -59,6 +59,14 @@ TEXT = {
         "c_rpm": "RPM", "c_pause": "Pause", "c_s": "s", "c_likes": "likes",
         "c_added": "Added to your recipes as **{name}**. Pick it on the Brew tab.",
         "c_suggest": "Suggest a recipe",
+        "h_for_bag": "A recipe for this bag", "s_use": "Use my recipe",
+        "s_add_use": "Add and use the community recipe",
+        "s_confirm_add_use": "Add this community recipe to your library and pick it?",
+        "s_own": "From your recipes: **{name}**, brewed {times} {basis}.",
+        "s_also": "Also: {names}.", "s_none": "None of your recipes has been brewed with coffee like this.",
+        "s_hub": "To try from the community: **{name}**, shared by {by}.",
+        "s_this_bag": "with this bag", "s_kind": "with {country} {process} coffee",
+        "s_origin": "with coffee from {country}",
         "c_for": "Suggested for **{bag}**, matching {basis}.",
         "c_popular": "The most downloaded Studio recipes.",
     },
@@ -104,6 +112,14 @@ TEXT = {
         "c_rpm": "دورة في الدقيقة", "c_pause": "الانتظار", "c_s": "ث", "c_likes": "إعجاب",
         "c_added": "أضيفت إلى وصفاتك باسم **{name}**. اخترها من تبويب التحضير.",
         "c_suggest": "اقترح وصفة",
+        "h_for_bag": "وصفة لهذا الكيس", "s_use": "استخدم وصفتي",
+        "s_add_use": "أضف وصفة المجتمع واستخدمها",
+        "s_confirm_add_use": "إضافة وصفة المجتمع هذه إلى مكتبتك واختيارها؟",
+        "s_own": "من وصفاتك: **{name}**، حُضّرت {times} {basis}.",
+        "s_also": "وأيضًا: {names}.", "s_none": "لم تُحضَّر أي وصفة من وصفاتك بقهوة مثل هذه.",
+        "s_hub": "لتجربة جديدة من المجتمع: **{name}**، شاركها {by}.",
+        "s_this_bag": "مع هذا الكيس", "s_kind": "مع قهوة من {country} بمعالجة {process}",
+        "s_origin": "مع قهوة من {country}",
         "c_for": "مقترحة لـ **{bag}**، بمطابقة {basis}.",
         "c_popular": "أكثر وصفات Studio تنزيلًا.",
     },
@@ -218,6 +234,17 @@ def brew_view(t: dict) -> dict:
             tile(f"sensor.{E}_last_brew_counted", visibility=[is_(f"sensor.{E}_last_brew_counted", "flagged")]),
         # Not hidden while no bag is chosen: this is where one is chosen.
         ], present(bag)[:1]),
+        # Asked for here, where the bag is chosen. Nothing reaches the machine
+        # until a recipe is used: picking one is what prepares it.
+        section(t["h_for_bag"], [
+            press(f"button.{E}_suggest_recipe", name=t["c_suggest"]),
+            {"type": "markdown", "content": suggestion_card(t, bag),
+             "visibility": present(f"sensor.{E}_recipe_suggestions")},
+            press(f"button.{E}_use_suggested_recipe", name=t["s_use"], visibility=[
+                {"condition": "numeric_state", "entity": f"sensor.{E}_recipe_suggestions", "above": 0}]),
+            press(f"button.{E}_add_and_use_community_recipe", t["s_confirm_add_use"], name=t["s_add_use"],
+                  visibility=[*present(f"sensor.{E}_recipe_suggestions"), *present(f"select.{E}_community_recipe")]),
+        ], [*present(bag), *at_home()]),
         section(t["h_brew"], [
             select(f"select.{E}_recipe"),
             # While a picked recipe is not yet ready: that it is being prepared,
@@ -526,6 +553,39 @@ def picked_card(t: dict, picker: str) -> str:
         + f"| {t['pour']} | {t['water']} | {t['temp']} | {t['c_pause']} |\n|:--:|:--:|:--:|:--:|\n"
         + "{% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} " + t["ml"]
         + " | {{ p.temperature_c | round(0) | int }}°C | {{ p.pause_s | int(0) }} " + t["c_s"] + " |\n{% endfor %}{% endif %}"
+    )
+
+
+def suggestion_card(t: dict, bag: str) -> str:
+    """Your best recipe for the bag, why, and a community one to try."""
+    sugg = f"sensor.{E}_recipe_suggestions"
+    hub = f"select.{E}_community_recipe"
+    if t is TEXT["ar"]:
+        # Arabic counted-noun agreement for how many times it was brewed.
+        times = ("{% if o.brews == 1 %}مرة واحدة{% elif o.brews == 2 %}مرتين"
+                 "{% elif o.brews <= 10 %}{{ o.brews }} مرات{% else %}{{ o.brews }} مرة{% endif %}")
+    else:
+        times = "{% if o.brews == 1 %}once{% elif o.brews == 2 %}twice{% else %}{{ o.brews }} times{% endif %}"
+    country = "{{ e(state_attr('" + bag + "', 'country')) }}"
+    process = "{{ e(state_attr('" + bag + "', 'process')) }}"
+    basis = (
+        "{% if o.matched == 'this_bag' %}" + t["s_this_bag"]
+        + "{% elif o.matched == 'origin_process' %}" + t["s_kind"].replace("{country}", country).replace("{process}", process)
+        + "{% else %}" + t["s_origin"].replace("{country}", country) + "{% endif %}"
+    )
+    own = t["s_own"].replace("{name}", "{{ e(o.name) }}").replace("{times}", times).replace("{basis}", basis)
+    also = t["s_also"].replace(
+        "{names}", "{% for x in rest %}{{ e(x.name) }}{% if not loop.last %}" + t["sep"] + "{% endif %}{% endfor %}")
+    by = "{{ 'xBloom' if (state_attr('" + hub + "', 'picked') or {}).get('official') else e((state_attr('" + hub + "', 'picked') or {}).get('author')) }}"
+    hub_line = t["s_hub"].replace("{name}", "{{ e(states('" + hub + "')) }}").replace("{by}", by)
+    return (
+        ESCAPE
+        + f"{{% set own = state_attr('{sugg}', 'own') or [] %}}"
+        + "{% if own %}{% set o = own[0] %}{% set rest = own[1:] %}" + own
+        + "{% if rest %} " + also + "{% endif %}"
+        + "{% else %}" + t["s_none"] + "{% endif %}"
+        + f"{{% if state_attr('{hub}', 'suggested') and states('{hub}') not in ['unknown', 'unavailable'] %}}\n\n"
+        + hub_line + "{% endif %}"
     )
 
 

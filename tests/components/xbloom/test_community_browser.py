@@ -150,7 +150,10 @@ async def test_the_recipe_picker_says_how_the_search_went():
 def test_every_platform_gets_its_entities_and_nothing_without_a_browser():
     entry = MagicMock()
     entry.runtime_data.community = _browser()[0]
-    assert [type(e).__name__ for e in ce.entities_for(entry, "button")] == ["CommunitySearchButton", "CommunitySuggestButton", "CommunityAddButton"]
+    assert [type(e).__name__ for e in ce.entities_for(entry, "button")] == [
+        "CommunitySearchButton", "CommunitySuggestButton", "CommunityAddButton",
+        "SuggestRecipeButton", "UseSuggestedRecipeButton", "AddAndUseCommunityRecipeButton",
+    ]
     entry.runtime_data.community = None
     assert ce.entities_for(entry, "select") == []
 
@@ -206,3 +209,74 @@ async def test_a_new_search_is_no_longer_a_suggestion():
     await browser.async_suggest(_bag())
     await browser.async_search()
     assert browser.suggested is False and browser.suggested_for is None
+
+
+
+# ── Fitting a community suggestion to the bag and the drippers ───────────────
+
+
+async def test_a_recipe_needing_more_coffee_than_is_left_is_not_suggested():
+    browser, client, *_ = _browser()
+    big = {**LISTED, "id": 1, "name": "Big", "dose_g": 20.0}
+    small = {**LISTED, "id": 2, "name": "Small", "dose_g": 15.0}
+    client.search.return_value = {"page": 1, "total_pages": 1, "total": 2, "recipes": [big, small]}
+    found = await cm.suggest(client, [], "Ethiopia", None, remaining_g=16.0)
+    assert [r["name"] for r in found["recipes"]] == ["Small"]
+
+
+async def test_recipes_for_the_librarys_drippers_come_first():
+    browser, client, *_ = _browser()
+    pod = {**LISTED, "id": 1, "name": "Pod", "cup_type": 1}
+    omni = {**LISTED, "id": 2, "name": "Omni", "cup_type": 2}
+    client.search.return_value = {"page": 1, "total_pages": 1, "total": 2, "recipes": [pod, omni]}
+    found = await cm.suggest(client, [{"name": "Mine", "cup_type": 2}], None, None)
+    assert [r["name"] for r in found["recipes"]] == ["Omni", "Pod"]
+
+
+def test_an_uncounted_bag_has_no_remaining_limit():
+    assert cm.bag_remaining_g(SimpleNamespace(tracked=False, remaining_g=10.0)) is None
+    assert cm.bag_remaining_g(SimpleNamespace(tracked=True, remaining_g=10.0)) == 10.0
+
+
+# ── The Brew tab: your own recipes, and using one ────────────────────────────
+
+
+async def test_suggest_for_bag_offers_your_own_and_a_community_one():
+    browser, client, *_ = _browser()
+    own = [cm.OwnSuggestion("Mine", 3, "this_bag", "2026-11-01")]
+    with patch.object(cm, "async_own_suggestions", AsyncMock(return_value=own)):
+        await browser.async_suggest_for_bag(_bag())
+    assert browser.own_facts() == [{"name": "Mine", "brews": 3, "matched": "this_bag", "last_brewed": "2026-11-01"}]
+    assert browser.picked_id == 4021
+
+
+async def test_your_own_are_kept_when_the_hub_cannot_be_reached():
+    browser, client, *_ = _browser()
+    client.search.side_effect = cm.XBloomAPIError("down")
+    own = [cm.OwnSuggestion("Mine", 1, "origin", "")]
+    with patch.object(cm, "async_own_suggestions", AsyncMock(return_value=own)):
+        await browser.async_suggest_for_bag(_bag())
+    assert browser.own == own
+
+
+async def test_use_and_add_and_use_pick_the_recipe_in_the_picker():
+    browser, *_ = _browser()
+    browser._hass.services.async_call = AsyncMock()
+    registry = MagicMock()
+    registry.async_get_entity_id = MagicMock(return_value="select.xbloom_studio_recipe")
+    browser.own = [cm.OwnSuggestion("Mine", 1, "origin", "")]
+    with patch.object(cm.er, "async_get", return_value=registry):
+        await browser.async_use_own()
+        await browser.async_search()
+        await browser.async_pick("Test Kenya Hot")
+        await browser.async_add_and_use()
+    picked = [c.args[2]["option"] for c in browser._hass.services.async_call.await_args_list]
+    assert picked == ["Mine", "Test Kenya Hot"]
+
+
+async def test_use_without_a_suggestion_is_refused():
+    browser, *_ = _browser()
+    browser.own = []
+    with pytest.raises(HomeAssistantError) as caught:
+        await browser.async_use_own()
+    assert caught.value.translation_key == "suggestion_none"

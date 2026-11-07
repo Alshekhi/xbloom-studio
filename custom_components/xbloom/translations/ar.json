@@ -600,6 +600,9 @@
       },
       "community_matches": {
         "name": "وصفات المجتمع المطابقة"
+      },
+      "recipe_suggestions": {
+        "name": "الوصفات المقترحة"
       }
     },
     "switch": {
@@ -722,6 +725,15 @@
       },
       "suggest_community_recipe": {
         "name": "اقترح وصفة من المجتمع"
+      },
+      "suggest_recipe": {
+        "name": "اقترح وصفة"
+      },
+      "use_suggested_recipe": {
+        "name": "استخدم الوصفة المقترحة"
+      },
+      "add_and_use_community_recipe": {
+        "name": "أضف وصفة المجتمع واستخدمها"
       }
     },
     "text": {
@@ -855,6 +867,9 @@
     },
     "community_none_picked": {
       "message": "اختر وصفة من المجتمع أولًا."
+    },
+    "suggestion_none": {
+      "message": "لا توجد وصفة مقترحة من وصفاتك لهذا الكيس."
     }
   },
   "services": {
