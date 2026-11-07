@@ -97,6 +97,15 @@ def version_changes(version: dict[str, Any], saved: dict[str, Any] | None) -> li
     ]
 
 
+def question_brews(questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Open questions as a message carries them: each coffee, and its cups."""
+    return [
+        {"brew_id": q["brew_id"], "recipe": q["recipe"], "bag": q["bag"],
+         "changes": q.get("changes") or [], "cups": len(q.get("brew_ids") or [q["brew_id"]])}
+        for q in questions
+    ]
+
+
 def change_label(changes: list[dict[str, Any]]) -> str:
     """What a version changed, in a few words: "grind 52, ratio 1:15"."""
     def number(value: Any) -> str:

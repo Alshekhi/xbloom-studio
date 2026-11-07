@@ -13,6 +13,11 @@ Several cups in one sitting are one message: it waits until 15 minutes
 after the caller's last cup and covers each question still open — one per
 recipe, bag and version — so two or three cups never ring two or three times.
 
+Home Assistant itself is told the same way: `xbloom_rating_due` fires once
+a sitting, 15 minutes after its last cup, for every brew whoever started it,
+listing each open question — what an automation asks with, such as the
+"Ask how the coffee was" blueprint.
+
 Who to ask is kept on each question, so a restart in between loses nothing;
 once sent, a question is marked so it is never sent twice.
 """
@@ -27,7 +32,11 @@ from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.util import dt as dt_util
 
 from .callbacks import Callbacks
-from .coffee_lab.lab import CoffeeLab
+from .coffee_lab.lab import CoffeeLab, question_brews
+
+EVENT_RATING_DUE = "xbloom_rating_due"
+# The group Home Assistant's own event is sent to, beside the callers.
+_BUS = "bus"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,9 +68,9 @@ class RatingAsker:
     def _on_question(self, question: dict[str, Any]) -> None:
         caller = self._callbacks.caller_of(question.get("run_id"))
         if caller is None:
-            # Started on the dashboard or at the machine: the card asks. It
-            # may still be another cup of a question an agent will ask about,
-            # now due later.
+            # Started on the dashboard or at the machine: no caller to ask,
+            # but Home Assistant's event is due later now, and so may be a
+            # call about an agent's earlier cup of the same coffee.
             self._schedule()
             return
         target, context = caller
@@ -79,6 +88,8 @@ class RatingAsker:
         """The questions still to be sent, by whom they are to be asked of."""
         waiting: dict[str, list[dict[str, Any]]] = {}
         for question in self._lab.rating_questions:
+            if not question.get("announced"):
+                waiting.setdefault(_BUS, []).append(question)
             if question.get("ask") and not question.get("asked"):
                 waiting.setdefault(_key(question["ask"]), []).append(question)
         return waiting
@@ -104,6 +115,11 @@ class RatingAsker:
         # are not in the list, and with none left nothing is sent.
         questions = self._waiting().get(key) or []
         if not questions:
+            return
+        if key == _BUS:
+            self._hass.bus.async_fire(EVENT_RATING_DUE, {"brews": question_brews(questions)})
+            for question in questions:
+                await self._lab.async_note_question(question["brew_id"], announced=True)
             return
         ask = questions[-1]["ask"]
         if ask.get("target") not in self._callbacks.targets:

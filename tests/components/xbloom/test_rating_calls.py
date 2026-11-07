@@ -12,9 +12,18 @@ from custom_components.xbloom.rating_calls import RatingAsker
 from .test_coffee_lab_rating import _at, _brew, _lab
 
 
+class FakeBus:
+    def __init__(self):
+        self.fired = []
+
+    def async_fire(self, event, data):
+        self.fired.append((event, data))
+
+
 class FakeHass:
     def __init__(self):
         self.tasks = []
+        self.bus = FakeBus()
 
     def async_create_task(self, coro):
         task = asyncio.ensure_future(coro)
@@ -67,14 +76,19 @@ async def _fire(hass, timers):
     await _settle(hass)
 
 
+async def _fire_all(hass, timers):
+    while timers:
+        await _fire(hass, timers)
+
+
 async def test_a_brew_an_agent_started_is_asked_about_once_when_due(timers):
     lab, bag, hass, callbacks, asker = await _asker({"run-1": ("phone", {"member": "m"})})
     result = await _brew(lab, bag, "run-1")
     await _settle(hass)
-    [(when, _)] = timers
-    assert when.isoformat() == lab.rating_question["due_at"], "asked when the card appears, not before"
+    assert {when.isoformat() for when, _ in timers} == {lab.rating_question["due_at"]}, \
+        "asked when the card appears, not before"
     assert callbacks.sent == []
-    await _fire(hass, timers)
+    await _fire_all(hass, timers)
     assert callbacks.sent == [("phone", {"member": "m"}, [(result.brew_id, "Test Hot")])]
     assert lab.rating_question["asked"] is True
     timers.clear()
@@ -87,15 +101,21 @@ async def test_nothing_is_sent_once_the_card_was_answered(timers):
     await _brew(lab, bag, "run-1")
     await _settle(hass)
     await lab.async_rate(verdict="fine")
-    await _fire(hass, timers)
-    assert callbacks.sent == []
+    await _fire_all(hass, timers)
+    assert callbacks.sent == [] and hass.bus.fired == []
 
 
-async def test_a_brew_started_on_the_dashboard_is_left_to_the_card(timers):
+async def test_a_brew_started_on_the_dashboard_is_asked_by_the_card_and_the_event(timers):
     lab, bag, hass, callbacks, _ = await _asker({})
-    await _brew(lab, bag, "run-1")
+    result = await _brew(lab, bag, "run-1")
     await _settle(hass)
-    assert timers == [] and callbacks.sent == []
+    await _fire_all(hass, timers)
+    assert callbacks.sent == []
+    [(event, data)] = hass.bus.fired
+    assert event == "xbloom_rating_due"
+    assert data == {"brews": [{"brew_id": result.brew_id, "recipe": "Test Hot", "bag": "Kenya",
+                               "changes": [], "cups": 1}]}
+    assert lab.rating_question["announced"] is True
 
 
 async def test_a_question_open_before_a_restart_is_still_asked(timers):
@@ -107,7 +127,7 @@ async def test_a_question_open_before_a_restart_is_still_asked(timers):
     # Home Assistant starts again: the callers in memory are gone, the question is not.
     restarted = RatingAsker(hass, lab, FakeCallbacks({}))
     restarted.start()
-    await _fire(hass, timers)
+    await _fire_all(hass, timers)
     assert restarted._callbacks.sent and restarted._callbacks.sent[0][0] == "phone"
 
 
@@ -122,10 +142,12 @@ async def test_cups_in_one_sitting_are_one_message_after_the_last(timers):
     with _at(lab, 10):
         other = await _brew(lab, bag, "run-3", recipe="Test Iced")
         await _settle(hass)
-    [(when, _)] = timers
-    assert when.isoformat() == lab.rating_questions[-1]["due_at"], "after the last cup"
-    await _fire(hass, timers)
+    assert {when.isoformat() for when, _ in timers} == {lab.rating_questions[-1]["due_at"]}, \
+        "after the last cup"
+    await _fire_all(hass, timers)
     [(target, context, asked)] = callbacks.sent
+    [(_, data)] = hass.bus.fired
+    assert [(b["brew_id"], b["cups"]) for b in data["brews"]] == [(again.brew_id, 2), (other.brew_id, 1)]
     assert asked == [(again.brew_id, "Test Hot"), (other.brew_id, "Test Iced")]
     assert lab.question_of(first.brew_id)["brew_ids"] == [first.brew_id, again.brew_id]
 
@@ -136,9 +158,9 @@ async def test_each_member_is_asked_about_their_own_cups(timers):
     await _brew(lab, bag, "run-1")
     await _brew(lab, bag, "run-2", recipe="Test Iced")
     await _settle(hass)
-    while timers:
-        await _fire(hass, timers)
+    await _fire_all(hass, timers)
     assert sorted(c[1]["member"] for c in callbacks.sent) == ["a", "b"]
+    assert len(hass.bus.fired) == 1, "Home Assistant is told once for the sitting"
 
 
 async def test_a_dashboard_cup_of_an_agent_s_coffee_moves_the_call_after_it(timers):
@@ -148,8 +170,7 @@ async def test_a_dashboard_cup_of_an_agent_s_coffee_moves_the_call_after_it(time
     with _at(lab, 10):
         await _brew(lab, bag, "run-2")
         await _settle(hass)
-    [(when, _)] = timers
-    assert when.isoformat() == lab.rating_question["due_at"]
+    assert {when.isoformat() for when, _ in timers} == {lab.rating_question["due_at"]}
 
 
 def test_the_rating_message_is_its_own_message_after_the_ending():
@@ -168,3 +189,14 @@ def test_the_rating_message_is_its_own_message_after_the_ending():
     assert (data["brew_id"], data["recipe"]) == ("b1", "Test Hot")
     assert [(b["brew_id"], b["cups"]) for b in data["brews"]] == [("b1", 2), ("b2", 1)]
     assert message.payload["context"] == {"member": "m"}
+
+
+async def test_the_event_is_fired_once_for_a_question(timers):
+    lab, bag, hass, callbacks, asker = await _asker({})
+    await _brew(lab, bag, "run-1")
+    await _settle(hass)
+    await _fire_all(hass, timers)
+    asker.stop()
+    RatingAsker(hass, lab, callbacks).start()
+    await _fire_all(hass, timers)
+    assert len(hass.bus.fired) == 1

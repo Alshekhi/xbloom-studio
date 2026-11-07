@@ -614,6 +614,51 @@ update_bean:
         text:
           multiline: true
 
+rate_brew:
+  fields:
+    brew_id:
+      selector:
+        text:
+    verdict:
+      selector:
+        select:
+          options: [again, fine, not_again]
+          translation_key: verdict
+    body:
+      selector:
+        select:
+          options: [light, medium, full]
+    acidity:
+      selector:
+        select:
+          options: [low, medium, high]
+    sweetness:
+      selector:
+        select:
+          options: [low, medium, high]
+    clarity:
+      selector:
+        select:
+          options: [low, medium, high]
+    hot_notes:
+      selector:
+        text:
+    warm_notes:
+      selector:
+        text:
+    cool_notes:
+      selector:
+        text:
+    overall_notes:
+      selector:
+        text:
+    finish:
+      selector:
+        text:
+    next_change:
+      selector:
+        text:
+
 archive_recipe:
   fields:
     name:

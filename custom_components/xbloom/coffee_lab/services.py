@@ -17,7 +17,7 @@ from ..const import DOMAIN
 from ..tool_common import refuse
 from . import actions
 from .lab import CoffeeLab
-from .models import STATUSES
+from .models import STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS
 
 _BAG = {vol.Exclusive("bean", "bag"): str, vol.Exclusive("bean_id", "bag"): str}
 _GRAMS = vol.All(vol.Coerce(float), vol.Range(min=0))
@@ -43,7 +43,18 @@ SERVICES: dict[str, tuple[Callable[..., Any], vol.Schema]] = {
     "update_bean": (actions.update_bean, vol.Schema({
         **_BAG, vol.Optional("new_name"): str, **_DETAILS,
     })),
+    # How a brew was: the oldest question due, unless brew_id names one of
+    # its cups — what the rating notification's buttons call.
+    "rate_brew": (actions.rate_brew, vol.Schema({
+        vol.Optional("brew_id"): str,
+        vol.Optional("verdict"): vol.In(list(VERDICTS)),
+        **{vol.Optional(key): vol.In(list(scale)) for key, scale in TASTE_SCALES.items()},
+        **{vol.Optional(key): str for key in (*TASTE_NOTES, "next_change")},
+    })),
 }
+
+# The services that are not about a bag.
+_NO_BAG = (actions.add_bean, actions.rate_brew)
 
 
 def async_register_lab_services(hass: HomeAssistant, lab: CoffeeLab) -> Callable[[], None]:
@@ -52,9 +63,9 @@ def async_register_lab_services(hass: HomeAssistant, lab: CoffeeLab) -> Callable
     def _handler(action: Callable[..., Any]) -> Callable[[ServiceCall], Any]:
         async def handle(call: ServiceCall) -> ServiceResponse:
             args = dict(call.data)
-            # Every service but add_bean names a bag; the schema can say "not
+            # Every service about a bag names one; the schema can say "not
             # both" but not "one of".
-            if action is not actions.add_bean and not (args.get("bean") or args.get("bean_id")):
+            if action not in _NO_BAG and not (args.get("bean") or args.get("bean_id")):
                 raise refuse("missing_arguments", action=call.service, arguments="bean or bean_id")
             facts = await action(lab, args)
             return facts if call.return_response else None

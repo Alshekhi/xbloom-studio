@@ -11,6 +11,7 @@ can your own automations or a service outside Home Assistant.
 | `xbloom_brew_failed` | The brew could not start, or the machine gave up on it | `reason`, `recipe_name`, sometimes `step` / `error` |
 | `xbloom_brew_stopped` | Someone stopped the brew | `by`, `recipe_name`, `ground` (whether the grinder had run), `dose_g` |
 | `xbloom_brew_timeout` | Ten minutes passed with no ending heard from the machine | `recipe_name` |
+| `xbloom_rating_due` | With Coffee Lab on: a quarter of an hour after the last cup of a sitting, for every brew still waiting for its verdict, whoever started it. The **Ask how the coffee was** blueprint is built on it | `brews`: each question as `brew_id`, `recipe`, `bag`, `changes`, `cups`. Answer one with the `xbloom.rate_brew` action and its `brew_id` |
 | `xbloom_machine_brew_started` | A brew started from one of the machine's own recipe slots, which Home Assistant did not send and so cannot follow | |
 
 **Every event of one brew also carries its `run_id`**, the same on each, so a

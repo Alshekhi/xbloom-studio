@@ -35,9 +35,10 @@ def test_an_edited_blueprint_is_never_overwritten():
         assert decide(EDITED, written, NEW) not in ("install", "update")
 
 
-def test_the_three_announcement_blueprints_are_bundled():
+def test_the_bundled_blueprints():
     assert bundled_names() == [
         "brew_announce.yaml", "live_control_announce.yaml", "machine_fault_announce.yaml",
+        "rating_ask.yaml",
     ]
 
 

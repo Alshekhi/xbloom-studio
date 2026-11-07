@@ -9,10 +9,10 @@ The events and states an automation can trigger on are listed in
 
 ## Ready-made blueprints
 
-Three blueprints come with the integration and are installed with it: open
+The blueprints come with the integration and are installed with it: open
 **Settings → Automations & Scenes → Blueprints**, pick one, and choose
-**Create automation**. Each is set up entirely through its form — pick your
-speakers and a language — with no YAML to edit.
+**Create automation**. Each is set up entirely through its form — pick where it
+speaks and a language — with no YAML to edit.
 
 Updating the integration updates the blueprints too, and the automations built
 on them keep their settings. A blueprint you have edited yourself is left as
@@ -23,26 +23,36 @@ it is; Home Assistant shows a repair notice when a newer one is available.
 | **Brew announcements** | Announces the coffee ready, or a brew that could not start, to the whole home; the brew starting, each step of it, and a cancellation can go to a speaker by the machine, the only one that says the recipe name. | [Import][bp-brew] |
 | **Live-session announcements** | Speaks live feedback while you turn the machine's knobs — weight, grind size, temperature, which module you're on. Needs the **Connect** switch on. | [Import][bp-live] |
 | **Machine fault announcements** | Speaks up when the machine runs out of water or beans, or reports a dose or gear problem. | [Import][bp-fault] |
+| **Ask how the coffee was** | With Coffee Lab on, asks how each coffee was a quarter of an hour after the last cup: on a phone, with Again / Fine / Not again buttons, or aloud through a voice assistant that keeps the answer and what was said about the taste. | [Import][bp-rating] |
 
 [bp-brew]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Fbrew_announce.yaml
 [bp-live]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Flive_control_announce.yaml
 [bp-fault]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Fmachine_fault_announce.yaml
+[bp-rating]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Frating_ask.yaml
 
 The **Import** links are only needed without the integration installed, for
 example to try a blueprint elsewhere. The files are in
 [`custom_components/xbloom/blueprints/`](../custom_components/xbloom/blueprints/).
 
-**Every blueprint speaks through whatever you have.** Under **How to
+**The announcement blueprints speak through whatever you have.** Under **How to
 announce**, **Announce with** offers three choices:
 
 - **Alexa** — via the [Alexa Media Player](https://github.com/alandtse/alexa_media_player) custom integration.
 - **Speaker (TTS)** — any TTS engine (Piper, Google Translate, Cloud) on any media player.
 - **Notification** — any `notify.*` service, so the text arrives as a phone notification instead of speech.
 
-All three are **bilingual, English or Arabic**, chosen per automation. You can
+All of them are **bilingual, English or Arabic**, chosen per automation. You can
 create more than one automation from a blueprint — for example, English on one
 speaker and Arabic on another. Each blueprint's entities are filled in for you
 under **xBloom entities**, collapsed.
+
+**Ask how the coffee was** asks in one of two ways. **Phone** needs the Home
+Assistant companion app; a tap on a button keeps the verdict. **Voice
+assistant** needs a voice assistant that can start a conversation, whose
+conversation agent has the **xBloom Studio** tools turned on — it asks, listens,
+and keeps the verdict and anything said about the taste. Cups of the same
+coffee brewed close together are asked about once, and a coffee already rated
+on the dashboard or to another assistant is not asked about at all.
 
 ### What the brew announcements say, and where
 

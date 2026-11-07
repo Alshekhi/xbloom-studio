@@ -237,11 +237,9 @@ class Callbacks:
         receiver asks the person and keeps each answer with the coffee_lab
         tool's rate_brew, by its brew_id.
         """
-        brews = [
-            {"brew_id": q["brew_id"], "recipe": q["recipe"], "bag": q["bag"],
-             "changes": q.get("changes") or [], "cups": len(q.get("brew_ids") or [q["brew_id"]])}
-            for q in questions
-        ]
+        from .coffee_lab.lab import question_brews
+
+        brews = question_brews(questions)
         first = brews[0]
         self._queue.put_nowait(Message(target, {
             "type": "xbloom.rating.due",

@@ -1525,6 +1525,60 @@
     "list_archived_recipes": {
       "name": "List Archived Recipes",
       "description": "The archived recipes, with when each was archived and whether it stayed in the xBloom cloud."
+    },
+    "rate_brew": {
+      "name": "Rate a brew",
+      "description": "Keep how a brew was: its verdict, how it tasted, and what to change next time.",
+      "fields": {
+        "brew_id": {
+          "name": "Brew id",
+          "description": "The brew, or any cup of its question. The oldest question due when left out."
+        },
+        "verdict": {
+          "name": "Verdict",
+          "description": "Whether it is worth brewing again."
+        },
+        "body": {
+          "name": "Body",
+          "description": "Light, medium or full."
+        },
+        "acidity": {
+          "name": "Acidity",
+          "description": "Low, medium or high."
+        },
+        "sweetness": {
+          "name": "Sweetness",
+          "description": "Low, medium or high."
+        },
+        "clarity": {
+          "name": "Clarity",
+          "description": "Low, medium or high."
+        },
+        "hot_notes": {
+          "name": "Hot",
+          "description": "How it tasted hot."
+        },
+        "warm_notes": {
+          "name": "Warm",
+          "description": "How it tasted warm."
+        },
+        "cool_notes": {
+          "name": "Cool",
+          "description": "How it tasted once cool."
+        },
+        "overall_notes": {
+          "name": "Overall",
+          "description": "Anything else about it."
+        },
+        "finish": {
+          "name": "Finish",
+          "description": "The aftertaste."
+        },
+        "next_change": {
+          "name": "Next change",
+          "description": "What to change next time, such as grind 52."
+        }
+      }
     }
   },
   "selector": {
@@ -1559,6 +1613,13 @@
         "date": "Newest",
         "likes": "Most liked",
         "downloads": "Most downloaded"
+      }
+    },
+    "verdict": {
+      "options": {
+        "again": "Again",
+        "fine": "Fine",
+        "not_again": "Not again"
       }
     }
   },

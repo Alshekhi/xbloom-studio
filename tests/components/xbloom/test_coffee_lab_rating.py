@@ -285,3 +285,22 @@ def test_notion_keeps_buy_again_in_its_own_column():
     assert bean_properties({"buy_again": "maybe"}) == {"Buy Again": {"select": {"name": "Maybe"}}}
     page = {"id": "b", "properties": {"Buy Again": {"select": {"name": "Maybe"}}}}
     assert bean_from_page(page).buy_again == "maybe"
+
+
+async def test_the_rate_brew_service_needs_no_bag_and_answers_the_question():
+    from custom_components.xbloom.coffee_lab import services
+
+    lab, store, bag = await _lab()
+    result = await _brew(lab, bag, "run-1")
+    handlers = {}
+    hass = MagicMock()
+    hass.services.async_register.side_effect = (
+        lambda domain, name, handler, **kw: handlers.__setitem__(name, (handler, kw["schema"]))
+    )
+    services.async_register_lab_services(hass, lab)
+    handler, _ = handlers["rate_brew"]  # the schema is stubbed here; Home Assistant checks it
+    call = MagicMock(service="rate_brew", data={"brew_id": result.brew_id, "verdict": "again"},
+                     return_response=False)
+    await handler(call)
+    [brew] = await store.async_list_brews()
+    assert brew.rating == 3 and lab.rating_question is None
