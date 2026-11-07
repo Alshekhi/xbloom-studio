@@ -19,3 +19,27 @@ it stays in the xBloom app and is only hidden in Home Assistant. Restoring
 puts it back where the library is: signed in, in the cloud (created again if
 it was removed, under a new cloud id, so an older share link to it no longer
 works); signed out, in the local library.
+
+## Community recipes
+
+xBloom's [community hub](https://collective.xbloom.com) holds recipes people
+have shared. The integration searches and reads it without an account, and
+offers Studio recipes only.
+
+On the dashboard's **Community** tab, type a keyword in **Community Search**,
+narrow it with **Community Origin** and order it with **Community Sort**
+(newest, most liked or most downloaded), then press **Search Community**.
+**Community Matches** says how many recipes matched, and **Community Recipe**
+lists them; picking one reads it in full — the coffee it was made for, its
+dose, ratio, grind and pours — into that select's attributes, where the
+dashboard shows it. **Add Community Recipe** puts it in your recipe
+library — in the cloud when you are signed in — where it brews like any other.
+
+**Suggest Community Recipe** picks one without a search: the most downloaded
+Studio recipe for the origin and process of the bag in use, then for its
+origin alone, then any. A recipe already in your library, or one needing more
+coffee than the bag has left, is passed over, and recipes for the drippers your
+library already uses come first.
+
+The actions are `xbloom.search_community`, `xbloom.get_community_recipe` and
+`xbloom.suggest_community`, each returning what it found as a response.

@@ -54,14 +54,65 @@ Coffee made another way — a V60, say — is recorded with **Manual brewer**,
 **Manual brew dose** and **Record manual brew**, or `xbloom.consume`. The
 brewers offered are yours to set in **Configure → Coffee Lab**.
 
+**A brew is never lost when the record cannot be reached** — Notion down, or
+the network away. It waits in Home Assistant with the time it was brewed, and
+is saved once, every five minutes being tried again. **Waiting brews** counts
+them; after an hour a repair says so.
+
+## How was it
+
+A while after a brew, Coffee Lab asks how it was: **Brew to rate** names the
+recipe and the bag a quarter of an hour after the brew, when the coffee can
+have been tasted, and **Verdict** answers it — **Again**, **Fine** or **Not
+again**. Unanswered, the question goes after a day.
+
+A question is asked once for a recipe with a bag at one grind, ratio and dose,
+and not again once it has a verdict. Cups of the same one brewed close
+together share a question, and its answer is kept on each of them; a
+different recipe, bag or setting gets a question of its own. Up to three are
+open at once, asked oldest first.
+
+Beside the verdict, how it tasted can be kept — body, acidity, sweetness and
+clarity, how it was hot, warm and cool, overall, the finish — and a **Next
+change**, such as "grind 52", with the `xbloom.rate_brew` action or by telling
+an AI assistant. Only what is given is kept. The question can also be asked
+for you: by an AI assistant that started the brew, through its
+[callback](events.md#callbacks), or by the **Ask how the coffee was**
+[blueprint](automations.md#ready-made-blueprints), on a phone or aloud.
+
+### Trying a change
+
+The next time the recipe is picked with that bag, **Next Change** offers the
+change asked for, and **Use Next Change** sets the Brew tab's one-off
+adjustments to it; the saved recipe stays as it is. The versions tried and
+their verdicts are side by side on the Brew tab. A changed version rated
+**Again** is offered to keep, as **Version to Keep**: **Make Version the
+Recipe** changes the saved recipe, **Save Version as New Recipe** keeps both.
+
+### A recipe for this bag
+
+**Suggest Recipe** looks for a recipe for the bag in use: your own first,
+ranked by how close the bags they were brewed with are — this bag, then the
+same origin and process, then the same origin — and by their verdicts, with
+a recipe last rated **Not again** with this bag left out. **Recipe
+Suggestions** lists them, and **Use Suggested Recipe** picks the best. A
+[community recipe](recipes.md#community-recipes) is suggested beside them,
+which **Add and Use Community Recipe** adds and picks in one press.
+
+### Buy it again?
+
+When a bag is finished, **Finished bag** names it for a week, and **Buy
+again** keeps whether you would buy it again — yes, maybe or no.
+
 ## Entities and actions
 
 **Coffee bag** (the bag in use), **Coffee left**, **Coffee bags** (with every
 bag as an attribute), **Brews** and **Stats period**, **Last brew counted**,
-and the manual-brew controls. The actions are `xbloom.add_bean`,
+**Waiting brews**, the manual-brew controls, and those described above for
+rating, versions and suggestions. The actions are `xbloom.add_bean`,
 `xbloom.update_bean`, `xbloom.set_active_bean`, `xbloom.consume`,
-`xbloom.start_tracking` and `xbloom.finish_bag`; each can return what it did as
-a response.
+`xbloom.start_tracking`, `xbloom.finish_bag` and `xbloom.rate_brew`; each can
+return what it did as a response.
 
 **Brews** counts brews that made coffee; a brew stopped after grinding counts
 toward the coffee used but not as a brew.
@@ -87,6 +138,9 @@ alone:
 | Brews | Brew (title), Brewed At (date), Dose g, Ratio, Water g, Temperature C, Flow Rate, Total Time sec (numbers), Brewer, Dripper, Outcome, Review Reason (selects), Bean (relation to Coffee Beans), Recipe, Grind, Run ID (text), Needs Review (checkbox) |
 
 A field missing or of the wrong type is named when you set it up, and nothing
-is saved until it is fixed. A select option the database lacks — a new brewer,
+is saved until it is fixed. The fields for ratings — Rating, Body, Acidity,
+Sweetness, Clarity, Hot, Warm, Cool and Overall Notes, Finish and Next Change
+in Brews, and Buy Again in Coffee Beans — are added the first time one is
+kept. A select option the database lacks — a new brewer,
 say — is added before it is used. A bag added or changed in Notion itself
 appears within ten minutes, or at once with **Refresh Coffee Bags**.

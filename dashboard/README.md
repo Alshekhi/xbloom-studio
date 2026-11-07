@@ -49,9 +49,10 @@ repair appears if one has waited more than an hour.
   with coffee of the same origin and process, and a community recipe to try;
   **Use my recipe** or **Add and use the community recipe** then picks it for
   brewing. Asking for a suggestion sends nothing to the machine.
-  **How was it?** appears a quarter of an hour after the first brew of a
-  recipe, bag and grind, ratio and dose that has no verdict, and asks for one:
-  Again, Fine or Not again. A version rated Again that changed the recipe is
+  **How was it?** appears a quarter of an hour after a brew of a recipe, bag
+  and grind, ratio and dose that has no verdict, and asks for one: Again, Fine
+  or Not again. Cups of the same one brewed close together are asked about
+  once; several different ones are asked about in turn. A version rated Again that changed the recipe is
   offered to keep, as the recipe or as a new one; a change asked for last time
   is offered as **Use that change** under the recipe picker; a finished bag
   asks whether it would be bought again.

@@ -19,6 +19,21 @@ answers. With Coffee Lab on, it needs the bag the coffee comes from, or
 `unattributed`. With `notify_target`, the caller is told how the brew ends by
 [callback](events.md#callbacks).
 
+`search_hub`, `suggest_hub` and `hub_recipe` reach the
+[community hub](recipes.md#community-recipes): Studio recipes by keyword,
+origin, process, roast or flavor, one suggested for a bag, and one read in
+full to add to the library. What strangers wrote there reaches the assistant
+quoted, as text to describe, never as instructions.
+
+**How a brew was.** With Coffee Lab on, `active_bean` lists the
+`rating_questions` waiting for a verdict, and `rate_brew` keeps what the
+person says — the verdict, how it tasted, the next change — closing the
+dashboard's question; `rate_bag` keeps whether a finished bag would be bought
+again. An assistant raises an open question at most once, while already
+talking about coffee. One that started a brew with `notify_target` is also
+told when to ask, by a [callback](events.md#callbacks) of its own a quarter of
+an hour after the last cup.
+
 **A conversation agent in Home Assistant:** in its settings, under **Control
 Home Assistant**, choose **xBloom Studio**.
 

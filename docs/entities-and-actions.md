@@ -7,7 +7,9 @@
 - **Event** — Brew Event, fired on brew lifecycle changes (useful as an automation trigger).
 - **Selects** — Recipe, Recipe Action, Archived Recipe, Mode (auto / pro), Water Source (tank / tap), Temperature Unit (°C / °F), Weight Unit (g / oz / ml), Brew Pattern.
 - **Numbers** — Grind Size, Grind Speed, Brew Volume, Brew Temperature, Brew Flow Rate, and the brew-customizer overrides: Brew Dose, Brew Ratio, Brew Grind Size.
-- **Text** — New Recipe Name (used by the brew customizer's Save as New Recipe).
+- **Text** — New Recipe Name (used by the brew customizer's Save as New Recipe), Community Search.
+- **Community** — Community Search, Community Origin, Community Sort, Community Recipe, Community Matches, and the Search, Suggest, Add, and Add and Use Community Recipe buttons. See [Recipes](recipes.md#community-recipes).
+- **Coffee Lab** — while it is on, the bag, counting, rating, version and suggestion entities. See [Coffee Lab](coffee-lab.md).
 - **Buttons** — Start Brew, Cancel Brew, Pause Brew, Resume Brew, Cancel Preparation, Tare Scale, Back to Home, Grind, Brew (standalone), Refresh Recipes, Save as New Recipe, Run Recipe Action, Restore Archived Recipe, Delete Selected Recipe, plus BLE Connect / BLE Disconnect diagnostics.
 - **Switches** — Use Grinder, Connect (opens a live session that holds the BLE link and streams machine events for sensors, the dashboard, and optional spoken announcements). Machine Control: off, every action that starts, prepares or changes something on the machine is refused; stopping, pausing, cancelling, disconnecting and all recipe work still run.
 - **Update** — Firmware (installed vs latest, with an Install button; available when signed in to the xBloom cloud).
@@ -19,6 +21,8 @@ The integration registers its services under the `xbloom.` domain:
 - **Brewing** — `prepare_brew`, `cancel_preparation`, `start_brew`, `stop_brew`, `brew_pause`, `brew_resume`, `brew_standalone`, `write_slot`.
 - **Machine control** — `grind`, `tare`, `back_to_home`, `set_mode`, `set_water_source`, `set_temp_unit`, `set_weight_unit`.
 - **Recipe library** — `list_recipes`, `get_recipe`, `build_recipe`, `add_recipe`, `update_recipe`, `delete_recipe`, `save_scaled_recipe`, `archive_recipe`, `restore_recipe`, `list_archived_recipes`.
+- **Community hub** — `search_community`, `get_community_recipe`, `suggest_community`.
+- **Coffee Lab**, while it is on — `add_bean`, `update_bean`, `set_active_bean`, `consume`, `start_tracking`, `finish_bag`, `rate_brew`.
 - **Diagnostics** — `ble_connect`, `ble_disconnect`, `refresh_status`.
 
 Each service, its fields, and examples appear in **Developer Tools → Actions**, and are documented in `custom_components/xbloom/services.yaml`.
