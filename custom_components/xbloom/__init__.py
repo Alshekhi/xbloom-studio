@@ -38,7 +38,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from .const import (
     CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_BREWERS, CONF_CALLBACK_TARGETS, CONF_COFFEE_LAB,
     CONF_COFFEE_LAB_STORE, CONF_NOTION_BEANS, CONF_NOTION_BREWS, CONF_NOTION_TOKEN,
-    CONF_PRODUCT_ID, DEFAULT_BREWERS, DOMAIN,
+    COMMUNITY_MACHINE, CONF_PRODUCT_ID, DEFAULT_BREWERS, DOMAIN,
     SIGNAL_COFFEE_LAB_UPDATED,
 )
 from .blueprint_install import async_install_blueprints
@@ -61,6 +61,7 @@ from .tool_common import refuse, require_machine_control
 from .coffee_lab.history import ChartFeed
 from .coffee_lab.services import async_register_lab_services
 from .coordinator import XBloomCoordinator
+from .community import CommunityBrowser, NotForThisMachine, active_bag, studio_recipe, suggest
 from . import llm_api
 from xbloom.client import XBloomClient
 from xbloom.cloud import XBloomCloudClient, language_type_for
@@ -275,6 +276,8 @@ class XBloomRuntimeData:
     preparer: object = None
     # Off: commands that set the machine going are refused (switch.py).
     machine_control: bool = True
+    # The dashboard's community hub search (community.py).
+    community: CommunityBrowser | None = None
 
 
 type XBloomConfigEntry = ConfigEntry[XBloomRuntimeData]
@@ -391,6 +394,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         client=client,
         cloud=cloud,
         ble_device_resolver=_ble_device_for_listener,
+    )
+    entry.runtime_data.community = CommunityBrowser(
+        hass, entry.entry_id, community, client, coordinator,
     )
     if entry.data.get(CONF_COFFEE_LAB):
         store = None
@@ -1974,13 +1980,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         filters = {
             arg: call.data[arg]
             for arg in (
-                "keyword", "machine", "kind", "source", "origins", "varietals",
+                "keyword", "kind", "source", "origins", "varietals",
                 "processes", "roasts", "flavors", "cup_types", "sort", "page", "page_size",
             )
             if arg in call.data
         }
         try:
-            result = await community.search(**filters)
+            result = await community.search(machine=COMMUNITY_MACHINE, **filters)
         except ValueError as err:  # a filter name the hub does not list
             return {"ok": False, "error": str(err)}
         except (XBloomAPIError, aiohttp.ClientError) as err:
@@ -1989,12 +1995,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         return {"ok": True, **result}
 
     async def handle_get_community_recipe(call) -> dict:
+        # An id can come from anywhere, so the search's Studio filter is not
+        # enough: studio_recipe refuses a recipe for another machine too.
         try:
-            recipe = await community.detail(call.data["recipe_id"])
+            recipe = await studio_recipe(community, call.data["recipe_id"])
+        except NotForThisMachine as err:
+            return {"ok": False, "error": str(err)}
         except (XBloomAPIError, aiohttp.ClientError) as err:
             _LOGGER.warning("xbloom.get_community_recipe: %s", err)
             return {"ok": False, "error": str(err)}
         return {"ok": True, "recipe": recipe}
+
+    async def handle_suggest_community(call) -> dict:
+        """Community recipes to try, for the bag in use unless told otherwise."""
+        bag = None
+        country, process = call.data.get("origin"), call.data.get("process")
+        if not (country or process):
+            bag = await active_bag(entry.runtime_data.coffee_lab)
+            country, process = getattr(bag, "country", None), getattr(bag, "process", None)
+        try:
+            found = await suggest(
+                community, entry.runtime_data.coordinator.data or [], country, process,
+            )
+        except (XBloomAPIError, aiohttp.ClientError) as err:
+            _LOGGER.warning("xbloom.suggest_community: %s", err)
+            return {"ok": False, "error": str(err)}
+        return {"ok": True, "bag": getattr(bag, "name", None), **found}
 
     async def handle_build_recipe(call) -> dict:
         """Snap loose recipe fields onto the machine's grid, then validate.
@@ -2204,9 +2230,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         DOMAIN, "search_community", handle_search_community,
         schema=vol.Schema({
             vol.Optional("keyword"): str,
-            # This integration drives the Studio, so its recipes come first;
-            # an empty value searches every machine.
-            vol.Optional("machine", default="Studio"): vol.Any(None, str),
             vol.Optional("kind"): vol.In(list(COMMUNITY_KINDS)),
             vol.Optional("source"): vol.In(list(COMMUNITY_SOURCES)),
             **{
@@ -2219,6 +2242,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 vol.Coerce(int), vol.Range(min=1, max=50),
             ),
         }),
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register(
+        DOMAIN, "suggest_community", handle_suggest_community,
+        schema=vol.Schema({vol.Optional("origin"): str, vol.Optional("process"): str}),
         supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(
@@ -2284,7 +2312,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         "build_recipe",
         "list_recipes", "get_recipe", "add_recipe", "update_recipe", "delete_recipe",
         "archive_recipe", "restore_recipe", "list_archived_recipes",
-        "search_community", "get_community_recipe",
+        "search_community", "suggest_community", "get_community_recipe",
         "save_scaled_recipe",
     ):
         entry.async_on_unload(

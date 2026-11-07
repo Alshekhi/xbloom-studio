@@ -45,6 +45,13 @@ Coffee Bags** appears only when Coffee Lab is kept in Notion.
   from the brew record, so they cover every brew in it.
 - **Bags** — every open or unopened bag, choosing the one in use, and a link
   to where bags are added and edited.
+- **Community** — Studio recipes other people shared on the xBloom
+  community hub. **Suggest a recipe** offers the most downloaded ones for the
+  bag in use (its origin and process), leaving out recipes you already have,
+  and picks one; or search by words, origin and order. Read one with its
+  pours, and add it to your recipes. It is then brewed from the Brew tab like any
+  other recipe. Text a recipe's author wrote is shown exactly as written,
+  never as a link, image or formatting.
 - **xBloom** — connection and status, the grinder, brewer and scale modules,
   the recipe library with its actions (archive, delete), settings, tools, announcements, updates, and a 24-hour log of
   machine events.
@@ -88,7 +95,8 @@ unavailable, so the card is hidden rather than shown broken.
   second control beside the tile's own action. Action tiles also set
   `hide_state: true`.
 - **Names come from the entities.** Tiles do not override them, so they are
-  translated.
+  translated — except on the Community tab, whose section heading already says
+  "community", so its tiles take short names from `TEXT` in each language.
 - **Destructive actions ask first** — Stop brew, Run recipe action,
   Record manual brew.
 

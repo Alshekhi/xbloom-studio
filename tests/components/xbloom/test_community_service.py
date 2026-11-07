@@ -32,7 +32,7 @@ async def _setup(entry):
     entry.async_on_unload = MagicMock()
     community = MagicMock()
     community.search = AsyncMock(return_value=PAGE)
-    community.detail = AsyncMock(return_value={"id": 4021, "pours": []})
+    community.detail = AsyncMock(return_value={"id": 4021, "machine": "Studio", "pours": []})
     with patch("custom_components.xbloom.XBloomCoordinator") as mc, \
          patch("custom_components.xbloom.XBloomClient") as mk, \
          patch("custom_components.xbloom.XBloomCommunityClient", return_value=community):
@@ -69,9 +69,9 @@ async def test_both_services_are_registered(services) -> None:
 async def test_search_forwards_the_filters_and_returns_the_page(services) -> None:
     registered, community = services
     handler = registered["search_community"][0]
-    res = await handler(_call(keyword="kenya", machine="Studio", origins=["Kenya"], sort="likes", page=1, page_size=20))
+    res = await handler(_call(keyword="kenya", origins=["Kenya"], sort="likes", page=1, page_size=20))
     community.search.assert_awaited_once_with(
-        keyword="kenya", machine="Studio", origins=["Kenya"], sort="likes", page=1, page_size=20,
+        machine="Studio", keyword="kenya", origins=["Kenya"], sort="likes", page=1, page_size=20,
     )
     assert res == {"ok": True, **PAGE}
 
@@ -84,7 +84,7 @@ async def test_search_forwards_the_filters_and_returns_the_page(services) -> Non
 async def test_search_failure_is_reported_not_raised(services, error) -> None:
     registered, community = services
     community.search.side_effect = error
-    res = await registered["search_community"][0](_call(machine="Studio"))
+    res = await registered["search_community"][0](_call())
     assert res == {"ok": False, "error": str(error)}
 
 
@@ -92,7 +92,7 @@ async def test_get_community_recipe_returns_the_detail(services) -> None:
     registered, community = services
     res = await registered["get_community_recipe"][0](_call(recipe_id=4021))
     community.detail.assert_awaited_once_with(4021)
-    assert res == {"ok": True, "recipe": {"id": 4021, "pours": []}}
+    assert res == {"ok": True, "recipe": {"id": 4021, "machine": "Studio", "pours": []}}
 
 
 async def test_get_community_recipe_failure_is_reported(services) -> None:
@@ -100,3 +100,17 @@ async def test_get_community_recipe_failure_is_reported(services) -> None:
     community.detail.side_effect = XBloomAPIError("community hub: This requires you to log in first")
     res = await registered["get_community_recipe"][0](_call(recipe_id=1))
     assert res["ok"] is False and "log in" in res["error"]
+
+
+async def test_search_is_always_for_the_studio(services) -> None:
+    """A machine passed in anyway is not the caller's to choose."""
+    registered, community = services
+    await registered["search_community"][0](_call(machine="Original"))
+    assert community.search.await_args.kwargs["machine"] == "Studio"
+
+
+async def test_a_recipe_for_another_machine_is_refused(services) -> None:
+    registered, community = services
+    community.detail.return_value = {"id": 686619, "machine": "Original", "pours": []}
+    res = await registered["get_community_recipe"][0](_call(recipe_id=686619))
+    assert res == {"ok": False, "error": "recipe 686619 is for the Original, not the Studio"}

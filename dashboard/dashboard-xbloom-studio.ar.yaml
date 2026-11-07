@@ -758,6 +758,163 @@ views:
     - condition: state
       entity: sensor.xbloom_studio_coffee_bags
       state_not: unavailable
+- title: المجتمع
+  path: community
+  icon: mdi:account-group
+  type: sections
+  max_columns: 2
+  sections:
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## البحث عن وصفة من المجتمع'
+    - type: tile
+      entity: button.xbloom_studio_suggest_community_recipe
+      name: اقترح وصفة
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_suggest_community_recipe
+    - type: tile
+      entity: text.xbloom_studio_community_search
+      name: كلمات البحث
+      icon_tap_action:
+        action: none
+    - type: tile
+      entity: select.xbloom_studio_community_origin
+      name: المنشأ
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: tile
+      entity: select.xbloom_studio_community_sort
+      name: الترتيب
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: tile
+      entity: button.xbloom_studio_search_community
+      name: ابحث
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_search_community
+    - type: markdown
+      text_only: true
+      content: '{% set n = states(''sensor.xbloom_studio_community_matches'') | int(0) %}{% set shown
+        = state_attr(''select.xbloom_studio_community_recipe'', ''shown'') | int(0) %}{% if n == 0 %}لا
+        توجد وصفات مطابقة.{% elif n == 1 %}وصفة واحدة تطابق البحث.{% elif n == 2 %}وصفتان تطابقان البحث.{%
+        elif n <= 10 %}{{ n }} وصفات تطابق البحث.{% else %}{{ n }} وصفة تطابق البحث.{% endif %}{% if 0
+        < shown < n %} أول {{ shown }} منها في القائمة أدناه.{% endif %}'
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_community_matches
+        state_not: unavailable
+      - condition: state
+        entity: sensor.xbloom_studio_community_matches
+        state_not: unknown
+    visibility:
+    - condition: state
+      entity: text.xbloom_studio_community_search
+      state_not: unavailable
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## الوصفات المطابقة'
+    - type: tile
+      entity: select.xbloom_studio_community_recipe
+      name: الوصفة
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    visibility:
+    - condition: numeric_state
+      entity: sensor.xbloom_studio_community_matches
+      above: 0
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## الوصفة المختارة'
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = state_attr(''select.xbloom_studio_community_recipe'',
+        ''picked'') or {} %}{% set added = state_attr(''select.xbloom_studio_community_recipe'', ''added'')
+        %}{% if added %}أضيفت إلى وصفاتك باسم **{{ e(added) }}**. اخترها من تبويب التحضير.
+
+
+        {% endif %}{% if state_attr(''select.xbloom_studio_community_recipe'', ''suggested'') %}{% if
+        state_attr(''select.xbloom_studio_community_recipe'', ''suggested_for'') and state_attr(''select.xbloom_studio_community_recipe'',
+        ''matched_origin'') %}مقترحة لـ **{{ e(state_attr(''select.xbloom_studio_community_recipe'', ''suggested_for''))
+        }}**، بمطابقة {{ e(state_attr(''select.xbloom_studio_community_recipe'', ''matched_origin''))
+        }}{% if state_attr(''select.xbloom_studio_community_recipe'', ''matched_process'') %} · {{ e(state_attr(''select.xbloom_studio_community_recipe'',
+        ''matched_process'')) }}{% endif %}.{% else %}أكثر وصفات Studio تنزيلًا.{% endif %}
+
+
+        {% endif %}شاركها {{ ''xBloom'' if a.get(''official'') else e(a.get(''author'')) }}{% set about
+        = (a.get(''origin'') or []) + (a.get(''process'') or []) + ([a.get(''roast'')] if a.get(''roast'')
+        else []) %}{% if about %} · {% for x in about %}{{ e(x) }}{% if not loop.last %} · {% endif %}{%
+        endfor %}{% endif %}{% if a.get(''likes'') %} · {{ a.get(''likes'') }} إعجاب{% endif %}
+
+
+        {% if a.get(''flavor'') %}**النكهات:** {% for x in a.get(''flavor'') %}{{ e(x) }}{% if not loop.last
+        %}، {% endif %}{% endfor %}
+
+
+        {% endif %}{% if a.get(''description'') %}{{ e(a.get(''description'')) }}
+
+
+        {% endif %}{% if a.get(''dose_g'') %}**القهوة:** {{ a.get(''dose_g'') | round(1) }} غ{% if a.get(''ratio'')
+        %} · **النسبة:** 1:{{ a.get(''ratio'') | round(1) }}{% endif %}{% if a.get(''grind_size'') %}
+        · درجة الطحن {{ a.get(''grind_size'') | round(0) | int }} بسرعة {{ a.get(''rpm'') }} دورة في الدقيقة{%
+        endif %}
+
+
+        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| الصبة | الماء | الحرارة | الانتظار
+        |
+
+        |:--:|:--:|:--:|:--:|
+
+        {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} مل | {{ p.temperature_c
+        | round(0) | int }}°C | {{ p.pause_s | int(0) }} ث |
+
+        {% endfor %}{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_add_community_recipe
+      name: أضفها إلى وصفاتي
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_community_recipe
+        confirmation:
+          text: إضافة هذه الوصفة إلى مكتبتك؟
+    visibility:
+    - condition: numeric_state
+      entity: sensor.xbloom_studio_community_matches
+      above: 0
+    - condition: state
+      entity: select.xbloom_studio_community_recipe
+      state_not: unavailable
+    - condition: state
+      entity: select.xbloom_studio_community_recipe
+      state_not: unknown
 - title: xBloom
   path: xbloom
   icon: mdi:coffee-maker

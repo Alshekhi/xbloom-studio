@@ -11,6 +11,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
 
 from .const import DOMAIN
+from .community_entities import entities_for as community_entities
 
 _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0
@@ -21,6 +22,7 @@ _RECIPE_SELECT = "select.xbloom_studio_recipe"
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
     async_add_entities([XBloomNewRecipeName(entry)])
+    async_add_entities(community_entities(entry, "text"))
 
 
 class XBloomNewRecipeName(TextEntity):

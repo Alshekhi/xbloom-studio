@@ -119,8 +119,9 @@ async def test_update_platform_registers_the_firmware_entity() -> None:
 
 
 @pytest.mark.asyncio
-async def test_text_platform_registers_the_recipe_name_box() -> None:
-    assert _ids(await _added(text_platform)) == {"xbloom_new_recipe_name"}
+async def test_text_platform_registers_its_two_boxes() -> None:
+    """The recipe name box, and the community search words."""
+    assert _ids(await _added(text_platform)) == {"xbloom_new_recipe_name", "xbloom_community_search"}
 
 
 @pytest.mark.asyncio

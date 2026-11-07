@@ -44,6 +44,12 @@ CONF_NOTION_BEANS = "notion_beans_db"
 CONF_NOTION_BREWS = "notion_brews_db"
 DEFAULT_BREWERS = ("V60", "Chemex", "AeroPress", "Kalita Wave", "Clever")
 
+# The community hub's name for the machine this integration drives, as its
+# criteria list and its recipes' `model` both give it (the Original is J20).
+# Hub recipes for other machines are never offered: nothing here has checked
+# that one brews correctly on the Studio.
+COMMUNITY_MACHINE = "Studio"
+
 # Where brew callbacks may be sent, by name: {name: {"url", "secret"}}. A caller
 # names one; it never gives a URL. entry.data.
 CONF_CALLBACK_TARGETS = "callback_targets"

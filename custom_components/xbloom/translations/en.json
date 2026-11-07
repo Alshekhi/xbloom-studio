@@ -510,6 +510,23 @@
       },
       "archived_recipe": {
         "name": "Archived Recipe"
+      },
+      "community_origin": {
+        "name": "Community Origin",
+        "state": {
+          "any": "Any origin"
+        }
+      },
+      "community_sort": {
+        "name": "Community Sort",
+        "state": {
+          "date": "Newest first",
+          "likes": "Most liked first",
+          "downloads": "Most downloaded first"
+        }
+      },
+      "community_recipe": {
+        "name": "Community Recipe"
       }
     },
     "sensor": {
@@ -580,6 +597,9 @@
       },
       "brew_time": {
         "name": "Brew Time"
+      },
+      "community_matches": {
+        "name": "Community Matches"
       }
     },
     "switch": {
@@ -693,11 +713,23 @@
       },
       "cancel_preparation": {
         "name": "Cancel Preparation"
+      },
+      "search_community": {
+        "name": "Search Community"
+      },
+      "add_community_recipe": {
+        "name": "Add Community Recipe"
+      },
+      "suggest_community_recipe": {
+        "name": "Suggest Community Recipe"
       }
     },
     "text": {
       "new_recipe_name": {
         "name": "New Recipe Name"
+      },
+      "community_search": {
+        "name": "Community Search"
       }
     },
     "event": {
@@ -817,6 +849,12 @@
     },
     "recipe_not_prepared": {
       "message": "The recipe could not be sent to the xBloom ({reason})."
+    },
+    "community_failed": {
+      "message": "The community hub did not answer: {reason}"
+    },
+    "community_none_picked": {
+      "message": "Pick a community recipe first."
     }
   },
   "services": {
@@ -1205,15 +1243,11 @@
     },
     "search_community": {
       "name": "Search Community Recipes",
-      "description": "Search the recipes people share on the xBloom community hub. Returns a page of matches as response data, each with its share_url: pass that to start_brew or write_slot to brew it. Filters take the names the hub lists, in the language Home Assistant uses; a name it does not know comes back as an error listing the ones it does.",
+      "description": "Search the Studio recipes people share on the xBloom community hub. Returns a page of matches as response data, each with its share_url: pass that to start_brew or write_slot to brew it. Filters take the names the hub lists, in the language Home Assistant uses; a name it does not know comes back as an error listing the ones it does.",
       "fields": {
         "keyword": {
           "name": "Keyword",
           "description": "Words in the recipe name."
-        },
-        "machine": {
-          "name": "Machine",
-          "description": "Studio or Original. Leave empty for every machine."
         },
         "kind": {
           "name": "Coffee or tea",
@@ -1249,7 +1283,7 @@
         },
         "sort": {
           "name": "Sort by",
-          "description": "Newest or most liked first."
+          "description": "Newest, most liked or most downloaded first."
         },
         "page": {
           "name": "Page",
@@ -1258,6 +1292,20 @@
         "page_size": {
           "name": "Page size",
           "description": "Recipes per page."
+        }
+      }
+    },
+    "suggest_community": {
+      "name": "Suggest Community Recipes",
+      "description": "Suggest Studio recipes from the xBloom community hub to try with a coffee: its most downloaded ones for the bag in use, or for the origin and process given, leaving out recipes already in the library. When nothing new matches both, origin alone is tried, then any recipe. The response says which origin and process were matched.",
+      "fields": {
+        "origin": {
+          "name": "Origin",
+          "description": "Where the coffee was grown, instead of the bag in use."
+        },
+        "process": {
+          "name": "Process",
+          "description": "How it was processed, instead of the bag in use."
         }
       }
     },
@@ -1444,7 +1492,8 @@
     "community_sort": {
       "options": {
         "date": "Newest",
-        "likes": "Most liked"
+        "likes": "Most liked",
+        "downloads": "Most downloaded"
       }
     }
   },

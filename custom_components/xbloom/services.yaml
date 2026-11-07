@@ -247,10 +247,6 @@ search_community:
       example: "Yirgacheffe"
       selector:
         text:
-    machine:
-      default: "Studio"
-      selector:
-        text:
     kind:
       selector:
         select:
@@ -299,6 +295,7 @@ search_community:
           options:
             - date
             - likes
+            - downloads
     page:
       default: 1
       selector:
@@ -313,6 +310,17 @@ search_community:
           min: 1
           max: 50
           mode: box
+
+suggest_community:
+  fields:
+    origin:
+      example: "Ethiopia"
+      selector:
+        text:
+    process:
+      example: "Natural"
+      selector:
+        text:
 
 get_community_recipe:
   fields:

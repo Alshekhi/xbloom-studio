@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .ble_entities import send_brewer_pattern_live, signal_event
 from .tool_common import require_machine_control
 from .const import DOMAIN
+from .community_entities import entities_for as community_entities
 from .coordinator import XBloomCoordinator
 from .prepare import signal_clear_recipe
 from .coffee_lab.entities import entities_for as coffee_lab_entities
@@ -57,6 +58,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     ])
     # Coffee Lab's, only while it is switched on.
     async_add_entities(coffee_lab_entities(entry.runtime_data.coffee_lab, "select"))
+    async_add_entities(community_entities(entry, "select"))
 
 
 def labelled(recipes: list[dict]) -> list[tuple[str, dict]]:

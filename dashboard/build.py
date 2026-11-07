@@ -48,6 +48,19 @@ TEXT = {
         "not_tracked": "not tracked", "no_bags": "No open or unopened bags.",
         "speak_brew": "Speak brew progress", "speak_faults": "Speak machine faults",
         "speak_live": "Speak live readings",
+        "view_community": "Community", "h_find": "Find a community recipe",
+        "h_results": "Matching recipes", "h_picked": "Chosen recipe",
+        "c_words": "Search words", "c_origin": "Origin", "c_sort": "Sort", "c_search": "Search",
+        "c_recipe": "Recipe", "c_add": "Add to my recipes",
+        "c_confirm_add": "Add this recipe to your library?",
+        "c_none": "No recipes match.", "c_one": "1 recipe matches.",
+        "c_many": "{n} recipes match.", "c_first": "The first {shown} are in the list below.",
+        "c_by": "Shared by", "c_notes": "Notes", "c_grind": "grind", "c_at": "at",
+        "c_rpm": "RPM", "c_pause": "Pause", "c_s": "s", "c_likes": "likes",
+        "c_added": "Added to your recipes as **{name}**. Pick it on the Brew tab.",
+        "c_suggest": "Suggest a recipe",
+        "c_for": "Suggested for **{bag}**, matching {basis}.",
+        "c_popular": "The most downloaded Studio recipes.",
     },
     "ar": {
         "view_brew": "التحضير", "view_stats": "الإحصاءات", "view_bags": "الأكياس", "view_xbloom": "xBloom",
@@ -80,6 +93,19 @@ TEXT = {
         "not_tracked": "غير متتبع", "no_bags": "لا توجد أكياس مفتوحة أو غير مفتوحة.",
         "speak_brew": "إعلان سير التحضير", "speak_faults": "إعلان أعطال الماكينة",
         "speak_live": "إعلان القراءات المباشرة",
+        "view_community": "المجتمع", "h_find": "البحث عن وصفة من المجتمع",
+        "h_results": "الوصفات المطابقة", "h_picked": "الوصفة المختارة",
+        "c_words": "كلمات البحث", "c_origin": "المنشأ", "c_sort": "الترتيب", "c_search": "ابحث",
+        "c_recipe": "الوصفة", "c_add": "أضفها إلى وصفاتي",
+        "c_confirm_add": "إضافة هذه الوصفة إلى مكتبتك؟",
+        "c_none": "لا توجد وصفات مطابقة.", "c_one": "وصفة واحدة تطابق البحث.",
+        "c_many": "{n} وصفات تطابق البحث.", "c_first": "أول {shown} منها في القائمة أدناه.",
+        "c_by": "شاركها", "c_notes": "النكهات", "c_grind": "درجة الطحن", "c_at": "بسرعة",
+        "c_rpm": "دورة في الدقيقة", "c_pause": "الانتظار", "c_s": "ث", "c_likes": "إعجاب",
+        "c_added": "أضيفت إلى وصفاتك باسم **{name}**. اخترها من تبويب التحضير.",
+        "c_suggest": "اقترح وصفة",
+        "c_for": "مقترحة لـ **{bag}**، بمطابقة {basis}.",
+        "c_popular": "أكثر وصفات Studio تنزيلًا.",
     },
 }
 
@@ -436,9 +462,106 @@ def xbloom_view(t: dict) -> dict:
     ]}
 
 
+# Hub text was typed by strangers. Backslash-escaping every character markdown
+# or HTML reads makes it print as written: no link, no image fetched, no tag.
+ESCAPE = (
+    "{% macro e(s) %}{{ (s or '') | string | regex_replace("
+    "'([\\\\\\\\`*_{}\\\\[\\\\]()<>#+!|~])', '\\\\\\\\\\\\1') }}{% endmacro %}"
+)
+
+
+def matches_sentence(t: dict, sensor: str, picker: str) -> str:
+    """How many recipes the last search found, counted the language's way."""
+    n = "n"
+    if t is TEXT["ar"]:
+        # Arabic counted-noun agreement: one, two, three to ten, then eleven and up.
+        count = (
+            f"{{% if n == 0 %}}{t['c_none']}{{% elif n == 1 %}}{t['c_one']}"
+            "{% elif n == 2 %}وصفتان تطابقان البحث."
+            "{% elif n <= 10 %}{{ n }} وصفات تطابق البحث."
+            "{% else %}{{ n }} وصفة تطابق البحث.{% endif %}"
+        )
+    else:
+        count = (
+            f"{{% if n == 0 %}}{t['c_none']}{{% elif n == 1 %}}{t['c_one']}"
+            f"{{% else %}}{t['c_many'].replace('{n}', '{{ n }}')}{{% endif %}}"
+        )
+    first = t["c_first"].replace("{shown}", "{{ shown }}")
+    return (
+        f"{{% set {n} = states('{sensor}') | int(0) %}}"
+        f"{{% set shown = state_attr('{picker}', 'shown') | int(0) %}}"
+        f"{count}{{% if 0 < shown < n %}} {first}{{% endif %}}"
+    )
+
+
+def picked_card(t: dict, picker: str) -> str:
+    """The chosen recipe: who shared it, what it is, and its pours."""
+    added = t["c_added"].replace("{name}", "{{ e(added) }}")
+    basis = (
+        "{{ e(state_attr('" + picker + "', 'matched_origin')) }}"
+        "{% if state_attr('" + picker + "', 'matched_process') %} · "
+        "{{ e(state_attr('" + picker + "', 'matched_process')) }}{% endif %}"
+    )
+    suggested = t["c_for"].replace("{bag}", "{{ e(state_attr('" + picker + "', 'suggested_for')) }}").replace("{basis}", basis)
+    return (
+        ESCAPE
+        + f"{{% set a = state_attr('{picker}', 'picked') or {{}} %}}"
+        + f"{{% set added = state_attr('{picker}', 'added') %}}"
+        + "{% if added %}" + added + "\n\n{% endif %}"
+        # Why this one: the bag it was suggested for, or the fallback.
+        + f"{{% if state_attr('{picker}', 'suggested') %}}"
+        + f"{{% if state_attr('{picker}', 'suggested_for') and state_attr('{picker}', 'matched_origin') %}}{suggested}"
+        + f"{{% else %}}{t['c_popular']}{{% endif %}}\n\n{{% endif %}}"
+        + f"{t['c_by']} {{{{ 'xBloom' if a.get('official') else e(a.get('author')) }}}}"
+        + f"{{% set about = (a.get('origin') or []) + (a.get('process') or []) + ([a.get('roast')] if a.get('roast') else []) %}}"
+        + "{% if about %} · {% for x in about %}{{ e(x) }}{% if not loop.last %} · {% endif %}{% endfor %}{% endif %}"
+        + f"{{% if a.get('likes') %}} · {{{{ a.get('likes') }}}} {t['c_likes']}{{% endif %}}\n\n"
+        + f"{{% if a.get('flavor') %}}**{t['c_notes']}:** "
+        + f"{{% for x in a.get('flavor') %}}{{{{ e(x) }}}}{{% if not loop.last %}}{t['sep']}{{% endif %}}{{% endfor %}}\n\n{{% endif %}}"
+        + "{% if a.get('description') %}{{ e(a.get('description')) }}\n\n{% endif %}"
+        + f"{{% if a.get('dose_g') %}}**{t['coffee']}:** {{{{ a.get('dose_g') | round(1) }}}} {t['g']}"
+        + f"{{% if a.get('ratio') %}} · **{t['ratio']}:** 1:{{{{ a.get('ratio') | round(1) }}}}{{% endif %}}"
+        + f"{{% if a.get('grind_size') %}} · {t['c_grind']} {{{{ a.get('grind_size') | round(0) | int }}}} {t['c_at']} {{{{ a.get('rpm') }}}} {t['c_rpm']}{{% endif %}}\n\n{{% endif %}}"
+        + f"{{% set pours = a.get('pours') or [] %}}{{% if pours %}}"
+        + f"| {t['pour']} | {t['water']} | {t['temp']} | {t['c_pause']} |\n|:--:|:--:|:--:|:--:|\n"
+        + "{% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} " + t["ml"]
+        + " | {{ p.temperature_c | round(0) | int }}°C | {{ p.pause_s | int(0) }} " + t["c_s"] + " |\n{% endfor %}{% endif %}"
+    )
+
+
+def community_view(t: dict) -> dict:
+    """Studio recipes others shared: suggest or search, read one, add it.
+
+    Brewing stays on the Brew tab, through the same picker, bag and
+    preparation as every other recipe.
+    """
+    sensor = f"sensor.{E}_community_matches"
+    picker = f"select.{E}_community_recipe"
+    return {"title": t["view_community"], "path": "community", "icon": "mdi:account-group",
+            "type": "sections", "max_columns": 2, "sections": [
+        section(t["h_find"], [
+            # First: one press, a recipe to try with the bag in use.
+            press(f"button.{E}_suggest_community_recipe", name=t["c_suggest"]),
+            tile(f"text.{E}_community_search", name=t["c_words"]),
+            select(f"select.{E}_community_origin", name=t["c_origin"]),
+            select(f"select.{E}_community_sort", name=t["c_sort"]),
+            press(f"button.{E}_search_community", name=t["c_search"]),
+            {"type": "markdown", "text_only": True, "content": matches_sentence(t, sensor, picker),
+             "visibility": present(sensor)},
+        ], present(f"text.{E}_community_search")[:1]),
+        section(t["h_results"], [
+            select(picker, name=t["c_recipe"]),
+        ], [{"condition": "numeric_state", "entity": sensor, "above": 0}]),
+        section(t["h_picked"], [
+            {"type": "markdown", "content": picked_card(t, picker)},
+            press(f"button.{E}_add_community_recipe", t["c_confirm_add"], name=t["c_add"]),
+        ], [{"condition": "numeric_state", "entity": sensor, "above": 0}, *present(picker)]),
+    ]}
+
+
 def dashboard(lang: str) -> dict:
     t = TEXT[lang]
-    return {"views": [brew_view(t), stats_view(t), bags_view(t), xbloom_view(t), archive_view(t)]}
+    return {"views": [brew_view(t), stats_view(t), bags_view(t), community_view(t), xbloom_view(t), archive_view(t)]}
 
 
 def main() -> None:
