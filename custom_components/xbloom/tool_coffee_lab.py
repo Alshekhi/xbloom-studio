@@ -24,8 +24,9 @@ ACTIONS: dict[str, Spec] = {
     "list_beans": Spec(actions.list_beans, "every open or unopened bag, with what is left"),
     "active_bean": Spec(
         actions.active_bean,
-        "the bag the xBloom draws from when none is named; rating_question when a "
-        "brew is waiting for its verdict, bag_question when a finished bag is",
+        "the bag the xBloom draws from when none is named; rating_questions, oldest "
+        "first, for brews waiting for their verdict (one per recipe, bag and "
+        "version, covering every cup of it), bag_question when a finished bag is",
     ),
     "brew_history": Spec(
         actions.brew_history,
@@ -45,8 +46,9 @@ ACTIONS: dict[str, Spec] = {
         "keep what the person said about a brew: verdict (again, fine, not_again), "
         "body, acidity, sweetness, clarity, hot/warm/cool/overall notes, finish, and "
         "next_change, such as \"grind 52\". Only what they said; never fill one in. "
-        "The brew in rating_question unless brew_id. Mention an open question at "
-        "most once, and only while already talking about coffee",
+        "The oldest of rating_questions unless brew_id; a question's answer is kept "
+        "on all its cups. Mention open questions at most once, and only while "
+        "already talking about coffee",
     ),
     "stats": Spec(
         actions.stats,

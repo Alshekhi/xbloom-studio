@@ -110,8 +110,8 @@ async def list_beans(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
 async def active_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     bean = await lab.async_active_bean()
     facts: dict[str, Any] = {"bag": bean_facts(bean) if bean else None}
-    if (question := lab.rating_question_due()) is not None:
-        facts["rating_question"] = question_facts(question)
+    if questions := lab.rating_questions_due():
+        facts["rating_questions"] = [question_facts(q) for q in questions]
     if (bag := lab.bag_question) is not None:
         facts["bag_question"] = {"bean_id": bag["bean_id"], "bag": bag["name"]}
     return facts
@@ -133,6 +133,7 @@ def question_facts(question: dict[str, Any]) -> dict[str, Any]:
     return {
         "brew_id": question["brew_id"], "recipe": question["recipe"], "bag": question["bag"],
         "changed_from_recipe": question.get("changes") or [],
+        "cups": len(question.get("brew_ids") or [question["brew_id"]]),
     }
 
 

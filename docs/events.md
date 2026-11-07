@@ -102,13 +102,19 @@ as the event and `context` is what `start_brew` was given. A caller names a
 target; it can never supply a URL.
 
 With Coffee Lab on, a brew that completed and is worth asking about gets one
-more message, later and on its own: `xbloom.rating.due`, sent when the
-question about it falls due (a quarter of an hour after the brew, when the
-dashboard's card appears too), and only if it is still unanswered. Its `data`
-is `{"event": "rating_due", "final": false, "run_id", "brew_id", "recipe",
-"bag", "changes"}` and its `context` is the brew's. The receiver asks the
-person how it was and keeps the answer with the `coffee_lab` tool's
-`rate_brew`, which closes the card; left unanswered, the card stays.
+more message, later and on its own: `xbloom.rating.due`. Coffee Lab keeps a
+question per recipe, bag and version (grind, ratio, dose): cups of the same
+one share it, and a different one gets its own, up to three at a time. The
+message is sent a quarter of an hour after the caller's last cup — when the
+dashboard's card appears too — and covers every question of theirs still
+unanswered, so cups brewed close together are asked about once. Its `data` is
+`{"event": "rating_due", "final": false, "run_id", "brew_id", "recipe", "bag",
+"changes", "brews"}`: `brews` lists each question as `{"brew_id", "recipe",
+"bag", "changes", "cups"}`, and the top-level fields repeat the first. Its
+`context` is the brews'. The receiver asks the person how each was and keeps
+each answer with the `coffee_lab` tool's `rate_brew` and that `brew_id`; the
+answer is kept on every cup of the question and closes its card. Left
+unanswered, the card stays.
 
 ## Event reference
 

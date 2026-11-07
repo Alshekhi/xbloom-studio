@@ -227,21 +227,31 @@ class Callbacks:
         """The target and context a completed brew was started with, if any."""
         return self._completed.get(run_id) if run_id else None
 
-    def send_rating_due(self, target: str, context: Any, question: dict[str, Any]) -> None:
-        """Ask the caller how a brew was: once it can have been tasted.
+    def send_rating_due(self, target: str, context: Any, questions: list[dict[str, Any]]) -> None:
+        """Ask the caller how the coffee was: once it can have been tasted.
 
         A message of its own, after the brew's ending, so the coffee is not
-        asked about in the call that says it is ready. Facts only, as every
-        callback; the receiver asks the person and keeps the answer with the
-        coffee_lab tool's rate_brew.
+        asked about in the call that says it is ready. One message for a
+        sitting: `brews` holds each question, one per recipe, bag and version,
+        with how many cups it covers. Facts only, as every callback; the
+        receiver asks the person and keeps each answer with the coffee_lab
+        tool's rate_brew, by its brew_id.
         """
+        brews = [
+            {"brew_id": q["brew_id"], "recipe": q["recipe"], "bag": q["bag"],
+             "changes": q.get("changes") or [], "cups": len(q.get("brew_ids") or [q["brew_id"]])}
+            for q in questions
+        ]
+        first = brews[0]
         self._queue.put_nowait(Message(target, {
             "type": "xbloom.rating.due",
             "timestamp": dt_util.utcnow().isoformat(),
             "data": {
-                "event": "rating_due", "final": False, "run_id": question.get("run_id"),
-                "brew_id": question["brew_id"], "recipe": question["recipe"],
-                "bag": question["bag"], "changes": question.get("changes") or [],
+                "event": "rating_due", "final": False, "run_id": questions[-1].get("run_id"),
+                # The first brew's facts at the top level, as before there
+                # could be several; `brews` holds them all.
+                "brew_id": first["brew_id"], "recipe": first["recipe"],
+                "bag": first["bag"], "changes": first["changes"], "brews": brews,
             },
             "context": context,
         }))

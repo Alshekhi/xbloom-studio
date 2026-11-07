@@ -1,8 +1,9 @@
-"""How a brew was: the one question, the verdict, and what is kept.
+"""How a brew was: the questions, the verdict, and what is kept.
 
-The question is asked for the first brew of a recipe, bag and version (grind,
-ratio, dose) that has no verdict, is due a while after the brew, and lapses
-after a day. Asking must never undo a count.
+A question is asked for a recipe, bag and version (grind, ratio, dose) that
+has no verdict; cups of the same one share it, and a different one gets its
+own. Each is due a while after its last cup and lapses after a day. Asking
+must never undo a count.
 """
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
@@ -81,11 +82,66 @@ async def test_a_changed_version_is_asked_about_and_names_the_change():
     assert lab.rating_question["changes"] == [{"setting": "grind", "value": 52.0, "saved": 50.0}]
 
 
-async def test_a_newer_brew_replaces_the_open_question():
+async def test_two_cups_of_the_same_coffee_share_one_question_due_after_the_second():
     lab, store, bag = await _lab()
-    await _brew(lab, bag, "run-1")
-    second = await _brew(lab, bag, "run-2", grind="52")
-    assert lab.rating_question["brew_id"] == second.brew_id
+    first = await _brew(lab, bag, "run-1")
+    with _at(lab, 10):
+        second = await _brew(lab, bag, "run-2")
+    [question] = lab.rating_questions
+    assert question["brew_ids"] == [first.brew_id, second.brew_id]
+    with _at(lab, 20):
+        assert lab.rating_question_due() is None, "not before the second cup can be tasted"
+    with _at(lab, 26):
+        await lab.async_rate(verdict="again", tasting={"sweetness": "high"})
+    brews = {b.id: b for b in await store.async_list_brews()}
+    assert {brews[first.brew_id].rating, brews[second.brew_id].rating} == {3}
+    assert brews[first.brew_id].tasting == brews[second.brew_id].tasting
+    assert lab.rating_questions == []
+
+
+async def test_another_version_recipe_or_bag_gets_its_own_question_oldest_first():
+    lab, store, bag = await _lab()
+    other_bag = await store.async_add_bean(name="Colombia", status="open", tracked=True, remaining_g=200.0)
+    first = await _brew(lab, bag, "run-1")
+    changed = await _brew(lab, bag, "run-2", grind="52")
+    elsewhere = await _brew(lab, other_bag, "run-3")
+    assert [q["brew_id"] for q in lab.rating_questions] == [
+        first.brew_id, changed.brew_id, elsewhere.brew_id,
+    ]
+    with _at(lab, 16):
+        assert lab.rating_question_due()["brew_id"] == first.brew_id
+        await lab.async_rate(verdict="fine")
+        assert lab.rating_question_due()["brew_id"] == changed.brew_id
+        await lab.async_rate(verdict="again", brew_id=elsewhere.brew_id)
+        assert [q["brew_id"] for q in lab.rating_questions] == [changed.brew_id]
+
+
+async def test_no_more_than_three_questions_stay_open():
+    lab, store, bag = await _lab()
+    cups = [await _brew(lab, bag, f"run-{g}", grind=str(g)) for g in (50, 51, 52, 53)]
+    assert [q["brew_id"] for q in lab.rating_questions] == [c.brew_id for c in cups[1:]]
+
+
+async def test_a_question_kept_by_the_earlier_single_slot_is_still_asked():
+    lab, store, bag = await _lab()
+    result = await _brew(lab, bag, "run-1")
+    question = lab.rating_question
+    del question["brew_ids"]
+    lab._state = {"rating_question": question}
+    assert lab.rating_question["brew_ids"] == [result.brew_id]
+    await lab.async_rate(verdict="fine")
+    assert lab.rating_question is None
+
+
+async def test_two_changed_versions_rated_again_are_both_offered_in_turn():
+    lab, store, bag = await _lab()
+    await _brew(lab, bag, "run-1", grind="52")
+    await _brew(lab, bag, "run-2", grind="54")
+    await lab.async_rate(verdict="again")
+    await lab.async_rate(verdict="again")
+    assert [k["label"] for k in lab.versions_to_keep] == ["grind 52", "grind 54"]
+    await lab.async_clear_version_to_keep()
+    assert lab.version_to_keep["label"] == "grind 54"
 
 
 async def test_answering_keeps_the_verdict_and_closes_the_question():
@@ -134,10 +190,11 @@ async def test_a_failure_while_asking_never_undoes_the_count():
 async def test_the_open_question_reaches_an_agent_once_due():
     lab, store, bag = await _lab()
     await _brew(lab, bag, "run-1")
-    assert "rating_question" not in await actions.active_bean(lab, {})
+    assert "rating_questions" not in await actions.active_bean(lab, {})
     with _at(lab, 16):
         facts = await actions.active_bean(lab, {})
-    assert facts["rating_question"]["recipe"] == "Test Hot"
+    [question] = facts["rating_questions"]
+    assert (question["recipe"], question["cups"]) == ("Test Hot", 1)
 
 
 def test_versions_compare_as_numbers():

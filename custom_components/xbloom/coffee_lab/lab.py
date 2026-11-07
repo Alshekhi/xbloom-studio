@@ -56,6 +56,8 @@ QUESTION_DELAY = timedelta(minutes=15)
 QUESTION_LAPSE = timedelta(days=1)
 QUESTION_LOOKBACK = timedelta(days=365)
 BAG_QUESTION_LAPSE = timedelta(days=7)
+# Questions open at once; a busy morning drops the oldest rather than piling up.
+MAX_OPEN_QUESTIONS = 3
 
 
 def _rounded(value: Any, digits: int) -> float | None:
@@ -281,37 +283,68 @@ class CoffeeLab:
 
     # ── How it was ───────────────────────────────────────────────────────
     #
-    # One question, never more: how a recipe was with a bag, asked for the
-    # first brew of that recipe, bag and version (grind, ratio, dose) that has
-    # no verdict yet. It is due a while after the brew, so it is not asked
-    # while the cup is in hand, and it lapses after a day unanswered.
+    # A question per recipe, bag and version (grind, ratio, dose) that has no
+    # verdict yet. Cups of the same one brewed close together share their
+    # question, and the answer is kept on each of them; a different recipe,
+    # bag or version gets its own. Each is due a while after its last cup, so
+    # it is not asked while the cup is in hand, and lapses after a day
+    # unanswered. They are asked one at a time, oldest first.
+
+    def _open_questions(self) -> list[dict[str, Any]]:
+        now = dt_util.utcnow()
+        questions = self._state.get("rating_questions")
+        if questions is None and self._state.get("rating_question"):
+            questions = [self._state["rating_question"]]  # kept by an earlier version
+        open_ = []
+        for question in questions or []:
+            expires = dt_util.parse_datetime(question["expires_at"])
+            if expires is None or now < expires:
+                open_.append({"brew_ids": [question["brew_id"]], **question})
+        return open_
+
+    async def _async_set_questions(self, questions: list[dict[str, Any]], **values: Any) -> None:
+        await self._async_set_state(rating_questions=questions, rating_question=None, **values)
+
+    @property
+    def rating_questions(self) -> list[dict[str, Any]]:
+        """Every open question, whether due yet or not, oldest first."""
+        return [dict(q) for q in self._open_questions()]
 
     @property
     def rating_question(self) -> dict[str, Any] | None:
-        """The open question, whether due yet or not; None once it has lapsed."""
-        question = self._state.get("rating_question")
-        if not question:
-            return None
-        expires = dt_util.parse_datetime(question["expires_at"])
-        if expires is not None and dt_util.utcnow() >= expires:
-            return None
-        return dict(question)
+        """The oldest open question, whether due yet or not."""
+        questions = self._open_questions()
+        return dict(questions[0]) if questions else None
 
-    async def async_note_question(self, brew_id: str, **changes: Any) -> None:
-        """Keep something about the open question, if it is still this brew's."""
-        question = self._state.get("rating_question")
-        if question and question.get("brew_id") == brew_id:
-            await self._async_set_state(rating_question={**question, **changes})
+    def rating_questions_due(self, now: datetime | None = None) -> list[dict[str, Any]]:
+        now = now or dt_util.utcnow()
+        due = []
+        for question in self._open_questions():
+            when = dt_util.parse_datetime(question["due_at"])
+            if when is None or now >= when:
+                due.append(dict(question))
+        return due
 
     def rating_question_due(self, now: datetime | None = None) -> dict[str, Any] | None:
-        question = self.rating_question
-        if question is None:
-            return None
-        due = dt_util.parse_datetime(question["due_at"])
-        return question if due is None or (now or dt_util.utcnow()) >= due else None
+        """The question to ask now: the oldest that is due."""
+        due = self.rating_questions_due(now)
+        return due[0] if due else None
+
+    def question_of(self, brew_id: str) -> dict[str, Any] | None:
+        """The open question a brew is one of the cups of."""
+        return next((dict(q) for q in self._open_questions() if brew_id in q["brew_ids"]), None)
+
+    async def async_note_question(self, brew_id: str, **changes: Any) -> None:
+        """Keep something about the open question this brew is a cup of."""
+        questions = self._open_questions()
+        for i, question in enumerate(questions):
+            if brew_id in question["brew_ids"]:
+                questions[i] = {**question, **changes}
+                await self._async_set_questions(questions)
+                return
 
     async def _async_maybe_ask(self, run_id: str, args: dict[str, Any], done: Consumption) -> None:
-        """Open the question for this brew, when it is one worth asking about.
+        """Open, or join, the question for this brew, when it is worth asking about.
 
         Never lets counting fail: whatever goes wrong here is logged and the
         brew stands as counted.
@@ -323,26 +356,47 @@ class CoffeeLab:
         ):
             return
         try:
+            recipe = args["recipe"]
             version = brew_version(args.get("grams"), args.get("settings") or {})
             since = dt_util.utcnow() - QUESTION_LOOKBACK
             for brew in await self.store.async_list_brews(since=since):
                 if (
                     brew.rating is not None and brew.bean_id == done.bean_id
-                    and (brew.recipe or "").casefold() == args["recipe"].casefold()
+                    and (brew.recipe or "").casefold() == recipe.casefold()
                     and brew_version(brew.dose_g, brew.settings) == version
                 ):
                     return
-            bean = await self.store.async_get_bean(done.bean_id)
             now = dt_util.utcnow()
-            question = {
-                "brew_id": done.brew_id, "run_id": run_id, "recipe": args["recipe"],
-                "bean_id": done.bean_id, "bag": bean.name, "version": version,
-                "changes": version_changes(version, self.recipe_lookup(args["recipe"])),
+            timing = {
                 "brewed_at": args.get("brewed_at"),
                 "due_at": (now + QUESTION_DELAY).isoformat(),
                 "expires_at": (now + QUESTION_LAPSE).isoformat(),
             }
-            await self._async_set_state(rating_question=question)
+            questions = self._open_questions()
+            same = next((
+                q for q in questions
+                if q["bean_id"] == done.bean_id and q["version"] == version
+                and q["recipe"].casefold() == recipe.casefold()
+            ), None)
+            if same is not None:
+                # Another cup of the same coffee: one question for both, due
+                # after the later one.
+                question = {
+                    **same, **timing, "brew_id": done.brew_id, "run_id": run_id,
+                    "brew_ids": [*same["brew_ids"], done.brew_id],
+                }
+                questions[questions.index(same)] = question
+            else:
+                bean = await self.store.async_get_bean(done.bean_id)
+                question = {
+                    "brew_id": done.brew_id, "brew_ids": [done.brew_id], "run_id": run_id,
+                    "recipe": recipe, "bean_id": done.bean_id, "bag": bean.name,
+                    "version": version,
+                    "changes": version_changes(version, self.recipe_lookup(recipe)),
+                    **timing,
+                }
+                questions = [*questions, question][-MAX_OPEN_QUESTIONS:]
+            await self._async_set_questions(questions)
             self.on_question(question)
         except Exception:  # noqa: BLE001 — asking must never undo a count
             _LOGGER.exception("Coffee Lab: could not open the question for brew %s", done.brew_id)
@@ -351,43 +405,63 @@ class CoffeeLab:
         self, *, verdict: str | None = None, brew_id: str | None = None,
         tasting: dict[str, str] | None = None, next_change: str | None = None,
     ) -> Brew:
-        """Keep what was said about a brew: the open question's, unless named.
+        """Keep what was said about a brew: the oldest due question's, unless named.
 
-        With no question open and no brew named, the most recent brew.
+        A question's answer is kept on every cup it covers. With no question
+        and no brew named, the most recent brew.
         """
-        question = self.rating_question
-        target = brew_id or (question or {}).get("brew_id")
-        if target is None:
+        question = self.question_of(brew_id) if brew_id else (
+            self.rating_question_due() or self.rating_question
+        )
+        if question is not None:
+            targets = question["brew_ids"]
+        elif brew_id is not None:
+            targets = [brew_id]
+        else:
             latest = await self.store.async_list_brews(limit=1)
             if not latest:
                 raise UnknownBrew("")
-            target = latest[0].id
-        brew = await self.store.async_rate_brew(
-            target, rating=VERDICTS[verdict] if verdict else None,
-            tasting=tasting, next_change=next_change,
-        )
-        if question and question["brew_id"] == target and verdict:
+            targets = [latest[0].id]
+        named = brew_id or targets[-1]
+        rated = None
+        for target in [t for t in targets if t != named] + [named]:
+            rated = await self.store.async_rate_brew(
+                target, rating=VERDICTS[verdict] if verdict else None,
+                tasting=tasting, next_change=next_change,
+            )
+        if question is not None and verdict:
+            questions = [q for q in self._open_questions() if q["brew_id"] != question["brew_id"]]
+            keeps = self.versions_to_keep
             changes = question.get("changes") or []
             # A changed version liked enough to brew again is offered to keep,
             # as the recipe or beside it; the saved recipe is never changed
-            # without being asked.
-            keep = (
-                {"recipe": question["recipe"], "version": question["version"],
-                 "changes": changes, "label": change_label(changes)}
-                if verdict == "again" and changes else None
-            )
-            await self._async_set_state(rating_question=None, version_to_keep=keep)
+            # without being asked. Several are offered in turn.
+            if verdict == "again" and changes and not any(
+                k["recipe"] == question["recipe"] and k["version"] == question["version"]
+                for k in keeps
+            ):
+                keeps.append({"recipe": question["recipe"], "version": question["version"],
+                              "changes": changes, "label": change_label(changes)})
+            await self._async_set_questions(questions, versions_to_keep=keeps, version_to_keep=None)
         self.on_change()
-        return brew
+        return rated
+
+    @property
+    def versions_to_keep(self) -> list[dict[str, Any]]:
+        """Changed versions rated Again, until each is kept or dismissed."""
+        keeps = self._state.get("versions_to_keep")
+        if keeps is None and self._state.get("version_to_keep"):
+            keeps = [self._state["version_to_keep"]]  # kept by an earlier version
+        return [dict(k) for k in keeps or []]
 
     @property
     def version_to_keep(self) -> dict[str, Any] | None:
-        """A changed version rated Again, until it is kept or another replaces it."""
-        keep = self._state.get("version_to_keep")
-        return dict(keep) if keep else None
+        """The changed version to offer now: the first rated Again."""
+        keeps = self.versions_to_keep
+        return keeps[0] if keeps else None
 
     async def async_clear_version_to_keep(self) -> None:
-        await self._async_set_state(version_to_keep=None)
+        await self._async_set_state(versions_to_keep=self.versions_to_keep[1:], version_to_keep=None)
 
     # The one question a bag gets, when it is finished: would it be bought
     # again. Open for a week, and replaced by the next bag finished.
