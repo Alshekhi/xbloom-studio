@@ -24,11 +24,11 @@ from xbloom import spec
 
 from ..const import DOMAIN
 from .inventory import Deduct, Flag, Skip, decide_consumption, is_xpod
-from .models import SELECTABLE, Bean, Brew, Review
+from .models import SELECTABLE, VERDICTS, Bean, Brew, Review
 from .pending import PendingBrews
 from .stats import DEFAULT_PERIOD, PERIODS, Report, earliest_needed, period_report
 from .store import (
-    STORAGE_VERSION, CoffeeLabStore, ProcessedRuns, Storage, UnknownBean,
+    STORAGE_VERSION, CoffeeLabStore, ProcessedRuns, Storage, UnknownBean, UnknownBrew,
     async_local_store, async_processed_runs,
 )
 
@@ -48,6 +48,60 @@ XBLOOM_BREWER = "xBloom Studio"
 # left. Above it, one mistaken finish would retire a bag that still holds
 # coffee; a bag emptier than its record is weighed and re-based first.
 FINISH_BELOW_G = 20.0
+
+# The question about a brew: due this long after it, so it is not asked with
+# the cup in hand; gone this long after, unanswered. Earlier verdicts are
+# looked for this far back.
+QUESTION_DELAY = timedelta(minutes=15)
+QUESTION_LAPSE = timedelta(days=1)
+QUESTION_LOOKBACK = timedelta(days=365)
+
+
+def _rounded(value: Any, digits: int) -> float | None:
+    try:
+        return round(float(value), digits)
+    except (TypeError, ValueError):
+        return None
+
+
+def brew_version(dose: Any, settings: dict[str, Any]) -> dict[str, float | None]:
+    """What tells two brews of one recipe apart: grind, ratio and dose.
+
+    The record keeps the grind as text ("50" or "50.0"), so all three are
+    compared as rounded numbers.
+    """
+    return {
+        "grind": _rounded(settings.get("grind"), 1),
+        "ratio": _rounded(settings.get("ratio"), 2),
+        "dose_g": _rounded(dose, 1),
+    }
+
+
+def version_changes(version: dict[str, Any], saved: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Where this version differs from the saved recipe, setting by setting."""
+    if not saved:
+        return []
+    ratio = normalize_ratio(saved)
+    saved_version = {
+        "grind": _rounded(saved.get("grinder_size", saved.get("grind_size")), 1),
+        "ratio": _rounded(ratio, 2),
+        "dose_g": _rounded(saved.get("dose_g"), 1),
+    }
+    return [
+        {"setting": key, "value": value, "saved": saved_version[key]}
+        for key, value in version.items()
+        if value is not None and saved_version[key] is not None and value != saved_version[key]
+    ]
+
+
+def normalize_ratio(recipe: dict[str, Any]) -> float | None:
+    """The saved recipe's ratio denominator, whichever shape it is in."""
+    from xbloom.recipe_validate import normalize_recipe
+
+    try:
+        return float(str(normalize_recipe(recipe).get("ratio")).split(":", 1)[1])
+    except (IndexError, TypeError, ValueError):
+        return None
 
 
 @dataclass(frozen=True)
@@ -69,6 +123,8 @@ class Consumption:
     remaining_g: float | None = None
     opened: bool = False
     finished: bool = False
+    # The brew's row, when this count wrote one.
+    brew_id: str | None = None
 
 
 def cup_label(cup_type: Any) -> str | None:
@@ -103,6 +159,9 @@ class CoffeeLab:
         self._state: dict[str, Any] = {}
         # Entities subscribe to this; anything that changes what they show calls it.
         self.on_change = on_change
+        # The saved recipe of a name, from the integration's library: what the
+        # question compares a brew's grind, ratio and dose against.
+        self.recipe_lookup: Callable[[str], dict[str, Any] | None] = lambda name: None
         # One brew at a time: two deliveries of one completion, handled
         # together, would both pass the duplicate check while the first waits
         # on the store, and subtract twice.
@@ -203,6 +262,90 @@ class CoffeeLab:
     async def async_set_manual_brewer(self, brewer: str) -> None:
         await self._async_set_state(manual_brewer=brewer)
 
+    # ── How it was ───────────────────────────────────────────────────────
+    #
+    # One question, never more: how a recipe was with a bag, asked for the
+    # first brew of that recipe, bag and version (grind, ratio, dose) that has
+    # no verdict yet. It is due a while after the brew, so it is not asked
+    # while the cup is in hand, and it lapses after a day unanswered.
+
+    @property
+    def rating_question(self) -> dict[str, Any] | None:
+        """The open question, whether due yet or not; None once it has lapsed."""
+        question = self._state.get("rating_question")
+        if not question:
+            return None
+        expires = dt_util.parse_datetime(question["expires_at"])
+        if expires is not None and dt_util.utcnow() >= expires:
+            return None
+        return dict(question)
+
+    def rating_question_due(self, now: datetime | None = None) -> dict[str, Any] | None:
+        question = self.rating_question
+        if question is None:
+            return None
+        due = dt_util.parse_datetime(question["due_at"])
+        return question if due is None or (now or dt_util.utcnow()) >= due else None
+
+    async def _async_maybe_ask(self, args: dict[str, Any], done: Consumption) -> None:
+        """Open the question for this brew, when it is one worth asking about.
+
+        Never lets counting fail: whatever goes wrong here is logged and the
+        brew stands as counted.
+        """
+        if (
+            done.result not in ("counted", "recorded") or not done.brew_id
+            or args.get("brewer") != XBLOOM_BREWER or not args.get("recipe")
+            or not done.bean_id
+        ):
+            return
+        try:
+            version = brew_version(args.get("grams"), args.get("settings") or {})
+            since = dt_util.utcnow() - QUESTION_LOOKBACK
+            for brew in await self.store.async_list_brews(since=since):
+                if (
+                    brew.rating is not None and brew.bean_id == done.bean_id
+                    and (brew.recipe or "").casefold() == args["recipe"].casefold()
+                    and brew_version(brew.dose_g, brew.settings) == version
+                ):
+                    return
+            bean = await self.store.async_get_bean(done.bean_id)
+            now = dt_util.utcnow()
+            await self._async_set_state(rating_question={
+                "brew_id": done.brew_id, "recipe": args["recipe"],
+                "bean_id": done.bean_id, "bag": bean.name, "version": version,
+                "changes": version_changes(version, self.recipe_lookup(args["recipe"])),
+                "brewed_at": args.get("brewed_at"),
+                "due_at": (now + QUESTION_DELAY).isoformat(),
+                "expires_at": (now + QUESTION_LAPSE).isoformat(),
+            })
+        except Exception:  # noqa: BLE001 — asking must never undo a count
+            _LOGGER.exception("Coffee Lab: could not open the question for brew %s", done.brew_id)
+
+    async def async_rate(
+        self, *, verdict: str | None = None, brew_id: str | None = None,
+        tasting: dict[str, str] | None = None, next_change: str | None = None,
+    ) -> Brew:
+        """Keep what was said about a brew: the open question's, unless named.
+
+        With no question open and no brew named, the most recent brew.
+        """
+        question = self.rating_question
+        target = brew_id or (question or {}).get("brew_id")
+        if target is None:
+            latest = await self.store.async_list_brews(limit=1)
+            if not latest:
+                raise UnknownBrew("")
+            target = latest[0].id
+        brew = await self.store.async_rate_brew(
+            target, rating=VERDICTS[verdict] if verdict else None,
+            tasting=tasting, next_change=next_change,
+        )
+        if question and question["brew_id"] == target and verdict:
+            await self._async_set_state(rating_question=None)
+        self.on_change()
+        return brew
+
     # ── Counting ─────────────────────────────────────────────────────────
 
     async def async_consume(
@@ -288,6 +431,8 @@ class CoffeeLab:
                     result = Consumption("queued", reason=reason)
                 continue
             await self.pending.async_remove(entry["run_id"])
+            if entry["kind"] == "brew":
+                await self._async_maybe_ask(entry["args"], done)
             if entry["run_id"] == wanted:
                 result = done
             elif (self.last_count or {}).get("run_id") == entry["run_id"]:
@@ -326,13 +471,15 @@ class CoffeeLab:
         # missing: finish that, without deciding the subtraction again.
         if entry.get("bag"):
             bag = entry["bag"]
+            written = None
             if not await self.store.async_has_run(run_id):
-                await self.store.async_create_brew(record(bag["bean_id"]))
+                written = await self.store.async_create_brew(record(bag["bean_id"]))
             await self._runs.async_add(run_id)
             self.on_change()
             return Consumption(
                 "counted", bean_id=bag["bean_id"], grams=bag["grams"],
                 remaining_g=bag["remaining_g"], opened=bag["opened"], finished=bag["finished"],
+                brew_id=written.id if written else None,
             )
 
         # Read the bag fresh: a cached amount is exactly what must not be stale
@@ -356,14 +503,16 @@ class CoffeeLab:
         if isinstance(decision, Skip):
             # A skipped subtraction is not a skipped brew: an untracked bag's
             # brew still happened, with a real dose, against a real bag.
+            written = None
             if decision.record_brew:
-                await self.store.async_create_brew(record(decision.bean_id))
+                written = await self.store.async_create_brew(record(decision.bean_id))
             # Marked after writing: had the write failed, the queue retries it.
             await self._runs.async_add(run_id)
             self.on_change()
             return Consumption(
                 "recorded" if decision.record_brew else "skipped",
                 reason=decision.reason, bean_id=decision.bean_id,
+                brew_id=written.id if written else None,
             )
 
         if isinstance(decision, Flag):
@@ -391,7 +540,7 @@ class CoffeeLab:
             "remaining_g": decision.new_remaining_g,
             "opened": decision.open_bag, "finished": decision.finish,
         })
-        await self.store.async_create_brew(record(decision.bean_id))
+        written = await self.store.async_create_brew(record(decision.bean_id))
         # Marked once both writes are in; until then the queue holds the run,
         # and a second delivery of it is refused there.
         await self._runs.async_add(run_id)
@@ -399,7 +548,7 @@ class CoffeeLab:
         return Consumption(
             "counted", bean_id=decision.bean_id, grams=decision.grams,
             remaining_g=decision.new_remaining_g,
-            opened=decision.open_bag, finished=decision.finish,
+            opened=decision.open_bag, finished=decision.finish, brew_id=written.id,
         )
 
     async def async_record_stopped(

@@ -33,6 +33,10 @@ KEEP_RUN_IDS = 500
 EDITABLE = tuple(f.name for f in fields(Bean) if f.name != "id")
 
 
+class UnknownBrew(LookupError):
+    """No brew with that id."""
+
+
 class UnknownBean(LookupError):
     """No bag has that id."""
 
@@ -75,6 +79,13 @@ class CoffeeLabStore(ABC):
     @abstractmethod
     async def async_create_brew(self, brew: Brew) -> Brew:
         """Record a brew; the store assigns its id."""
+
+    @abstractmethod
+    async def async_rate_brew(
+        self, brew_id: str, *, rating: int | None = None,
+        tasting: dict[str, str] | None = None, next_change: str | None = None,
+    ) -> Brew:
+        """Keep what someone said about a brew; what is not given is left as it is."""
 
     async def async_set_tracking(self, bean_id: str, tracked: bool) -> Bean:
         return await self.async_update_bean(bean_id, tracked=tracked)
@@ -178,6 +189,24 @@ class LocalStore(CoffeeLabStore):
         self._brews.append(recorded)
         await self._async_save()
         return recorded
+
+    async def async_rate_brew(
+        self, brew_id: str, *, rating: int | None = None,
+        tasting: dict[str, str] | None = None, next_change: str | None = None,
+    ) -> Brew:
+        for i, brew in enumerate(self._brews):
+            if brew.id == brew_id:
+                changes: dict[str, Any] = {}
+                if rating is not None:
+                    changes["rating"] = rating
+                if tasting:
+                    changes["tasting"] = {**brew.tasting, **tasting}
+                if next_change is not None:
+                    changes["next_change"] = next_change
+                self._brews[i] = replace(brew, **changes)
+                await self._async_save()
+                return self._brews[i]
+        raise UnknownBrew(brew_id)
 
 
 class ProcessedRuns:

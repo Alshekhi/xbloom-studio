@@ -574,3 +574,30 @@ async def test_suggest_hub_passes_origin_and_process_and_keeps_text_apart():
     assert hass.calls == [("xbloom", "suggest_community", {"origin": "Kenya"})]
     assert (res["matched_origin"], res["matched_process"]) == ("Kenya", None)
     assert res["recipes"][0]["author_written"]["name"] == "Test Kenya Hot"
+
+
+# ── What Home Assistant asks of a tool ───────────────────────────────────────
+
+
+def test_each_tool_says_which_integration_provides_it():
+    """Home Assistant 2026.10 warns about a tool that does not, and 2027.10 refuses it."""
+    assert llm_api.XBloomTool.integration == "xbloom"
+    assert llm_api.CoffeeLabTool.integration == "xbloom"
+
+
+async def test_a_tool_answers_with_a_tool_result_where_home_assistant_has_one():
+    """From 2027.11 a tool must return a ToolResult; 2026.8 and 2026.9 have none."""
+
+    class ToolResult:
+        def __init__(self, data):
+            self.data = data
+
+    hass = FakeHass(states={"binary_sensor.xbloom_in_range": "off"})
+    tool = llm_api.XBloomTool()
+    tool.parameters = lambda args: dict(args)
+    tool_input = SimpleNamespace(tool_args={"action": "machine_status"})
+    with patch.object(llm_api, "_TOOL_RESULT", ToolResult):
+        wrapped = await tool.async_call(hass, tool_input, SimpleNamespace(context=None))
+    with patch.object(llm_api, "_TOOL_RESULT", None):
+        plain = await tool.async_call(hass, tool_input, SimpleNamespace(context=None))
+    assert isinstance(wrapped, ToolResult) and wrapped.data == plain

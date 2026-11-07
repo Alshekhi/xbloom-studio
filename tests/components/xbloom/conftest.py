@@ -318,6 +318,7 @@ def _inject_global_stubs() -> None:
     dt_stub.utcnow = lambda: datetime.now(timezone.utc)
     dt_stub.now = lambda: datetime.now(timezone.utc)
     dt_stub.as_local = lambda value: value
+    dt_stub.parse_datetime = lambda text: datetime.fromisoformat(text) if text else None
     dt_stub.UTC = timezone.utc
     util.dt = dt_stub
     util.json = _stub_mod("homeassistant.util.json")

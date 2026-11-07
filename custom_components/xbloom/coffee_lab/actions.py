@@ -21,9 +21,9 @@ from homeassistant.exceptions import ServiceValidationError
 
 from ..tool_common import refuse
 from .lab import STORE_UNREACHABLE, CoffeeLab, Consumption
-from .models import Bean, Brew
+from .models import TASTE_NOTES, TASTE_SCALES, VERDICT_OF, Bean, Brew
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER, Totals
-from .store import UnknownBean
+from .store import UnknownBean, UnknownBrew
 
 DEFAULT_BREW_HISTORY = 10
 # Asked for no period, stats answer for the month so far.
@@ -108,7 +108,37 @@ async def list_beans(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
 
 async def active_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     bean = await lab.async_active_bean()
-    return {"bag": bean_facts(bean) if bean else None}
+    facts: dict[str, Any] = {"bag": bean_facts(bean) if bean else None}
+    if (question := lab.rating_question_due()) is not None:
+        facts["rating_question"] = question_facts(question)
+    return facts
+
+
+def question_facts(question: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "brew_id": question["brew_id"], "recipe": question["recipe"], "bag": question["bag"],
+        "changed_from_recipe": question.get("changes") or [],
+    }
+
+
+async def rate_brew(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
+    """What someone said about a brew: a verdict, how it tasted, what to change.
+
+    Only what was said is written; nothing is filled in on their behalf.
+    """
+    tasting = {k: str(args[k]).strip().lower() for k in TASTE_SCALES if args.get(k)}
+    tasting |= {k: str(args[k]).strip() for k in TASTE_NOTES if args.get(k)}
+    next_change = str(args["next_change"]).strip() if args.get("next_change") else None
+    if not (args.get("verdict") or tasting or next_change):
+        raise refuse("missing_arguments", action="rate_brew", arguments="verdict, a tasting note or next_change")
+    try:
+        brew = await lab.async_rate(
+            verdict=args.get("verdict"), brew_id=args.get("brew_id"),
+            tasting=tasting or None, next_change=next_change,
+        )
+    except UnknownBrew:
+        raise refuse("brew_not_found", brew=args.get("brew_id") or "") from None
+    return {"brew": _brew_facts(brew, {})}
 
 
 def _brew_facts(brew: Brew, names: dict[str, str]) -> dict[str, Any]:
@@ -130,6 +160,13 @@ def _brew_facts(brew: Brew, names: dict[str, str]) -> dict[str, Any]:
     }
     if brew.review is not None:
         facts["needs_review"] = {"reason": brew.review.reason, **brew.review.detail}
+    if brew.rating is not None:
+        facts["verdict"] = VERDICT_OF.get(brew.rating)
+    if brew.tasting:
+        facts["tasting"] = dict(brew.tasting)
+    if brew.next_change:
+        facts["next_change"] = brew.next_change
+    facts["id"] = brew.id
     return {k: v for k, v in facts.items() if v is not None}
 
 

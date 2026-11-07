@@ -527,6 +527,14 @@
       },
       "community_recipe": {
         "name": "Community Recipe"
+      },
+      "coffee_lab_rate_brew": {
+        "name": "Verdict",
+        "state": {
+          "again": "Again",
+          "fine": "Fine",
+          "not_again": "Not again"
+        }
       }
     },
     "sensor": {
@@ -607,6 +615,9 @@
       },
       "coffee_lab_waiting_brews": {
         "name": "Waiting brews"
+      },
+      "coffee_lab_rating_question": {
+        "name": "Brew to rate"
       }
     },
     "switch": {
@@ -874,6 +885,9 @@
     },
     "suggestion_none": {
       "message": "There is no suggested recipe of your own for this bag."
+    },
+    "brew_not_found": {
+      "message": "There is no brew with id {brew}."
     }
   },
   "services": {

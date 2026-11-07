@@ -59,6 +59,10 @@ TEXT = {
         "c_rpm": "RPM", "c_pause": "Pause", "c_s": "s", "c_likes": "likes",
         "c_added": "Added to your recipes as **{name}**. Pick it on the Brew tab.",
         "c_suggest": "Suggest a recipe",
+        "h_how_was": "How was it?", "r_verdict": "Verdict",
+        "r_question": "How was **{recipe}** with {bag}{changes}?", "r_at": ", at ",
+        "r_grind": "grind {value} instead of {saved}", "r_ratio": "ratio 1:{value} instead of 1:{saved}",
+        "r_dose": "{value} g instead of {saved} g",
         "h_for_bag": "A recipe for this bag", "s_use": "Use my recipe",
         "s_add_use": "Add and use the community recipe",
         "s_confirm_add_use": "Add this community recipe to your library and pick it?",
@@ -112,6 +116,10 @@ TEXT = {
         "c_rpm": "دورة في الدقيقة", "c_pause": "الانتظار", "c_s": "ث", "c_likes": "إعجاب",
         "c_added": "أضيفت إلى وصفاتك باسم **{name}**. اخترها من تبويب التحضير.",
         "c_suggest": "اقترح وصفة",
+        "h_how_was": "كيف كانت؟", "r_verdict": "الحكم",
+        "r_question": "كيف كانت **{recipe}** مع {bag}{changes}؟", "r_at": "، ",
+        "r_grind": "بدرجة طحن {value} بدل {saved}", "r_ratio": "بنسبة 1:{value} بدل 1:{saved}",
+        "r_dose": "بجرعة {value} غ بدل {saved} غ",
         "h_for_bag": "وصفة لهذا الكيس", "s_use": "استخدم وصفتي",
         "s_add_use": "أضف وصفة المجتمع واستخدمها",
         "s_confirm_add_use": "إضافة وصفة المجتمع هذه إلى مكتبتك واختيارها؟",
@@ -209,6 +217,11 @@ def brew_view(t: dict) -> dict:
             tile(f"sensor.{E}_waiting_brews", visibility=[
                 {"condition": "numeric_state", "entity": f"sensor.{E}_waiting_brews", "above": 0}]),
         ]),
+        # Due a while after a brew; never while one is running.
+        section(t["h_how_was"], [
+            {"type": "markdown", "text_only": True, "content": rating_card(t)},
+            select(f"select.{E}_verdict", name=t["r_verdict"]),
+        ], [*present(f"sensor.{E}_brew_to_rate"), *not_busy()]),
         section(t["h_in_progress"], [
             tile(f"sensor.{E}_current_recipe", visibility=present(f"sensor.{E}_current_recipe")),
             # "Pour 2 of 3", once the pours have begun.
@@ -557,6 +570,26 @@ def picked_card(t: dict, picker: str) -> str:
         + "{% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} " + t["ml"]
         + " | {{ p.temperature_c | round(0) | int }}°C | {{ p.pause_s | int(0) }} " + t["c_s"] + " |\n{% endfor %}{% endif %}"
     )
+
+
+def rating_card(t: dict) -> str:
+    """The question: which recipe with which bag, and what was changed."""
+    q = f"sensor.{E}_brew_to_rate"
+    num = "{{ (c.%s | float) | round(1) | string | replace('.0', '') }}"
+    change = (
+        "{% if c.setting == 'grind' %}" + t["r_grind"]
+        + "{% elif c.setting == 'ratio' %}" + t["r_ratio"]
+        + "{% else %}" + t["r_dose"] + "{% endif %}"
+    ).replace("{value}", num % "value").replace("{saved}", num % "saved")
+    changes = (
+        f"{{% set cs = state_attr('{q}', 'changes') or [] %}}{{% if cs %}}{t['r_at']}"
+        "{% for c in cs %}" + change + "{% if not loop.last %}" + t["sep"] + "{% endif %}{% endfor %}{% endif %}"
+    )
+    return ESCAPE + t["r_question"].replace(
+        "{recipe}", f"{{{{ e(states('{q}')) }}}}"
+    ).replace(
+        "{bag}", f"{{{{ e(state_attr('{q}', 'bag')) }}}}"
+    ).replace("{changes}", changes)
 
 
 def suggestion_card(t: dict, bag: str) -> str:

@@ -14,7 +14,7 @@ import voluptuous as vol
 
 from .coffee_lab import actions
 from .coffee_lab.lab import CoffeeLab
-from .coffee_lab.models import STATUSES, Bean
+from .coffee_lab.models import STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS, Bean
 from .coffee_lab.stats import PERIODS
 from .tool_common import Spec, check_arguments as _check, describe as _describe
 
@@ -22,11 +22,24 @@ BAG = ("bean", "bean_id")
 
 ACTIONS: dict[str, Spec] = {
     "list_beans": Spec(actions.list_beans, "every open or unopened bag, with what is left"),
-    "active_bean": Spec(actions.active_bean, "the bag the xBloom draws from when none is named"),
+    "active_bean": Spec(
+        actions.active_bean,
+        "the bag the xBloom draws from when none is named, and rating_question "
+        "when a brew is waiting for its verdict",
+    ),
     "brew_history": Spec(
         actions.brew_history,
         "what was brewed, newest first — recipe, bag, dose, brewer, and how: grind, "
-        "ratio, temperature, flow rate, seconds from first pour to end (limit, days)",
+        "ratio, temperature, flow rate, seconds from first pour to end, and the "
+        "verdict, tasting and next_change when given (limit, days)",
+    ),
+    "rate_brew": Spec(
+        actions.rate_brew,
+        "keep what the person said about a brew: verdict (again, fine, not_again), "
+        "body, acidity, sweetness, clarity, hot/warm/cool/overall notes, finish, and "
+        "next_change, such as \"grind 52\". Only what they said; never fill one in. "
+        "The brew in rating_question unless brew_id. Mention an open question at "
+        "most once, and only while already talking about coffee",
     ),
     "stats": Spec(
         actions.stats,
@@ -97,6 +110,17 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
     "region": (str, "The region within the country."),
     "process": (str, "How it was processed, such as washed or natural."),
     "roaster_notes": (str, "The roaster's tasting notes."),
+    "verdict": (vol.In(list(VERDICTS)), "For rate_brew: again, fine or not_again."),
+    "brew_id": (str, "For rate_brew: the brew, by the id brew_history gives."),
+    **{
+        key: (vol.In(list(scale)), f"For rate_brew: {key.replace('_', ' ')}, {'/'.join(scale)}.")
+        for key, scale in TASTE_SCALES.items()
+    },
+    **{
+        key: (str, f"For rate_brew: {key.replace('_', ' ')}, in the person's words.")
+        for key in TASTE_NOTES
+    },
+    "next_change": (str, "For rate_brew: what to change next time, such as \"grind 52\"."),
 }
 
 

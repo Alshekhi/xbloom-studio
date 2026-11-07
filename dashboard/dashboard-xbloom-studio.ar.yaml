@@ -63,6 +63,43 @@ views:
     cards:
     - type: markdown
       text_only: true
+      content: '## كيف كانت؟'
+    - type: markdown
+      text_only: true
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}كيف كانت **{{ e(states(''sensor.xbloom_studio_brew_to_rate'')) }}**
+        مع {{ e(state_attr(''sensor.xbloom_studio_brew_to_rate'', ''bag'')) }}{% set cs = state_attr(''sensor.xbloom_studio_brew_to_rate'',
+        ''changes'') or [] %}{% if cs %}، {% for c in cs %}{% if c.setting == ''grind'' %}بدرجة طحن {{
+        (c.value | float) | round(1) | string | replace(''.0'', '''') }} بدل {{ (c.saved | float) | round(1)
+        | string | replace(''.0'', '''') }}{% elif c.setting == ''ratio'' %}بنسبة 1:{{ (c.value | float)
+        | round(1) | string | replace(''.0'', '''') }} بدل 1:{{ (c.saved | float) | round(1) | string
+        | replace(''.0'', '''') }}{% else %}بجرعة {{ (c.value | float) | round(1) | string | replace(''.0'',
+        '''') }} غ بدل {{ (c.saved | float) | round(1) | string | replace(''.0'', '''') }} غ{% endif %}{%
+        if not loop.last %}، {% endif %}{% endfor %}{% endif %}؟'
+    - type: tile
+      entity: select.xbloom_studio_verdict
+      name: الحكم
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_brew_to_rate
+      state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_brew_to_rate
+      state_not: unknown
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: grinding
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: brewing
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
       content: '## تحضير جار'
     - type: tile
       entity: sensor.xbloom_studio_current_recipe

@@ -435,6 +435,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             hass, tuple(entry.data.get(CONF_BREWERS, DEFAULT_BREWERS)), store
         )
         lab.on_change = lambda: async_dispatcher_send(hass, SIGNAL_COFFEE_LAB_UPDATED)
+        # The question about a brew names what was changed from the saved recipe.
+        lab.recipe_lookup = lambda name: next(
+            (r for r in coordinator.data or [] if r.get("name") == name), None,
+        )
         entry.runtime_data.coffee_lab = lab
         entry.async_on_unload(async_count_completed_brews(hass, lab))
         # Brews that could not reach the store wait in Home Assistant and are

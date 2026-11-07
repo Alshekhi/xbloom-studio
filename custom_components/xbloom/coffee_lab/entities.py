@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from datetime import timedelta
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.components.number import NumberEntity, NumberMode
@@ -19,17 +20,20 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.event import async_track_time_interval
 
 from ..const import DOMAIN, SIGNAL_COFFEE_LAB_UPDATED
 from . import actions
 from .lab import CoffeeLab
-from .models import Bean
+from .models import VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
 
 _LOGGER = logging.getLogger(__name__)
 
 # The results a count can have, as the last-count sensor's states.
 COUNT_RESULTS = ["counted", "recorded", "skipped", "flagged", "queued"]
+# How often the question's sensor looks at the clock.
+QUESTION_TICK = timedelta(minutes=1)
 
 
 def bag_labels(beans: list[Bean]) -> dict[str, str]:
@@ -174,6 +178,54 @@ class StatsSensor(CoffeeLabEntity, SensorEntity):
         self._attr_extra_state_attributes = facts
 
 
+class RatingQuestionSensor(CoffeeLabEntity, SensorEntity):
+    """The brew waiting for its verdict, once it is due: its recipe as state.
+
+    Unknown while there is none, or before it is due, so a dashboard shows the
+    question only when it should be asked. Re-read each minute, since being
+    due is a matter of time, not of anything changing.
+    """
+
+    _attr_icon = "mdi:star-outline"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "rating_question")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(async_track_time_interval(self.hass, self._tick, QUESTION_TICK))
+
+    @callback
+    def _tick(self, _now) -> None:
+        # A callback, so Home Assistant runs it in its event loop: a plain
+        # function given to the timer runs in a worker thread, where
+        # scheduling the re-read is unsafe.
+        self._changed()
+
+    async def async_read(self) -> None:
+        question = self.lab.rating_question_due()
+        self._attr_native_value = question["recipe"] if question else None
+        self._attr_extra_state_attributes = (
+            {"bag": question["bag"], "brew_id": question["brew_id"],
+             "changes": question.get("changes") or []}
+            if question else {}
+        )
+
+
+class RateBrewSelect(CoffeeLabEntity, SelectEntity):
+    """The verdict on the brew in question; picking one answers it."""
+
+    _attr_icon = "mdi:star"
+    _attr_options = list(VERDICTS)
+    _attr_current_option = None
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "rate_brew")
+
+    async def async_select_option(self, option: str) -> None:
+        await self.lab.async_rate(verdict=option)
+
+
 class WaitingBrewsSensor(CoffeeLabEntity, SensorEntity):
     """How many brews wait for the store; the oldest's error as an attribute."""
 
@@ -278,8 +330,11 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
     if lab is None:
         return []
     makers: dict[str, list[Callable[[CoffeeLab], Entity]]] = {
-        "select": [ActiveBagSelect, StatsPeriodSelect, ManualBrewerSelect],
-        "sensor": [RemainingSensor, BagsSensor, StatsSensor, LastCountSensor, WaitingBrewsSensor],
+        "select": [ActiveBagSelect, StatsPeriodSelect, ManualBrewerSelect, RateBrewSelect],
+        "sensor": [
+            RemainingSensor, BagsSensor, StatsSensor, LastCountSensor, WaitingBrewsSensor,
+            RatingQuestionSensor,
+        ],
         "number": [ManualDoseNumber],
         "button": [RecordManualBrewButton],
     }

@@ -63,6 +63,43 @@ views:
     cards:
     - type: markdown
       text_only: true
+      content: '## How was it?'
+    - type: markdown
+      text_only: true
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}How was **{{ e(states(''sensor.xbloom_studio_brew_to_rate'')) }}**
+        with {{ e(state_attr(''sensor.xbloom_studio_brew_to_rate'', ''bag'')) }}{% set cs = state_attr(''sensor.xbloom_studio_brew_to_rate'',
+        ''changes'') or [] %}{% if cs %}, at {% for c in cs %}{% if c.setting == ''grind'' %}grind {{
+        (c.value | float) | round(1) | string | replace(''.0'', '''') }} instead of {{ (c.saved | float)
+        | round(1) | string | replace(''.0'', '''') }}{% elif c.setting == ''ratio'' %}ratio 1:{{ (c.value
+        | float) | round(1) | string | replace(''.0'', '''') }} instead of 1:{{ (c.saved | float) | round(1)
+        | string | replace(''.0'', '''') }}{% else %}{{ (c.value | float) | round(1) | string | replace(''.0'',
+        '''') }} g instead of {{ (c.saved | float) | round(1) | string | replace(''.0'', '''') }} g{%
+        endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}?'
+    - type: tile
+      entity: select.xbloom_studio_verdict
+      name: Verdict
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_brew_to_rate
+      state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_brew_to_rate
+      state_not: unknown
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: grinding
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: brewing
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
       content: '## Brew in progress'
     - type: tile
       entity: sensor.xbloom_studio_current_recipe

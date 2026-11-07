@@ -22,7 +22,7 @@ from typing import Any
 import aiohttp
 
 from ..tool_common import fail
-from .models import REVIEW_REASONS, SELECTABLE, Bean, Brew, Review
+from .models import TASTE_SCALES, REVIEW_REASONS, SELECTABLE, Bean, Brew, Review
 from .stats import moment
 from .store import CoffeeLabStore, UnknownBean, _check_changes
 
@@ -63,6 +63,17 @@ OTHER = "Other"
 SETTINGS = {
     "grind": "Grind", "ratio": "Ratio", "temperature_c": "Temperature C",
     "flow_rate": "Flow Rate", "duration_s": "Total Time sec",
+}
+
+# How a brew was, onto the Brews database's columns. None of them is needed
+# to set Coffee Lab up: a column a database lacks is added the first time a
+# brew is rated (`_ensure_columns`), so an older database keeps working.
+RATING = "Rating"
+NEXT_CHANGE = "Next Change"
+TASTE_COLUMNS = {
+    "body": "Body", "acidity": "Acidity", "sweetness": "Sweetness", "clarity": "Clarity",
+    "hot_notes": "Hot Notes", "warm_notes": "Warm Notes", "cool_notes": "Cool Notes",
+    "overall_notes": "Overall Notes", "finish": "Finish",
 }
 
 
@@ -213,7 +224,31 @@ def brew_from_page(page: dict) -> Brew:
             Review(_select(props.get("Review Reason")) or "needs_review")
             if (props.get("Needs Review") or {}).get("checkbox") else None
         ),
+        rating=int(r) if (r := _number(props.get(RATING))) is not None else None,
+        tasting={
+            key: value for key, name in TASTE_COLUMNS.items()
+            if (value := (
+                (_select(props.get(name)) or "").lower() if key in TASTE_SCALES
+                else _plain(props.get(name))
+            ))
+        },
+        next_change=_plain(props.get(NEXT_CHANGE)),
     )
+
+
+def rating_properties(
+    rating: int | None, tasting: dict[str, str] | None, next_change: str | None,
+) -> dict[str, Any]:
+    """What is said about a brew, as the columns it is written to."""
+    props: dict[str, Any] = {}
+    if rating is not None:
+        props[RATING] = {"number": rating}
+    for key, value in (tasting or {}).items():
+        name = TASTE_COLUMNS[key]
+        props[name] = _choice(value.capitalize()) if key in TASTE_SCALES else _text(value)
+    if next_change is not None:
+        props[NEXT_CHANGE] = _text(next_change)
+    return props
 
 
 def brew_properties(brew: Brew) -> dict[str, Any]:
@@ -387,6 +422,7 @@ class NotionStore(CoffeeLabStore):
         # A select option the database lacks is added before it is written:
         # Notion refuses a whole page sent an option it does not have.
         self._options: dict[tuple[str, str], set[str]] = {}
+        self._columns: dict[str, set[str] | None] = {}
         self._schema_lock = asyncio.Lock()
 
     async def _call(self, method: str, path: str, body: dict | None = None) -> dict:
@@ -394,6 +430,27 @@ class NotionStore(CoffeeLabStore):
             return await self._client.call(method, path, body)
         except NotionError as err:
             raise fail("notion_failed", error=str(err)) from err
+
+    async def _ensure_columns(self, database_id: str, props: dict[str, Any]) -> None:
+        """Add the number and text columns `props` writes that the database lacks.
+
+        Select columns are added by `_ensure_options` with their option.
+        """
+        kinds = {
+            name: kind for name, value in props.items()
+            for kind in ("number", "rich_text") if kind in value
+        }
+        async with self._schema_lock:
+            if self._columns.get(database_id) is None:
+                schema = (await self._call("GET", f"/databases/{database_id}")).get("properties") or {}
+                self._columns[database_id] = set(schema)
+            missing = {n: k for n, k in kinds.items() if n not in self._columns[database_id]}
+            if not missing:
+                return
+            await self._call("PATCH", f"/databases/{database_id}", {"properties": {
+                name: {kind: {}} for name, kind in missing.items()
+            }})
+            self._columns[database_id] |= set(missing)
 
     async def _ensure_options(self, database_id: str, props: dict[str, Any]) -> None:
         wanted = {
@@ -497,6 +554,16 @@ class NotionStore(CoffeeLabStore):
         except NotionError as err:
             raise fail("notion_failed", error=str(err)) from err
         return bool(pages)
+
+    async def async_rate_brew(
+        self, brew_id: str, *, rating: int | None = None,
+        tasting: dict[str, str] | None = None, next_change: str | None = None,
+    ) -> Brew:
+        props = rating_properties(rating, tasting, next_change)
+        await self._ensure_columns(self._db.brews, props)
+        await self._ensure_options(self._db.brews, props)
+        page = await self._call("PATCH", f"/pages/{brew_id}", {"properties": props})
+        return brew_from_page(page)
 
     async def async_create_brew(self, brew: Brew) -> Brew:
         props = brew_properties(brew)

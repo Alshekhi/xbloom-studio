@@ -21,6 +21,22 @@ REVIEW_REASONS = (
 )
 SELECTABLE: tuple[Status, ...] = ("open", "unopened")
 
+# A brew's verdict, as asked once per recipe, bag and version, and the number
+# it is kept as in a store's Rating column.
+VERDICTS: dict[str, int] = {"again": 3, "fine": 2, "not_again": 1}
+VERDICT_OF: dict[int, str] = {n: v for v, n in VERDICTS.items()}
+
+# What a person may say about how a brew tasted: each one never asked for,
+# kept when given. The scales are the Brews database's own options; the
+# notes are free text.
+TASTE_SCALES: dict[str, tuple[str, ...]] = {
+    "body": ("light", "medium", "full"),
+    "acidity": ("low", "medium", "high"),
+    "sweetness": ("low", "medium", "high"),
+    "clarity": ("low", "medium", "high"),
+}
+TASTE_NOTES = ("hot_notes", "warm_notes", "cool_notes", "overall_notes", "finish")
+
 
 @dataclass(frozen=True)
 class Bean:
@@ -79,3 +95,8 @@ class Brew:
     # flow_rate, duration_s — only what the completion carried.
     settings: dict[str, Any] = field(default_factory=dict)
     review: Review | None = None
+    # How it was, when someone said: the verdict as VERDICTS' number, the
+    # tasting (TASTE_SCALES and TASTE_NOTES keys), and what to change next time.
+    rating: int | None = None
+    tasting: dict[str, str] = field(default_factory=dict)
+    next_change: str = ""
