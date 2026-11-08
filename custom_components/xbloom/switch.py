@@ -22,6 +22,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
+from .community_entities import entities_for as community_entities
 from .const import CONF_IDLE_TIMEOUT, DOMAIN
 from .live_session import LiveSessionListener
 from .tool_common import require_machine_control
@@ -56,6 +57,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         XBloomUseGrinderSwitch(),
         XBloomMachineControlSwitch(entry),
     ])
+    async_add_entities(community_entities(entry, "switch"))
 
 
 class XBloomUseGrinderSwitch(SwitchEntity, RestoreEntity):

@@ -546,6 +546,12 @@
       },
       "suggested_recipe": {
         "name": "Suggested Recipe"
+      },
+      "trending_recipe": {
+        "name": "Trending Recipes"
+      },
+      "tea_recipe": {
+        "name": "Tea Recipes"
       }
     },
     "sensor": {
@@ -638,6 +644,9 @@
       },
       "coffee_lab_bag_question": {
         "name": "Finished bag"
+      },
+      "for_you_recipe": {
+        "name": "For You"
       }
     },
     "switch": {
@@ -649,6 +658,9 @@
       },
       "connect": {
         "name": "Connect"
+      },
+      "show_xpod_recipes": {
+        "name": "Show xPod Recipes"
       }
     },
     "update": {
@@ -775,6 +787,18 @@
       },
       "save_version_as_new": {
         "name": "Save Version as New Recipe"
+      },
+      "another_for_you": {
+        "name": "Another For You"
+      },
+      "add_trending_recipe": {
+        "name": "Add Trending Recipe"
+      },
+      "add_tea_recipe": {
+        "name": "Add Tea Recipe"
+      },
+      "add_for_you_recipe": {
+        "name": "Add For You Recipe"
       }
     },
     "text": {
@@ -932,6 +956,9 @@
     },
     "rate_brew_empty": {
       "message": "Say how it was: a verdict, a tasting note or what to change next time."
+    },
+    "account_signed_out": {
+      "message": "Sign in to the xBloom account in the integration's Configure menu first."
     }
   },
   "services": {
@@ -1636,7 +1663,8 @@
     },
     "suggestion_source": {
       "options": {
-        "community": "community"
+        "community": "community",
+        "xpod": "xPod"
       }
     }
   },

@@ -63,7 +63,10 @@ repair appears if one has waited more than an hour.
   from the brew record, so they cover every brew in it.
 - **Bags** — every open or unopened bag, choosing the one in use, and a link
   to where bags are added and edited.
-- **Community** — Studio recipes other people shared on the xBloom
+- **Community** — signed in to the xBloom account, first For You (with
+  Another), Trending recipes and Tea recipes, as the xBloom app offers them to
+  the account, each with Add, and Show xPod recipes. Then, signed in or not,
+  Studio recipes other people shared on the xBloom
   community hub. **Suggest a recipe** offers the most downloaded ones for the
   bag in use (its origin and process), leaving out recipes you already have,
   and picks one; or search by words, origin and order. Read one with its

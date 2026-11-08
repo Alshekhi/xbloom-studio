@@ -152,9 +152,13 @@ def test_every_platform_gets_its_entities_and_nothing_without_a_browser():
     entry.runtime_data.community = _browser()[0]
     assert [type(e).__name__ for e in ce.entities_for(entry, "button")] == [
         "CommunitySearchButton", "CommunitySuggestButton", "CommunityAddButton",
-        "SuggestRecipeButton", "UseSuggestedRecipeButton",
+        "SuggestRecipeButton", "UseSuggestedRecipeButton", "AnotherForYouButton",
+        "AddAccountRecipeButton", "AddAccountRecipeButton", "AddAccountRecipeButton",
     ]
-    assert [type(e).__name__ for e in ce.entities_for(entry, "select")][-1] == "SuggestedRecipeSelect"
+    assert [type(e).__name__ for e in ce.entities_for(entry, "select")][-3:] == [
+        "SuggestedRecipeSelect", "AccountRecipeSelect", "AccountRecipeSelect",
+    ]
+    assert [type(e).__name__ for e in ce.entities_for(entry, "switch")] == ["ShowXpodRecipesSwitch"]
     entry.runtime_data.community = None
     assert ce.entities_for(entry, "select") == []
 
@@ -373,3 +377,77 @@ async def test_a_hub_recipe_never_replaces_one_of_yours_with_the_same_name():
     name = await browser.async_add_picked()
     assert name == "Test Kenya Hot 3"
     assert coordinator.async_add_recipe.await_args.args[0]["name"] == "Test Kenya Hot 3"
+
+
+
+# ── The app's Recipes tab, signed in ─────────────────────────────────────────
+
+
+def _pod(rid, name, xpod=False):
+    recipe = {"id": str(rid), "name": name, "cup_type_name": "XPOD" if xpod else "OMNI",
+              "pod": {"theName": "Tea Leaf"} if name.startswith("Tea") else None,
+              "dose_g": 15.0, "water_ratio": 16.0, "grinder_size": 50.0, "pours": [{}, {}]}
+    if xpod:
+        recipe["pod"] = {"theName": "Test Pod", "origin": "Test Origin\nline", "process": "Natural"}
+    return recipe
+
+
+def _signed_in(browser, coordinator, lists, for_you=None):
+    coordinator.cloud_logged_in = True
+    coordinator.data = [{"name": "Test Trend"}]
+
+    async def account(kind):
+        return for_you if kind == "for_you" else lists.get(kind, [])
+
+    coordinator.async_account_recipes = account
+
+
+async def test_signed_out_shows_nothing_of_the_account():
+    browser, *_ , coordinator = _browser()
+    coordinator.cloud_logged_in = False
+    await browser.async_load_account()
+    assert browser.account_recipes("trending") == [] and browser.for_you is None
+    with pytest.raises(HomeAssistantError) as caught:
+        await browser.async_another_for_you()
+    assert caught.value.translation_key == "account_signed_out"
+
+
+async def test_the_accounts_lists_are_offered_with_xpods_marked_and_hideable():
+    browser, *_, coordinator = _browser()
+    _signed_in(browser, coordinator, {"trending": [_pod(1, "Test Pod Recipe", xpod=True), _pod(2, "Test Omni")]})
+    await browser.async_load_account()
+    select = ce.AccountRecipeSelect(browser, "trending")
+    assert select.options == ["Test Pod Recipe (xPod)", "Test Omni"]
+    facts = select.extra_state_attributes
+    assert facts["xpod"] is True and facts["coffee"]["origin"] == "Test Origin line"
+    browser.set_show_xpods(False)
+    assert select.options == ["Test Omni"] and select.current_option == "Test Omni"
+
+
+async def test_adding_an_account_recipe_never_replaces_one_of_yours():
+    browser, *_, coordinator = _browser()
+    _signed_in(browser, coordinator, {"tea": [_pod(9, "Test Trend")]})
+    await browser.async_load_account()
+    name = await browser.async_add_account("tea")
+    assert name == "Test Trend 2"
+    added = coordinator.async_add_recipe.await_args.args[0]
+    assert added["name"] == "Test Trend 2" and "id" not in added
+
+
+async def test_for_you_asks_past_a_hidden_xpod():
+    browser, *_, coordinator = _browser()
+    picks = iter([_pod(1, "Pod One", xpod=True), _pod(2, "Test Filter")])
+    coordinator.cloud_logged_in = True
+
+    async def account(kind):
+        return next(picks)
+
+    coordinator.async_account_recipes = account
+    browser.show_xpods = False
+    await browser.async_another_for_you()
+    assert browser.for_you["name"] == "Test Filter"
+
+
+def test_a_tea_recipe_with_a_pod_is_not_an_xpod():
+    assert cm.is_xpod(_pod(1, "Tea Test")) is False
+    assert cm.is_xpod(_pod(2, "Pod Test", xpod=True)) is True

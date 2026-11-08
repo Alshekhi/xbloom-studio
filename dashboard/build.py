@@ -59,6 +59,8 @@ TEXT = {
         "c_rpm": "RPM", "c_pause": "Pause", "c_s": "s", "c_likes": "likes",
         "c_added": "Added to your recipes as **{name}**. Pick it on the Brew tab.",
         "c_suggest": "Suggest a recipe", "c_suggest_hub": "Suggest a community recipe",
+        "h_for_you": "For you", "h_trending": "Trending recipes", "h_tea": "Tea recipes",
+        "a_another": "Another", "a_pod": "Pod",
         "h_how_was": "How was it?", "r_verdict": "Verdict",
         "v_wanted": "Last time you wanted: {text}.", "v_use": "Use that change",
         "h_keep": "Keep this version?", "v_keep": "**{recipe}** {changes} is worth brewing again.",
@@ -123,6 +125,8 @@ TEXT = {
         "c_rpm": "دورة في الدقيقة", "c_pause": "الانتظار", "c_s": "ث", "c_likes": "إعجاب",
         "c_added": "أضيفت إلى وصفاتك باسم **{name}**. اخترها من تبويب التحضير.",
         "c_suggest": "اقترح وصفة", "c_suggest_hub": "اقترح وصفة من المجتمع",
+        "h_for_you": "مقترحة لك", "h_trending": "الوصفات الرائجة", "h_tea": "وصفات الشاي",
+        "a_another": "اقتراح آخر", "a_pod": "الكبسولة",
         "h_how_was": "كيف كانت؟", "r_verdict": "الحكم",
         "v_wanted": "في المرة السابقة أردت: {text}.", "v_use": "استخدم هذا التعديل",
         "h_keep": "هل تحفظ هذه النسخة؟", "v_keep": "**{recipe}** {changes} تستحق التكرار.",
@@ -593,13 +597,34 @@ def picked_card(t: dict, picker: str) -> str:
         + f"{{% if a.get('flavor') %}}**{t['c_notes']}:** "
         + f"{{% for x in a.get('flavor') %}}{{{{ e(x) }}}}{{% if not loop.last %}}{t['sep']}{{% endif %}}{{% endfor %}}\n\n{{% endif %}}"
         + "{% if a.get('description') %}{{ e(a.get('description')) }}\n\n{% endif %}"
-        + f"{{% if a.get('dose_g') %}}**{t['coffee']}:** {{{{ a.get('dose_g') | round(1) }}}} {t['g']}"
+        + recipe_lines(t)
+    )
+
+
+def recipe_lines(t: dict) -> str:
+    """A recipe's dose, ratio, grind and pours, read from `a`."""
+    return (
+        f"{{% if a.get('dose_g') %}}**{t['coffee']}:** {{{{ a.get('dose_g') | round(1) }}}} {t['g']}"
         + f"{{% if a.get('ratio') %}} · **{t['ratio']}:** 1:{{{{ a.get('ratio') | round(1) }}}}{{% endif %}}"
         + f"{{% if a.get('grind_size') %}} · {t['c_grind']} {{{{ a.get('grind_size') | round(0) | int }}}} {t['c_at']} {{{{ a.get('rpm') }}}} {t['c_rpm']}{{% endif %}}\n\n{{% endif %}}"
         + f"{{% set pours = a.get('pours') or [] %}}{{% if pours %}}"
         + f"| {t['pour']} | {t['water']} | {t['temp']} | {t['c_pause']} |\n|:--:|:--:|:--:|:--:|\n"
         + "{% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} " + t["ml"]
         + " | {{ p.temperature_c | round(0) | int }}°C | {{ p.pause_s | int(0) }} " + t["c_s"] + " |\n{% endfor %}{% endif %}"
+    )
+
+
+def account_card(t: dict, entity: str, with_name: bool = False) -> str:
+    """A Trending, Tea or For You recipe: its pod's coffee when it has one, then the recipe."""
+    return (
+        ESCAPE
+        + f"{{% set a = states['{entity}'].attributes if states['{entity}'] is defined else {{}} %}}"
+        + (f"### {{{{ e(states('{entity}')) }}}}\n\n" if with_name else "")
+        + "{% set c = a.get('coffee') or {} %}{% if c.get('name') %}"
+        + f"**{t['a_pod']}:** {{{{ e(c.get('name')) }}}}"
+        + "{% for x in [c.get('origin'), c.get('process'), c.get('varietal')] if x %} · {{ e(x) }}{% endfor %}\n\n"
+        + f"{{% if c.get('flavor') %}}**{t['c_notes']}:** {{{{ e(c.get('flavor')) }}}}\n\n{{% endif %}}{{% endif %}}"
+        + recipe_lines(t)
     )
 
 
@@ -706,8 +731,28 @@ def community_view(t: dict) -> dict:
     """
     sensor = f"sensor.{E}_community_matches"
     picker = f"select.{E}_community_recipe"
+    trending, tea = f"select.{E}_trending_recipes", f"select.{E}_tea_recipes"
+    for_you = f"sensor.{E}_for_you"
     return {"title": t["view_community"], "path": "community", "icon": "mdi:account-group",
             "type": "sections", "max_columns": 2, "sections": [
+        # Signed in to the xBloom account: what the app's Recipes tab offers
+        # it. Signed out, these entities are unavailable and the sections hidden.
+        section(t["h_for_you"], [
+            {"type": "markdown", "content": account_card(t, for_you, with_name=True)},
+            press(f"button.{E}_another_for_you", name=t["a_another"]),
+            press(f"button.{E}_add_for_you_recipe", t["c_confirm_add"], name=t["c_add"]),
+        ], present(for_you)),
+        section(t["h_trending"], [
+            select(trending, name=t["c_recipe"]),
+            {"type": "markdown", "content": account_card(t, trending)},
+            press(f"button.{E}_add_trending_recipe", t["c_confirm_add"], name=t["c_add"]),
+            toggle(f"switch.{E}_show_xpod_recipes"),
+        ], present(trending)),
+        section(t["h_tea"], [
+            select(tea, name=t["c_recipe"]),
+            {"type": "markdown", "content": account_card(t, tea)},
+            press(f"button.{E}_add_tea_recipe", t["c_confirm_add"], name=t["c_add"]),
+        ], present(tea)),
         section(t["h_find"], [
             # First: one press, a recipe to try with the bag in use.
             press(f"button.{E}_suggest_community_recipe", name=t["c_suggest_hub"]),

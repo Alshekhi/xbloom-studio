@@ -13,15 +13,17 @@ from typing import Any
 from homeassistant.components.button import ButtonEntity
 from homeassistant.components.select import SelectEntity
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.switch import SwitchEntity
 from homeassistant.components.text import TextEntity
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.translation import async_get_translations
 
 from xbloom.community import SORTS
 
-from .community import ANY_ORIGIN, CommunityBrowser, hub_text
+from .community import ANY_ORIGIN, CommunityBrowser, account_facts, hub_text, is_xpod
 from .const import DOMAIN
 
 
@@ -36,6 +38,8 @@ def entities_for(entry, platform: str) -> list:
             CommunitySortSelect(browser),
             CommunityRecipeSelect(browser),
             SuggestedRecipeSelect(browser),
+            AccountRecipeSelect(browser, "trending"),
+            AccountRecipeSelect(browser, "tea"),
         ],
         "button": [
             CommunitySearchButton(browser),
@@ -43,8 +47,13 @@ def entities_for(entry, platform: str) -> list:
             CommunityAddButton(browser),
             SuggestRecipeButton(browser, entry),
             UseSuggestedRecipeButton(browser),
+            AnotherForYouButton(browser),
+            AddAccountRecipeButton(browser, "trending"),
+            AddAccountRecipeButton(browser, "tea"),
+            AddAccountRecipeButton(browser, "for_you"),
         ],
-        "sensor": [CommunityMatchesSensor(browser), RecipeSuggestionsSensor(browser)],
+        "switch": [ShowXpodRecipesSwitch(browser)],
+        "sensor": [CommunityMatchesSensor(browser), RecipeSuggestionsSensor(browser), ForYouSensor(browser)],
     }.get(platform, [])
 
 
@@ -335,3 +344,144 @@ class RecipeSuggestionsSensor(_CommunityEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {"own": self._browser.own_facts(), "bag": self._browser.suggested_for}
+
+
+# ── The app's Recipes tab, for a signed-in account ──────────────────────────
+
+
+class _AccountEntity(_CommunityEntity):
+    """Present only while signed in to the xBloom account."""
+
+    @property
+    def available(self) -> bool:
+        return self._browser.signed_in
+
+
+class AccountRecipeSelect(_AccountEntity, SelectEntity):
+    """Trending or Tea, as the app lists them; the pick's details as attributes.
+
+    An xPod recipe is marked as such, in Home Assistant's language.
+    """
+
+    _attr_icon = "mdi:fire"
+    _xpod_marker = "xPod"
+
+    def __init__(self, browser: CommunityBrowser, kind: str) -> None:
+        super().__init__(browser)
+        self._kind = kind
+        self._attr_translation_key = f"{kind}_recipe"
+        self._attr_unique_id = f"xbloom_{kind}_recipe"
+        if kind == "tea":
+            self._attr_icon = "mdi:tea"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        strings = await async_get_translations(
+            self.hass, self.hass.config.language, "selector", {DOMAIN},
+        )
+        self._xpod_marker = strings.get(
+            f"component.{DOMAIN}.selector.suggestion_source.options.xpod", self._xpod_marker,
+        )
+
+    def _labels(self) -> list[tuple[str, str]]:
+        seen: dict[str, int] = {}
+        out = []
+        for recipe in self._browser.account_recipes(self._kind):
+            label = hub_text(recipe.get("name")) or str(recipe.get("id"))
+            if is_xpod(recipe):
+                label = f"{label} ({self._xpod_marker})"
+            seen[label] = seen.get(label, 0) + 1
+            out.append((label if seen[label] == 1 else f"{label} {seen[label]}", str(recipe.get("id"))))
+        return out
+
+    @property
+    def options(self) -> list[str]:
+        return [label for label, _ in self._labels()]
+
+    @property
+    def current_option(self) -> str | None:
+        wanted = self._browser.account_pick.get(self._kind)
+        return next((label for label, rid in self._labels() if rid == wanted), None)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return account_facts(self._browser.account_pick_recipe(self._kind))
+
+    async def async_select_option(self, option: str) -> None:
+        rid = next((rid for label, rid in self._labels() if label == option), None)
+        if rid is not None:
+            self._browser.set_account_pick(self._kind, rid)
+
+
+class ForYouSensor(_AccountEntity, SensorEntity):
+    """The recipe the account's For You suggests; its details as attributes."""
+
+    _attr_translation_key = "for_you_recipe"
+    _attr_unique_id = "xbloom_for_you_recipe"
+    _attr_icon = "mdi:star-shooting-outline"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # The account's lists are read here, in the background: a slow
+        # account must not hold up setup.
+        self.hass.async_create_background_task(
+            self._browser.async_load_account(), "xbloom account recipes",
+        )
+
+    @property
+    def native_value(self) -> str | None:
+        recipe = self._browser.for_you
+        return hub_text(recipe.get("name")) if recipe else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return account_facts(self._browser.for_you)
+
+
+class AnotherForYouButton(_AccountEntity, ButtonEntity):
+    """Ask For You for another recipe, as the app's Switch does."""
+
+    _attr_translation_key = "another_for_you"
+    _attr_unique_id = "xbloom_another_for_you"
+    _attr_icon = "mdi:refresh"
+
+    async def async_press(self) -> None:
+        await self._browser.async_another_for_you()
+
+
+class AddAccountRecipeButton(_AccountEntity, ButtonEntity):
+    """Add the chosen Trending or Tea recipe, or the For You one, to the library."""
+
+    _attr_icon = "mdi:playlist-plus"
+
+    def __init__(self, browser: CommunityBrowser, kind: str) -> None:
+        super().__init__(browser)
+        self._kind = kind
+        self._attr_translation_key = f"add_{kind}_recipe"
+        self._attr_unique_id = f"xbloom_add_{kind}_recipe"
+
+    async def async_press(self) -> None:
+        await self._browser.async_add_account(self._kind)
+
+
+class ShowXpodRecipesSwitch(_CommunityEntity, SwitchEntity, RestoreEntity):
+    """Whether Trending, Tea and For You offer xPod recipes; on unless turned off."""
+
+    _attr_translation_key = "show_xpod_recipes"
+    _attr_unique_id = "xbloom_show_xpod_recipes"
+    _attr_icon = "mdi:coffee-maker-outline"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        self._browser.set_show_xpods(last is None or last.state != "off")
+
+    @property
+    def is_on(self) -> bool:
+        return self._browser.show_xpods
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self._browser.set_show_xpods(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self._browser.set_show_xpods(False)

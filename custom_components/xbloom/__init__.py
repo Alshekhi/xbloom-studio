@@ -258,6 +258,8 @@ async def _await_brew_outcome(
 # How often brews waiting for the store are retried, and how long one may
 # wait before a repair says so.
 PENDING_RETRY = timedelta(minutes=5)
+# How often the account's Trending, Tea and For You are read again.
+ACCOUNT_REFRESH = timedelta(hours=6)
 PENDING_REPAIR_AFTER = timedelta(hours=1)
 PENDING_ISSUE = "brews_waiting"
 
@@ -431,6 +433,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         hass, entry.entry_id, community, client, coordinator,
         HubNames(session),
     )
+    # The account's Trending, Tea and For You are read once the For You
+    # sensor is added (community_entities.py), and again every few hours.
+    browser = entry.runtime_data.community
+
+    @callback
+    def _reload_account(_now) -> None:
+        hass.async_create_task(browser.async_load_account())
+
+    entry.async_on_unload(async_track_time_interval(hass, _reload_account, ACCOUNT_REFRESH))
     if entry.data.get(CONF_COFFEE_LAB):
         store = None
         if entry.data.get(CONF_COFFEE_LAB_STORE) == "notion":

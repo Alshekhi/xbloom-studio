@@ -65,6 +65,10 @@ from xbloom.exceptions import XBloomAPIError
 _LOGGER = logging.getLogger(__name__)
 
 
+
+# The session call behind each of the app's Recipes tab lists.
+ACCOUNT_CALLS = {"trending": "trending", "tea": "tea_recipes", "for_you": "for_you"}
+
 class XBloomCoordinator(DataUpdateCoordinator):
     """Surfaces the recipe library (local or cloud) to entities."""
 
@@ -213,6 +217,16 @@ class XBloomCoordinator(DataUpdateCoordinator):
         writes are rare enough that one undebounced fetch each costs nothing.
         """
         await self.async_refresh()
+
+    async def async_account_recipes(self, kind: str):
+        """The app's Recipes tab for the signed-in account: `trending`, `tea` or `for_you`.
+
+        None while signed out. Read only; the account's library is untouched.
+        """
+        session = self._session()
+        if session is None:
+            return None
+        return await self._cloud_op(getattr(session, ACCOUNT_CALLS[kind])())
 
     async def async_add_recipe(self, recipe: dict) -> None:
         """Add a recipe and refresh subscribers."""

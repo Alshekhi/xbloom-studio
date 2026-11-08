@@ -53,6 +53,46 @@ RECIPE_SELECT = "xbloom_recipe_select"
 # What the hub client and its link reading raise when the hub cannot answer:
 # a timeout is a plain TimeoutError, not a ClientError.
 HUB_ERRORS = (XBloomAPIError, aiohttp.ClientError, TimeoutError)
+# The app's Recipes tab lists that are lists; For You is one recipe.
+ACCOUNT_LISTS = ("trending", "tea")
+# How many times For You is asked past a hidden xPod recipe.
+FOR_YOU_TRIES = 3
+
+
+def is_xpod(recipe: dict[str, Any]) -> bool:
+    """A recipe for xBloom's pre-packed coffee pods, by its cup type.
+
+    Not by its pod: a tea recipe carries one too.
+    """
+    return str(recipe.get("cup_type_name") or "").casefold() == "xpod"
+
+
+def account_facts(recipe: dict[str, Any] | None) -> dict[str, Any]:
+    """A Trending, Tea or For You recipe as the dashboard shows it, text cleaned."""
+    if not recipe:
+        return {}
+    pod = recipe.get("pod") or {}
+    return {
+        "id": str(recipe.get("id")),
+        "xpod": is_xpod(recipe),
+        "cup": hub_text(recipe.get("cup_type_name")),
+        "dose_g": recipe.get("dose_g"),
+        "ratio": recipe.get("water_ratio"),
+        "grind_size": recipe.get("grinder_size"),
+        "rpm": recipe.get("rpm"),
+        "pours": [
+            {"volume_ml": p.get("volume_ml"), "temperature_c": p.get("temperature_c"),
+             "pause_s": p.get("pause_s")}
+            for p in recipe.get("pours") or []
+        ],
+        "coffee": {
+            "name": hub_text(pod.get("theName")), "origin": hub_text(pod.get("origin")),
+            "process": hub_text(pod.get("process")), "varietal": hub_text(pod.get("varietal")),
+            "flavor": hub_text(pod.get("flavor")),
+        } if pod else None,
+    }
+
+
 # `async_suggest` was not handed the bag: it reads it itself.
 _UNREAD = object()
 # The longest name a hub recipe is kept under in the library.
@@ -242,6 +282,12 @@ class CommunityBrowser:
         # The one chosen in the Brew tab's Suggested Recipe picker, as a key:
         # "own:<name>" or "hub:<id>".
         self.choice: str | None = None
+        # The signed-in account's lists (async_load_account), the pick in
+        # each, the For You recipe, and whether xPod recipes are shown.
+        self.account: dict[str, list[dict[str, Any]]] = {kind: [] for kind in ACCOUNT_LISTS}
+        self.account_pick: dict[str, str | None] = {kind: None for kind in ACCOUNT_LISTS}
+        self.for_you: dict[str, Any] | None = None
+        self.show_xpods = True
 
     @callback
     def _changed(self) -> None:
@@ -512,12 +558,117 @@ class CommunityBrowser:
             )
         except (ValueError, *HUB_ERRORS) as err:
             raise fail("community_failed", reason=hub_text(str(err))) from err
-        name = library_name(detail.get("name")) or recipe.get("name")
+        name = await self._async_add_numbered(
+            recipe, library_name(detail.get("name")) or recipe.get("name"),
+        )
+        self.added = name
+        self._changed()
+        return name
+
+    async def _async_add_numbered(self, recipe: dict[str, Any], name: str) -> str:
+        """Add a recipe under `name`, numbered when the library already has it.
+
+        The library replaces a recipe added under an existing name, and one of
+        your own must never be replaced by one from outside.
+        """
         taken = {str(r.get("name") or "").casefold() for r in self._coordinator.data or []}
         base, number = name, 2
         while name.casefold() in taken:
             name, number = f"{base} {number}", number + 1
         await self._coordinator.async_add_recipe({**recipe, "name": name})
+        return name
+
+    # ── The app's Recipes tab, for a signed-in account ───────────────────────
+    #
+    # Trending, For You and Tea, as the xBloom app shows them once signed in:
+    # chosen by xBloom for the account — its country's roasters and pods.
+    # Nothing here is shown while signed out; the hub above serves that.
+
+    @property
+    def signed_in(self) -> bool:
+        return getattr(self._coordinator, "cloud_logged_in", False) is True
+
+    def account_recipes(self, kind: str) -> list[dict[str, Any]]:
+        """A list as offered: xPod recipes left out while they are hidden."""
+        return [r for r in self.account.get(kind, []) if self.show_xpods or not is_xpod(r)]
+
+    async def async_load_account(self) -> None:
+        """Read Trending, Tea and a For You recipe; each that fails is logged, the rest shown."""
+        if not self.signed_in:
+            self.account = {kind: [] for kind in ACCOUNT_LISTS}
+            self.account_pick = {kind: None for kind in ACCOUNT_LISTS}
+            self.for_you = None
+            self._changed()
+            return
+        for kind in ACCOUNT_LISTS:
+            try:
+                self.account[kind] = list(await self._coordinator.async_account_recipes(kind) or [])
+            except (HomeAssistantError, *HUB_ERRORS) as err:
+                _LOGGER.warning("xbloom %s recipes: %s", kind, err)
+                continue
+            offered = self.account_recipes(kind)
+            if self.account_pick.get(kind) not in {str(r.get("id")) for r in offered}:
+                self.account_pick[kind] = str(offered[0]["id"]) if offered else None
+        self._changed()
+        try:
+            await self.async_another_for_you()
+        except HomeAssistantError as err:
+            _LOGGER.warning("xbloom for you: %s", err)
+
+    async def async_another_for_you(self) -> None:
+        """Ask for another For You recipe, as the app's Switch does."""
+        if not self.signed_in:
+            raise fail("account_signed_out")
+        # A hidden xPod recipe is asked past, a few times at most.
+        for _ in range(FOR_YOU_TRIES):
+            try:
+                found = await self._coordinator.async_account_recipes("for_you")
+            except HUB_ERRORS as err:
+                raise fail("community_failed", reason=hub_text(str(err))) from err
+            if found is None or self.show_xpods or not is_xpod(found):
+                break
+        self.for_you = found if (found is None or self.show_xpods or not is_xpod(found)) else None
+        self._changed()
+
+    def account_pick_recipe(self, kind: str) -> dict[str, Any] | None:
+        if kind == "for_you":
+            return self.for_you
+        wanted = self.account_pick.get(kind)
+        return next((r for r in self.account_recipes(kind) if str(r.get("id")) == wanted), None)
+
+    def set_account_pick(self, kind: str, recipe_id: str) -> None:
+        if any(str(r.get("id")) == recipe_id for r in self.account_recipes(kind)):
+            self.account_pick[kind] = recipe_id
+            self._changed()
+
+    def set_show_xpods(self, show: bool) -> None:
+        self.show_xpods = show
+        for kind in ACCOUNT_LISTS:
+            offered = self.account_recipes(kind)
+            if self.account_pick.get(kind) not in {str(r.get("id")) for r in offered}:
+                self.account_pick[kind] = str(offered[0]["id"]) if offered else None
+        if not show and self.for_you is not None and is_xpod(self.for_you):
+            # Hidden now: For You is asked for one that is not an xPod.
+            self.for_you = None
+            if self.signed_in:
+                self._hass.async_create_task(self._async_another_quietly())
+        self._changed()
+
+    async def _async_another_quietly(self) -> None:
+        try:
+            await self.async_another_for_you()
+        except HomeAssistantError as err:
+            _LOGGER.info("xbloom for you: %s", err)
+
+    async def async_add_account(self, kind: str) -> str:
+        """Add the chosen Trending or Tea recipe, or the For You one, to the library."""
+        recipe = self.account_pick_recipe(kind)
+        if recipe is None:
+            raise fail("community_none_picked")
+        name = await self._async_add_numbered(
+            {k: v for k, v in recipe.items() if k != "id"},
+            library_name(recipe.get("name")) or "xBloom",
+        )
         self.added = name
         self._changed()
         return name

@@ -1026,6 +1026,193 @@ views:
     cards:
     - type: markdown
       text_only: true
+      content: '## For you'
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = states[''sensor.xbloom_studio_for_you''].attributes if
+        states[''sensor.xbloom_studio_for_you''] is defined else {} %}### {{ e(states(''sensor.xbloom_studio_for_you''))
+        }}
+
+
+        {% set c = a.get(''coffee'') or {} %}{% if c.get(''name'') %}**Pod:** {{ e(c.get(''name'')) }}{%
+        for x in [c.get(''origin''), c.get(''process''), c.get(''varietal'')] if x %} · {{ e(x) }}{% endfor
+        %}
+
+
+        {% if c.get(''flavor'') %}**Notes:** {{ e(c.get(''flavor'')) }}
+
+
+        {% endif %}{% endif %}{% if a.get(''dose_g'') %}**Coffee:** {{ a.get(''dose_g'') | round(1) }}
+        g{% if a.get(''ratio'') %} · **Ratio:** 1:{{ a.get(''ratio'') | round(1) }}{% endif %}{% if a.get(''grind_size'')
+        %} · grind {{ a.get(''grind_size'') | round(0) | int }} at {{ a.get(''rpm'') }} RPM{% endif %}
+
+
+        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause
+        |
+
+        |:--:|:--:|:--:|:--:|
+
+        {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} ml | {{ p.temperature_c
+        | round(0) | int }}°C | {{ p.pause_s | int(0) }} s |
+
+        {% endfor %}{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_another_for_you
+      name: Another
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_another_for_you
+    - type: tile
+      entity: button.xbloom_studio_add_for_you_recipe
+      name: Add to my recipes
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_for_you_recipe
+        confirmation:
+          text: Add this recipe to your library?
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_for_you
+      state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_for_you
+      state_not: unknown
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## Trending recipes'
+    - type: tile
+      entity: select.xbloom_studio_trending_recipes
+      name: Recipe
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_trending_recipes''].attributes
+        if states[''select.xbloom_studio_trending_recipes''] is defined else {} %}{% set c = a.get(''coffee'')
+        or {} %}{% if c.get(''name'') %}**Pod:** {{ e(c.get(''name'')) }}{% for x in [c.get(''origin''),
+        c.get(''process''), c.get(''varietal'')] if x %} · {{ e(x) }}{% endfor %}
+
+
+        {% if c.get(''flavor'') %}**Notes:** {{ e(c.get(''flavor'')) }}
+
+
+        {% endif %}{% endif %}{% if a.get(''dose_g'') %}**Coffee:** {{ a.get(''dose_g'') | round(1) }}
+        g{% if a.get(''ratio'') %} · **Ratio:** 1:{{ a.get(''ratio'') | round(1) }}{% endif %}{% if a.get(''grind_size'')
+        %} · grind {{ a.get(''grind_size'') | round(0) | int }} at {{ a.get(''rpm'') }} RPM{% endif %}
+
+
+        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause
+        |
+
+        |:--:|:--:|:--:|:--:|
+
+        {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} ml | {{ p.temperature_c
+        | round(0) | int }}°C | {{ p.pause_s | int(0) }} s |
+
+        {% endfor %}{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_add_trending_recipe
+      name: Add to my recipes
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_trending_recipe
+        confirmation:
+          text: Add this recipe to your library?
+    - type: tile
+      entity: switch.xbloom_studio_show_xpod_recipes
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      tap_action:
+        action: toggle
+    visibility:
+    - condition: state
+      entity: select.xbloom_studio_trending_recipes
+      state_not: unavailable
+    - condition: state
+      entity: select.xbloom_studio_trending_recipes
+      state_not: unknown
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## Tea recipes'
+    - type: tile
+      entity: select.xbloom_studio_tea_recipes
+      name: Recipe
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_tea_recipes''].attributes
+        if states[''select.xbloom_studio_tea_recipes''] is defined else {} %}{% set c = a.get(''coffee'')
+        or {} %}{% if c.get(''name'') %}**Pod:** {{ e(c.get(''name'')) }}{% for x in [c.get(''origin''),
+        c.get(''process''), c.get(''varietal'')] if x %} · {{ e(x) }}{% endfor %}
+
+
+        {% if c.get(''flavor'') %}**Notes:** {{ e(c.get(''flavor'')) }}
+
+
+        {% endif %}{% endif %}{% if a.get(''dose_g'') %}**Coffee:** {{ a.get(''dose_g'') | round(1) }}
+        g{% if a.get(''ratio'') %} · **Ratio:** 1:{{ a.get(''ratio'') | round(1) }}{% endif %}{% if a.get(''grind_size'')
+        %} · grind {{ a.get(''grind_size'') | round(0) | int }} at {{ a.get(''rpm'') }} RPM{% endif %}
+
+
+        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause
+        |
+
+        |:--:|:--:|:--:|:--:|
+
+        {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} ml | {{ p.temperature_c
+        | round(0) | int }}°C | {{ p.pause_s | int(0) }} s |
+
+        {% endfor %}{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_add_tea_recipe
+      name: Add to my recipes
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_tea_recipe
+        confirmation:
+          text: Add this recipe to your library?
+    visibility:
+    - condition: state
+      entity: select.xbloom_studio_tea_recipes
+      state_not: unavailable
+    - condition: state
+      entity: select.xbloom_studio_tea_recipes
+      state_not: unknown
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
       content: '## Find a community recipe'
     - type: tile
       entity: button.xbloom_studio_suggest_community_recipe

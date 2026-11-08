@@ -22,6 +22,18 @@ works); signed out, in the local library.
 
 ## Community recipes
 
+### Signed in to the xBloom account
+
+Signed in, the **Community** tab offers what the xBloom app's Recipes tab
+offers the account — chosen by xBloom for it, so its country's roasters and
+pods: **For You**, one recipe at a time, with **Another** to ask for a
+different one; **Trending Recipes**; and **Tea Recipes**. Each shows the
+recipe and, for a pod, its coffee, and **Add** puts it in your recipe
+library. xPod recipes are marked as such and shown unless **Show xPod
+Recipes** is turned off. Signed out, these are not shown.
+
+### The community hub
+
 xBloom's [community hub](https://collective.xbloom.com) holds recipes people
 have shared. The integration searches and reads it without an account, and
 offers Studio recipes only.

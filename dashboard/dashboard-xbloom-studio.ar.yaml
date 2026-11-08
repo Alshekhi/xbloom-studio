@@ -1027,6 +1027,196 @@ views:
     cards:
     - type: markdown
       text_only: true
+      content: '## مقترحة لك'
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = states[''sensor.xbloom_studio_for_you''].attributes if
+        states[''sensor.xbloom_studio_for_you''] is defined else {} %}### {{ e(states(''sensor.xbloom_studio_for_you''))
+        }}
+
+
+        {% set c = a.get(''coffee'') or {} %}{% if c.get(''name'') %}**الكبسولة:** {{ e(c.get(''name''))
+        }}{% for x in [c.get(''origin''), c.get(''process''), c.get(''varietal'')] if x %} · {{ e(x) }}{%
+        endfor %}
+
+
+        {% if c.get(''flavor'') %}**النكهات:** {{ e(c.get(''flavor'')) }}
+
+
+        {% endif %}{% endif %}{% if a.get(''dose_g'') %}**القهوة:** {{ a.get(''dose_g'') | round(1) }}
+        غ{% if a.get(''ratio'') %} · **النسبة:** 1:{{ a.get(''ratio'') | round(1) }}{% endif %}{% if a.get(''grind_size'')
+        %} · درجة الطحن {{ a.get(''grind_size'') | round(0) | int }} بسرعة {{ a.get(''rpm'') }} دورة في
+        الدقيقة{% endif %}
+
+
+        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| الصبة | الماء | الحرارة | الانتظار
+        |
+
+        |:--:|:--:|:--:|:--:|
+
+        {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} مل | {{ p.temperature_c
+        | round(0) | int }}°C | {{ p.pause_s | int(0) }} ث |
+
+        {% endfor %}{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_another_for_you
+      name: اقتراح آخر
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_another_for_you
+    - type: tile
+      entity: button.xbloom_studio_add_for_you_recipe
+      name: أضفها إلى وصفاتي
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_for_you_recipe
+        confirmation:
+          text: إضافة هذه الوصفة إلى مكتبتك؟
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_for_you
+      state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_for_you
+      state_not: unknown
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## الوصفات الرائجة'
+    - type: tile
+      entity: select.xbloom_studio_trending_recipes
+      name: الوصفة
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_trending_recipes''].attributes
+        if states[''select.xbloom_studio_trending_recipes''] is defined else {} %}{% set c = a.get(''coffee'')
+        or {} %}{% if c.get(''name'') %}**الكبسولة:** {{ e(c.get(''name'')) }}{% for x in [c.get(''origin''),
+        c.get(''process''), c.get(''varietal'')] if x %} · {{ e(x) }}{% endfor %}
+
+
+        {% if c.get(''flavor'') %}**النكهات:** {{ e(c.get(''flavor'')) }}
+
+
+        {% endif %}{% endif %}{% if a.get(''dose_g'') %}**القهوة:** {{ a.get(''dose_g'') | round(1) }}
+        غ{% if a.get(''ratio'') %} · **النسبة:** 1:{{ a.get(''ratio'') | round(1) }}{% endif %}{% if a.get(''grind_size'')
+        %} · درجة الطحن {{ a.get(''grind_size'') | round(0) | int }} بسرعة {{ a.get(''rpm'') }} دورة في
+        الدقيقة{% endif %}
+
+
+        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| الصبة | الماء | الحرارة | الانتظار
+        |
+
+        |:--:|:--:|:--:|:--:|
+
+        {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} مل | {{ p.temperature_c
+        | round(0) | int }}°C | {{ p.pause_s | int(0) }} ث |
+
+        {% endfor %}{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_add_trending_recipe
+      name: أضفها إلى وصفاتي
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_trending_recipe
+        confirmation:
+          text: إضافة هذه الوصفة إلى مكتبتك؟
+    - type: tile
+      entity: switch.xbloom_studio_show_xpod_recipes
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      tap_action:
+        action: toggle
+    visibility:
+    - condition: state
+      entity: select.xbloom_studio_trending_recipes
+      state_not: unavailable
+    - condition: state
+      entity: select.xbloom_studio_trending_recipes
+      state_not: unknown
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## وصفات الشاي'
+    - type: tile
+      entity: select.xbloom_studio_tea_recipes
+      name: الوصفة
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_tea_recipes''].attributes
+        if states[''select.xbloom_studio_tea_recipes''] is defined else {} %}{% set c = a.get(''coffee'')
+        or {} %}{% if c.get(''name'') %}**الكبسولة:** {{ e(c.get(''name'')) }}{% for x in [c.get(''origin''),
+        c.get(''process''), c.get(''varietal'')] if x %} · {{ e(x) }}{% endfor %}
+
+
+        {% if c.get(''flavor'') %}**النكهات:** {{ e(c.get(''flavor'')) }}
+
+
+        {% endif %}{% endif %}{% if a.get(''dose_g'') %}**القهوة:** {{ a.get(''dose_g'') | round(1) }}
+        غ{% if a.get(''ratio'') %} · **النسبة:** 1:{{ a.get(''ratio'') | round(1) }}{% endif %}{% if a.get(''grind_size'')
+        %} · درجة الطحن {{ a.get(''grind_size'') | round(0) | int }} بسرعة {{ a.get(''rpm'') }} دورة في
+        الدقيقة{% endif %}
+
+
+        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| الصبة | الماء | الحرارة | الانتظار
+        |
+
+        |:--:|:--:|:--:|:--:|
+
+        {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} مل | {{ p.temperature_c
+        | round(0) | int }}°C | {{ p.pause_s | int(0) }} ث |
+
+        {% endfor %}{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_add_tea_recipe
+      name: أضفها إلى وصفاتي
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_tea_recipe
+        confirmation:
+          text: إضافة هذه الوصفة إلى مكتبتك؟
+    visibility:
+    - condition: state
+      entity: select.xbloom_studio_tea_recipes
+      state_not: unavailable
+    - condition: state
+      entity: select.xbloom_studio_tea_recipes
+      state_not: unknown
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
       content: '## البحث عن وصفة من المجتمع'
     - type: tile
       entity: button.xbloom_studio_suggest_community_recipe
