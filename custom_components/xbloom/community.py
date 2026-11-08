@@ -32,7 +32,7 @@ from xbloom.community import XBloomCommunityClient
 from xbloom.exceptions import XBloomAPIError
 
 from .coffee_names import HubNames, name_key
-from .const import COMMUNITY_MACHINE, DOMAIN
+from .const import COMMUNITY_MACHINE, DOMAIN, ICED_RATIO_MAX
 from .suggestions import OwnSuggestion, async_own_suggestions
 from .tool_common import fail
 
@@ -145,9 +145,27 @@ async def studio_recipe(client: XBloomCommunityClient, recipe_id: int) -> dict[s
 # how closely each fits the bag, of which SUGGESTIONS are offered.
 SUGGEST_POOL = 50
 SUGGESTIONS = 5
+# Iced recipes are few among the most downloaded, so more are read for one.
+ICED_POOL = 100
 # How many shared tasting notes count towards a recipe's fit: past this, a
 # long list of notes would outweigh the variety and the roast.
 FLAVORS_COUNTED = 3
+
+
+def drink_of(recipe: dict[str, Any]) -> str | None:
+    """"iced" or "hot", by how much water the recipe pours for its coffee."""
+    try:
+        ratio = float(recipe.get("water_ratio"))
+    except (TypeError, ValueError):
+        return None
+    return "iced" if ratio <= ICED_RATIO_MAX else "hot"
+
+
+def of_drink(recipes: list[dict[str, Any]], drink: str | None) -> list[dict[str, Any]]:
+    """The recipes for that drink; all of them for "any"."""
+    if drink in (None, "any"):
+        return recipes
+    return [r for r in recipes if drink_of(r) == drink]
 
 
 def library_cup_types(library: list[dict[str, Any]]) -> set[int]:
@@ -172,6 +190,7 @@ async def suggest(
     varietal: str | None = None,
     roast: str | None = None,
     notes: str | None = None,
+    drink: str | None = None,
 ) -> dict[str, Any]:
     """Community recipes worth trying for a coffee of this origin and process.
 
@@ -189,6 +208,8 @@ async def suggest(
     for the same process, a shared variety and the same roast, and one for
     each tasting note in the bag's `notes` the recipe also names, up to
     FLAVORS_COUNTED. Each recipe's `fits` says which of these it shares.
+
+    `drink`, "hot" or "iced", keeps only recipes for it (`drink_of`).
     """
     have = {str(r.get("name") or "").casefold() for r in library}
     cups = library_cup_types(library)
@@ -215,12 +236,12 @@ async def suggest(
                 origins=[origin] if origin else [],
                 processes=[proc] if proc else [],
                 sort="downloads",
-                page_size=SUGGEST_POOL,
+                page_size=ICED_POOL if drink == "iced" else SUGGEST_POOL,
             )
         except ValueError:
             continue
         fresh = [
-            {**r, "fits": await fit.async_fits(r)} for r in page["recipes"]
+            {**r, "fits": await fit.async_fits(r)} for r in of_drink(page["recipes"], drink)
             if (library_name(r.get("name")) or "").casefold() not in have
             and (remaining_g is None or (r.get("dose_g") or 0) <= remaining_g)
         ]
@@ -373,6 +394,8 @@ class CommunityBrowser:
         self.account_pick: dict[str, str | None] = {kind: None for kind in ACCOUNT_LISTS}
         self.for_you: dict[str, Any] | None = None
         self.show_xpods = True
+        # The Brew tab's Drink: suggestions only for it (DRINKS).
+        self.drink = "any"
 
     @callback
     def _changed(self) -> None:
@@ -446,7 +469,7 @@ class CommunityBrowser:
             found = await suggest(
                 self._client, self._coordinator.data or [],
                 getattr(bag, "country", None), getattr(bag, "process", None),
-                bag_remaining_g(bag), self.names, **bag_coffee(bag),
+                bag_remaining_g(bag), self.names, **bag_coffee(bag), drink=self.drink,
             )
         except HUB_ERRORS as err:
             _LOGGER.warning("xbloom community suggestion: %s", err)
@@ -483,7 +506,7 @@ class CommunityBrowser:
             def current() -> bool:
                 return lab is None or getattr(lab, "active_bean_id", None) == wanted
 
-            own = await async_own_suggestions(lab, bag, self._coordinator.data or [])
+            own = await async_own_suggestions(lab, bag, of_drink(self._coordinator.data or [], self.drink))
             if not current():
                 return
             self.own, self.suggestions, self.choice = own, [], None
@@ -725,6 +748,12 @@ class CommunityBrowser:
         if any(str(r.get("id")) == recipe_id for r in self.account_recipes(kind)):
             self.account_pick[kind] = recipe_id
             self._changed()
+
+    @callback
+    def set_drink(self, lab: Any, drink: str) -> None:
+        """Another drink: the bag in use is suggested for again."""
+        self.drink = drink
+        self.bag_chosen(lab, getattr(lab, "active_bean_id", None))
 
     def set_show_xpods(self, show: bool) -> None:
         self.show_xpods = show

@@ -329,6 +329,11 @@ suggest_community:
       example: "Light Roast"
       selector:
         text:
+    drink:
+      selector:
+        select:
+          options: [any, hot, iced]
+          translation_key: drink
 
 xbloom_picks:
   fields:

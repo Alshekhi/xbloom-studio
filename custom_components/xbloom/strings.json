@@ -568,6 +568,22 @@
       },
       "coffee_lab_active_tea": {
         "name": "Tea"
+      },
+      "drink": {
+        "name": "Drink",
+        "state": {
+          "any": "Any",
+          "hot": "Hot",
+          "iced": "Iced"
+        }
+      },
+      "brew_taste": {
+        "name": "Taste",
+        "state": {
+          "balanced": "Balanced",
+          "less_sour": "Less sour",
+          "less_bitter": "Less bitter"
+        }
       }
     },
     "sensor": {
@@ -1480,6 +1496,10 @@
         "roast": {
           "name": "Roast",
           "description": "How dark it was roasted, instead of the bag in use."
+        },
+        "drink": {
+          "name": "Drink",
+          "description": "Hot or iced recipes only, instead of the Brew tab's Drink."
         }
       }
     },
@@ -1769,6 +1789,13 @@
         "coffee": "Coffee",
         "xpod": "xPod box",
         "tea": "Tea"
+      }
+    },
+    "drink": {
+      "options": {
+        "any": "Any",
+        "hot": "Hot",
+        "iced": "Iced"
       }
     }
   },

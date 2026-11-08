@@ -296,6 +296,8 @@ def brew_view(t: dict) -> dict:
         # Asked for here, where the bag is chosen. Nothing reaches the machine
         # until a recipe is used: picking one is what prepares it.
         section(t["h_for_bag"], [
+            # Hot or iced: what is suggested is only for that drink.
+            select(f"select.{E}_drink"),
             press(f"button.{E}_suggest_recipe", name=t["c_suggest"]),
             # Every suggestion, your own first; the card below says why the
             # chosen one was suggested, and Use picks it for brewing.
@@ -347,6 +349,8 @@ def brew_view(t: dict) -> dict:
         ]),
         section(t["h_adjust"], [
             toggle(f"switch.{E}_use_grinder"),
+            # Moves the grind below, from the recipe's; the recipe is kept.
+            select(f"select.{E}_taste", visibility=[is_(f"switch.{E}_use_grinder", "on")]),
             slider(f"number.{E}_brew_grind_size", visibility=[is_(f"switch.{E}_use_grinder", "on")]),
             slider(f"number.{E}_brew_ratio"),
             slider(f"number.{E}_brew_dose", visibility=present(f"number.{E}_brew_dose")),

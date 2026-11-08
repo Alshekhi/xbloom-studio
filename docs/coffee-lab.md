@@ -128,6 +128,18 @@ each community one marked as such, with the best already chosen; its
 attributes say why the chosen one was suggested. **Use Suggested Recipe**
 picks it for brewing, adding a community recipe to your library first.
 
+**Drink** — Any, Hot or Iced — keeps the suggestions to that drink, your own
+and the community's, and asks again for the bag in use when it changes. A
+recipe is iced when it pours 12 parts of water to its coffee or fewer: iced
+recipes brew about 1:8 to 1:10 straight onto ice, hot ones about 1:14 to 1:18.
+
+**Taste** — Balanced, Less sour or Less bitter — moves this brew's grind from
+the picked recipe's: three steps finer for less sour, three coarser for less
+bitter, never past the grinder's range. **Brew Grind Size** shows the result,
+and the saved recipe is not changed; the brew's version records the grind it
+was made at. A recipe that does not grind is left as it is. Taste goes back to
+Balanced when another bag is chosen.
+
 ### Buy it again?
 
 When a bag is finished, **Finished bag** names it for a week, and **Buy

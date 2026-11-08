@@ -155,8 +155,8 @@ def test_every_platform_gets_its_entities_and_nothing_without_a_browser():
         "SuggestRecipeButton", "UseSuggestedRecipeButton", "AnotherForYouButton",
         "AddAccountRecipeButton", "AddAccountRecipeButton", "AddAccountRecipeButton",
     ]
-    assert [type(e).__name__ for e in ce.entities_for(entry, "select")][-3:] == [
-        "SuggestedRecipeSelect", "AccountRecipeSelect", "AccountRecipeSelect",
+    assert [type(e).__name__ for e in ce.entities_for(entry, "select")][-4:] == [
+        "SuggestedRecipeSelect", "DrinkSelect", "AccountRecipeSelect", "AccountRecipeSelect",
     ]
     assert [type(e).__name__ for e in ce.entities_for(entry, "switch")] == ["ShowXpodRecipesSwitch"]
     entry.runtime_data.community = None
@@ -482,3 +482,42 @@ async def test_saving_a_shared_link_reads_only_xbloom_links_and_numbers_a_clash(
     share.get_recipe_by_share_id.assert_not_awaited()
     assert await browser.async_save_link(LINK) == "Another Name 2"
     assert "id" not in coordinator.async_add_recipe.await_args.args[0]
+
+
+# ── Hot or iced ──────────────────────────────────────────────────────────────
+
+
+def test_a_recipe_is_iced_by_how_little_water_it_pours():
+    assert [cm.drink_of({"water_ratio": r}) for r in (8.5, 12, 12.5, 16, None, "x")] == [
+        "iced", "iced", "hot", "hot", None, None,
+    ]
+
+
+async def test_an_iced_suggestion_reads_more_recipes_and_keeps_only_iced_ones():
+    browser, client, *_ = _browser()
+    hot = {**LISTED, "id": 1, "name": "Hot", "water_ratio": 16}
+    iced = {**LISTED, "id": 2, "name": "Iced", "water_ratio": 9}
+    client.search.return_value = {"page": 1, "total_pages": 1, "total": 2, "recipes": [hot, iced]}
+    found = await cm.suggest(client, [], "Ethiopia", None, drink="iced")
+    assert [r["name"] for r in found["recipes"]] == ["Iced"]
+    assert client.search.await_args.kwargs["page_size"] == cm.ICED_POOL
+
+
+async def test_choosing_a_drink_suggests_again_for_the_bag_in_use_from_its_own_recipes():
+    browser, client, _, coordinator = _browser()
+    coordinator.data = [{"name": "Mine Hot", "water_ratio": 16}, {"name": "Mine Iced", "water_ratio": 9}]
+    lab = _bag()
+    seen = []
+
+    async def own(lab_, bag, library):
+        seen.append([r["name"] for r in library])
+        return []
+
+    tasks = []
+    browser._hass.async_create_task = tasks.append
+    with patch.object(cm, "async_own_suggestions", own):
+        browser.set_drink(lab, "iced")
+        assert browser.drink == "iced" and len(tasks) == 1, "the bag in use is suggested for again"
+        await tasks[0]
+    assert seen == [["Mine Iced"]]
+    assert client.search.await_args.kwargs["page_size"] == cm.ICED_POOL

@@ -14,13 +14,13 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .ble_entities import send_brewer_pattern_live, signal_event
 from .tool_common import require_machine_control
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_TASTE, TASTE_GRIND
 from .community_entities import entities_for as community_entities
 from .coordinator import XBloomCoordinator
 from .prepare import signal_clear_recipe
@@ -55,6 +55,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         XBloomTempUnitSelect(entry),
         XBloomWeightUnitSelect(entry),
         XBloomBrewPatternSelect(entry),
+        XBloomTasteSelect(entry),
     ])
     # Coffee Lab's, only while it is switched on.
     async_add_entities(coffee_lab_entities(entry.runtime_data.coffee_lab, "select"))
@@ -545,3 +546,44 @@ class XBloomBrewPatternSelect(_XBloomSettingSelect):
                 EV_BREWER_SETTING,
                 {"setting": "pattern", "value": pattern_byte, "value_name": option},
             )
+
+
+class XBloomTasteSelect(SelectEntity):
+    """Taste: a one-off grind change to the picked recipe, the recipe kept.
+
+    Less sour grinds finer, less bitter coarser (const.TASTE_GRIND); the
+    Brew Grind Size slider moves with it, so what will be sent is in sight.
+    Kept until another bag is chosen, and not across a restart: a correction
+    asked of one coffee is not silently asked of the next.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "brew_taste"
+    _attr_unique_id = "xbloom_brew_taste"
+    _attr_icon = "mdi:emoticon-tongue-outline"
+    _attr_options = list(TASTE_GRIND)
+
+    def __init__(self, entry) -> None:
+        self._entry = entry
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, "xbloom_studio")})
+
+    @property
+    def _signal(self) -> str:
+        return f"{SIGNAL_TASTE}_{self._entry.entry_id}"
+
+    @property
+    def current_option(self) -> str:
+        return self._entry.runtime_data.taste
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, self._signal, self.async_write_ha_state)
+        )
+
+    async def async_select_option(self, option: str) -> None:
+        self._entry.runtime_data.taste = option
+        async_dispatcher_send(self.hass, self._signal)

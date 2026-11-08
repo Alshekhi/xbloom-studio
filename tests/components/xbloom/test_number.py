@@ -298,3 +298,33 @@ async def test_temperature_set_ignores_a_stopped_live_session() -> None:
     entity._entry.runtime_data.live_session_listener = listener
     await entity.async_set_native_value(91.0)
     assert entity._drive_unsub is None
+
+
+# --------------------------------------------------------------------------- #
+# The Brew tab's Taste moves the grind                                        #
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(("taste", "grind"), [("balanced", 56.0), ("less_sour", 53.0), ("less_bitter", 59.0)])
+def test_the_taste_moves_the_grind_from_the_recipes(taste: str, grind: float) -> None:
+    entity = _make(XBloomBrewGrindNumber, recipe_attrs={"grinder_size": 56, "cup_type": 2})
+    entity._entry.runtime_data.taste = taste
+    entity._seed_from_recipe()
+    assert entity.native_value == grind
+
+
+@pytest.mark.parametrize("attrs", [
+    {"grinder_size": 56, "cup_type": 4},
+    {"grinder_size": 56, "cup_type": 2, "grinder_size_enabled": 2},
+])
+def test_a_recipe_that_does_not_grind_is_not_moved(attrs: dict) -> None:
+    entity = _make(XBloomBrewGrindNumber, recipe_attrs=attrs)
+    entity._entry.runtime_data.taste = "less_sour"
+    entity._seed_from_recipe()
+    assert entity.native_value == 56.0
+
+
+def test_the_taste_never_moves_the_grind_past_the_grinder() -> None:
+    low = XBloomBrewGrindNumber._attr_native_min_value
+    entity = _make(XBloomBrewGrindNumber, recipe_attrs={"grinder_size": low + 1, "cup_type": 2})
+    entity._entry.runtime_data.taste = "less_sour"
+    entity._seed_from_recipe()
+    assert entity.native_value == low

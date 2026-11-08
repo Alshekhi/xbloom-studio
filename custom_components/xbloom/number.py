@@ -31,7 +31,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from .ble_entities import send_brewer_temp_live, signal_event
 from .tool_common import require_machine_control
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_TASTE, TASTE_GRIND
 from .coffee_lab.entities import entities_for as coffee_lab_entities
 from xbloom import spec
 from xbloom.ble import packet_grinder_set
@@ -78,6 +78,8 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
 # extra_state_attributes carries the full recipe dict (dose_g, water_ratio,
 # grinder_size, cup_type, pours, …) — see select.XBloomRecipeSelect.
 _RECIPE_SELECT = "select.xbloom_studio_recipe"
+# A recipe's cup_type for tea, which is not ground.
+TEA_CUP = 4
 
 
 class _XBloomNumberBase(NumberEntity, RestoreEntity):
@@ -429,12 +431,41 @@ class _XBloomRecipeOverrideNumber(_XBloomNumberBase):
 
 
 class XBloomBrewGrindNumber(_XBloomRecipeOverrideNumber):
+    """The grind this brew will use: the recipe's, moved by the Brew tab's Taste.
+
+    A Taste chosen sets it afresh from the recipe, over any hand change; a
+    recipe that does not grind (pre-ground coffee, tea) is not moved.
+    """
+
     _attr_translation_key = "brew_grind_size"
     _attr_unique_id = "xbloom_brew_grind"
     _attr_native_min_value, _attr_native_max_value, _attr_native_step = _range("grind_size")
     _attr_icon = "mdi:grain"
     _default_value = 50.0
     _recipe_attr = "grinder_size"
+
+    def _seed_from_recipe(self) -> None:
+        raw = self._recipe_value(self._recipe_attr)
+        if raw is None:
+            return
+        try:
+            grind = float(raw)
+        except (TypeError, ValueError):
+            return
+        grinds = (
+            self._recipe_value("grinder_size_enabled") != 2
+            and self._recipe_value("cup_type") != TEA_CUP
+        )
+        if grinds:
+            grind += TASTE_GRIND.get(getattr(self._entry.runtime_data, "taste", "balanced"), 0)
+        self._current_value = min(self._attr_native_max_value, max(self._attr_native_min_value, grind))
+        self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(async_dispatcher_connect(
+            self.hass, f"{SIGNAL_TASTE}_{self._entry.entry_id}", self._seed_from_recipe,
+        ))
 
 
 class XBloomBrewRatioNumber(_XBloomRecipeOverrideNumber):

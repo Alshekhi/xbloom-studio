@@ -40,7 +40,7 @@ from .const import (
     CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_BREWERS, CONF_CALLBACK_TARGETS, CONF_COFFEE_LAB,
     CONF_COFFEE_LAB_STORE, CONF_NOTION_BEANS, CONF_NOTION_BREWS, CONF_NOTION_TOKEN,
     COMMUNITY_MACHINE, CONF_PRODUCT_ID, DEFAULT_BREWERS, DOMAIN,
-    SIGNAL_COFFEE_LAB_UPDATED,
+    DRINKS, SIGNAL_COFFEE_LAB_UPDATED, SIGNAL_TASTE,
 )
 from .blueprint_install import async_install_blueprints
 from .callbacks import Callbacks, targets_from
@@ -312,6 +312,9 @@ class XBloomRuntimeData:
     community: CommunityBrowser | None = None
     # The Next Change and the version to keep (versions.py), with Coffee Lab.
     versions: object = None
+    # The Brew tab's Taste (const.TASTE_GRIND), kept until another bag is
+    # chosen or it is changed.
+    taste: str = "balanced"
 
 
 type XBloomConfigEntry = ConfigEntry[XBloomRuntimeData]
@@ -472,7 +475,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 _LOGGER.info("Coffee Lab: the card's xPod box could not be looked up: %s", err)
 
         entry.async_on_unload(hass.bus.async_listen("xbloom_recipe_card_scanned", _card_read))
-        lab.on_bag_chosen = lambda bean_id: browser.bag_chosen(lab, bean_id)
+        def _bag_chosen(bean_id: str | None) -> None:
+            # A taste asked of one coffee is not asked of the next.
+            if entry.runtime_data.taste != "balanced":
+                entry.runtime_data.taste = "balanced"
+                async_dispatcher_send(hass, f"{SIGNAL_TASTE}_{entry.entry_id}")
+            browser.bag_chosen(lab, bean_id)
+
+        lab.on_bag_chosen = _bag_chosen
         entry.async_on_unload(async_count_completed_brews(hass, lab))
         # Brews that could not reach the store wait in Home Assistant and are
         # retried here, at startup and every few minutes (coffee_lab/pending.py).
@@ -2115,6 +2125,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             found = await suggest(
                 community, entry.runtime_data.coordinator.data or [], country, process,
                 bag_remaining_g(bag), entry.runtime_data.community.names, **coffee,
+                drink=call.data.get("drink", entry.runtime_data.community.drink),
             )
         except HUB_ERRORS as err:
             _LOGGER.warning("xbloom.suggest_community: %s", err)
@@ -2346,7 +2357,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     hass.services.async_register(
         DOMAIN, "suggest_community", handle_suggest_community,
         schema=vol.Schema({
-            vol.Optional(key): str for key in ("origin", "process", "varietal", "roast")
+            **{vol.Optional(key): str for key in ("origin", "process", "varietal", "roast")},
+            vol.Optional("drink"): vol.In(list(DRINKS)),
         }),
         supports_response=SupportsResponse.ONLY,
     )

@@ -57,6 +57,19 @@ CONF_CALLBACK_TARGETS = "callback_targets"
 # Sent when anything Coffee Lab shows has changed; its entities re-read.
 SIGNAL_COFFEE_LAB_UPDATED = f"{DOMAIN}_coffee_lab_updated"
 
+# The Brew tab's Taste: a one-off change to the picked recipe's grind, in
+# grinder steps. A smaller number grinds finer: a finer grind draws more from
+# the coffee, so it is less sour; a coarser one less, so it is less bitter.
+TASTE_GRIND = {"balanced": 0, "less_sour": -3, "less_bitter": 3}
+# Sent when the Brew tab's Taste changes: the grind slider moves with it.
+SIGNAL_TASTE = f"{DOMAIN}_taste"
+
+# A hub or saved recipe is iced when it pours this little water for its
+# coffee or less: iced recipes brew about 1:8 to 1:10 straight onto ice, hot
+# ones about 1:14 to 1:18.
+ICED_RATIO_MAX = 12.0
+DRINKS = ("any", "hot", "iced")
+
 # How long a Connect (live) session may sit idle before HA auto-disconnects,
 # handing the machine back to the iOS app. There is no upstream value to mirror
 # (the app leans on the phone OS killing the link when it backgrounds; HA's link

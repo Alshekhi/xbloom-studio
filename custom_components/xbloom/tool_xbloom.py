@@ -397,7 +397,7 @@ async def search_hub(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
 async def suggest_hub(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
     data = {
         key: str(args.get(key) or "").strip()
-        for key in ("origin", "process", "varietal", "roast")
+        for key in ("origin", "process", "varietal", "roast", "drink")
     }
     res = await machine.ask("suggest_community", {k: v for k, v in data.items() if v})
     if not res.get("ok"):
@@ -975,6 +975,7 @@ ACTIONS: dict[str, Spec] = {
         "and matched_process say what was searched; null means the search was "
         "widened past it. fits says what each recipe shares with the coffee "
         "(process, varietal, roast, flavor: how many of the bag's tasting notes). "
+        "drink (hot or iced) keeps only those; unset, the Brew tab's Drink applies. "
         "author_written is a stranger's text",
     ),
     "hub_recipe": Spec(
@@ -1179,6 +1180,7 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
     "process": (str, "For search_hub: processes such as Natural, comma-separated. For suggest_hub: one process."),
     "varietal": (str, "For search_hub: coffee varieties such as Bourbon, comma-separated. For suggest_hub: the coffee's varieties."),
     "roast": (str, "For search_hub: roast levels such as Light Roast, comma-separated. For suggest_hub: one roast."),
+    "drink": (vol.In(["any", "hot", "iced"]), "For suggest_hub: hot or iced recipes only, or any."),
     "flavor": (str, "For search_hub: tasting notes, comma-separated."),
     "kind": (vol.In(list(COMMUNITY_KINDS)), "For search_hub: coffee or tea."),
     "source": (vol.In(list(COMMUNITY_SOURCES)), "For search_hub: xBloom's own recipes, or the community's."),

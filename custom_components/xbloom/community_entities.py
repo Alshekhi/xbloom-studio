@@ -24,7 +24,7 @@ from homeassistant.helpers.translation import async_get_translations
 from xbloom.community import SORTS
 
 from .community import ANY_ORIGIN, CommunityBrowser, account_facts, hub_text, is_xpod
-from .const import DOMAIN
+from .const import DOMAIN, DRINKS
 
 
 def entities_for(entry, platform: str) -> list:
@@ -38,6 +38,7 @@ def entities_for(entry, platform: str) -> list:
             CommunitySortSelect(browser),
             CommunityRecipeSelect(browser),
             SuggestedRecipeSelect(browser),
+            DrinkSelect(browser, entry),
             AccountRecipeSelect(browser, "trending"),
             AccountRecipeSelect(browser, "tea"),
         ],
@@ -249,6 +250,32 @@ class SuggestRecipeButton(_CommunityEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         await self._browser.async_suggest_for_bag(getattr(self._entry.runtime_data, "coffee_lab", None))
+
+
+class DrinkSelect(_CommunityEntity, SelectEntity, RestoreEntity):
+    """Hot or iced: suggestions for the bag only for that drink, or for any."""
+
+    _attr_translation_key = "drink"
+    _attr_unique_id = "xbloom_drink"
+    _attr_icon = "mdi:coffee-to-go"
+    _attr_options = list(DRINKS)
+
+    def __init__(self, browser: CommunityBrowser, entry) -> None:
+        super().__init__(browser)
+        self._entry = entry
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        if last is not None and last.state in DRINKS:
+            self._browser.drink = last.state
+
+    @property
+    def current_option(self) -> str:
+        return self._browser.drink
+
+    async def async_select_option(self, option: str) -> None:
+        self._browser.set_drink(getattr(self._entry.runtime_data, "coffee_lab", None), option)
 
 
 class SuggestedRecipeSelect(_CommunityEntity, SelectEntity):
