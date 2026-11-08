@@ -2321,6 +2321,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         schema=vol.Schema({vol.Optional("origin"): str, vol.Optional("process"): str}),
         supports_response=SupportsResponse.ONLY,
     )
+    async def handle_xbloom_picks(call) -> dict:
+        """For You, Trending or Tea for the signed-in account."""
+        recipes = await entry.runtime_data.community.async_picks(call.data["kind"])
+        return {"ok": True, "kind": call.data["kind"], "recipes": recipes}
+
+    async def handle_save_shared_recipe(call) -> dict:
+        """The recipe an xBloom share link holds, put in the library."""
+        name = await entry.runtime_data.community.async_save_link(call.data["share_url"])
+        return {"ok": True, "name": name} if call.return_response else None
+
+    hass.services.async_register(
+        DOMAIN, "xbloom_picks", handle_xbloom_picks,
+        schema=vol.Schema({vol.Required("kind"): vol.In(["for_you", "trending", "tea"])}),
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register(
+        DOMAIN, "save_shared_recipe", handle_save_shared_recipe,
+        schema=vol.Schema({vol.Required("share_url"): str}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
     hass.services.async_register(
         DOMAIN, "get_community_recipe", handle_get_community_recipe,
         schema=vol.Schema({vol.Required("recipe_id"): vol.Coerce(int)}),
@@ -2385,6 +2405,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         "list_recipes", "get_recipe", "add_recipe", "update_recipe", "delete_recipe",
         "archive_recipe", "restore_recipe", "list_archived_recipes",
         "search_community", "suggest_community", "get_community_recipe",
+        "xbloom_picks", "save_shared_recipe",
         "save_scaled_recipe",
     ):
         entry.async_on_unload(

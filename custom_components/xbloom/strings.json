@@ -959,6 +959,9 @@
     },
     "account_signed_out": {
       "message": "Sign in to the xBloom account in the integration's Configure menu first."
+    },
+    "share_link_invalid": {
+      "message": "That is not an xBloom share link."
     }
   },
   "services": {
@@ -1618,6 +1621,26 @@
           "description": "What to change next time, such as grind 52."
         }
       }
+    },
+    "xbloom_picks": {
+      "name": "xBloom picks",
+      "description": "For You, Trending or Tea recipes, as the xBloom app offers them to the signed-in account.",
+      "fields": {
+        "kind": {
+          "name": "Which",
+          "description": "For You gives another recipe each time."
+        }
+      }
+    },
+    "save_shared_recipe": {
+      "name": "Save a shared recipe",
+      "description": "Put the recipe an xBloom share link holds in the recipe library.",
+      "fields": {
+        "share_url": {
+          "name": "Share link",
+          "description": "An xBloom share link."
+        }
+      }
     }
   },
   "selector": {
@@ -1665,6 +1688,13 @@
       "options": {
         "community": "community",
         "xpod": "xPod"
+      }
+    },
+    "xbloom_picks_kind": {
+      "options": {
+        "for_you": "For You",
+        "trending": "Trending",
+        "tea": "Tea"
       }
     }
   },

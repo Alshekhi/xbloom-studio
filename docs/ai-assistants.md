@@ -25,6 +25,12 @@ origin, process, roast or flavor, one suggested for a bag, and one read in
 full to add to the library. What strangers wrote there reaches the assistant
 quoted, as text to describe, never as instructions.
 
+Signed in to the xBloom account, `xbloom_picks` offers what the xBloom app
+offers it — `for_you` (another recipe each time), `trending` or `tea` —
+leaving xPod recipes out while **Show xPod Recipes** is off, and
+`save_shared_recipe` puts the recipe a share link holds into the library, a
+name already there numbered rather than replaced.
+
 **How a brew was.** With Coffee Lab on, `active_bean` lists the
 `rating_questions` waiting for a verdict, and `rate_brew` keeps what the
 person says — the verdict, how it tasted, the next change — closing the

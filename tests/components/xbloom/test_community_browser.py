@@ -451,3 +451,34 @@ async def test_for_you_asks_past_a_hidden_xpod():
 def test_a_tea_recipe_with_a_pod_is_not_an_xpod():
     assert cm.is_xpod(_pod(1, "Tea Test")) is False
     assert cm.is_xpod(_pod(2, "Pod Test", xpod=True)) is True
+
+
+async def test_picks_for_an_assistant_follow_the_switch_and_carry_the_link():
+    browser, *_, coordinator = _browser()
+    trend = [{**_pod(1, "Test Pod Recipe", xpod=True), "share_url": LINK}, _pod(2, "Test Omni")]
+    _signed_in(browser, coordinator, {"trending": trend})
+    picks = await browser.async_picks("trending")
+    assert [(p["name"], p["xpod"], p["share_url"]) for p in picks] == [
+        ("Test Pod Recipe", True, LINK), ("Test Omni", False, None),
+    ]
+    browser.set_show_xpods(False)
+    assert [p["name"] for p in await browser.async_picks("trending")] == ["Test Omni"]
+
+
+async def test_picks_are_refused_signed_out():
+    browser, *_, coordinator = _browser()
+    coordinator.cloud_logged_in = False
+    with pytest.raises(HomeAssistantError) as caught:
+        await browser.async_picks("tea")
+    assert caught.value.translation_key == "account_signed_out"
+
+
+async def test_saving_a_shared_link_reads_only_xbloom_links_and_numbers_a_clash():
+    browser, _, share, coordinator = _browser()
+    coordinator.data = [{"name": "Another Name"}]
+    with pytest.raises(HomeAssistantError) as caught:
+        await browser.async_save_link("https://example.invalid/?id=abc")
+    assert caught.value.translation_key == "share_link_invalid"
+    share.get_recipe_by_share_id.assert_not_awaited()
+    assert await browser.async_save_link(LINK) == "Another Name 2"
+    assert "id" not in coordinator.async_add_recipe.await_args.args[0]

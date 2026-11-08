@@ -959,6 +959,9 @@
     },
     "account_signed_out": {
       "message": "سجّل الدخول إلى حساب xBloom أولًا من قائمة الإعداد في التكامل."
+    },
+    "share_link_invalid": {
+      "message": "هذا ليس رابط مشاركة من xBloom."
     }
   },
   "services": {
@@ -1618,6 +1621,26 @@
           "description": "ما يُعدَّل في المرة القادمة، مثل طحن 52."
         }
       }
+    },
+    "xbloom_picks": {
+      "name": "اختيارات xBloom",
+      "description": "وصفات «مقترحة لك» أو الرائجة أو وصفات الشاي، كما يعرضها تطبيق xBloom للحساب المسجّل.",
+      "fields": {
+        "kind": {
+          "name": "أيّها",
+          "description": "«مقترحة لك» تعطي وصفة أخرى في كل مرة."
+        }
+      }
+    },
+    "save_shared_recipe": {
+      "name": "حفظ وصفة مشتركة",
+      "description": "أضف إلى مكتبة الوصفات الوصفةَ التي يحملها رابط مشاركة من xBloom.",
+      "fields": {
+        "share_url": {
+          "name": "رابط المشاركة",
+          "description": "رابط مشاركة من xBloom."
+        }
+      }
     }
   },
   "selector": {
@@ -1665,6 +1688,13 @@
       "options": {
         "community": "من المجتمع",
         "xpod": "xPod"
+      }
+    },
+    "xbloom_picks_kind": {
+      "options": {
+        "for_you": "مقترحة لك",
+        "trending": "الرائجة",
+        "tea": "الشاي"
       }
     }
   },

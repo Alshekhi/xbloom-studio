@@ -322,6 +322,23 @@ suggest_community:
       selector:
         text:
 
+xbloom_picks:
+  fields:
+    kind:
+      required: true
+      selector:
+        select:
+          options: [for_you, trending, tea]
+          translation_key: xbloom_picks_kind
+
+save_shared_recipe:
+  fields:
+    share_url:
+      required: true
+      example: "https://share-h5.xbloom.com/?id=abc%3D%3D"
+      selector:
+        text:
+
 get_community_recipe:
   fields:
     recipe_id:

@@ -673,6 +673,49 @@ class CommunityBrowser:
         self._changed()
         return name
 
+    async def async_picks(self, kind: str) -> list[dict[str, Any]]:
+        """For You, Trending or Tea for an assistant, as the dashboard offers them.
+
+        For You is asked again, so each call gives another recipe, as Another
+        does. xPod recipes are left out while Show xPod Recipes is off.
+        """
+        if not self.signed_in:
+            raise fail("account_signed_out")
+        if kind == "for_you":
+            await self.async_another_for_you()
+            recipes = [self.for_you] if self.for_you else []
+        else:
+            if not self.account.get(kind):
+                await self.async_load_account()
+            recipes = self.account_recipes(kind)
+        return [
+            {**account_facts(r), "name": hub_text(r.get("name")), "share_url": hub_share_url(r)}
+            for r in recipes
+        ]
+
+    async def async_save_link(self, link: str) -> str:
+        """Put the recipe an xBloom share link holds in the library; its name as saved.
+
+        Only xBloom's own share links are read, and a name already in the
+        library gets a number rather than replacing that recipe.
+        """
+        link = str(link or "").strip()
+        if hub_share_url({"share_url": link}) is None:
+            raise fail("share_link_invalid")
+        try:
+            recipe = await self._share_client.get_recipe_by_share_id(
+                self._share_client.share_id_from_url(link)
+            )
+        except (ValueError, *HUB_ERRORS) as err:
+            raise fail("community_failed", reason=hub_text(str(err))) from err
+        name = await self._async_add_numbered(
+            {k: v for k, v in recipe.items() if k != "id"},
+            library_name(recipe.get("name")) or "xBloom",
+        )
+        self.added = name
+        self._changed()
+        return name
+
     def picked_facts(self) -> dict[str, Any]:
         """The picked recipe as the dashboard shows it, every text cleaned."""
         d = self.detail
