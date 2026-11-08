@@ -32,6 +32,22 @@ the country's name in Arabic or Chinese, or "Anaerobic" become "Ethiopia" and
 hub. A name the hub does not list is kept as typed, and the action's response
 names it under `not_on_hub`.
 
+## Coffee, xPod boxes and tea
+
+An item is a **bag of coffee**, a **box of xPods** or a **tea** — its kind,
+set when it is added or edited. A brew draws from the kind its recipe's cup
+takes: a coffee brew takes its dose from **Coffee bag**, an xPod brew takes
+**one pod** from **xPod box**, and a tea brew takes its grams from **Tea**.
+An xPod or tea brew is never charged to a bag of coffee, and with nothing of
+its kind in use it is recorded against nothing. Only a coffee recipe needs a
+bag chosen before it is prepared; the Brew tab shows the picker the picked
+recipe needs.
+
+A box is counted in **pods** — give how many it holds when adding it — and is
+finished when the last is used. When the machine reads a pod's recipe card
+while Connect holds the link, the box that card belongs to is put in use;
+the first card read with a box in use teaches that box its card.
+
 ## How a brew is counted
 
 The bag is fixed when the brew starts: the one named in `start_brew`

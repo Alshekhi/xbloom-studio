@@ -20,6 +20,10 @@ REVIEW_REASONS = (
     "stopped_after_grinding",
 )
 SELECTABLE: tuple[Status, ...] = ("open", "unopened")
+# What a Coffee Lab item holds: a bag of coffee counted in grams, a box of
+# xPods counted in pods, or tea counted in grams. A brew draws from the kind
+# its cup type takes (`inventory.kind_of_cup`).
+KINDS: tuple[str, ...] = ("coffee", "xpod", "tea")
 
 # A brew's verdict, as asked once per recipe, bag and version, and the number
 # it is kept as in a store's Rating column.
@@ -65,6 +69,12 @@ class Bean:
     finished_on: str = ""   # YYYY-MM-DD
     # Asked once, when the bag is finished: would it be bought again.
     buy_again: str = ""   # one of BUY_AGAIN, or "" until answered
+    kind: str = "coffee"  # one of KINDS
+    # An xPod box: how many pods are left (None while it is not counted
+    # down), and the id on its pods' recipe cards, learnt from the first
+    # card read while the box is in use.
+    pods_left: int | None = None
+    pod_id: str = ""
 
 
 @dataclass(frozen=True)

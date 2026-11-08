@@ -463,6 +463,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         # choosing another bag replaces what was suggested for the last.
         browser = entry.runtime_data.community
         lab.hub_names = browser.names
+
+        # A pod's card read at the machine finds, or teaches, its xPod box.
+        async def _card_read(event) -> None:
+            try:
+                await lab.async_card_read(event.data.get("pod_id"))
+            except STORE_UNREACHABLE as err:
+                _LOGGER.info("Coffee Lab: the card's xPod box could not be looked up: %s", err)
+
+        entry.async_on_unload(hass.bus.async_listen("xbloom_recipe_card_scanned", _card_read))
         lab.on_bag_chosen = lambda bean_id: browser.bag_chosen(lab, bean_id)
         entry.async_on_unload(async_count_completed_brews(hass, lab))
         # Brews that could not reach the store wait in Home Assistant and are
@@ -932,15 +941,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
         # Coffee Lab: the bag is fixed now, as the brew starts. Choosing another
         # bag while it runs must not recharge this brew to it.
+        # The coffee bag, xPod box and tea in use all ride on the brew; its cup
+        # type picks which it draws from when it is counted. A bag named on
+        # the brew takes the place of the one in use for its kind.
         if (lab := entry.runtime_data.coffee_lab) is not None:
             if data.get("unattributed"):
                 meta["unattributed"] = True
-            elif bean_id := data.get("bean_id") or lab.active_bean_id:
-                meta["bean_id"] = bean_id
-                try:
-                    meta["bean_name"] = (await lab.store.async_get_bean(bean_id)).name
-                except UnknownBean:
-                    pass
+            else:
+                drawn = {kind: lab.active_id(kind) for kind in ("coffee", "xpod", "tea")}
+                if named := data.get("bean_id"):
+                    try:
+                        named_bean = await lab.store.async_get_bean(named)
+                    except UnknownBean:
+                        drawn["coffee"] = named
+                    else:
+                        drawn[named_bean.kind] = named
+                if drawn["coffee"]:
+                    meta["bean_id"] = drawn["coffee"]
+                    try:
+                        meta["bean_name"] = (await lab.store.async_get_bean(drawn["coffee"])).name
+                    except UnknownBean:
+                        pass
+                if drawn["xpod"]:
+                    meta["xpod_id"] = drawn["xpod"]
+                if drawn["tea"]:
+                    meta["tea_id"] = drawn["tea"]
 
         def _fire_failed(reason: str, recipe_name: str | None, **extra) -> None:
             # A brew that cannot run must say so on the bus, not only in the

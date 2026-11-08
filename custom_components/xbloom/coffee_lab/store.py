@@ -107,11 +107,16 @@ class CoffeeLabStore(ABC):
         """Whether a brew with this run id is already recorded."""
 
     async def async_apply_bean_update(
-        self, bean_id: str, *, remaining_g: float, open_bag: bool, finish: bool,
-        today: str,
+        self, bean_id: str, *, remaining_g: float | None, open_bag: bool, finish: bool,
+        today: str, pods_left: int | None = None,
     ) -> Bean:
-        """What a counted brew does to its bag: the new amount, and its stage."""
-        changes: dict[str, Any] = {"remaining_g": remaining_g}
+        """What a counted brew does to its bag: the new amount, and its stage.
+
+        An xPod box is counted in pods (`pods_left`), anything else in grams.
+        """
+        changes: dict[str, Any] = (
+            {"pods_left": pods_left} if pods_left is not None else {"remaining_g": remaining_g}
+        )
         if finish:
             changes["status"] = "finished"
             changes["finished_on"] = today

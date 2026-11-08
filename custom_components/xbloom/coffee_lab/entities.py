@@ -20,17 +20,20 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 
 from ..tool_common import refuse
 from ..const import DOMAIN, SIGNAL_COFFEE_LAB_UPDATED
 from . import actions
 from .lab import CoffeeLab
-from .models import BUY_AGAIN, VERDICTS, Bean
+from .inventory import kind_of_cup
+from .models import BUY_AGAIN, KINDS, VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
 
 _LOGGER = logging.getLogger(__name__)
 
+# The recipe picker, whose pick decides which kind of item a brew draws from.
+RECIPE_SELECT = "select.xbloom_studio_recipe"
 # The results a count can have, as the last-count sensor's states.
 COUNT_RESULTS = ["counted", "recorded", "skipped", "flagged", "queued"]
 # How often the question's sensor looks at the clock.
@@ -91,28 +94,80 @@ class CoffeeLabEntity(Entity):
 
 
 class ActiveBagSelect(CoffeeLabEntity, SelectEntity):
-    """The bag the xBloom draws from when a brew names none."""
+    """The item of one kind the xBloom draws from when a brew names none.
+
+    One each for a bag of coffee, an xPod box and a tea: a brew draws from the
+    one its cup type takes.
+    """
 
     _attr_icon = "mdi:sack"
+    _kind = "coffee"
+    _key = "active_bag"
 
     def __init__(self, lab: CoffeeLab) -> None:
-        super().__init__(lab, "active_bag")
+        super().__init__(lab, self._key)
         self._ids_by_label: dict[str, str] = {}
         # Home Assistant reads the options while registering the entity,
         # before it is added and has read the bags.
         self._attr_options = []
 
     async def async_read(self) -> None:
-        beans = await self.lab.store.async_list_beans()
+        beans = [b for b in await self.lab.store.async_list_beans() if b.kind == self._kind]
         labels = bag_labels(beans)
         self._ids_by_label = {label: bean_id for bean_id, label in labels.items()}
         self._attr_options = list(labels.values())
-        active = await self.lab.async_active_bean()
+        active = await self.lab.async_active_bean(self._kind)
         self._attr_current_option = labels.get(active.id) if active else None
         self._attr_extra_state_attributes = actions.bean_facts(active) if active else {}
 
     async def async_select_option(self, option: str) -> None:
         await self.lab.async_select(self._ids_by_label[option])
+
+
+class ActiveXpodBoxSelect(ActiveBagSelect):
+    """The xPod box an xPod brew draws one pod from."""
+
+    _attr_icon = "mdi:package-variant"
+    _kind = "xpod"
+    _key = "active_xpod_box"
+
+
+class ActiveTeaSelect(ActiveBagSelect):
+    """The tea a tea brew draws its grams from."""
+
+    _attr_icon = "mdi:tea"
+    _kind = "tea"
+    _key = "active_tea"
+
+
+class RecipeKindSensor(CoffeeLabEntity, SensorEntity):
+    """What the picked recipe draws from: coffee, xpod or tea; unknown with none picked.
+
+    The dashboard shows the matching picker by it, since a card's visibility
+    cannot read the recipe's attributes.
+    """
+
+    _attr_icon = "mdi:shape-outline"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(KINDS)
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "recipe_kind")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(async_track_state_change_event(
+            self.hass, [RECIPE_SELECT], self._recipe_changed,
+        ))
+
+    @callback
+    def _recipe_changed(self, _event) -> None:
+        self._changed()
+
+    async def async_read(self) -> None:
+        recipe = self.hass.states.get(RECIPE_SELECT) if self.hass else None
+        cup = (recipe.attributes.get("cup_type") if recipe else None)
+        self._attr_native_value = kind_of_cup(cup) if cup is not None else None
 
 
 class StatsPeriodSelect(CoffeeLabEntity, SelectEntity):
@@ -363,10 +418,13 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
     if lab is None:
         return []
     makers: dict[str, list[Callable[[CoffeeLab], Entity]]] = {
-        "select": [ActiveBagSelect, StatsPeriodSelect, ManualBrewerSelect, RateBrewSelect, BuyAgainSelect],
+        "select": [
+            ActiveBagSelect, ActiveXpodBoxSelect, ActiveTeaSelect, StatsPeriodSelect,
+            ManualBrewerSelect, RateBrewSelect, BuyAgainSelect,
+        ],
         "sensor": [
             RemainingSensor, BagsSensor, StatsSensor, LastCountSensor, WaitingBrewsSensor,
-            RatingQuestionSensor, BagQuestionSensor,
+            RatingQuestionSensor, BagQuestionSensor, RecipeKindSensor,
         ],
         "number": [ManualDoseNumber],
         "button": [RecordManualBrewButton],

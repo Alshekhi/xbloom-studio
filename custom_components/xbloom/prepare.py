@@ -27,6 +27,8 @@ from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 
+from .coffee_lab.inventory import kind_of_cup
+
 _LOGGER = logging.getLogger(__name__)
 
 RECIPE = "select.xbloom_studio_recipe"
@@ -218,7 +220,13 @@ class BrewPreparer:
         recipe = self._hass.states.get(RECIPE)
         if recipe is None or recipe.state in UNUSABLE:
             return "no_recipe"
-        if self._entry.runtime_data.coffee_lab is not None and not self.unattributed:
+        # A coffee recipe needs its bag named. An xPod or tea recipe draws from
+        # the box or tea in use, if one is, and is recorded against nothing if
+        # none is: it is never charged to a bag of coffee.
+        if (
+            self._entry.runtime_data.coffee_lab is not None and not self.unattributed
+            and kind_of_cup(recipe.attributes.get("cup_type")) == "coffee"
+        ):
             bag = self._hass.states.get(BAG)
             if bag is None or bag.state in UNUSABLE:
                 return "no_bag"

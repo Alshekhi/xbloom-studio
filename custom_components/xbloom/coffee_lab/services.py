@@ -17,13 +17,15 @@ from ..const import DOMAIN
 from ..tool_common import refuse
 from . import actions
 from .lab import CoffeeLab
-from .models import STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS
+from .models import KINDS, STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS
 
 _BAG = {vol.Exclusive("bean", "bag"): str, vol.Exclusive("bean_id", "bag"): str}
 _GRAMS = vol.All(vol.Coerce(float), vol.Range(min=0))
+_PODS = vol.All(vol.Coerce(int), vol.Range(min=0, max=500))
 _DETAILS = {
     vol.Optional("bag_size_g"): _GRAMS,
     vol.Optional("status"): vol.In(list(STATUSES)),
+    vol.Optional("kind"): vol.In(list(KINDS)),
     **{vol.Optional(key): str for key in actions.DESCRIPTIVE},
 }
 
@@ -34,11 +36,13 @@ SERVICES: dict[str, tuple[Callable[..., Any], vol.Schema]] = {
         **_BAG, vol.Required("grams"): _GRAMS, vol.Optional("brewer"): str,
     })),
     "start_tracking": (actions.start_tracking, vol.Schema({
-        **_BAG, vol.Required("grams"): _GRAMS,
+        # Grams for a bag or a tea, pods for an xPod box.
+        **_BAG, vol.Optional("grams"): _GRAMS, vol.Optional("pods"): _PODS,
     })),
     "finish_bag": (actions.finish_bag, vol.Schema(_BAG)),
     "add_bean": (actions.add_bean, vol.Schema({
-        vol.Required("name"): str, vol.Optional("remaining_g"): _GRAMS, **_DETAILS,
+        vol.Required("name"): str, vol.Optional("remaining_g"): _GRAMS,
+        vol.Optional("pods"): _PODS, **_DETAILS,
     })),
     "update_bean": (actions.update_bean, vol.Schema({
         **_BAG, vol.Optional("new_name"): str, **_DETAILS,

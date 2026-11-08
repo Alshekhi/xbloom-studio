@@ -26,9 +26,11 @@ DEFAULT_FINISHED_BELOW_G = 5.0
 class Deduct:
     bean_id: str
     grams: float
-    new_remaining_g: float
+    new_remaining_g: float | None
     open_bag: bool     # the first use of an unopened bag opens it
     finish: bool       # nothing usable left
+    # An xPod box is counted in pods: the pods left after this brew, else None.
+    new_pods: int | None = None
 
 
 @dataclass(frozen=True)
@@ -68,6 +70,30 @@ def is_xpod(cup_type: Any) -> bool:
     return spec.CUP_API_TO_LABEL.get(api, "").lower() == "xpod"
 
 
+def kind_of_cup(cup_type: Any) -> str:
+    """The kind of item a brew in this cup draws from: xpod, tea, or coffee."""
+    try:
+        label = spec.CUP_API_TO_LABEL.get(int(cup_type), "").lower()
+    except (TypeError, ValueError):
+        return "coffee"
+    return {"xpod": "xpod", "tea": "tea"}.get(label, "coffee")
+
+
+def _decide_pod(bean: Bean) -> Decision:
+    """One pod from an xPod box."""
+    if bean.status in ("finished", "archived"):
+        return Flag("bag_closed", {"bag": bean.name, "status": bean.status})
+    if not bean.tracked or bean.pods_left is None:
+        return Skip("untracked", record_brew=True, bean_id=bean.id)
+    if bean.pods_left < 1:
+        return Flag("more_than_left", {"bag": bean.name, "pods_left": bean.pods_left, "pods": 1})
+    left = bean.pods_left - 1
+    return Deduct(
+        bean_id=bean.id, grams=0.0, new_remaining_g=None,
+        open_bag=bean.status == "unopened", finish=left == 0, new_pods=left,
+    )
+
+
 def decide_consumption(
     *,
     bean: Bean | None,
@@ -82,15 +108,19 @@ def decide_consumption(
     if already_processed:
         return Skip("already_counted")
 
-    # Checked before the bag: a missing bag is not worth flagging for a brew
-    # that was never going to take from one.
-    if is_xpod(cup_type):
-        return Skip("xpod", record_brew=True)
-
     # Said at the start to come from no bag. Recorded, and never flagged as a
     # brew whose bag was forgotten.
     if unattributed:
         return Skip("unattributed", record_brew=True)
+
+    # An xPod or tea brew draws from an item of its own kind, never from a bag
+    # of coffee. With none of its kind in use it is recorded against nothing:
+    # a pod or tea nobody keeps count of is not worth flagging.
+    kind = kind_of_cup(cup_type)
+    if kind != "coffee" and (bean is None or bean.kind != kind):
+        return Skip(kind, record_brew=True)
+    if kind == "xpod":
+        return _decide_pod(bean)
 
     try:
         grams = float(grams)
@@ -103,6 +133,10 @@ def decide_consumption(
     # outcome that cannot be undone by looking.
     if bean is None:
         return Flag("no_bag", {"grams": grams})
+    # A coffee brew charged to an xPod box or a tea: the coffee's bag was not
+    # chosen.
+    if bean.kind != kind:
+        return Flag("no_bag", {"grams": grams, "bag": bean.name})
 
     if bean.status in ("finished", "archived"):
         return Flag("bag_closed", {"bag": bean.name, "status": bean.status})

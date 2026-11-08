@@ -15,7 +15,7 @@ import voluptuous as vol
 from .coffee_lab import actions
 from .community import hub_text
 from .coffee_lab.lab import CoffeeLab
-from .coffee_lab.models import BUY_AGAIN, STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS, Bean
+from .coffee_lab.models import BUY_AGAIN, KINDS, STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS, Bean
 from .coffee_lab.stats import PERIODS
 from .tool_common import Spec, check_arguments as _check, describe as _describe
 
@@ -68,8 +68,9 @@ ACTIONS: dict[str, Spec] = {
     ),
     "start_tracking": Spec(
         actions.start_tracking,
-        "count a bag down from an amount the person measured — never an estimate",
-        ("grams",), BAG,
+        "count a bag or tea down from grams the person measured — never an "
+        "estimate — or an xPod box from its pods",
+        (), BAG,
     ),
     "finish_bag": Spec(
         actions.finish_bag,
@@ -80,15 +81,18 @@ ACTIONS: dict[str, Spec] = {
     ),
     "add_bean": Spec(
         actions.add_bean,
-        "a new bag (bag_size_g, remaining_g to count it down, status, roaster, "
-        "country, region, process, roaster_notes). The country and process are kept "
+        "a new bag (kind: coffee, xpod — a box of xPods, counted in pods — or tea; "
+        "bag_size_g, remaining_g to count it down, pods for an xPod box, status, roaster, "
+        "country, region, process, roaster_notes). An xPod brew takes one pod from the "
+        "xPod box in use, a tea brew its grams from the tea in use, never from a bag "
+        "of coffee. The country and process are kept "
         "in the community hub's English names; one the hub does not list is kept as "
         "given and named in not_on_hub — ask the person once whether another name was meant",
         ("name",),
     ),
     "update_bean": Spec(
         actions.update_bean,
-        "correct a bag's details (new_name, bag_size_g, status, roaster, country, "
+        "correct a bag's details (new_name, kind, bag_size_g, status, roaster, country, "
         "region, process, roaster_notes), the country and process as for add_bean",
         one_of=BAG,
     ),
@@ -161,6 +165,8 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
         for key in TASTE_NOTES
     },
     "next_change": (str, "For rate_brew: what to change next time, such as \"grind 52\"."),
+    "kind": (vol.In(list(KINDS)), "For add_bean and update_bean: coffee, xpod (a box of xPods) or tea."),
+    "pods": (vol.All(vol.Coerce(int), vol.Range(min=0, max=500)), "For add_bean and start_tracking: the pods an xPod box holds now."),
 }
 
 

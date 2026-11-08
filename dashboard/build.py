@@ -19,7 +19,7 @@ HERE = Path(__file__).parent
 TEXT = {
     "en": {
         "view_brew": "Brew", "view_stats": "Stats", "view_bags": "Bags", "view_xbloom": "xBloom",
-        "h_now": "Right now", "h_in_progress": "Brew in progress", "h_bag": "Current bag",
+        "h_now": "Right now", "h_in_progress": "Brew in progress", "h_bag": "Current bag", "pods_left": "Pods left: {n}", "k_xpod": "xPod box", "k_tea": "tea",
         "h_brew": "Brew with the xBloom", "h_adjust": "Adjust this brew",
         "h_save": "Save as a new recipe", "h_manual": "Manual brew", "h_stats": "Coffee stats",
         "h_by_brewer": "By brewer", "h_bags": "Bags on hand", "h_connection": "Connection & status",
@@ -85,7 +85,7 @@ TEXT = {
     },
     "ar": {
         "view_brew": "التحضير", "view_stats": "الإحصاءات", "view_bags": "الأكياس", "view_xbloom": "xBloom",
-        "h_now": "الآن", "h_in_progress": "تحضير جار", "h_bag": "الكيس الحالي",
+        "h_now": "الآن", "h_in_progress": "تحضير جار", "h_bag": "الكيس الحالي", "pods_left": "الكبسولات المتبقية: {n}", "k_xpod": "علبة xPod", "k_tea": "شاي",
         "h_brew": "التحضير بماكينة xBloom", "h_adjust": "تعديل هذا التحضير",
         "h_save": "حفظ كوصفة جديدة", "h_manual": "تحضير يدوي", "h_stats": "إحصاءات القهوة",
         "h_by_brewer": "حسب أداة التحضير", "h_bags": "الأكياس المتوفرة", "h_connection": "الاتصال والحالة",
@@ -224,6 +224,7 @@ def section(title: str, cards: list[dict], visibility: list[dict] | None = None)
 
 def brew_view(t: dict) -> dict:
     bag = f"select.{E}_coffee_bag"
+    kind = f"sensor.{E}_recipe_kind"
     manual = "input_boolean.xbloom_show_manual_brew"
     return {"title": t["view_brew"], "path": "brew", "icon": "mdi:coffee", "type": "sections", "max_columns": 2, "sections": [
         section(t["h_now"], [
@@ -268,7 +269,17 @@ def brew_view(t: dict) -> dict:
             press(f"button.{E}_cancel_brew", t["confirm_stop"]),
         ], [{"condition": "or", "conditions": [is_(f"sensor.{E}_brew_status", s) for s in BUSY]}]),
         section(t["h_bag"], [
-            select(bag),
+            # The picker for what the picked recipe draws from: a bag of
+            # coffee, an xPod box, or a tea.
+            select(bag, visibility=[
+                {"condition": "state", "entity": kind, "state_not": k} for k in ("xpod", "tea")
+            ]),
+            select(f"select.{E}_xpod_box", visibility=[is_(kind, "xpod")]),
+            {"type": "markdown", "text_only": True, "content": (
+                "{% set n = state_attr('select." + E + "_xpod_box', 'pods_left') %}"
+                "{% if n is not none %}" + t["pods_left"].replace("{n}", "{{ n }}") + "{% endif %}"
+            ), "visibility": [is_(kind, "xpod"), *present(f"select.{E}_xpod_box")]},
+            select(f"select.{E}_tea", visibility=[is_(kind, "tea")]),
             {"type": "markdown", "content": (
                 "{% set a = states['" + bag + "'].attributes if states['" + bag + "'] else {} %}"
                 "{{ [a.get('roaster'), [a.get('country'), a.get('region')] | select | join('" + t["sep"] + "'), a.get('process')]"
@@ -430,11 +441,14 @@ def bags_view(t: dict) -> dict:
     return {"title": t["view_bags"], "path": "bags", "icon": "mdi:shopping", "type": "sections", "max_columns": 2, "sections": [
         section(t["h_bags"], [
             {"type": "markdown", "content": (
-                f"{{% set current = state_attr('{bag}','id') %}}"
+                f"{{% set current = [state_attr('{bag}','id'), state_attr('select.{E}_xpod_box','id'), state_attr('select.{E}_tea','id')] %}}"
                 f"{{% for b in state_attr('{bags}','bags') or [] %}}"
-                f"- **{{{{ b.name }}}}**{{{{ ' ({t['in_use']})' if b.id == current }}}} — "
+                f"- **{{{{ b.name }}}}**"
+                f"{{% if b.kind == 'xpod' %}} ({t['k_xpod']}){{% elif b.kind == 'tea' %}} ({t['k_tea']}){{% endif %}}"
+                f"{{{{ ' ({t['in_use']})' if b.id in current }}}} — "
                 f"{{{{ '{t['unopened']}' if b.status == 'unopened' else '{t['open']}' }}}}{t['sep']}"
-                f"{{{{ (b.remaining_g | round(0) | int ~ ' {t['g_left']}') if b.remaining_g is not none else '{t['not_tracked']}' }}}}\n"
+                f"{{% if b.kind == 'xpod' %}}{{{{ ('" + t['pods_left'].replace('{n}', "' ~ b.pods_left ~ '") + "') if b.pods_left is not none else '{t['not_tracked']}' }}}}"
+                f"{{% else %}}{{{{ (b.remaining_g | round(0) | int ~ ' {t['g_left']}') if b.remaining_g is not none else '{t['not_tracked']}' }}}}{{% endif %}}\n"
                 f"{{% else %}}{t['no_bags']}{{% endfor %}}"
             )},
             select(bag),

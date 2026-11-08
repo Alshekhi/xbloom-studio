@@ -72,6 +72,10 @@ SETTINGS = {
 # brew is rated (`_ensure_columns`), so an older database keeps working.
 RATING = "Rating"
 BUY_AGAIN_COLUMN = "Buy Again"
+# An item's kind and an xPod box's pods. Added to the database the first time
+# one is written, so an older database needs nothing.
+KIND_COLUMN, PODS_COLUMN, POD_ID_COLUMN = "Kind", "Pods Left", "Pod ID"
+KIND = {"coffee": "Coffee", "xpod": "xPod", "tea": "Tea"}
 # A Notion page id: 32 hex digits, with or without its dashes.
 _PAGE_ID = re.compile(r"[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}")
 NEXT_CHANGE = "Next Change"
@@ -145,6 +149,10 @@ def _select(prop: dict | None) -> str | None:
     return ((prop or {}).get("select") or {}).get("name")
 
 
+def _int(value: float | None) -> int | None:
+    return None if value is None else int(value)
+
+
 def _number(prop: dict | None) -> float | None:
     value = (prop or {}).get("number")
     return float(value) if isinstance(value, (int, float)) else None
@@ -182,6 +190,10 @@ def bean_from_page(page: dict) -> Bean:
         opened_on=_date(props.get("Opened Date")),
         finished_on=_date(props.get("Finished Date")),
         buy_again=(_select(props.get(BUY_AGAIN_COLUMN)) or "").lower(),
+        # No Kind is a bag of coffee: every item before kinds existed was one.
+        kind={v: k for k, v in KIND.items()}.get(_select(props.get(KIND_COLUMN)) or "", "coffee"),
+        pods_left=_int(_number(props.get(PODS_COLUMN))),
+        pod_id=_plain(props.get(POD_ID_COLUMN)),
     )
 
 
@@ -203,6 +215,12 @@ def bean_properties(values: dict[str, Any]) -> dict[str, Any]:
             # Added to the database with its option the first time it is
             # written (`_ensure_options`), so an older database needs nothing.
             out[BUY_AGAIN_COLUMN] = _choice(value.capitalize() if value else None)
+        elif key == "kind":
+            out[KIND_COLUMN] = _choice(KIND[value])
+        elif key == "pods_left":
+            out[PODS_COLUMN] = {"number": value}
+        elif key == "pod_id":
+            out[POD_ID_COLUMN] = _text(value or "")
         elif key in ("opened_on", "finished_on"):
             label = "Opened Date" if key == "opened_on" else "Finished Date"
             out[label] = {"date": {"start": value} if value else None}
@@ -524,6 +542,7 @@ class NotionStore(CoffeeLabStore):
     async def async_add_bean(self, **values: Any) -> Bean:
         _check_changes(values)
         props = bean_properties({"status": "unopened", "tracked": False, **values})
+        await self._ensure_columns(self._db.beans, props)
         await self._ensure_options(self._db.beans, props)
         page = await self._call("POST", "/pages", {
             "parent": {"database_id": self._db.beans}, "properties": props,
@@ -534,6 +553,7 @@ class NotionStore(CoffeeLabStore):
         _check_changes(changes)
         await self.async_get_bean(bean_id)
         props = bean_properties(changes)
+        await self._ensure_columns(self._db.beans, props)
         await self._ensure_options(self._db.beans, props)
         page = await self._call("PATCH", f"/pages/{bean_id}", {"properties": props})
         return bean_from_page(page)

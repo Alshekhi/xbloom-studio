@@ -9,7 +9,7 @@
 - **Numbers** — Grind Size, Grind Speed, Brew Volume, Brew Temperature, Brew Flow Rate, and the brew-customizer overrides: Brew Dose, Brew Ratio, Brew Grind Size.
 - **Text** — New Recipe Name (used by the brew customizer's Save as New Recipe), Community Search.
 - **Community** — Community Search, Community Origin, Community Sort, Community Recipe, Community Matches, and the Search, Suggest and Add Community Recipe buttons; for the Brew tab, Suggest Recipe, Suggested Recipe and Use Suggested Recipe; signed in to the xBloom account, For You, Trending Recipes, Tea Recipes, Another For You, their Add buttons, and Show xPod Recipes. See [Recipes](recipes.md#community-recipes).
-- **Coffee Lab** — while it is on, the bag, counting, rating, version and suggestion entities. See [Coffee Lab](coffee-lab.md).
+- **Coffee Lab** — while it is on, Coffee bag, xPod box and Tea, Recipe kind, and the counting, rating, version and suggestion entities. See [Coffee Lab](coffee-lab.md).
 - **Buttons** — Start Brew, Cancel Brew, Pause Brew, Resume Brew, Cancel Preparation, Tare Scale, Back to Home, Grind, Brew (standalone), Refresh Recipes, Save as New Recipe, Run Recipe Action, Restore Archived Recipe, Delete Selected Recipe, plus BLE Connect / BLE Disconnect diagnostics.
 - **Switches** — Use Grinder, Connect (opens a live session that holds the BLE link and streams machine events for sensors, the dashboard, and optional spoken announcements). Machine Control: off, every action that starts, prepares or changes something on the machine is refused; stopping, pausing, cancelling, disconnecting and all recipe work still run.
 - **Update** — Firmware (installed vs latest, with an Install button; available when signed in to the xBloom cloud).

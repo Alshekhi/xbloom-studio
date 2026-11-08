@@ -31,6 +31,7 @@ from .callbacks import target_problem
 from .coffee_lab.notion import NotionClient, SetupProblem, async_find_or_create, page_id_from
 from .coffee_lab import actions as coffee_lab_actions
 from .coffee_lab.entities import bag_labels
+from .coffee_lab.models import KINDS
 from .coffee_lab.models import STATUSES
 from .const import (
     CONF_BLE_ADDRESS,
@@ -450,6 +451,13 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
 
         return vol.Schema({
             vol.Required("name", default=bag.get("name", "")): selector.TextSelector(),
+            # A bag of coffee or tea is counted in grams, a box of xPods in pods.
+            vol.Required("kind", default=bag.get("kind", "coffee")): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=list(KINDS), translation_key="item_kind")
+            ),
+            vol.Optional("pods", description=suggested("pods_left")): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=500, step=1, mode="box")
+            ),
             vol.Optional("remaining_g", description=suggested("remaining_g")): grams,
             vol.Optional("bag_size_g", description=suggested("bag_size_g")): grams,
             vol.Required("status", default=bag.get("status", statuses[0])): selector.SelectSelector(
@@ -518,11 +526,16 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                 await coffee_lab_actions.in_hub_words(lab, details)
                 await lab.store.async_update_bean(
                     bean.id, name=name, status=user_input["status"],
-                    bag_size_g=user_input.get("bag_size_g"),
+                    bag_size_g=user_input.get("bag_size_g"), kind=user_input.get("kind", bean.kind),
                     **details,
                 )
                 lab.on_change()
-                if user_input.get("remaining_g") not in (None, "") and (
+                if user_input.get("kind", bean.kind) == "xpod":
+                    if user_input.get("pods") not in (None, "") and (
+                        int(user_input["pods"]) != bean.pods_left or not bean.tracked
+                    ):
+                        await lab.async_start_tracking(bean.id, pods=int(user_input["pods"]))
+                elif user_input.get("remaining_g") not in (None, "") and (
                     user_input["remaining_g"] != bean.remaining_g or not bean.tracked
                 ):
                     await lab.async_start_tracking(bean.id, float(user_input["remaining_g"]))

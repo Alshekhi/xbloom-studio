@@ -40,6 +40,7 @@ from xbloom.recipe_validate import normalize_recipe
 from xbloom.community import KINDS as COMMUNITY_KINDS, SORTS as COMMUNITY_SORTS, SOURCES as COMMUNITY_SOURCES
 
 from .coffee_lab.actions import resolve_bean
+from .coffee_lab.inventory import kind_of_cup
 from .community import HUB_LONG, hub_share_url, hub_text, hub_texts
 from .coffee_lab.lab import CoffeeLab
 from .const import DOMAIN
@@ -228,6 +229,21 @@ async def _resolve_recipe_name(machine: Machine, wanted: str) -> str:
         if str(recipe.get("name", "")).lower() == wanted.lower():
             return str(recipe["name"])
     raise await _no_such_recipe(machine, wanted)
+
+
+async def _recipe_kind(machine: Machine, args: dict[str, Any]) -> str:
+    """What the recipe a brew is for draws from: coffee, xpod or tea.
+
+    The named recipe, else the one picked. A share link's recipe is coffee:
+    it cannot be read before it is brewed.
+    """
+    if args.get("name"):
+        recipe = await _get_recipe(machine, await _resolve_recipe_name(machine, args["name"]))
+        return kind_of_cup(recipe.get("cup_type"))
+    if args.get("share_url") or args.get("share_id"):
+        return "coffee"
+    picked = machine.hass.states.get("select.xbloom_studio_recipe")
+    return kind_of_cup(picked.attributes.get("cup_type") if picked else None)
 
 
 async def _get_recipe(machine: Machine, name: str) -> dict[str, Any]:
@@ -644,9 +660,10 @@ async def prepare_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]
         if args.get("unattributed"):
             data["unattributed"] = True
         else:
-            if not (args.get("bean") or args.get("bean_id")):
+            if args.get("bean") or args.get("bean_id"):
+                data["bean_id"] = (await resolve_bean(machine.lab, args, selectable_only=True)).id
+            elif await _recipe_kind(machine, args) == "coffee":
                 raise refuse("bag_required")
-            data["bean_id"] = (await resolve_bean(machine.lab, args)).id
     await machine.call("prepare_brew", data)
     return _preparation(machine)
 
@@ -682,12 +699,13 @@ async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
         if args.get("unattributed"):
             data["unattributed"] = True
         else:
-            if not (args.get("bean") or args.get("bean_id")):
+            if args.get("bean") or args.get("bean_id"):
+                bag = await resolve_bean(machine.lab, args)
+                data["bean_id"] = bag.id
+                # The item in use is the one the dashboard should show.
+                await machine.lab.async_select(bag.id)
+            elif await _recipe_kind(machine, args) == "coffee":
                 raise refuse("bag_required")
-            bag = await resolve_bean(machine.lab, args)
-            data["bean_id"] = bag.id
-            # The bag in use is the one the dashboard should show.
-            await machine.lab.async_select(bag.id)
     if prepared:
         # A new recipe or settings are made ready first; otherwise the start
         # takes what is ready, or waits for a preparation still under way.
@@ -1094,9 +1112,10 @@ INTRO = (
 
 # Said of start_brew only while Coffee Lab is on.
 BAG_RULE = (
-    "Coffee Lab is on: start_brew also needs the bag the coffee comes from — "
-    "bean (its name) or bean_id — or unattributed=true for a brew from no bag, "
-    "such as an xPod. The bag is counted when the brew completes."
+    "Coffee Lab is on: start_brew of a coffee recipe also needs the bag the coffee "
+    "comes from — bean (its name) or bean_id — or unattributed=true for a brew from "
+    "no bag. An xPod or tea recipe needs none: it takes one pod from the xPod box "
+    "in use, or its grams from the tea in use. Counted when the brew completes."
 )
 
 

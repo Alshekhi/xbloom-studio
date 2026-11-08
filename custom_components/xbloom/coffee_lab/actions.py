@@ -48,7 +48,12 @@ def bean_facts(bean: Bean) -> dict[str, Any]:
         "opened_on": bean.opened_on or None,
         "finished_on": bean.finished_on or None,
         "buy_again": bean.buy_again or None,
+        "kind": bean.kind,
     }
+    if bean.kind == "xpod":
+        # A box is counted in pods; its grams were never weighed.
+        facts["pods_left"] = bean.pods_left if bean.tracked else None
+        facts["remaining_g"] = None
     facts.update({key: getattr(bean, key) for key in DESCRIPTIVE if getattr(bean, key)})
     return facts
 
@@ -255,13 +260,21 @@ async def consume(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
 async def start_tracking(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     """Count a bag down from an amount someone measured — never an estimate."""
     bean = await resolve_bean(lab, args)
+    if bean.kind == "xpod":
+        if args.get("pods") is None:
+            raise refuse("missing_arguments", action="start_tracking", arguments="pods")
+        return {"bag": bean_facts(await lab.async_start_tracking(bean.id, pods=int(args["pods"])))}
+    if args.get("grams") is None:
+        raise refuse("missing_arguments", action="start_tracking", arguments="grams")
     return {"bag": bean_facts(await lab.async_start_tracking(bean.id, float(args["grams"])))}
 
 
 async def finish_bag(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     bean = await resolve_bean(lab, args)
     if (why := CoffeeLab.finish_refusal(bean)) is not None:
-        raise refuse(why, name=bean.name, remaining_g=f"{bean.remaining_g or 0:g}")
+        raise refuse(
+            why, name=bean.name, remaining_g=f"{bean.remaining_g or 0:g}", pods=bean.pods_left or 0,
+        )
     finished = await lab.async_finish(bean.id)
     # Its brews stay in the record; the amount it showed stays as it was.
     return {"finished": bean_facts(finished)}
@@ -269,7 +282,7 @@ async def finish_bag(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
 
 def _bag_values(args: dict[str, Any]) -> dict[str, Any]:
     values = {key: args[key] for key in DESCRIPTIVE if args.get(key) is not None}
-    for key in ("bag_size_g", "status"):
+    for key in ("bag_size_g", "status", "kind"):
         if args.get(key) is not None:
             values[key] = args[key]
     return values
@@ -304,9 +317,14 @@ async def in_hub_words(lab: CoffeeLab, values: dict[str, Any]) -> dict[str, Any]
 async def add_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     """A new bag. Given how much is in it, it is counted down from there."""
     values = {"status": "unopened", **_bag_values(args)}
-    if args.get("remaining_g") is not None:
+    if values.get("kind") == "xpod":
+        # A box of xPods is counted in pods.
+        if args.get("pods") is not None:
+            values.update(tracked=True, pods_left=int(args["pods"]))
+    elif args.get("remaining_g") is not None:
         values.update(tracked=True, remaining_g=float(args["remaining_g"]))
-    checked = await in_hub_words(lab, values)
+    # The hub names coffee's countries and processes; a tea's are its own.
+    checked = await in_hub_words(lab, values) if values.get("kind") != "tea" else {}
     bean = await lab.store.async_add_bean(name=str(args["name"]).strip(), **values)
     lab.on_change()
     return {"added": bean_facts(bean), **checked}

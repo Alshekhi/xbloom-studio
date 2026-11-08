@@ -520,13 +520,18 @@ start_tracking:
       selector:
         text:
     grams:
-      required: true
       selector:
         number:
           min: 0
           max: 2000
           step: 0.1
           unit_of_measurement: g
+          mode: box
+    pods:
+      selector:
+        number:
+          min: 0
+          max: 500
           mode: box
 
 finish_bag:
@@ -585,6 +590,17 @@ add_bean:
       selector:
         text:
           multiline: true
+    kind:
+      selector:
+        select:
+          options: [coffee, xpod, tea]
+          translation_key: item_kind
+    pods:
+      selector:
+        number:
+          min: 0
+          max: 500
+          mode: box
 
 update_bean:
   fields:
@@ -630,6 +646,11 @@ update_bean:
       selector:
         text:
           multiline: true
+    kind:
+      selector:
+        select:
+          options: [coffee, xpod, tea]
+          translation_key: item_kind
 
 rate_brew:
   fields:

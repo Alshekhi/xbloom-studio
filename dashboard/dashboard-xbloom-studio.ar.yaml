@@ -281,6 +281,51 @@ views:
         action: none
       features:
       - type: select-options
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_recipe_kind
+        state_not: xpod
+      - condition: state
+        entity: sensor.xbloom_studio_recipe_kind
+        state_not: tea
+    - type: tile
+      entity: select.xbloom_studio_xpod_box
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_recipe_kind
+        state: xpod
+    - type: markdown
+      text_only: true
+      content: '{% set n = state_attr(''select.xbloom_studio_xpod_box'', ''pods_left'') %}{% if n is not
+        none %}الكبسولات المتبقية: {{ n }}{% endif %}'
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_recipe_kind
+        state: xpod
+      - condition: state
+        entity: select.xbloom_studio_xpod_box
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_xpod_box
+        state_not: unknown
+    - type: tile
+      entity: select.xbloom_studio_tea
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_recipe_kind
+        state: tea
     - type: markdown
       content: '{% set a = states[''select.xbloom_studio_coffee_bag''].attributes if states[''select.xbloom_studio_coffee_bag'']
         else {} %}{{ [a.get(''roaster''), [a.get(''country''), a.get(''region'')] | select | join(''،
@@ -979,11 +1024,13 @@ views:
       text_only: true
       content: '## الأكياس المتوفرة'
     - type: markdown
-      content: '{% set current = state_attr(''select.xbloom_studio_coffee_bag'',''id'') %}{% for b in
-        state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'') or [] %}- **{{ b.name }}**{{ '' (قيد
-        الاستخدام)'' if b.id == current }} — {{ ''غير مفتوح'' if b.status == ''unopened'' else ''مفتوح''
-        }}، {{ (b.remaining_g | round(0) | int ~ '' غ متبقية'') if b.remaining_g is not none else ''غير
-        متتبع'' }}
+      content: '{% set current = [state_attr(''select.xbloom_studio_coffee_bag'',''id''), state_attr(''select.xbloom_studio_xpod_box'',''id''),
+        state_attr(''select.xbloom_studio_tea'',''id'')] %}{% for b in state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'')
+        or [] %}- **{{ b.name }}**{% if b.kind == ''xpod'' %} (علبة xPod){% elif b.kind == ''tea'' %}
+        (شاي){% endif %}{{ '' (قيد الاستخدام)'' if b.id in current }} — {{ ''غير مفتوح'' if b.status ==
+        ''unopened'' else ''مفتوح'' }}، {% if b.kind == ''xpod'' %}{{ (''الكبسولات المتبقية: '' ~ b.pods_left
+        ~ '''') if b.pods_left is not none else ''{t[''not_tracked'']}'' }}}}{% else %}{{ (b.remaining_g
+        | round(0) | int ~ '' غ متبقية'') if b.remaining_g is not none else ''غير متتبع'' }}{% endif %}
 
         {% else %}لا توجد أكياس مفتوحة أو غير مفتوحة.{% endfor %}'
     - type: tile

@@ -19,7 +19,11 @@ from custom_components.xbloom.prepare import BrewPreparer, PrepareRefused
 
 
 class _State(SimpleNamespace):
-    pass
+    """A state with no attributes unless given: a recipe with none is a coffee recipe."""
+
+    def __init__(self, **kw):
+        kw.setdefault("attributes", {})
+        super().__init__(**kw)
 
 
 class _Hass:

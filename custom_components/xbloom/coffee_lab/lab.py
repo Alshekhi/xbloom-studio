@@ -23,7 +23,7 @@ from homeassistant.util import dt as dt_util
 from xbloom import spec
 
 from ..const import DOMAIN
-from .inventory import Deduct, Flag, Skip, decide_consumption, is_xpod
+from .inventory import Deduct, Flag, Skip, decide_consumption, kind_of_cup
 from .models import SELECTABLE, VERDICTS, Bean, Brew, Review
 from .pending import PendingBrews
 from .stats import DEFAULT_PERIOD, PERIODS, Report, earliest_needed, period_report
@@ -37,6 +37,10 @@ _LOGGER = logging.getLogger(__name__)
 
 STATE_KEY = f"{DOMAIN}.coffee_lab_state"
 PENDING_KEY = f"{DOMAIN}.coffee_lab_pending"
+
+# The state key holding the item in use for each kind. The coffee one is the
+# key this has always used.
+ACTIVE_KEYS = {"coffee": "active_bean_id", "xpod": "active_xpod_id", "tea": "active_tea_id"}
 
 # What a store that cannot be reached raises. Anything else is a fault in
 # this code, not a reason to wait and try again.
@@ -131,6 +135,11 @@ def normalize_ratio(recipe: dict[str, Any]) -> float | None:
         return float(str(normalize_recipe(recipe).get("ratio")).split(":", 1)[1])
     except (IndexError, TypeError, ValueError):
         return None
+
+
+def _drawn_from(cup_type: Any, bean_id: str | None, xpod_id: str | None, tea_id: str | None) -> str | None:
+    """The item a brew draws from: its cup type's kind decides which."""
+    return {"xpod": xpod_id, "tea": tea_id}.get(kind_of_cup(cup_type), bean_id)
 
 
 def _brew_day(brewed_at: str | None) -> str:
@@ -246,36 +255,67 @@ class CoffeeLab:
 
     @property
     def active_bean_id(self) -> str | None:
-        return self._state.get("active_bean_id")
+        """The bag of coffee in use."""
+        return self._state.get(ACTIVE_KEYS["coffee"])
 
-    async def async_active_bean(self) -> Bean | None:
-        """The bag the xBloom draws from, or None if none can be.
+    def active_id(self, kind: str) -> str | None:
+        """The item of this kind in use: a bag of coffee, an xPod box, a tea."""
+        return self._state.get(ACTIVE_KEYS[kind])
 
-        A selection whose bag has since been finished, or removed, is cleared
+    async def async_active_bean(self, kind: str = "coffee") -> Bean | None:
+        """The item of a kind the xBloom draws from, or None if none can be.
+
+        A selection whose item has since been finished, or removed, is cleared
         rather than brewed against.
         """
-        bean_id = self.active_bean_id
+        bean_id = self.active_id(kind)
         if not bean_id:
             return None
         try:
             bean = await self.store.async_get_bean(bean_id)
         except UnknownBean:
             bean = None
-        if bean is None or bean.status not in SELECTABLE:
-            await self._async_set_state(active_bean_id=None)
+        if bean is None or bean.status not in SELECTABLE or bean.kind != kind:
+            await self._async_set_state(**{ACTIVE_KEYS[kind]: None})
             return None
         return bean
 
-    async def async_select(self, bean_id: str | None) -> Bean | None:
-        """Choose the bag the xBloom draws from; the inventory is not touched."""
+    async def async_select(self, bean_id: str | None, kind: str = "coffee") -> Bean | None:
+        """Choose the item the xBloom draws from, for its kind; the inventory is not touched.
+
+        None clears the choice for `kind`.
+        """
         if bean_id is None:
-            await self._async_set_state(active_bean_id=None)
+            await self._async_set_state(**{ACTIVE_KEYS[kind]: None})
             return None
         bean = await self.store.async_get_bean(bean_id)
         if bean.status not in SELECTABLE:
             raise UnknownBean(bean_id)
-        await self._async_set_state(active_bean_id=bean.id)
+        await self._async_set_state(**{ACTIVE_KEYS[bean.kind]: bean.id})
         return bean
+
+    async def async_card_read(self, pod_id: str) -> Bean | None:
+        """A pod's recipe card was read: the xPod box it belongs to, put in use.
+
+        A box already known by this card id is chosen. Failing that, the box
+        in use learns the id if it has none, so the first brew from a box
+        teaches it and the next box of the same coffee is found by itself.
+        """
+        pod_id = str(pod_id or "").strip()
+        if not pod_id:
+            return None
+        boxes = [b for b in await self.store.async_list_beans() if b.kind == "xpod"]
+        known = next((b for b in boxes if b.pod_id == pod_id), None)
+        if known is not None:
+            if self.active_id("xpod") != known.id:
+                await self.async_select(known.id)
+            return known
+        active = await self.async_active_bean("xpod")
+        if active is not None and not active.pod_id:
+            learnt = await self.store.async_update_bean(active.id, pod_id=pod_id)
+            self.on_change()
+            return learnt
+        return None
 
     async def async_matching(self, name: str) -> list[Bean]:
         """The open or unopened bags called `name`, ignoring case.
@@ -542,14 +582,17 @@ class CoffeeLab:
         brewer: str | None = XBLOOM_BREWER, brewed_at: str | None = None,
         recipe_source: str | None = None, outcome: str | None = None,
         settings: dict[str, Any] | None = None, unattributed: bool = False,
+        xpod_id: str | None = None, tea_id: str | None = None,
     ) -> Consumption:
         """Apply one brew to its bag and the record.
 
         The brew is queued first and counted from the queue, so a store that
         cannot be reached leaves it waiting rather than lost; see pending.py.
+        `xpod_id` and `tea_id` are the xPod box and tea in use when it started:
+        its cup type picks which of the three it draws from.
         """
         return await self._async_queue_and_count("brew", run_id, {
-            "bean_id": bean_id, "grams": grams, "cup_type": cup_type, "recipe": recipe,
+            "bean_id": _drawn_from(cup_type, bean_id, xpod_id, tea_id), "grams": grams, "cup_type": cup_type, "recipe": recipe,
             "brewer": brewer, "brewed_at": brewed_at, "recipe_source": recipe_source,
             "outcome": outcome, "settings": settings, "unattributed": unattributed,
         })
@@ -672,7 +715,8 @@ class CoffeeLab:
         sent = entry.get("bag_sent")
         if sent and not entry.get("bag"):
             try:
-                now_g = (await self.store.async_get_bean(sent["bean_id"])).remaining_g
+                read = await self.store.async_get_bean(sent["bean_id"])
+                now_g = read.pods_left if sent.get("unit") == "pods" else read.remaining_g
             except UnknownBean:
                 now_g = None
             if now_g is not None and now_g == sent["remaining_g"] != sent["from_g"]:
@@ -748,17 +792,19 @@ class CoffeeLab:
         # Noted before it is sent: if the answer is lost, the next try reads
         # the bag back to learn whether this landed, rather than taking the
         # dose a second time.
+        pods = decision.new_pods is not None
         await self.pending.async_update(run_id, bag_sent={
             "bean_id": decision.bean_id, "grams": decision.grams,
-            "from_g": bean.remaining_g if bean else None,
-            "remaining_g": decision.new_remaining_g,
+            "unit": "pods" if pods else "g",
+            "from_g": (bean.pods_left if pods else bean.remaining_g) if bean else None,
+            "remaining_g": decision.new_pods if pods else decision.new_remaining_g,
             "opened": decision.open_bag, "finished": decision.finish,
         })
         await self.store.async_apply_bean_update(
             decision.bean_id, remaining_g=decision.new_remaining_g,
             open_bag=decision.open_bag, finish=decision.finish,
             # The day it was brewed, not the day a waiting brew was saved.
-            today=_brew_day(brewed_at),
+            today=_brew_day(brewed_at), pods_left=decision.new_pods,
         )
         # Noted at once, so a retry after a failed row write does not take
         # from the bag again.
@@ -783,7 +829,7 @@ class CoffeeLab:
     async def async_record_stopped(
         self, *, bean_id: str | None, grams: Any, run_id: str | None,
         cup_type: Any = None, recipe: str | None = None, brewed_at: str | None = None,
-        unattributed: bool = False,
+        unattributed: bool = False, xpod_id: str | None = None, tea_id: str | None = None,
     ) -> Consumption:
         """A brew stopped after grinding: its coffee is used, none was made.
 
@@ -792,7 +838,7 @@ class CoffeeLab:
         the machine can say. Queued like a finished brew.
         """
         return await self._async_queue_and_count("stopped", run_id, {
-            "bean_id": bean_id, "grams": grams, "cup_type": cup_type,
+            "bean_id": _drawn_from(cup_type, bean_id, xpod_id, tea_id), "grams": grams, "cup_type": cup_type,
             "recipe": recipe, "brewed_at": brewed_at, "unattributed": unattributed,
         })
 
@@ -802,8 +848,9 @@ class CoffeeLab:
     ) -> Consumption:
         if self._runs.contains(run_id) or await self.store.async_has_run(run_id):
             return Consumption("skipped", reason="already_counted")
-        if unattributed or is_xpod(cup_type):
-            # No bag to put right: the coffee was in a pod, or came from none.
+        if unattributed or kind_of_cup(cup_type) != "coffee":
+            # No bag to put right: the coffee was in a pod, or it was tea, or
+            # it came from none.
             return Consumption("skipped", reason="no_bag_used")
         await self.store.async_create_brew(Brew(
             id="", brewed_at=brewed_at or dt_util.utcnow().isoformat(),
@@ -818,15 +865,16 @@ class CoffeeLab:
             detail={"grams": _grams(grams)}, bean_id=bean_id,
         )
 
-    async def async_start_tracking(self, bean_id: str, remaining_g: float) -> Bean:
-        """Count a bag down from an amount someone measured.
+    async def async_start_tracking(
+        self, bean_id: str, remaining_g: float | None = None, pods: int | None = None,
+    ) -> Bean:
+        """Count a bag down from an amount someone measured — an xPod box from its pods.
 
         Accounting runs forward from this number and claims nothing about the
         bag before it.
         """
-        bean = await self.store.async_update_bean(
-            bean_id, tracked=True, remaining_g=remaining_g
-        )
+        amount = {"pods_left": int(pods)} if pods is not None else {"remaining_g": remaining_g}
+        bean = await self.store.async_update_bean(bean_id, tracked=True, **amount)
         self.on_change()
         return bean
 
@@ -837,14 +885,18 @@ class CoffeeLab:
             # With a coffee bought twice, the unopened bag is the one easiest
             # to finish by mistake.
             return "bag_unopened"
-        if bean.tracked and bean.remaining_g is not None and bean.remaining_g >= FINISH_BELOW_G:
+        if bean.kind == "xpod":
+            if bean.tracked and bean.pods_left is not None and bean.pods_left >= 1:
+                return "box_not_empty"
+        elif bean.tracked and bean.remaining_g is not None and bean.remaining_g >= FINISH_BELOW_G:
             return "bag_not_empty"
         return None
 
     async def async_finish(self, bean_id: str) -> Bean:
         bean = await self.store.async_finish_bag(bean_id, dt_util.now().date().isoformat())
-        if self.active_bean_id == bean_id:
-            await self._async_set_state(active_bean_id=None)
+        for key in ACTIVE_KEYS.values():
+            if self._state.get(key) == bean_id:
+                await self._async_set_state(**{key: None})
         await self._async_ask_about_bag(bean)
         self.on_change()
         return bean
