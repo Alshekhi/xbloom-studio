@@ -1338,6 +1338,14 @@ views:
       text_only: true
       content: '## البحث عن وصفة من المجتمع'
     - type: tile
+      entity: select.xbloom_studio_drink
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: tile
       entity: button.xbloom_studio_suggest_community_recipe
       name: اقترح وصفة من المجتمع
       icon_tap_action:

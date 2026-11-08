@@ -1334,6 +1334,14 @@ views:
       text_only: true
       content: '## Find a community recipe'
     - type: tile
+      entity: select.xbloom_studio_drink
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: tile
       entity: button.xbloom_studio_suggest_community_recipe
       name: Suggest a community recipe
       icon_tap_action:

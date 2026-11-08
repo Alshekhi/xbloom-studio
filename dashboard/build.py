@@ -800,7 +800,10 @@ def community_view(t: dict) -> dict:
             press(f"button.{E}_add_tea_recipe", t["c_confirm_add"], name=t["c_add"]),
         ], present(tea)),
         section(t["h_find"], [
-            # First: one press, a recipe to try with the bag in use.
+            # First: one press, a recipe to try with the bag in use, for the
+            # drink chosen — here too, since without Coffee Lab the Brew
+            # tab's bag section, where Drink also is, is not shown.
+            select(f"select.{E}_drink"),
             press(f"button.{E}_suggest_community_recipe", name=t["c_suggest_hub"]),
             tile(f"text.{E}_community_search", name=t["c_words"]),
             select(f"select.{E}_community_origin", name=t["c_origin"]),
