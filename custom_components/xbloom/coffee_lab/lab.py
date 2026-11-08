@@ -100,8 +100,11 @@ def version_changes(version: dict[str, Any], saved: dict[str, Any] | None) -> li
 
 def question_brews(questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Open questions as a message carries them: each coffee, and its cups."""
+    from ..community import hub_text
+
+    # Names typed by people, read by other agents: one capped line each.
     return [
-        {"brew_id": q["brew_id"], "recipe": q["recipe"], "bag": q["bag"],
+        {"brew_id": q["brew_id"], "recipe": hub_text(q["recipe"]), "bag": hub_text(q["bag"]),
          "changes": q.get("changes") or [], "cups": len(q.get("brew_ids") or [q["brew_id"]])}
         for q in questions
     ]

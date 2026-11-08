@@ -38,6 +38,9 @@ TO = versions.TO_WORDS[1]
     ("grind from 55 to 56", {"grind": 56.0}),
     (f"only the {GRIND}, 55 {TO} 56, keeping 20 g", {"grind": 56.0}),
     ("ratio 1:15 → 1:16", {"ratio": 16.0}),
+    ("longer duration 3, aeration 2", {}),
+    ("grind finer, grind 52", {"grind": 52.0}),
+    (f"{GRIND} \u0661\u0668\u066b\u0665", {"grind": 18.5}),
 ])
 def test_a_next_time_note_is_read_for_its_settings(text, found):
     assert parse_next_change(text) == found

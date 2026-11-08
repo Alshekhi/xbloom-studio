@@ -44,7 +44,8 @@ BAG_SELECT = "xbloom_coffee_lab_active_bag"
 SLIDERS = {"grind": "xbloom_brew_grind", "ratio": "xbloom_brew_ratio", "dose_g": "xbloom_brew_dose"}
 USE_GRINDER = "xbloom_use_grinder"
 
-_NUMBER = r"\d+(?:[.,]\d+)?"
+# A decimal point, a comma or the Arabic decimal separator (U+066B).
+_NUMBER = r"\d+(?:[.,\u066b]\d+)?"
 # What a "next time" note can name: a setting's word, in English or Arabic,
 # followed by its value — "grind 52", "ratio 1:15", "dose 18 g", and the same
 # with the Arabic word. A note saying where from and where to ("grind from 55
@@ -56,7 +57,11 @@ WORDS = {
 }
 # "To", in English, in Arabic with and without the hamza, and as an arrow.
 TO_WORDS = ("to", "إلى", "الى", "→", "->")
-_KEYWORDS = {key: "|".join(words) for key, words in WORDS.items()}
+# An English word only at the start of a word ("duration" names no ratio); the
+# Arabic words also arrive joined to a prefix, so they are matched anywhere.
+_KEYWORDS = {
+    key: "|".join(rf"\b{w}" if w.isascii() else w for w in words) for key, words in WORDS.items()
+}
 _ANY_KEYWORD = re.compile("|".join(_KEYWORDS.values()), re.IGNORECASE)
 _TO = re.compile(
     "(?:" + "|".join(r"\bto\b" if w == "to" else re.escape(w) for w in TO_WORDS) + ")"
@@ -71,16 +76,17 @@ def parse_next_change(text: str) -> dict[str, float]:
     text = text or ""
     found = {}
     for key, keyword in _KEYWORDS.items():
-        match = re.search(keyword, text, re.IGNORECASE)
-        if match is None:
-            continue
-        # What follows this setting's name, up to the next one named.
-        rest = text[match.end():]
-        if (other := _ANY_KEYWORD.search(rest)) is not None:
-            rest = rest[:other.start()]
-        number = _TO.search(rest) or _FIRST.search(rest)
-        if number is not None:
-            found[key] = float(number.group(1).replace(",", "."))
+        # Each mention in turn, until one is followed by a value: "grind finer,
+        # grind 52" names 52.
+        for match in re.finditer(keyword, text, re.IGNORECASE):
+            # What follows this setting's name, up to the next one named.
+            rest = text[match.end():]
+            if (other := _ANY_KEYWORD.search(rest)) is not None:
+                rest = rest[:other.start()]
+            number = _TO.search(rest) or _FIRST.search(rest)
+            if number is not None:
+                found[key] = float(number.group(1).replace(",", ".").replace("\u066b", "."))
+                break
     return found
 
 
