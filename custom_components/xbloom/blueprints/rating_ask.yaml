@@ -175,8 +175,10 @@ action:
                 {{ coffees | map(attribute='brew_id') | join(', ') }}. For each
                 coffee the person talks about, keep only what they say, in their
                 words, with the coffee_lab tool's rate_brew for that brew_id:
-                the verdict (again, fine or not_again) and anything about how
-                it tasted. Do nothing else with this conversation unless they
+                the verdict (again, fine or not_again), what was wrong if they
+                say it was sour, bitter, too weak or too strong (issue: sour,
+                bitter, weak or strong), and anything about how it tasted.
+                Do nothing else with this conversation unless they
                 ask. Never fill in what they did not say, and never read an id
                 aloud. If they would rather not answer, leave it.
 

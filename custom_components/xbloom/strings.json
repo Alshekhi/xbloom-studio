@@ -584,6 +584,16 @@
           "less_sour": "Less sour",
           "less_bitter": "Less bitter"
         }
+      },
+      "coffee_lab_cup_issue": {
+        "name": "What was wrong",
+        "state": {
+          "none": "Nothing",
+          "sour": "Sour",
+          "bitter": "Bitter",
+          "weak": "Too weak",
+          "strong": "Too strong"
+        }
       }
     },
     "sensor": {
@@ -1670,6 +1680,10 @@
           "name": "Verdict",
           "description": "Whether it is worth brewing again."
         },
+        "issue": {
+          "name": "What was wrong",
+          "description": "What was wrong with it. Sets what to change next time with this recipe and bag: a finer grind for sour, coarser for bitter, a stronger ratio for too weak, a lighter one for too strong."
+        },
         "body": {
           "name": "Body",
           "description": "Light, medium or full."
@@ -1799,6 +1813,15 @@
         "any": "Any",
         "hot": "Hot",
         "iced": "Iced"
+      }
+    },
+    "issue": {
+      "options": {
+        "none": "Nothing",
+        "sour": "Sour",
+        "bitter": "Bitter",
+        "weak": "Too weak",
+        "strong": "Too strong"
       }
     }
   },

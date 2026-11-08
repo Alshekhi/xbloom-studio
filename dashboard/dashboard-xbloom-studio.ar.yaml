@@ -119,6 +119,13 @@ views:
         '''') }} غ بدل {{ (c.saved | float) | round(1) | string | replace(''.0'', '''') }} غ{% endif %}{%
         if not loop.last %}، {% endif %}{% endfor %}{% endif %}.'
     - type: tile
+      entity: select.xbloom_studio_what_was_wrong
+      name: ما المشكلة
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    - type: tile
       entity: select.xbloom_studio_verdict
       name: الحكم
       icon_tap_action:
@@ -521,8 +528,12 @@ views:
     - type: markdown
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
-        ''\\\\\\1'') }}{% endmacro %}في المرة السابقة أردت: **{{ e(states(''sensor.xbloom_studio_next_change''))
-        }}**.'
+        ''\\\\\\1'') }}{% endmacro %}في المرة السابقة أردت: **{% set s = state_attr(''sensor.xbloom_studio_next_change'',
+        ''settings'') or {} %}{% if s %}{% for k, v in s.items() %}{% if k == ''grind'' %}درجة طحن {{
+        (v | float) | round(1) | string | replace(''.0'', '''') }}{% elif k == ''ratio'' %}نسبة 1:{{ (v
+        | float) | round(1) | string | replace(''.0'', '''') }}{% else %}{{ (v | float) | round(1) | string
+        | replace(''.0'', '''') }} غ من البن{% endif %}{% if not loop.last %}، {% endif %}{% endfor %}{%
+        else %}{{ e(states(''sensor.xbloom_studio_next_change'')) }}{% endif %}**.'
       visibility:
       - condition: state
         entity: sensor.xbloom_studio_next_change

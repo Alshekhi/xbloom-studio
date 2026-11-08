@@ -156,16 +156,21 @@ async def rate_brew(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     tasting = {k: str(args[k]).strip().lower() for k in TASTE_SCALES if args.get(k)}
     tasting |= {k: str(args[k]).strip() for k in TASTE_NOTES if args.get(k)}
     next_change = str(args["next_change"]).strip() if args.get("next_change") else None
-    if not (args.get("verdict") or tasting or next_change):
+    issue = args.get("issue")
+    if not (args.get("verdict") or tasting or next_change or issue):
         raise refuse("rate_brew_empty")
     try:
         brew = await lab.async_rate(
             verdict=args.get("verdict"), brew_id=args.get("brew_id"),
-            tasting=tasting or None, next_change=next_change,
+            tasting=tasting or None, next_change=next_change, issue=issue,
         )
     except UnknownBrew:
         raise refuse("brew_not_found", brew=args.get("brew_id") or "") from None
-    return {"brew": _brew_facts(brew, {})}
+    facts = {"brew": _brew_facts(brew, {})}
+    if issue and issue != "none":
+        # What the answer set for next time; none when nothing is left to move.
+        facts["next_change"] = brew.next_change or None
+    return facts
 
 
 def _brew_facts(brew: Brew, names: dict[str, str]) -> dict[str, Any]:

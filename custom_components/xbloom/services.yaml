@@ -687,6 +687,11 @@ rate_brew:
         select:
           options: [again, fine, not_again]
           translation_key: verdict
+    issue:
+      selector:
+        select:
+          options: [none, sour, bitter, weak, strong]
+          translation_key: issue
     body:
       selector:
         select:

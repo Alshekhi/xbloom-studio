@@ -31,6 +31,9 @@ VERDICTS: dict[str, int] = {"again": 3, "fine": 2, "not_again": 1}
 VERDICT_OF: dict[int, str] = {n: v for v, n in VERDICTS.items()}
 # The question asked of a bag once it is finished.
 BUY_AGAIN: tuple[str, ...] = ("yes", "maybe", "no")
+# What was wrong with a cup, asked beside its verdict: each but "none" sets
+# the Next Change for that recipe with that bag (lab.issue_change).
+ISSUES: tuple[str, ...] = ("none", "sour", "bitter", "weak", "strong")
 
 # What a person may say about how a brew tasted: each one never asked for,
 # kept when given. The scales are the Brews database's own options; the

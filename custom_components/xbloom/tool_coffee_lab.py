@@ -15,7 +15,7 @@ import voluptuous as vol
 from .coffee_lab import actions
 from .community import hub_text
 from .coffee_lab.lab import CoffeeLab
-from .coffee_lab.models import BUY_AGAIN, KINDS, STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS, Bean
+from .coffee_lab.models import BUY_AGAIN, ISSUES, KINDS, STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS, Bean
 from .coffee_lab.stats import PERIODS
 from .tool_common import Spec, check_arguments as _check, describe as _describe
 
@@ -46,7 +46,9 @@ ACTIONS: dict[str, Spec] = {
         actions.rate_brew,
         "keep what the person said about a brew: verdict (again, fine, not_again), "
         "body, acidity, sweetness, clarity, hot/warm/cool/overall notes, finish, and "
-        "next_change, such as \"grind 52\". Only what they said; never fill one in. "
+        "next_change, such as \"grind 52\", or issue — what was wrong: sour, bitter, "
+        "weak (too weak) or strong (too strong), none for nothing — which sets the "
+        "next change itself and answers with it. Only what they said; never fill one in. "
         "The oldest of rating_questions unless brew_id; a question's answer is kept "
         "on all its cups. Mention open questions at most once, and only while "
         "already talking about coffee",
@@ -157,6 +159,7 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
     "roast": (str, "How dark it was roasted, such as light or medium."),
     "roaster_notes": (str, "The roaster's tasting notes."),
     "verdict": (vol.In(list(VERDICTS)), "For rate_brew: again, fine or not_again."),
+    "issue": (vol.In(list(ISSUES)), "For rate_brew: what was wrong — none, sour, bitter, weak or strong."),
     "buy_again": (vol.In(list(BUY_AGAIN)), "For rate_bag: yes, maybe or no."),
     "brew_id": (str, "For rate_brew: the brew, by the id brew_history gives."),
     **{

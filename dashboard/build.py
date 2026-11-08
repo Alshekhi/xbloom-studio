@@ -63,7 +63,8 @@ TEXT = {
         "c_suggest": "Suggest a recipe", "c_suggest_hub": "Suggest a community recipe",
         "h_for_you": "For you", "h_trending": "Trending recipes", "h_tea": "Tea recipes",
         "a_another": "Another", "a_pod": "Pod",
-        "h_how_was": "How was it?", "r_verdict": "Verdict",
+        "h_how_was": "How was it?", "r_verdict": "Verdict", "r_issue": "What was wrong",
+        "n_grind": "grind {value}", "n_ratio": "ratio 1:{value}", "n_dose": "{value} g of coffee",
         "v_wanted": "Last time you wanted: {text}.", "v_use": "Use that change",
         "h_keep": "Keep this version?", "v_keep": "**{recipe}** {changes} is worth brewing again.",
         "v_make": "Make it the recipe", "v_new": "Save as a new recipe",
@@ -131,7 +132,8 @@ TEXT = {
         "c_suggest": "اقترح وصفة", "c_suggest_hub": "اقترح وصفة من المجتمع",
         "h_for_you": "مقترحة لك", "h_trending": "الوصفات الرائجة", "h_tea": "وصفات الشاي",
         "a_another": "اقتراح آخر", "a_pod": "الكبسولة",
-        "h_how_was": "كيف كانت؟", "r_verdict": "الحكم",
+        "h_how_was": "كيف كانت؟", "r_verdict": "الحكم", "r_issue": "ما المشكلة",
+        "n_grind": "درجة طحن {value}", "n_ratio": "نسبة 1:{value}", "n_dose": "{value} غ من البن",
         "v_wanted": "في المرة السابقة أردت: {text}.", "v_use": "استخدم هذا التعديل",
         "h_keep": "هل تحفظ هذه النسخة؟", "v_keep": "**{recipe}** {changes} تستحق التكرار.",
         "v_make": "اجعلها الوصفة", "v_new": "احفظها كوصفة جديدة",
@@ -248,6 +250,9 @@ def brew_view(t: dict) -> dict:
         # Due a while after a brew; never while one is running.
         section(t["h_how_was"], [
             {"type": "markdown", "text_only": True, "content": rating_card(t)},
+            # Before the verdict, which answers the question and closes it:
+            # what was wrong sets what to change next time.
+            select(f"select.{E}_what_was_wrong", name=t["r_issue"]),
             select(f"select.{E}_verdict", name=t["r_verdict"]),
         ], [*present(f"sensor.{E}_brew_to_rate"), *not_busy()]),
         section(t["h_buy_again"], [
@@ -688,7 +693,18 @@ def keep_card(t: dict) -> str:
 
 def next_change_card(t: dict) -> str:
     n = f"sensor.{E}_next_change"
-    return ESCAPE + t["v_wanted"].replace("{text}", f"**{{{{ e(states('{n}')) }}}}**")
+    num = "{{ (v | float) | round(1) | string | replace('.0', '') }}"
+    # The settings in the dashboard's language when they were read from the
+    # note; the note as written otherwise.
+    said = (
+        f"{{% set s = state_attr('{n}', 'settings') or {{}} %}}"
+        "{% if s %}{% for k, v in s.items() %}"
+        "{% if k == 'grind' %}" + t["n_grind"] + "{% elif k == 'ratio' %}" + t["n_ratio"]
+        + "{% else %}" + t["n_dose"] + "{% endif %}"
+        "{% if not loop.last %}" + t["sep"] + "{% endif %}{% endfor %}"
+        f"{{% else %}}{{{{ e(states('{n}')) }}}}{{% endif %}}"
+    ).replace("{value}", num)
+    return ESCAPE + t["v_wanted"].replace("{text}", f"**{said}**")
 
 
 def rating_card(t: dict) -> str:

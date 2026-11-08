@@ -17,7 +17,7 @@ from ..const import DOMAIN
 from ..tool_common import refuse
 from . import actions
 from .lab import CoffeeLab
-from .models import KINDS, STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS
+from .models import ISSUES, KINDS, STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS
 
 _BAG = {vol.Exclusive("bean", "bag"): str, vol.Exclusive("bean_id", "bag"): str}
 _GRAMS = vol.All(vol.Coerce(float), vol.Range(min=0))
@@ -52,6 +52,7 @@ SERVICES: dict[str, tuple[Callable[..., Any], vol.Schema]] = {
     "rate_brew": (actions.rate_brew, vol.Schema({
         vol.Optional("brew_id"): str,
         vol.Optional("verdict"): vol.In(list(VERDICTS)),
+        vol.Optional("issue"): vol.In(list(ISSUES)),
         **{vol.Optional(key): vol.In(list(scale)) for key, scale in TASTE_SCALES.items()},
         **{vol.Optional(key): str for key in (*TASTE_NOTES, "next_change")},
     })),

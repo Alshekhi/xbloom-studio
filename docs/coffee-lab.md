@@ -108,7 +108,26 @@ open at once, asked oldest first.
 Beside the verdict, how it tasted can be kept — body, acidity, sweetness and
 clarity, how it was hot, warm and cool, overall, the finish — and a **Next
 change**, such as "grind 52", with the `xbloom.rate_brew` action or by telling
-an AI assistant. Only what is given is kept. The question can also be asked
+an AI assistant. Only what is given is kept.
+
+**What was wrong**, asked on the card before the verdict, sets the Next
+change for you, counted from the grind and ratio the cup was brewed at:
+
+| Answer | Next change |
+|---|---|
+| Sour | grind 3 steps finer |
+| Bitter | grind 3 steps coarser |
+| Too weak | ratio one step stronger, such as 1:16 to 1:15 |
+| Too strong | ratio one step lighter |
+| Nothing | no change |
+
+Answers build on each other, since each counts from the version brewed, but
+never move the grind more than 6 steps from the saved recipe's; past that, or
+for a recipe that does not grind, nothing is set and a change can still be
+given in words. The action and the AI tools take it as `issue`: `sour`,
+`bitter`, `weak`, `strong` or `none`.
+
+The question can also be asked
 for you: by an AI assistant that started the brew, through its
 [callback](events.md#callbacks), or by the **Ask how the coffee was**
 [blueprint](automations.md#ready-made-blueprints), on a phone or aloud.

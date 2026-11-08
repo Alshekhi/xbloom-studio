@@ -127,6 +127,41 @@ def change_label(changes: list[dict[str, Any]]) -> str:
     return ", ".join(words[c["setting"]](c["value"]) for c in changes if c["setting"] in words)
 
 
+# What answers what was wrong: grinder steps finer (-) or coarser (+) for
+# sour and bitter, and ratio steps stronger (-) or lighter (+) for too weak
+# and too strong. A finer grind draws more from the coffee, so it is less sour;
+# less water for the coffee makes it stronger.
+ISSUE_STEP = {"sour": ("grind", -3), "bitter": ("grind", 3), "weak": ("ratio", -1), "strong": ("ratio", 1)}
+# How far answers may move the grind from the saved recipe's, either way, so
+# answers given again and again cannot run it off.
+ISSUE_GRIND_REACH = 6
+
+
+def issue_change(issue: str, version: dict[str, Any], saved: dict[str, Any] | None) -> str | None:
+    """The Next Change that answers what was wrong with a brewed version.
+
+    Counted from the version brewed, so answers build on each other; None
+    when there is nothing to move — no grind to change, or the grind as far
+    from the saved recipe's as answers may take it, or the ratio at the
+    machine's limit. Written in the words `versions.parse_next_change` reads.
+    """
+    if issue not in ISSUE_STEP:
+        return None
+    setting, step = ISSUE_STEP[issue]
+    current = version.get(setting)
+    if current is None:
+        return None
+    if setting == "grind":
+        low, high = spec.field("grind_size").min, spec.field("grind_size").max
+        base = _rounded((saved or {}).get("grinder_size"), 1)
+        if base is not None:
+            low, high = max(low, base - ISSUE_GRIND_REACH), min(high, base + ISSUE_GRIND_REACH)
+        wanted = min(high, max(low, current + step))
+        return None if wanted == current else f"grind {wanted:g}"
+    wanted = min(spec.RATIO_DENOM.max, max(spec.RATIO_DENOM.min, current + step))
+    return None if wanted == current else f"ratio 1:{wanted:g}"
+
+
 def normalize_ratio(recipe: dict[str, Any]) -> float | None:
     """The saved recipe's ratio denominator, whichever shape it is in."""
     from xbloom.recipe_validate import normalize_recipe
@@ -212,6 +247,9 @@ class CoffeeLab:
         # Told when the bag in use changes, with its id or None, so what was
         # suggested for the last one is not shown for the next.
         self.on_bag_chosen: Callable[[str | None], None] = lambda bean_id: None
+        # What was wrong, as answered for each open question, by its brew id:
+        # shown beside its verdict until the question is answered.
+        self.issues: dict[str, str] = {}
         # Told of each question opened, so it can be asked of whoever started
         # the brew once it is due (rating_calls.py).
         self.on_question: Callable[[dict[str, Any]], None] = lambda question: None
@@ -476,14 +514,21 @@ class CoffeeLab:
         except Exception:  # noqa: BLE001 — asking must never undo a count
             _LOGGER.exception("Coffee Lab: could not open the question for brew %s", done.brew_id)
 
+    def _saved_recipe(self, name: str | None) -> dict[str, Any] | None:
+        return self.recipe_lookup(name) if name else None
+
     async def async_rate(
         self, *, verdict: str | None = None, brew_id: str | None = None,
         tasting: dict[str, str] | None = None, next_change: str | None = None,
+        issue: str | None = None,
     ) -> Brew:
         """Keep what was said about a brew: the oldest due question's, unless named.
 
         A question's answer is kept on every cup it covers. With no question
-        and no brew named, the most recent brew.
+        and no brew named, the most recent brew. `issue`, what was wrong
+        (ISSUES), sets the Next Change from the version brewed unless one is
+        given in words (`issue_change`); the question stays open for its
+        verdict.
         """
         question = self.question_of(brew_id) if brew_id else (
             self.rating_question_due() or self.rating_question
@@ -498,6 +543,10 @@ class CoffeeLab:
                 raise UnknownBrew("")
             targets = [latest[0].id]
         named = brew_id or targets[-1]
+        if issue and next_change is None and question is not None:
+            next_change = issue_change(
+                issue, question.get("version") or {}, self._saved_recipe(question.get("recipe")),
+            )
         rated = None
         for target in [t for t in targets if t != named] + [named]:
             try:
@@ -509,7 +558,17 @@ class CoffeeLab:
                 # A cup removed from the record since: the others are rated.
                 if target == named:
                     raise
+        if issue and next_change is None and question is None and rated is not None:
+            # No question to read the version from: the brew's own record.
+            change = issue_change(
+                issue, brew_version(rated.dose_g, rated.settings), self._saved_recipe(rated.recipe),
+            )
+            if change:
+                rated = await self.store.async_rate_brew(named, rating=None, tasting=None, next_change=change)
+        if question is not None and issue:
+            self.issues[question["brew_id"]] = issue
         if question is not None and verdict:
+            self.issues.pop(question["brew_id"], None)
             questions = [q for q in self._open_questions() if q["brew_id"] != question["brew_id"]]
             keeps = self.versions_to_keep
             changes = question.get("changes") or []

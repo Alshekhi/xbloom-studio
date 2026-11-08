@@ -27,7 +27,7 @@ from ..const import DOMAIN, SIGNAL_COFFEE_LAB_UPDATED
 from . import actions
 from .lab import CoffeeLab
 from .inventory import kind_of_cup
-from .models import BUY_AGAIN, KINDS, VERDICTS, Bean
+from .models import BUY_AGAIN, ISSUES, KINDS, VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
 
 _LOGGER = logging.getLogger(__name__)
@@ -287,6 +287,30 @@ class RateBrewSelect(CoffeeLabEntity, SelectEntity):
         await self.lab.async_rate(verdict=option, brew_id=question["brew_id"])
 
 
+class CupIssueSelect(CoffeeLabEntity, SelectEntity):
+    """What was wrong with the brew in question; picking one sets its Next Change.
+
+    The question stays open for its verdict: this only says what to change.
+    """
+
+    _attr_icon = "mdi:help-circle-outline"
+    _attr_options = list(ISSUES)
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "cup_issue")
+
+    @property
+    def current_option(self) -> str | None:
+        question = self.lab.rating_question_due()
+        return self.lab.issues.get(question["brew_id"]) if question else None
+
+    async def async_select_option(self, option: str) -> None:
+        question = self.lab.rating_question_due()
+        if question is None:
+            raise refuse("rating_none")
+        await self.lab.async_rate(issue=option, brew_id=question["brew_id"])
+
+
 class BagQuestionSensor(CoffeeLabEntity, SensorEntity):
     """A finished bag waiting to be asked about: its name, for a week."""
 
@@ -420,7 +444,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
     makers: dict[str, list[Callable[[CoffeeLab], Entity]]] = {
         "select": [
             ActiveBagSelect, ActiveXpodBoxSelect, ActiveTeaSelect, StatsPeriodSelect,
-            ManualBrewerSelect, RateBrewSelect, BuyAgainSelect,
+            ManualBrewerSelect, RateBrewSelect, CupIssueSelect, BuyAgainSelect,
         ],
         "sensor": [
             RemainingSensor, BagsSensor, StatsSensor, LastCountSensor, WaitingBrewsSensor,
