@@ -45,7 +45,7 @@ repair appears if one has waited more than an hour.
 
 - **Brew** — what is happening now, the bag in use, a recipe for that bag,
   brewing a recipe, one-off adjustments, saving a new recipe, and manual brews.
-  **Suggest a recipe** fills a picker with your own recipes brewed with this
+  Choosing a bag, or **Suggest a recipe**, fills a picker with your own recipes brewed with this
   bag or coffee like it, then community recipes to try, each marked as from
   the community, with the best chosen; a line says why it was suggested, and
   **Use this recipe** picks it for brewing, adding a community one to your

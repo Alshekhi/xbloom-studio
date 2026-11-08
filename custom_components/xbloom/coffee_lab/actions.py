@@ -15,9 +15,12 @@ from dataclasses import asdict
 from datetime import timedelta
 from typing import Any
 
+import aiohttp
 from homeassistant.util import dt as dt_util
 
 from homeassistant.exceptions import ServiceValidationError
+
+from xbloom.exceptions import XBloomAPIError
 
 from ..tool_common import refuse
 from .lab import STORE_UNREACHABLE, CoffeeLab, Consumption
@@ -267,14 +270,41 @@ def _bag_values(args: dict[str, Any]) -> dict[str, Any]:
     return values
 
 
+async def in_hub_words(lab: CoffeeLab, values: dict[str, Any]) -> dict[str, Any]:
+    """Rewrite a bag's country and process to the hub's names, in place.
+
+    Returns what the caller should hear: `not_on_hub`, the names the hub does
+    not list (kept as typed), and `unchecked`, the fields the hub could not be
+    asked about.
+    """
+    from ..coffee_names import LISTS
+
+    names, not_on_hub, unchecked = lab.hub_names, {}, []
+    for field in LISTS:
+        text = str(values.get(field) or "").strip()
+        if not text or names is None:
+            continue
+        try:
+            canonical = await names.async_canonical(field, text)
+        except (XBloomAPIError, aiohttp.ClientError, TimeoutError):
+            unchecked.append(field)
+            continue
+        if canonical:
+            values[field] = canonical
+        else:
+            not_on_hub[field] = text
+    return {k: v for k, v in (("not_on_hub", not_on_hub), ("unchecked", unchecked)) if v}
+
+
 async def add_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     """A new bag. Given how much is in it, it is counted down from there."""
     values = {"status": "unopened", **_bag_values(args)}
     if args.get("remaining_g") is not None:
         values.update(tracked=True, remaining_g=float(args["remaining_g"]))
+    checked = await in_hub_words(lab, values)
     bean = await lab.store.async_add_bean(name=str(args["name"]).strip(), **values)
     lab.on_change()
-    return {"added": bean_facts(bean)}
+    return {"added": bean_facts(bean), **checked}
 
 
 async def update_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
@@ -283,9 +313,10 @@ async def update_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     changes = _bag_values(args)
     if args.get("new_name"):
         changes["name"] = str(args["new_name"]).strip()
+    checked = await in_hub_words(lab, changes)
     updated = await lab.store.async_update_bean(bean.id, **changes)
     lab.on_change()
-    return {"updated": bean_facts(updated)}
+    return {"updated": bean_facts(updated), **checked}
 
 
 async def record_manual_brew(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:

@@ -16,6 +16,7 @@ and are told of every change over one dispatcher signal.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -30,6 +31,7 @@ from xbloom.client import XBloomClient
 from xbloom.community import XBloomCommunityClient
 from xbloom.exceptions import XBloomAPIError
 
+from .coffee_names import HubNames
 from .const import COMMUNITY_MACHINE, DOMAIN
 from .suggestions import OwnSuggestion, async_own_suggestions
 from .tool_common import fail
@@ -108,6 +110,7 @@ async def suggest(
     country: str | None,
     process: str | None,
     remaining_g: float | None = None,
+    names: HubNames | None = None,
 ) -> dict[str, Any]:
     """Community recipes worth trying for a coffee of this origin and process.
 
@@ -125,6 +128,14 @@ async def suggest(
     cups = library_cup_types(library)
     country = (country or "").strip() or None
     process = (process or "").strip() or None
+    # A bag typed before its names were checked ("Anaerobic") is searched by
+    # the hub's own name ("Anaerobic Fermentation").
+    if names is not None:
+        try:
+            country = (await names.async_canonical("country", country) if country else None) or country
+            process = (await names.async_canonical("process", process) if process else None) or process
+        except (XBloomAPIError, aiohttp.ClientError, TimeoutError) as err:
+            _LOGGER.debug("xbloom community names: %s", err)
     tried: list[tuple[str | None, str | None]] = []
     for attempt in ((country, process), (country, None), (None, None)):
         if attempt in tried:
@@ -181,8 +192,11 @@ class CommunityBrowser:
         client: XBloomCommunityClient,
         share_client: XBloomClient,
         coordinator: Any,
+        names: HubNames | None = None,
     ) -> None:
         self._hass = hass
+        self.names = names
+        self._resuggesting = asyncio.Lock()
         self._signal = signal_community(entry_id)
         self._client = client
         self._share_client = share_client
@@ -284,7 +298,7 @@ class CommunityBrowser:
             found = await suggest(
                 self._client, self._coordinator.data or [],
                 getattr(bag, "country", None), getattr(bag, "process", None),
-                bag_remaining_g(bag),
+                bag_remaining_g(bag), self.names,
             )
         except (XBloomAPIError, aiohttp.ClientError) as err:
             _LOGGER.warning("xbloom community suggestion: %s", err)
@@ -327,6 +341,35 @@ class CommunityBrowser:
         keys = self.choice_keys()
         self.choice = keys[0] if keys else None
         self._changed()
+
+    @callback
+    def bag_chosen(self, lab: Any, bean_id: str | None) -> None:
+        """Another bag is in use: what was suggested for the last one goes.
+
+        Suggestions for the new one are asked for at once — they read only
+        the brew record and the hub, and send nothing to the machine.
+        """
+        self.own = None
+        self.suggestions = []
+        self.choice = None
+        if self.suggested:
+            self.suggested = False
+            self.suggested_for = None
+            self.basis = {}
+        self._changed()
+        if bean_id is not None:
+            self._hass.async_create_task(self._async_resuggest(lab, bean_id))
+
+    async def _async_resuggest(self, lab: Any, bean_id: str) -> None:
+        # One at a time, and only for the bag still in use: a quick change of
+        # mind must not leave the first bag's suggestions on the second.
+        async with self._resuggesting:
+            if lab.active_bean_id != bean_id:
+                return
+            try:
+                await self.async_suggest_for_bag(lab)
+            except HomeAssistantError as err:
+                _LOGGER.info("xbloom suggestion for the new bag: %s", err)
 
     def choice_keys(self) -> list[str]:
         """The Suggested Recipe picker's choices: your own, then the community's."""

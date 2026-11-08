@@ -187,6 +187,12 @@ class CoffeeLab:
         # The saved recipe of a name, from the integration's library: what the
         # question compares a brew's grind, ratio and dose against.
         self.recipe_lookup: Callable[[str], dict[str, Any] | None] = lambda name: None
+        # The community hub's names for a bag's country and process
+        # (coffee_names.HubNames); None leaves them as typed.
+        self.hub_names: Any = None
+        # Told when the bag in use changes, with its id or None, so what was
+        # suggested for the last one is not shown for the next.
+        self.on_bag_chosen: Callable[[str | None], None] = lambda bean_id: None
         # Told of each question opened, so it can be asked of whoever started
         # the brew once it is due (rating_calls.py).
         self.on_question: Callable[[dict[str, Any]], None] = lambda question: None
@@ -216,9 +222,15 @@ class CoffeeLab:
         self._state = dict(await self._state_storage.async_load() or {})
 
     async def _async_set_state(self, **values: Any) -> None:
+        chosen = (
+            "active_bean_id" in values
+            and values["active_bean_id"] != self._state.get("active_bean_id")
+        )
         self._state = {**self._state, **values}
         await self._state_storage.async_save(self._state)
         self.on_change()
+        if chosen:
+            self.on_bag_chosen(values["active_bean_id"])
 
     # ── The active bag ───────────────────────────────────────────────────
 

@@ -514,10 +514,12 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             else:
                 # A field emptied in the form is not sent at all, so every
                 # field is set: absent means cleared.
+                details = {k: user_input.get(k, "") for k in coffee_lab_actions.DESCRIPTIVE}
+                await coffee_lab_actions.in_hub_words(lab, details)
                 await lab.store.async_update_bean(
                     bean.id, name=name, status=user_input["status"],
                     bag_size_g=user_input.get("bag_size_g"),
-                    **{k: user_input.get(k, "") for k in coffee_lab_actions.DESCRIPTIVE},
+                    **details,
                 )
                 lab.on_change()
                 if user_input.get("remaining_g") not in (None, "") and (

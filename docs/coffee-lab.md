@@ -25,6 +25,13 @@ first. A finished bag keeps its brews.
 Bags are named by their name, or by their id when two bags share one; a shared
 name is refused rather than guessed.
 
+A bag's **country** and **process** are kept in the
+[community hub](recipes.md#community-recipes)'s English names — "ethiopia",
+the country's name in Arabic or Chinese, or "Anaerobic" become "Ethiopia" and
+"Anaerobic Fermentation" — so bags of the same coffee match each other and the
+hub. A name the hub does not list is kept as typed, and the action's response
+names it under `not_on_hub`.
+
 ## How a brew is counted
 
 The bag is fixed when the brew starts: the one named in `start_brew`
@@ -91,7 +98,8 @@ Recipe** changes the saved recipe, **Save Version as New Recipe** keeps both.
 
 ### A recipe for this bag
 
-**Suggest Recipe** looks for a recipe for the bag in use: your own first,
+Choosing a bag looks for a recipe for it at once, and **Suggest Recipe** looks
+again: your own first,
 ranked by how close the bags they were brewed with are — this bag, then the
 same origin and process, then the same origin — and by their verdicts, with
 a recipe last rated **Not again** with this bag left out — and, after them,

@@ -64,6 +64,7 @@ from .coffee_lab.history import ChartFeed
 from .coffee_lab.services import async_register_lab_services
 from .coordinator import XBloomCoordinator
 from .versions import VersionDesk
+from .coffee_names import HubNames
 from .community import (
     CommunityBrowser, NotForThisMachine, active_bag, bag_remaining_g, studio_recipe, suggest,
 )
@@ -427,6 +428,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     )
     entry.runtime_data.community = CommunityBrowser(
         hass, entry.entry_id, community, client, coordinator,
+        HubNames(session),
     )
     if entry.data.get(CONF_COFFEE_LAB):
         store = None
@@ -445,6 +447,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             (r for r in coordinator.data or [] if r.get("name") == name), None,
         )
         entry.runtime_data.coffee_lab = lab
+        # A new bag's country and process are kept in the hub's words, and
+        # choosing another bag replaces what was suggested for the last.
+        browser = entry.runtime_data.community
+        lab.hub_names = browser.names
+        lab.on_bag_chosen = lambda bean_id: browser.bag_chosen(lab, bean_id)
         entry.async_on_unload(async_count_completed_brews(hass, lab))
         # Brews that could not reach the store wait in Home Assistant and are
         # retried here, at startup and every few minutes (coffee_lab/pending.py).

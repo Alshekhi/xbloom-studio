@@ -80,13 +80,15 @@ ACTIONS: dict[str, Spec] = {
     "add_bean": Spec(
         actions.add_bean,
         "a new bag (bag_size_g, remaining_g to count it down, status, roaster, "
-        "country, region, process, roaster_notes)",
+        "country, region, process, roaster_notes). The country and process are kept "
+        "in the community hub's English names; one the hub does not list is kept as "
+        "given and named in not_on_hub — ask the person once whether another name was meant",
         ("name",),
     ),
     "update_bean": Spec(
         actions.update_bean,
         "correct a bag's details (new_name, bag_size_g, status, roaster, country, "
-        "region, process, roaster_notes)",
+        "region, process, roaster_notes), the country and process as for add_bean",
         one_of=BAG,
     ),
 }
@@ -115,7 +117,7 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
     ),
     "status": (vol.In(list(STATUSES)), "The bag's stage."),
     "roaster": (str, "Who roasted it."),
-    "country": (str, "Where it was grown."),
+    "country": (str, "Where it was grown, as a country name."),
     "region": (str, "The region within the country."),
     "process": (str, "How it was processed, such as washed or natural."),
     "roaster_notes": (str, "The roaster's tasting notes."),

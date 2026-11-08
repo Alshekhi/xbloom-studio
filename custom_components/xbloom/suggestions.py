@@ -23,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .coffee_lab.lab import XBLOOM_BREWER
+from .coffee_names import name_key
 from .coffee_lab.models import Bean, Brew
 from .coffee_lab.stats import made_coffee
 from .versions import versions_of
@@ -51,7 +52,8 @@ class OwnSuggestion:
 
 
 def _same(a: str, b: str) -> bool:
-    return bool(a) and a.strip().casefold() == b.strip().casefold()
+    """One country or process however it was typed (coffee_names.name_key)."""
+    return bool(name_key(a)) and name_key(a) == name_key(b)
 
 
 def _match(bag: Bean, other: Bean | None, bean_id: str | None) -> str | None:
