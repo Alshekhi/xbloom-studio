@@ -26,6 +26,8 @@ PERIODS = (
     "this_month", "last_month", "this_year",
 )
 DEFAULT_PERIOD = "last_7_days"
+# A brew's dripper when it was tea (models.Brew.dripper, the cup's label).
+TEA = "Tea"
 
 
 @dataclass(frozen=True)
@@ -96,7 +98,8 @@ def totals(records: list[Brew], start: datetime, end: datetime) -> Totals:
     tools = Counter(r.brewer or UNKNOWN_BREWER for r in made)
     return Totals(
         brews=len(made),
-        coffee_g=float(sum(r.dose_g or 0 for r in inside)),
+        # An xPod is coffee; tea's grams are tea.
+        coffee_g=float(sum(r.dose_g or 0 for r in inside if r.dripper != TEA)),
         water_ml=float(sum(watered)),
         brews_with_water=len(watered),
         # Ties go to the name, so the answer does not change between reads.

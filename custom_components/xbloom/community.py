@@ -223,6 +223,8 @@ async def suggest(
             process = (await names.async_canonical("process", process) if process else None) or process
         except HUB_ERRORS as err:
             _LOGGER.debug("xbloom community names: %s", err)
+            # Not waited on again for the fit: both sides compared as typed.
+            names = None
     fit = await _Fit.async_for(names, process, varietal, roast, notes)
     tried: list[tuple[str | None, str | None]] = []
     for attempt in ((country, process), (country, None), (None, None)):

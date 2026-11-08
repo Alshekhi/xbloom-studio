@@ -28,6 +28,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 
 from .coffee_lab.inventory import kind_of_cup
+from .const import SIGNAL_TASTE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,6 +53,18 @@ EV_PREPARED = "xbloom_recipe_prepared"
 EV_NOT_PREPARED = "xbloom_recipe_not_prepared"
 BUSY = ("grinding", "brewing")
 UNUSABLE = ("unknown", "unavailable", "")
+
+
+@callback
+def reset_taste(hass: HomeAssistant, entry) -> None:
+    """The Brew tab's Taste back to balanced, the grind slider with it.
+
+    A taste asked of one brew of one coffee is not asked of the next: this
+    runs once a brew has used its coffee, and when another bag is chosen.
+    """
+    if getattr(entry.runtime_data, "taste", "balanced") != "balanced":
+        entry.runtime_data.taste = "balanced"
+        async_dispatcher_send(hass, f"{SIGNAL_TASTE}_{entry.entry_id}")
 
 
 def signal_prepared(entry_id: str) -> str:
@@ -357,6 +370,7 @@ class BrewPreparer:
         self._set_ready(False, None)
         await self._clear_picks(bag=used_coffee)
         if used_coffee:
+            reset_taste(self._hass, self._entry)
             await self._release()
         elif self.owns_connect:
             self._cancel_idle_release()

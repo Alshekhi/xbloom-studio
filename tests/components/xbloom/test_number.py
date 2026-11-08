@@ -15,7 +15,9 @@ the slider.
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+
+import inspect
 
 import pytest
 
@@ -328,3 +330,41 @@ def test_the_taste_never_moves_the_grind_past_the_grinder() -> None:
     entity._entry.runtime_data.taste = "less_sour"
     entity._seed_from_recipe()
     assert entity.native_value == low
+
+
+def test_the_taste_reseed_runs_on_home_assistant_s_loop() -> None:
+    """Connected to a dispatcher signal, so it must be a callback, not a job.
+
+    Read from the source: the test stubs' @callback leaves no mark.
+    """
+    source = inspect.getsource(XBloomBrewGrindNumber)
+    assert "    @callback\n    def _seed_from_recipe(self)" in source
+
+
+def test_the_taste_does_not_move_the_grind_with_the_grinder_off() -> None:
+    entity = _make(XBloomBrewGrindNumber, recipe_attrs={"grinder_size": 56, "cup_type": 2})
+    grinder = MagicMock(state="off")
+    recipe = entity.hass.states.get("select.xbloom_studio_recipe")
+    entity.hass.states.get = lambda eid: grinder if eid == "switch.xbloom_studio_use_grinder" else recipe
+    entity._entry.runtime_data.taste = "less_sour"
+    entity._seed_from_recipe()
+    assert entity.native_value == 56.0
+
+
+def test_a_tea_given_as_text_is_not_moved() -> None:
+    entity = _make(XBloomBrewGrindNumber, recipe_attrs={"grinder_size": 56, "cup_type": "4"})
+    entity._entry.runtime_data.taste = "less_sour"
+    entity._seed_from_recipe()
+    assert entity.native_value == 56.0
+
+
+def test_the_taste_goes_back_to_balanced_and_the_slider_is_told() -> None:
+    from custom_components.xbloom import prepare
+    entry = MagicMock()
+    entry.entry_id = "test_entry"
+    entry.runtime_data.taste = "less_bitter"
+    with patch.object(prepare, "async_dispatcher_send") as sent:
+        prepare.reset_taste(MagicMock(), entry)
+        prepare.reset_taste(MagicMock(), entry)
+    assert entry.runtime_data.taste == "balanced"
+    assert sent.call_count == 1, "told once; balanced already says nothing"

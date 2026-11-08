@@ -296,3 +296,9 @@ async def test_a_row_of_the_brews_database_is_rated():
     brew = await store.async_rate_brew(ROW, rating=3)
     assert brew.rating == 3
     assert ("PATCH", f"/pages/{ROW}", {"properties": {"Rating": {"number": 3}}}) in notion.calls
+
+
+def test_a_comma_never_reaches_a_single_choice_column():
+    props = bean_properties({"process": "Natural, Anaerobic", "roast": "light,"})
+    assert props["Process"] == {"select": {"name": "Natural / Anaerobic"}}
+    assert props["Roast"] == {"select": {"name": "light"}}

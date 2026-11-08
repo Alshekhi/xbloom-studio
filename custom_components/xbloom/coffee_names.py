@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from typing import Any
 
 import aiohttp
@@ -36,6 +37,8 @@ LISTS = {
 LANGUAGES = ("en", "ar", "zh")
 # Adding a bag waits for this, so a hub that does not answer must not hold it.
 LOOKUP_TIMEOUT = 5
+# A language that did not answer is asked for again after this, in seconds.
+RETRY_AFTER = 600
 _NOISE = {"process", "processing", "processed", "fermentation", "fermented", "method", "roast"}
 
 
@@ -55,9 +58,13 @@ class HubNames:
         self._session = session
         # list name → name_key → the hub's English name
         self._names: dict[str, dict[str, str]] | None = None
+        # Set while another language's names are missing: when to ask again.
+        # Until then the names that did load are used, so one language not
+        # answering is not waited on at every lookup.
+        self._retry_at: float | None = None
 
     async def _async_load(self) -> dict[str, dict[str, str]]:
-        if self._names is not None:
+        if self._names is not None and (self._retry_at is None or time.monotonic() < self._retry_at):
             return self._names
         names: dict[str, dict[str, str]] = {lst: {} for lst in LISTS.values()}
         english: dict[str, dict[str, str]] = {}  # list → value → English name
@@ -69,24 +76,28 @@ class HubNames:
             except (XBloomAPIError, aiohttp.ClientError, TimeoutError):
                 # Without English nothing can be named; another language only
                 # adds what a name may arrive as, so its names are used without
-                # it this time and asked for again next time.
+                # it until RETRY_AFTER has passed.
                 if language == "en":
+                    if self._names is not None:
+                        return self._names
                     raise
                 complete = False
                 continue
             for lst in LISTS.values():
-                for option in criteria.get(lst, []):
-                    if language == "en":
-                        english.setdefault(lst, {})[option["value"]] = option["name"]
-                    canonical = english.get(lst, {}).get(option["value"])
-                    if not canonical:
-                        continue
-                    # "Geisha/Gesha" answers to "geisha gesha", "geisha" and "gesha".
-                    for alias in (option["name"], *str(option["name"]).split("/")):
-                        if key := name_key(alias):
-                            names[lst].setdefault(key, canonical)
-        if complete:
-            self._names = names
+                options = criteria.get(lst, [])
+                if language == "en":
+                    english[lst] = {o["value"]: o["name"] for o in options}
+                # Every option's whole name first, then the alternatives in a
+                # name like "Green/Vegetative": an alternative never takes the
+                # place of an option that is named that on its own.
+                whole = [(o["name"], o["value"]) for o in options]
+                parts = [(a, o["value"]) for o in options if "/" in str(o["name"]) for a in str(o["name"]).split("/")]
+                for alias, value in whole + parts:
+                    canonical = english.get(lst, {}).get(value)
+                    if canonical and (key := name_key(alias)):
+                        names[lst].setdefault(key, canonical)
+        self._names = names
+        self._retry_at = None if complete else time.monotonic() + RETRY_AFTER
         return names
 
     async def async_canonical(self, field: str, text: str) -> str | None:

@@ -112,3 +112,10 @@ def test_a_brew_flagged_for_another_reason_still_counts():
                    review=Review("no_bag"))
     assert totals([flagged], *SEPTEMBER).brews == 1
 
+
+
+def test_the_coffee_total_leaves_out_tea_and_keeps_xpods():
+    tea = Brew(id="t", brewed_at="2026-09-10T08:00:00+03:00", recorded_at="", dose_g=5.0, dripper="Tea")
+    pod = Brew(id="p", brewed_at="2026-09-11T08:00:00+03:00", recorded_at="", dose_g=15.0, dripper="xPod")
+    t = totals([tea, pod, brew("2026-09-12T08:00:00+03:00", 16)], *SEPTEMBER)
+    assert (t.brews, t.coffee_g) == (3, 31.0)

@@ -33,6 +33,7 @@ from .ble_entities import send_brewer_temp_live, signal_event
 from .tool_common import require_machine_control
 from .const import DOMAIN, SIGNAL_TASTE, TASTE_GRIND
 from .coffee_lab.entities import entities_for as coffee_lab_entities
+from .coffee_lab.inventory import kind_of_cup
 from xbloom import spec
 from xbloom.ble import packet_grinder_set
 
@@ -78,8 +79,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
 # extra_state_attributes carries the full recipe dict (dose_g, water_ratio,
 # grinder_size, cup_type, pours, …) — see select.XBloomRecipeSelect.
 _RECIPE_SELECT = "select.xbloom_studio_recipe"
-# A recipe's cup_type for tea, which is not ground.
-TEA_CUP = 4
+_USE_GRINDER = "switch.xbloom_studio_use_grinder"
 
 
 class _XBloomNumberBase(NumberEntity, RestoreEntity):
@@ -444,6 +444,24 @@ class XBloomBrewGrindNumber(_XBloomRecipeOverrideNumber):
     _default_value = 50.0
     _recipe_attr = "grinder_size"
 
+    @property
+    def _taste(self) -> str:
+        return getattr(self._entry.runtime_data, "taste", "balanced")
+
+    def _grinds(self) -> bool:
+        """Whether this brew grinds: the recipe does, and Use Grinder is on."""
+        try:
+            preground = int(self._recipe_value("grinder_size_enabled")) == 2
+        except (TypeError, ValueError):
+            preground = False
+        grinder = self.hass.states.get(_USE_GRINDER)
+        return (
+            not preground
+            and kind_of_cup(self._recipe_value("cup_type")) != "tea"
+            and (grinder is None or grinder.state != "off")
+        )
+
+    @callback
     def _seed_from_recipe(self) -> None:
         raw = self._recipe_value(self._recipe_attr)
         if raw is None:
@@ -452,12 +470,8 @@ class XBloomBrewGrindNumber(_XBloomRecipeOverrideNumber):
             grind = float(raw)
         except (TypeError, ValueError):
             return
-        grinds = (
-            self._recipe_value("grinder_size_enabled") != 2
-            and self._recipe_value("cup_type") != TEA_CUP
-        )
-        if grinds:
-            grind += TASTE_GRIND.get(getattr(self._entry.runtime_data, "taste", "balanced"), 0)
+        if self._grinds():
+            grind += TASTE_GRIND.get(self._taste, 0)
         self._current_value = min(self._attr_native_max_value, max(self._attr_native_min_value, grind))
         self.async_write_ha_state()
 
@@ -466,6 +480,14 @@ class XBloomBrewGrindNumber(_XBloomRecipeOverrideNumber):
         self.async_on_remove(async_dispatcher_connect(
             self.hass, f"{SIGNAL_TASTE}_{self._entry.entry_id}", self._seed_from_recipe,
         ))
+
+        @callback
+        def _on_grinder(_event) -> None:
+            # A Taste applies only while grinding; with none, nothing moves.
+            if self._taste != "balanced":
+                self._seed_from_recipe()
+
+        self.async_on_remove(async_track_state_change_event(self.hass, [_USE_GRINDER], _on_grinder))
 
 
 class XBloomBrewRatioNumber(_XBloomRecipeOverrideNumber):

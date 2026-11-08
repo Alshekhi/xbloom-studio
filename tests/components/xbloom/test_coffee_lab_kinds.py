@@ -4,7 +4,7 @@ A coffee brew takes grams from a bag of coffee, an xPod brew one pod from an
 xPod box, a tea brew grams from a tea. An xPod or tea brew with none of its
 kind in use is recorded against nothing, never charged to a bag of coffee.
 """
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -102,15 +102,29 @@ async def test_a_box_is_added_and_counted_in_pods():
         await actions.start_tracking(lab, {"bean_id": added["id"], "grams": 100})
 
 
-async def test_a_card_read_teaches_the_box_in_use_then_finds_it():
+async def test_a_card_read_teaches_the_box_in_use_and_keeps_it():
     lab, store, coffee, box, tea = await _items()
     learnt = await lab.async_card_read("TEST01")
     assert learnt.id == box.id and (await store.async_get_bean(box.id)).pod_id == "TEST01"
-    other = await store.async_add_bean(name="Other Box", status="open", kind="xpod",
-                                       tracked=True, pods_left=8)
-    await lab.async_select(other.id)
-    found = await lab.async_card_read("TEST01")
-    assert found.id == box.id and lab.active_id("xpod") == box.id, "the card found its own box"
+    assert (await lab.async_card_read("TEST01")).id == box.id
+    assert await lab.async_card_read("  ") is None
+
+
+async def test_the_next_box_of_the_same_coffee_learns_the_card_too():
+    lab, store, coffee, box, tea = await _items()
+    await lab.async_card_read("TEST01")
+    second = await store.async_add_bean(name="Second Box", status="unopened", kind="xpod",
+                                        tracked=True, pods_left=8)
+    await lab.async_select(second.id)
+    assert (await lab.async_card_read("TEST01")).id == second.id, "the box in use, not the first known"
+    assert lab.active_id("xpod") == second.id
+
+
+async def test_with_no_box_in_use_an_open_box_is_chosen_before_an_unopened_one():
+    lab, store, coffee = await _lab()
+    await store.async_add_bean(name="Unopened Box", status="unopened", kind="xpod", pod_id="TEST01")
+    opened = await store.async_add_bean(name="Open Box", status="open", kind="xpod", pod_id="TEST01")
+    assert (await lab.async_card_read("TEST01")).id == opened.id
 
 
 async def test_finishing_an_item_clears_it_from_its_own_kind():
@@ -118,3 +132,30 @@ async def test_finishing_an_item_clears_it_from_its_own_kind():
     await store.async_update_bean(tea.id, remaining_g=3.0)
     await lab.async_finish(tea.id)
     assert lab.active_id("tea") is None and lab.active_bean_id == coffee.id
+
+
+def _start_button(cup_type, lab):
+    from custom_components.xbloom.button import XBloomStartBrewButton
+    entry = MagicMock()
+    entry.runtime_data.coffee_lab = lab
+    button = XBloomStartBrewButton(MagicMock(), entry)
+    recipe = MagicMock(state="Test Recipe", attributes={"name": "Test Recipe", "cup_type": cup_type})
+    button.hass = MagicMock()
+    button.hass.states.get = lambda eid: recipe if eid == "select.xbloom_studio_recipe" else None
+    button.hass.services.async_call = AsyncMock()
+    return button
+
+
+@pytest.mark.parametrize("cup", [XPOD, TEA, str(TEA)])
+async def test_start_brew_needs_no_coffee_bag_for_an_xpod_or_tea_recipe(cup):
+    lab, store, coffee = await _lab()
+    button = _start_button(cup, lab)
+    await button.async_press()
+    button.hass.services.async_call.assert_awaited()
+
+
+async def test_start_brew_still_needs_a_bag_for_a_coffee_recipe():
+    lab, store, coffee = await _lab()
+    with pytest.raises(HomeAssistantError) as raised:
+        await _start_button(OMNI, lab).async_press()
+    assert raised.value.translation_key == "bag_required"

@@ -21,6 +21,7 @@ from .versions import entities_for as version_entities
 from .tool_common import refuse
 from .coordinator import XBloomCoordinator
 from .coffee_lab.entities import entities_for as coffee_lab_entities
+from .coffee_lab.inventory import kind_of_cup
 from .tool_common import refuse
 
 _LOGGER = logging.getLogger(__name__)
@@ -250,10 +251,12 @@ class XBloomStartBrewButton(CoordinatorEntity, ButtonEntity):
         if select_state is None or select_state.state in ("unknown", "unavailable", ""):
             _LOGGER.warning("Start Brew pressed but no recipe selected — ignoring")
             return
-        # With Coffee Lab on, the dashboard brews only from a picked bag — the
-        # same rule that decides whether the recipe is prepared at all.
+        # With Coffee Lab on, the dashboard brews a coffee recipe only from a
+        # picked bag — the same rule that decides whether the recipe is
+        # prepared at all. An xPod or tea recipe draws from its own kind.
         lab = getattr(getattr(self._entry, "runtime_data", None), "coffee_lab", None)
-        if lab is not None and lab.active_bean_id is None:
+        if (lab is not None and lab.active_bean_id is None
+                and kind_of_cup(select_state.attributes.get("cup_type")) == "coffee"):
             raise refuse("bag_required")
         data: dict = {}
         ratio = self._num(self.hass, "number.xbloom_studio_brew_ratio")

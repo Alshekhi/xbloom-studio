@@ -173,6 +173,12 @@ def _choice(value: str | None) -> dict:
     return {"select": {"name": value} if value else None}
 
 
+def _one_option(value: Any) -> str | None:
+    """Typed text as one select option: Notion refuses a comma in one."""
+    text = " / ".join(p.strip() for p in str(value or "").split(",") if p.strip())
+    return text or None
+
+
 def bean_from_page(page: dict) -> Bean:
     props = page.get("properties") or {}
     status = {v: k for k, v in STATUS.items()}.get(_select(props.get("Status")) or "", "unopened")
@@ -217,9 +223,9 @@ def bean_properties(values: dict[str, Any]) -> dict[str, Any]:
         elif key in ("remaining_g", "bag_size_g"):
             out["Remaining g" if key == "remaining_g" else "Bag Size g"] = {"number": value}
         elif key == "process":
-            out["Process"] = _choice(value or None)
+            out["Process"] = _choice(_one_option(value))
         elif key == "roast":
-            out[ROAST_COLUMN] = _choice(value or None)
+            out[ROAST_COLUMN] = _choice(_one_option(value))
         elif key == "varietal":
             # Notion refuses a comma in an option, and commas are what
             # separate a bag's varieties.

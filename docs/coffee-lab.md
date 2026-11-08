@@ -137,8 +137,9 @@ recipes brew about 1:8 to 1:10 straight onto ice, hot ones about 1:14 to 1:18.
 the picked recipe's: three steps finer for less sour, three coarser for less
 bitter, never past the grinder's range. **Brew Grind Size** shows the result,
 and the saved recipe is not changed; the brew's version records the grind it
-was made at. A recipe that does not grind is left as it is. Taste goes back to
-Balanced when another bag is chosen.
+was made at. Nothing moves while Use Grinder is off, or for a recipe that does
+not grind. Taste goes back to Balanced once a brew has used its coffee, and
+when another bag is chosen.
 
 ### Buy it again?
 

@@ -297,25 +297,27 @@ class CoffeeLab:
     async def async_card_read(self, pod_id: str) -> Bean | None:
         """A pod's recipe card was read: the xPod box it belongs to, put in use.
 
-        A box already known by this card id is chosen. Failing that, the box
-        in use learns the id if it has none, so the first brew from a box
-        teaches it and the next box of the same coffee is found by itself.
+        The box in use is kept when the card is its own, and learns the card
+        when it has none yet: the first brew from a box teaches it, so the
+        next box of the same coffee, chosen before its first brew, learns it
+        too. Otherwise a box known by this card is chosen, an open one before
+        an unopened one.
         """
         pod_id = str(pod_id or "").strip()
         if not pod_id:
             return None
-        boxes = [b for b in await self.store.async_list_beans() if b.kind == "xpod"]
-        known = next((b for b in boxes if b.pod_id == pod_id), None)
-        if known is not None:
-            if self.active_id("xpod") != known.id:
-                await self.async_select(known.id)
-            return known
         active = await self.async_active_bean("xpod")
+        if active is not None and active.pod_id == pod_id:
+            return active
         if active is not None and not active.pod_id:
             learnt = await self.store.async_update_bean(active.id, pod_id=pod_id)
             self.on_change()
             return learnt
-        return None
+        boxes = [b for b in await self.store.async_list_beans() if b.kind == "xpod" and b.pod_id == pod_id]
+        known = min(boxes, key=lambda b: b.status != "open", default=None)
+        if known is not None:
+            await self.async_select(known.id)
+        return known
 
     async def async_matching(self, name: str) -> list[Bean]:
         """The open or unopened bags called `name`, ignoring case.

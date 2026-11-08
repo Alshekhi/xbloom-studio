@@ -553,8 +553,9 @@ class XBloomTasteSelect(SelectEntity):
 
     Less sour grinds finer, less bitter coarser (const.TASTE_GRIND); the
     Brew Grind Size slider moves with it, so what will be sent is in sight.
-    Kept until another bag is chosen, and not across a restart: a correction
-    asked of one coffee is not silently asked of the next.
+    Kept until a brew has used its coffee or another bag is chosen
+    (prepare.reset_taste), and not across a restart: a correction asked of
+    one brew is not silently asked of the next.
     """
 
     _attr_has_entity_name = True

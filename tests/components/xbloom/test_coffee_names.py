@@ -170,10 +170,21 @@ async def test_english_names_still_work_when_another_language_fails():
                 raise aiohttp.ClientError()
             return await super().criteria()
 
-    with patch.object(coffee_names, "XBloomCommunityClient", ChineseDown):
+    asked = []
+
+    class Counting(ChineseDown):
+        async def criteria(self):
+            asked.append(self.language)
+            return await super().criteria()
+
+    with patch.object(coffee_names, "XBloomCommunityClient", Counting):
         names = HubNames(MagicMock())
         assert await names.async_canonical("country", "ethiopia") == "Ethiopia"
-        assert names._names is None, "asked for again next time"
+        assert await names.async_keys("roast", ["light"]) == {"light"}
+        assert asked == ["en", "ar", "zh"], "what loaded is used until it is time to ask again"
+        names._retry_at = 0
+        await names.async_canonical("country", "ethiopia")
+        assert asked == ["en", "ar", "zh"] * 2
 
 
 async def test_a_name_made_only_of_process_words_matches_nothing(hub):
@@ -246,3 +257,35 @@ async def test_without_the_hubs_names_each_side_is_compared_as_typed_and_asked_o
     assert [r["name"] for r in found["recipes"]] == ["Same", "Other"]
     assert names.async_keys.await_count == 1, "the hub is not waited on once a recipe"
     assert not names.async_flavors_in.await_count, "names gone, notes are not matched"
+
+
+async def test_a_name_s_alternative_never_takes_the_place_of_an_option_named_so():
+    criteria = {"en": {"flavorList": [{"name": "Green/Vegetative", "value": "1"},
+                                      {"name": "Vegetative", "value": "2"}]},
+                "ar": {}, "zh": {}}
+
+    class Hub(FakeHubClient):
+        async def criteria(self):
+            return criteria[self.language]
+
+    with patch.object(coffee_names, "XBloomCommunityClient", Hub):
+        names = HubNames(MagicMock())
+        assert await names.async_canonical("flavor", "vegetative") == "Vegetative"
+        assert await names.async_canonical("flavor", "green") == "Green/Vegetative"
+
+
+async def test_a_hub_that_does_not_answer_is_asked_once_for_a_new_bag():
+    lab = await _lab()
+    lab.hub_names = MagicMock(async_canonical=AsyncMock(side_effect=TimeoutError()))
+    facts = await actions.add_bean(lab, {"name": "Test Bag", "country": "ethiopia", "process": "washed",
+                                         "roast": "light"})
+    assert lab.hub_names.async_canonical.await_count == 1
+    assert facts["unchecked"] == ["country", "process", "roast"]
+
+
+async def test_a_tea_is_corrected_without_the_coffee_names(hub):
+    lab = await _lab()
+    lab.hub_names = hub
+    await actions.add_bean(lab, {"name": "Test Tea", "kind": "tea"})
+    facts = await actions.update_bean(lab, {"bean": "Test Tea", "process": "washed"})
+    assert facts["updated"]["process"] == "washed"

@@ -126,3 +126,19 @@ async def test_keeping_a_version_rescales_the_saved_recipe(as_new):
         assert name == "Test Hot" and kept["id"] == "77"
     assert kept["grinder_size"] == 54
     assert lab.version_to_keep is None
+
+
+async def test_an_xpod_recipe_s_next_change_is_the_one_asked_with_the_box_in_use():
+    lab, store, bag = await _lab()
+    box = await store.async_add_bean(name="Test Box", status="open", kind="xpod", tracked=True, pods_left=4)
+    await lab.async_select(box.id)
+    desk, hass, coordinator, registry = _desk(lab, [SAVED])
+    hass.states.get = lambda eid: SimpleNamespace(
+        state="Test Hot", attributes={"name": "Test Hot", "cup_type": 1})
+    store.async_list_brews = AsyncMock(return_value=[
+        brew("2", "50", next_change="grind 52", bean=box.id),
+    ])
+    with patch.object(versions.er, "async_get", return_value=registry), \
+            patch.object(versions, "async_dispatcher_send"):
+        await desk.async_refresh()
+    assert desk.next_change["settings"] == {"grind": 52.0}

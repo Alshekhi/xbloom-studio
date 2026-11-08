@@ -40,7 +40,7 @@ from .const import (
     CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_BREWERS, CONF_CALLBACK_TARGETS, CONF_COFFEE_LAB,
     CONF_COFFEE_LAB_STORE, CONF_NOTION_BEANS, CONF_NOTION_BREWS, CONF_NOTION_TOKEN,
     COMMUNITY_MACHINE, CONF_PRODUCT_ID, DEFAULT_BREWERS, DOMAIN,
-    DRINKS, SIGNAL_COFFEE_LAB_UPDATED, SIGNAL_TASTE,
+    DRINKS, SIGNAL_COFFEE_LAB_UPDATED,
 )
 from .blueprint_install import async_install_blueprints
 from .callbacks import Callbacks, targets_from
@@ -51,6 +51,7 @@ from .coffee_lab.notion import Databases, NotionClient, NotionStore
 from .coffee_lab.store import UnknownBean
 from .prepare import (
     changes_from_recipe,
+    reset_taste,
     DOSE as PREP_DOSE,
     GRIND as PREP_GRIND,
     RATIO as PREP_RATIO,
@@ -312,8 +313,8 @@ class XBloomRuntimeData:
     community: CommunityBrowser | None = None
     # The Next Change and the version to keep (versions.py), with Coffee Lab.
     versions: object = None
-    # The Brew tab's Taste (const.TASTE_GRIND), kept until another bag is
-    # chosen or it is changed.
+    # The Brew tab's Taste (const.TASTE_GRIND), kept until a brew has used
+    # its coffee or another bag is chosen (prepare.reset_taste).
     taste: str = "balanced"
 
 
@@ -476,10 +477,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
         entry.async_on_unload(hass.bus.async_listen("xbloom_recipe_card_scanned", _card_read))
         def _bag_chosen(bean_id: str | None) -> None:
-            # A taste asked of one coffee is not asked of the next.
-            if entry.runtime_data.taste != "balanced":
-                entry.runtime_data.taste = "balanced"
-                async_dispatcher_send(hass, f"{SIGNAL_TASTE}_{entry.entry_id}")
+            reset_taste(hass, entry)
             browser.bag_chosen(lab, bean_id)
 
         lab.on_bag_chosen = _bag_chosen
@@ -822,11 +820,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             await hass.services.async_call(
                 "select", "select_option", {"entity_id": PREP_RECIPE, "option": name}, blocking=True,
             )
-        for key, entity_id in (("dose", PREP_DOSE), ("ratio", PREP_RATIO), ("grind_size", PREP_GRIND)):
-            if call.data.get(key) is not None:
-                await hass.services.async_call(
-                    "number", "set_value", {"entity_id": entity_id, "value": call.data[key]}, blocking=True,
-                )
+        # The bag and the grinder first: choosing a bag resets the Taste and
+        # turning the grinder on applies it, both moving the grind slider, so
+        # the settings asked for here go last and are what is prepared.
+        if (lab := entry.runtime_data.coffee_lab) is not None:
+            if call.data.get("unattributed"):
+                preparer.unattributed = True
+            elif bean_id := call.data.get("bean_id"):
+                await lab.async_select(bean_id)
         if call.data.get("use_preground") is not None:
             wanted = "off" if call.data["use_preground"] else "on"
             current = hass.states.get(PREP_USE_GRINDER)
@@ -837,11 +838,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 await hass.services.async_call(
                     "switch", f"turn_{wanted}", {"entity_id": PREP_USE_GRINDER}, blocking=True,
                 )
-        if (lab := entry.runtime_data.coffee_lab) is not None:
-            if call.data.get("unattributed"):
-                preparer.unattributed = True
-            elif bean_id := call.data.get("bean_id"):
-                await lab.async_select(bean_id)
+        for key, entity_id in (("dose", PREP_DOSE), ("ratio", PREP_RATIO), ("grind_size", PREP_GRIND)):
+            if call.data.get(key) is not None:
+                await hass.services.async_call(
+                    "number", "set_value", {"entity_id": entity_id, "value": call.data[key]}, blocking=True,
+                )
         try:
             if call.data.get("wait", True):
                 await preparer.async_prepare_now()
@@ -962,7 +963,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 if named := data.get("bean_id"):
                     try:
                         named_bean = await lab.store.async_get_bean(named)
-                    except UnknownBean:
+                    except (UnknownBean, *STORE_UNREACHABLE):
+                        # Unknown, or the store not answering: the brew goes
+                        # ahead, and the item is checked when it is counted.
                         drawn["coffee"] = named
                     else:
                         drawn[named_bean.kind] = named
@@ -970,7 +973,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     meta["bean_id"] = drawn["coffee"]
                     try:
                         meta["bean_name"] = (await lab.store.async_get_bean(drawn["coffee"])).name
-                    except UnknownBean:
+                    except (UnknownBean, *STORE_UNREACHABLE):
                         pass
                 if drawn["xpod"]:
                     meta["xpod_id"] = drawn["xpod"]

@@ -28,6 +28,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
 from .coffee_lab.lab import CoffeeLab, brew_version, normalize_ratio
+from .coffee_lab.inventory import kind_of_cup
 from .coffee_lab.models import VERDICT_OF, Brew
 from .const import DOMAIN, SIGNAL_COFFEE_LAB_UPDATED
 from .tool_common import fail
@@ -38,6 +39,8 @@ _LOGGER = logging.getLogger(__name__)
 LOOKBACK = timedelta(days=365)
 RECIPE_SELECT = "xbloom_recipe_select"
 BAG_SELECT = "xbloom_coffee_lab_active_bag"
+# The xPod box and tea in use: an xPod or tea recipe's versions are its own.
+ITEM_SELECTS = (BAG_SELECT, "xbloom_coffee_lab_active_xpod_box", "xbloom_coffee_lab_active_tea")
 
 # The Brew tab's one-off adjustments, by unique id, and the grinder switch a
 # grind change needs on.
@@ -156,7 +159,11 @@ class VersionDesk:
 
     async def async_refresh(self) -> None:
         """Read the Next Change for the picked recipe with the bag in use."""
-        recipe, bean_id = self._picked_recipe(), self._lab.active_bean_id
+        recipe = self._picked_recipe()
+        # The item this recipe draws from: the bag, or the xPod box or tea.
+        state = self._hass.states.get(self._entity_id("select", RECIPE_SELECT))
+        kind = kind_of_cup(state.attributes.get("cup_type")) if state is not None else "coffee"
+        bean_id = self._lab.active_id(kind)
         found = None
         if recipe and bean_id:
             since = dt_util.utcnow() - LOOKBACK
@@ -268,8 +275,8 @@ class NextChangeSensor(_VersionEntity, SensorEntity):
         await super().async_added_to_hass()
         registry = er.async_get(self.hass)
         watched = [
-            eid for platform, uid in (("select", RECIPE_SELECT), ("select", BAG_SELECT))
-            if (eid := registry.async_get_entity_id(platform, DOMAIN, uid))
+            eid for uid in (RECIPE_SELECT, *ITEM_SELECTS)
+            if (eid := registry.async_get_entity_id("select", DOMAIN, uid))
         ]
         self.async_on_remove(async_track_state_change_event(self.hass, watched, self._changed))
         self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_COFFEE_LAB_UPDATED, self._changed))

@@ -303,6 +303,10 @@ async def in_hub_words(lab: CoffeeLab, values: dict[str, Any]) -> dict[str, Any]
         text = str(values.get(field) or "").strip()
         if not text or names is None:
             continue
+        if unchecked:
+            # The hub did not answer for one field: it is not waited on again.
+            unchecked.append(field)
+            continue
         parts = [p.strip() for p in text.split(",") if p.strip()] if field == "varietal" else [text]
         try:
             canonical = [await names.async_canonical(field, p) for p in parts]
@@ -337,7 +341,8 @@ async def update_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     changes = _bag_values(args)
     if args.get("new_name"):
         changes["name"] = str(args["new_name"]).strip()
-    checked = await in_hub_words(lab, changes)
+    # The hub names coffee's countries and processes; a tea's are its own.
+    checked = await in_hub_words(lab, changes) if changes.get("kind", bean.kind) != "tea" else {}
     updated = await lab.store.async_update_bean(bean.id, **changes)
     lab.on_change()
     return {"updated": bean_facts(updated), **checked}
