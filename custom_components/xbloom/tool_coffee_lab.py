@@ -104,11 +104,13 @@ INTRO = (
 
 # Free text in the record — typed by people, kept in a store others may edit —
 # reaches the model only as one line of printable text, capped. Every string
-# is cleaned, keys included, except those this code itself writes: ids,
-# codes and dates. A note may run longer than a name.
+# is cleaned, keys included, except those this code itself writes or checks
+# against a fixed list when reading them: ids, codes and dates. A value read
+# back from a store's own field (Buy Again, Outcome, Review Reason) is
+# cleaned like any text. A note may run longer than a name.
 _OURS = {
     "id", "brew_id", "bean_id", "run_id", "status", "brewed_at", "opened_on", "finished_on",
-    "buy_again", "outcome", "period", "verdict", "matched", "result", "reason", "setting",
+    "period", "verdict", "matched", "result", "setting",
 }
 _NOTES = {"roaster_notes", "next_change", *TASTE_NOTES}
 _NAME_LIMIT, _NOTE_LIMIT = 80, 300
