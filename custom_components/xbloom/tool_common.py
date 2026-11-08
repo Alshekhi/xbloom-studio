@@ -23,7 +23,7 @@ def refuse(key: str, **placeholders: Any) -> ServiceValidationError:
     """
     return ServiceValidationError(
         translation_domain=DOMAIN, translation_key=key,
-        translation_placeholders={k: str(v) for k, v in placeholders.items()},
+        translation_placeholders=_placeholders(placeholders),
     )
 
 
@@ -32,8 +32,21 @@ def fail(key: str, **placeholders: Any) -> HomeAssistantError:
     refused, or cannot be reached. Translated like a refusal."""
     return HomeAssistantError(
         translation_domain=DOMAIN, translation_key=key,
-        translation_placeholders={k: str(v) for k, v in placeholders.items()},
+        translation_placeholders=_placeholders(placeholders),
     )
+
+
+def _placeholders(values: dict[str, Any]) -> dict[str, str]:
+    """A message's values as one line of printable text each, capped.
+
+    They can carry text from outside — a bag's name, a store's or the hub's
+    error — and the message reaches an assistant as well as a person.
+    """
+    out = {}
+    for key, value in values.items():
+        text = " ".join("".join(ch if ch.isprintable() else " " for ch in str(value)).split())
+        out[key] = text if len(text) <= 200 else text[:199].rstrip() + "…"
+    return out
 
 
 def require_machine_control(entry) -> None:

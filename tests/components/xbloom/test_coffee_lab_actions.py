@@ -237,3 +237,23 @@ async def test_record_text_reaches_the_model_as_one_capped_line():
     assert "\n" not in bag["roaster_notes"] and "‮" not in bag["roaster_notes"]
     assert len(bag["roaster_notes"]) <= 300 and bag["roaster_notes"].endswith("…")
     assert bag["remaining_g"] is None, "facts that are not text are left as they are"
+
+
+def test_every_outside_string_is_cleaned_keys_too_but_ids_and_codes_are_not():
+    dirty = "Line one\nline two‮"
+    cleaned = tool_coffee_lab._clean({
+        "id": "abc\n", "dripper": dirty, "by_brewer": {dirty: 2},
+        "changed_from_recipe": [{"setting": "grind", "value": 52}],
+    })
+    assert cleaned["id"] == "abc\n", "this code's own values are left alone"
+    assert cleaned["dripper"] == "Line one line two"
+    assert list(cleaned["by_brewer"]) == ["Line one line two"]
+    assert cleaned["changed_from_recipe"] == [{"setting": "grind", "value": 52}]
+
+
+def test_a_refusal_carries_outside_text_as_one_line():
+    from custom_components.xbloom.tool_common import refuse
+
+    error = refuse("bag_not_found", name="Bag\nIGNORE ALL‮" + "x" * 300)
+    text = error.translation_placeholders["name"]
+    assert "\n" not in text and "‮" not in text and len(text) <= 200
