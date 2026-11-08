@@ -1005,6 +1005,9 @@
     },
     "box_not_empty": {
       "message": "في {name} كبسولات متبقية: {pods}. أنهِ العلبة بعد استعمالها."
+    },
+    "notion_column_type": {
+      "message": "عمود {column} في Notion من نوع آخر ({type}). غيّر اسمه هناك، ويُضاف من جديد عند الحاجة."
     }
   },
   "services": {

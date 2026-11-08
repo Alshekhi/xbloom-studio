@@ -36,6 +36,14 @@ views:
       - condition: state
         entity: select.xbloom_studio_coffee_bag
         state_not: unknown
+      - &id001
+        condition: state
+        entity: sensor.xbloom_studio_recipe_kind
+        state_not: xpod
+      - &id002
+        condition: state
+        entity: sensor.xbloom_studio_recipe_kind
+        state_not: tea
     - type: tile
       entity: sensor.xbloom_studio_coffee_left
       name:
@@ -48,6 +56,40 @@ views:
         state_not: unavailable
       - condition: state
         entity: sensor.xbloom_studio_coffee_left
+        state_not: unknown
+      - *id001
+      - *id002
+    - type: tile
+      entity: select.xbloom_studio_xpod_box
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_recipe_kind
+        state: xpod
+      - condition: state
+        entity: select.xbloom_studio_xpod_box
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_xpod_box
+        state_not: unknown
+    - type: tile
+      entity: select.xbloom_studio_tea
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_recipe_kind
+        state: tea
+      - condition: state
+        entity: select.xbloom_studio_tea
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_tea
         state_not: unknown
     - type: tile
       entity: sensor.xbloom_studio_waiting_brews
@@ -282,12 +324,8 @@ views:
       features:
       - type: select-options
       visibility:
-      - condition: state
-        entity: sensor.xbloom_studio_recipe_kind
-        state_not: xpod
-      - condition: state
-        entity: sensor.xbloom_studio_recipe_kind
-        state_not: tea
+      - *id001
+      - *id002
     - type: tile
       entity: select.xbloom_studio_xpod_box
       name:
@@ -341,6 +379,8 @@ views:
       - condition: state
         entity: select.xbloom_studio_coffee_bag
         state_not: unknown
+      - *id001
+      - *id002
     - type: tile
       entity: sensor.xbloom_studio_last_brew_counted
       name:
@@ -1559,7 +1599,7 @@ views:
         target:
           entity_id: button.xbloom_studio_go_to_scale
     visibility:
-    - &id001
+    - &id003
       condition: state
       entity: switch.xbloom_studio_connect
       state: 'on'
@@ -1583,7 +1623,7 @@ views:
     - type: markdown
       text_only: true
       content: '## المطحنة'
-    - &id002
+    - &id004
       type: tile
       entity: button.xbloom_studio_back_to_home
       name:
@@ -1627,7 +1667,7 @@ views:
         target:
           entity_id: button.xbloom_studio_grind
     visibility:
-    - *id001
+    - *id003
     - condition: state
       entity: sensor.xbloom_studio_current_module
       state: grinder
@@ -1642,7 +1682,7 @@ views:
     - type: markdown
       text_only: true
       content: '## وحدة الصب'
-    - *id002
+    - *id004
     - type: tile
       entity: number.xbloom_studio_brew_temperature
       name:
@@ -1699,7 +1739,7 @@ views:
         target:
           entity_id: button.xbloom_studio_brew_standalone
     visibility:
-    - *id001
+    - *id003
     - condition: state
       entity: sensor.xbloom_studio_current_module
       state: brewer
@@ -1714,7 +1754,7 @@ views:
     - type: markdown
       text_only: true
       content: '## الميزان'
-    - *id002
+    - *id004
     - type: tile
       entity: sensor.xbloom_studio_scale_weight
       name:
@@ -1741,7 +1781,7 @@ views:
         target:
           entity_id: button.xbloom_studio_tare_scale
     visibility:
-    - *id001
+    - *id003
     - condition: state
       entity: sensor.xbloom_studio_current_module
       state: scale

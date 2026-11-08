@@ -48,8 +48,15 @@ recipe needs.
 
 A box is counted in **pods** — give how many it holds when adding it — and is
 finished when the last is used. When the machine reads a pod's recipe card
-while Connect holds the link, the box that card belongs to is put in use;
-the first card read with a box in use teaches that box its card.
+while Connect holds the link, the box in use keeps it if the card is its own,
+and learns the card if it has none yet; otherwise a box that knows the card is
+put in use, an open one before an unopened one.
+
+Changing an item between a box and a bag or tea clears its amount, since pods
+and grams do not convert; give the new amount to count it again. An xPod brew
+stopped after grinding is recorded for review against its box, as a coffee
+brew is against its bag; a stopped tea brew is not recorded, since tea is not
+ground.
 
 ## How a brew is counted
 

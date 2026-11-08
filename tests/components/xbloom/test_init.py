@@ -163,3 +163,29 @@ async def test_service_deregistration_on_unload(mock_config_entry) -> None:
     hass.services.async_remove.assert_called()
     remove_pairs = [(a[0][0], a[0][1]) for a in hass.services.async_remove.call_args_list if len(a[0]) >= 2]
     assert (DOMAIN, "start_brew") in remove_pairs
+
+
+async def test_suggest_community_asks_for_the_brew_tab_s_drink_unless_told(mock_config_entry) -> None:
+    hass = MagicMock()
+    hass.services.async_register = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    hass.bus.async_listen = MagicMock(return_value=lambda: None)
+    entry = mock_config_entry
+    entry.async_on_unload = MagicMock()
+    with patch("custom_components.xbloom.XBloomCoordinator") as mc, \
+         patch("custom_components.xbloom.XBloomClient") as mk:
+        mk.return_value = AsyncMock()
+        coord = MagicMock()
+        coord.async_config_entry_first_refresh = AsyncMock()
+        coord.data = []
+        mc.return_value = coord
+        await async_setup_entry(hass, entry)
+    handler = next(a[0][2] for a in hass.services.async_register.call_args_list
+                   if len(a[0]) >= 3 and a[0][1] == "suggest_community")
+    entry.runtime_data.community.drink = "iced"
+    found = {"origin": "Ethiopia", "process": None, "recipes": []}
+    with patch("custom_components.xbloom.suggest", AsyncMock(return_value=found)) as asked:
+        await handler(MagicMock(data={"origin": "Ethiopia"}))
+        assert asked.await_args.kwargs["drink"] == "iced"
+        await handler(MagicMock(data={"origin": "Ethiopia", "drink": "hot"}))
+        assert asked.await_args.kwargs["drink"] == "hot"

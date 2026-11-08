@@ -1005,6 +1005,9 @@
     },
     "box_not_empty": {
       "message": "{name} still has pods left: {pods}. Finish the box once they are used."
+    },
+    "notion_column_type": {
+      "message": "The {column} column in Notion is of another type ({type}). Rename it there, and it is added again as needed."
     }
   },
   "services": {

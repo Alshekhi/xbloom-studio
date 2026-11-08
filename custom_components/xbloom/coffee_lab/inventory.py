@@ -70,6 +70,13 @@ def is_xpod(cup_type: Any) -> bool:
     return spec.CUP_API_TO_LABEL.get(api, "").lower() == "xpod"
 
 
+# The cup type that draws from an xPod box or a tea (spec.CUP_API_TO_LABEL).
+CUP_OF_KIND = {
+    label.lower(): api for api, label in spec.CUP_API_TO_LABEL.items()
+    if label.lower() in ("xpod", "tea")
+}
+
+
 def kind_of_cup(cup_type: Any) -> str:
     """The kind of item a brew in this cup draws from: xpod, tea, or coffee."""
     try:

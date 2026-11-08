@@ -173,6 +173,20 @@ def _choice(value: str | None) -> dict:
     return {"select": {"name": value} if value else None}
 
 
+def _same_type(column: str, found: str | None, wanted: str) -> None:
+    """Refuse a column that exists as another type: writing would change it.
+
+    Notion turns a column into the type a write asks for, and what the
+    column held is lost in the change; a column added by hand under one of
+    these names is left as it is.
+    """
+    if found is not None and found != wanted:
+        raise StoreRefused(
+            translation_domain=DOMAIN, translation_key="notion_column_type",
+            translation_placeholders={"column": column, "type": found},
+        )
+
+
 def _one_option(value: Any) -> str | None:
     """Typed text as one select option: Notion refuses a comma in one."""
     text = " / ".join(p.strip() for p in str(value or "").split(",") if p.strip())
@@ -476,7 +490,8 @@ class NotionStore(CoffeeLabStore):
         # A select option the database lacks is added before it is written:
         # Notion refuses a whole page sent an option it does not have.
         self._options: dict[tuple[str, str], set[str]] = {}
-        self._columns: dict[str, set[str] | None] = {}
+        # database id → column name → its type
+        self._columns: dict[str, dict[str, str | None] | None] = {}
         self._schema_lock = asyncio.Lock()
 
     async def _call(self, method: str, path: str, body: dict | None = None) -> dict:
@@ -502,14 +517,17 @@ class NotionStore(CoffeeLabStore):
         async with self._schema_lock:
             if self._columns.get(database_id) is None:
                 schema = (await self._call("GET", f"/databases/{database_id}")).get("properties") or {}
-                self._columns[database_id] = set(schema)
-            missing = {n: k for n, k in kinds.items() if n not in self._columns[database_id]}
+                self._columns[database_id] = {n: (p or {}).get("type") for n, p in schema.items()}
+            columns = self._columns[database_id]
+            for name, kind in kinds.items():
+                _same_type(name, columns.get(name), kind)
+            missing = {n: k for n, k in kinds.items() if n not in columns}
             if not missing:
                 return
             await self._call("PATCH", f"/databases/{database_id}", {"properties": {
                 name: {kind: {}} for name, kind in missing.items()
             }})
-            self._columns[database_id] |= set(missing)
+            columns.update(missing)
 
     async def _ensure_options(self, database_id: str, props: dict[str, Any]) -> None:
         """Add the select and multi-select options `props` writes that the database lacks.
@@ -530,6 +548,7 @@ class NotionStore(CoffeeLabStore):
             if not all((database_id, n) in self._options for n in wanted):
                 schema = (await self._call("GET", f"/databases/{database_id}")).get("properties") or {}
                 for name, (kind, _) in wanted.items():
+                    _same_type(name, (schema.get(name) or {}).get("type"), kind)
                     options = ((schema.get(name) or {}).get(kind) or {}).get("options") or []
                     self._options[(database_id, name)] = {o["name"] for o in options}
             missing = {

@@ -199,7 +199,7 @@ async def test_a_brew_stopped_after_grinding_is_recorded_for_review_bag_untouche
 
 @pytest.mark.parametrize("extra", [
     {"ground": False},
-    {"ground": True, "cup_type": 1},          # an xPod
+    {"ground": True, "cup_type": 1},          # an xPod, with no box in use
     {"ground": True, "unattributed": True},
 ])
 async def test_a_stop_that_used_no_bag_s_coffee_records_nothing(extra):

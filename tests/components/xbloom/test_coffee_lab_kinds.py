@@ -159,3 +159,29 @@ async def test_start_brew_still_needs_a_bag_for_a_coffee_recipe():
     with pytest.raises(HomeAssistantError) as raised:
         await _start_button(OMNI, lab).async_press()
     assert raised.value.translation_key == "bag_required"
+
+
+async def test_a_stopped_xpod_brew_is_recorded_for_review_and_a_stopped_tea_is_not():
+    lab, store, coffee, box, tea = await _items()
+    stopped = await lab.async_record_stopped(
+        bean_id=coffee.id, xpod_id=box.id, tea_id=tea.id, grams=15, run_id="s1", cup_type=XPOD)
+    assert (stopped.result, stopped.bean_id) == ("flagged", box.id)
+    assert (await store.async_get_bean(box.id)).pods_left == 2, "left as it is, for review"
+    skipped = await lab.async_record_stopped(
+        bean_id=coffee.id, xpod_id=box.id, tea_id=tea.id, grams=5, run_id="s2", cup_type=TEA)
+    assert skipped.result == "skipped"
+
+
+async def test_moving_an_item_between_pods_and_grams_clears_its_amount():
+    lab, store, coffee, box, tea = await _items()
+    facts = (await actions.update_bean(lab, {"bean_id": box.id, "kind": "coffee"}))["updated"]
+    assert (facts["kind"], facts["tracked"], facts["remaining_g"]) == ("coffee", False, None)
+    kept = (await actions.update_bean(lab, {"bean_id": tea.id, "kind": "coffee"}))["updated"]
+    assert (kept["tracked"], kept["remaining_g"]) == (True, 50.0), "grams stay grams"
+
+
+async def test_grams_taken_from_a_tea_by_hand_come_off_the_tea():
+    lab, store, coffee, box, tea = await _items()
+    facts = await actions.consume(lab, {"bean_id": tea.id, "grams": 4, "brewer": "Test Teapot"})
+    assert (await store.async_get_bean(tea.id)).remaining_g == 46.0
+    assert (await store.async_get_bean(coffee.id)).remaining_g == 200.0

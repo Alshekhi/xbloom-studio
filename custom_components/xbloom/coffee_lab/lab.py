@@ -850,9 +850,11 @@ class CoffeeLab:
     ) -> Consumption:
         if self._runs.contains(run_id) or await self.store.async_has_run(run_id):
             return Consumption("skipped", reason="already_counted")
-        if unattributed or kind_of_cup(cup_type) != "coffee":
-            # No bag to put right: the coffee was in a pod, or it was tea, or
-            # it came from none.
+        kind = kind_of_cup(cup_type)
+        if unattributed or kind == "tea" or (kind == "xpod" and bean_id is None):
+            # Nothing ground to put right: tea is not ground, and a brew from
+            # no item has none. A pod is ground like a bag's coffee, so a
+            # stopped xPod brew is recorded for review against its box.
             return Consumption("skipped", reason="no_bag_used")
         await self.store.async_create_brew(Brew(
             id="", brewed_at=brewed_at or dt_util.utcnow().isoformat(),

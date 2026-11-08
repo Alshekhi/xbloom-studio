@@ -526,19 +526,23 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                 # The hub names coffee's countries and processes; a tea's are its own.
                 if user_input.get("kind", bean.kind) != "tea":
                     await coffee_lab_actions.in_hub_words(lab, details)
+                kind = user_input.get("kind", bean.kind)
+                # Between pods and grams the old amount no longer holds.
+                cleared = coffee_lab_actions.kind_changes(bean, kind)
                 await lab.store.async_update_bean(
                     bean.id, name=name, status=user_input["status"],
-                    bag_size_g=user_input.get("bag_size_g"), kind=user_input.get("kind", bean.kind),
-                    **details,
+                    bag_size_g=user_input.get("bag_size_g"), kind=kind,
+                    **details, **cleared,
                 )
                 lab.on_change()
-                if user_input.get("kind", bean.kind) == "xpod":
+                untracked = bool(cleared) or not bean.tracked
+                if kind == "xpod":
                     if user_input.get("pods") not in (None, "") and (
-                        int(user_input["pods"]) != bean.pods_left or not bean.tracked
+                        int(user_input["pods"]) != bean.pods_left or untracked
                     ):
                         await lab.async_start_tracking(bean.id, pods=int(user_input["pods"]))
                 elif user_input.get("remaining_g") not in (None, "") and (
-                    user_input["remaining_g"] != bean.remaining_g or not bean.tracked
+                    user_input["remaining_g"] != bean.remaining_g or untracked
                 ):
                     await lab.async_start_tracking(bean.id, float(user_input["remaining_g"]))
                 return self.async_create_entry(title="", data={"_bag_edited": bean.id})

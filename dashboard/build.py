@@ -230,12 +230,17 @@ def brew_view(t: dict) -> dict:
     bag = f"select.{E}_coffee_bag"
     kind = f"sensor.{E}_recipe_kind"
     manual = "input_boolean.xbloom_show_manual_brew"
+    # Shown while the picked recipe draws from a bag of coffee.
+    coffee = [{"condition": "state", "entity": kind, "state_not": k} for k in ("xpod", "tea")]
     return {"title": t["view_brew"], "path": "brew", "icon": "mdi:coffee", "type": "sections", "max_columns": 2, "sections": [
         section(t["h_now"], [
             tile(f"sensor.{E}_brew_status"),
             tile(f"binary_sensor.{E}_in_range"),
-            tile(bag, visibility=present(bag)),
-            tile(f"sensor.{E}_coffee_left", visibility=present(f"sensor.{E}_coffee_left")),
+            # What the picked recipe draws from: the bag, the xPod box or the tea.
+            tile(bag, visibility=[*present(bag), *coffee]),
+            tile(f"sensor.{E}_coffee_left", visibility=[*present(f"sensor.{E}_coffee_left"), *coffee]),
+            tile(f"select.{E}_xpod_box", visibility=[is_(kind, "xpod"), *present(f"select.{E}_xpod_box")]),
+            tile(f"select.{E}_tea", visibility=[is_(kind, "tea"), *present(f"select.{E}_tea")]),
             # Only while a brew could not be saved; it is retried by itself.
             tile(f"sensor.{E}_waiting_brews", visibility=[
                 {"condition": "numeric_state", "entity": f"sensor.{E}_waiting_brews", "above": 0}]),
@@ -275,9 +280,7 @@ def brew_view(t: dict) -> dict:
         section(t["h_bag"], [
             # The picker for what the picked recipe draws from: a bag of
             # coffee, an xPod box, or a tea.
-            select(bag, visibility=[
-                {"condition": "state", "entity": kind, "state_not": k} for k in ("xpod", "tea")
-            ]),
+            select(bag, visibility=coffee),
             select(f"select.{E}_xpod_box", visibility=[is_(kind, "xpod")]),
             {"type": "markdown", "text_only": True, "content": (
                 "{% set n = state_attr('select." + E + "_xpod_box', 'pods_left') %}"
@@ -289,7 +292,7 @@ def brew_view(t: dict) -> dict:
                 "{{ [a.get('roaster'), [a.get('country'), a.get('region')] | select | join('" + t["sep"] + "'), a.get('process'), a.get('varietal'), a.get('roast')]"
                 " | select | join(' · ') }}"
                 "{% if a.get('roaster_notes') %}\n\n{{ a.get('roaster_notes') }}{% endif %}"
-            ), "visibility": present(bag)},
+            ), "visibility": [*present(bag), *coffee]},
             tile(f"sensor.{E}_last_brew_counted", visibility=[is_(f"sensor.{E}_last_brew_counted", "flagged")]),
         # Not hidden while no bag is chosen: this is where one is chosen.
         ], present(bag)[:1]),

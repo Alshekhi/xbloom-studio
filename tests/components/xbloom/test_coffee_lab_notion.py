@@ -302,3 +302,18 @@ def test_a_comma_never_reaches_a_single_choice_column():
     props = bean_properties({"process": "Natural, Anaerobic", "roast": "light,"})
     assert props["Process"] == {"select": {"name": "Natural / Anaerobic"}}
     assert props["Roast"] == {"select": {"name": "light"}}
+
+
+async def test_a_column_of_another_type_is_refused_never_changed():
+    notion = FakeNotion({
+        ("GET", "/databases/b"): {"properties": {
+            "Roast": {"type": "rich_text", "rich_text": {}},
+            "Status": {"type": "select", "select": {"options": [{"name": "Unopened"}]}},
+            "Inventory Tracking": {"type": "select", "select": {"options": [{"name": "Untracked"}]}},
+        }},
+    })
+    store = NotionStore(notion, Databases("b", "r"))
+    with pytest.raises(HomeAssistantError) as caught:
+        await store.async_add_bean(name="Kenya", status="unopened", roast="Light Roast")
+    assert caught.value.translation_key == "notion_column_type"
+    assert not [c for c in notion.calls if c[0] in ("PATCH", "POST")], "nothing written"

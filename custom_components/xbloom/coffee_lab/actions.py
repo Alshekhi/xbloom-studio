@@ -24,6 +24,7 @@ from xbloom.exceptions import XBloomAPIError
 
 from ..tool_common import refuse
 from .lab import STORE_UNREACHABLE, CoffeeLab, Consumption
+from .inventory import CUP_OF_KIND
 from .models import TASTE_NOTES, TASTE_SCALES, VERDICT_OF, Bean, Brew
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER, Totals
 from .store import UnknownBean, UnknownBrew
@@ -251,8 +252,11 @@ async def consume(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     if brewer is not None and ("," in str(brewer) or len(str(brewer)) > 100):
         raise refuse("brewer_invalid")
     bean_id, bean = await _bag_for_counting(lab, args)
+    # Taken from a tea or an xPod box, it draws from that, not from a bag.
+    kind = getattr(bean, "kind", "coffee")
     result = await lab.async_consume(
-        bean_id=bean_id, grams=args["grams"],
+        bean_id=bean_id, grams=args["grams"], cup_type=CUP_OF_KIND.get(kind),
+        xpod_id=bean_id if kind == "xpod" else None, tea_id=bean_id if kind == "tea" else None,
         # No brewer named is recorded as none, never as the xBloom.
         brewer=args.get("brewer"), recipe_source=args.get("source"),
     )
@@ -335,12 +339,25 @@ async def add_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     return {"added": bean_facts(bean), **checked}
 
 
+def kind_changes(bean: Bean, kind: str | None) -> dict[str, Any]:
+    """What an item's amount becomes when its kind changes.
+
+    A box is counted in pods and a bag or tea in grams, so moving between the
+    two leaves no amount: the item is untracked until one is given. Between
+    coffee and tea the grams still hold.
+    """
+    if not kind or kind == bean.kind or "xpod" not in (kind, bean.kind):
+        return {}
+    return {"tracked": False, "remaining_g": None, "pods_left": None}
+
+
 async def update_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     """Correct a bag's details. Its amount changes through start_tracking."""
     bean = await resolve_bean(lab, args, selectable_only=False)
     changes = _bag_values(args)
     if args.get("new_name"):
         changes["name"] = str(args["new_name"]).strip()
+    changes.update(kind_changes(bean, changes.get("kind")))
     # The hub names coffee's countries and processes; a tea's are its own.
     checked = await in_hub_words(lab, changes) if changes.get("kind", bean.kind) != "tea" else {}
     updated = await lab.store.async_update_bean(bean.id, **changes)

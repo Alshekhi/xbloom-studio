@@ -21,6 +21,13 @@ returns it when asked for a response. Give `start_brew` a `context` — any valu
 route the outcome to whoever started the brew. Events are kept in Home
 Assistant's history, and so is a `context` sent with one.
 
+With Coffee Lab on, every event of a brew also says what it draws from, as
+chosen when it started: `bean_id` and `bean_name` for the bag of coffee,
+`xpod_id` for the xPod box and `tea_id` for the tea, each only when one is in
+use or named. The recipe's cup type decides which of them the brew is counted
+against. `unattributed` is `true` when the brew was asked to count against
+nothing.
+
 `by` on a stop is `machine` (stopped on the machine itself), `home_assistant`
 (Cancel Brew, or the `stop_brew` action) or `superseded` (a new brew replaced
 one still running). A machine that stops over a fault it cannot brew through —
