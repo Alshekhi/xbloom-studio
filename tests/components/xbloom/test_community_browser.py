@@ -152,8 +152,9 @@ def test_every_platform_gets_its_entities_and_nothing_without_a_browser():
     entry.runtime_data.community = _browser()[0]
     assert [type(e).__name__ for e in ce.entities_for(entry, "button")] == [
         "CommunitySearchButton", "CommunitySuggestButton", "CommunityAddButton",
-        "SuggestRecipeButton", "UseSuggestedRecipeButton", "AddAndUseCommunityRecipeButton",
+        "SuggestRecipeButton", "UseSuggestedRecipeButton",
     ]
+    assert [type(e).__name__ for e in ce.entities_for(entry, "select")][-1] == "SuggestedRecipeSelect"
     entry.runtime_data.community = None
     assert ce.entities_for(entry, "select") == []
 
@@ -260,24 +261,80 @@ async def test_your_own_are_kept_when_the_hub_cannot_be_reached():
     assert browser.own == own
 
 
-async def test_use_and_add_and_use_pick_the_recipe_in_the_picker():
-    browser, *_ = _browser()
+SECOND = {"id": 4022, "name": "Test Peru Iced", "machine": "Studio", "share_url": LINK}
+
+
+def _registry(browser):
     browser._hass.services.async_call = AsyncMock()
     registry = MagicMock()
     registry.async_get_entity_id = MagicMock(return_value="select.xbloom_studio_recipe")
-    browser.own = [cm.OwnSuggestion("Mine", 1, "origin", "")]
-    with patch.object(cm.er, "async_get", return_value=registry):
-        await browser.async_use_own()
-        await browser.async_search()
-        await browser.async_pick("Test Kenya Hot")
-        await browser.async_add_and_use()
-    picked = [c.args[2]["option"] for c in browser._hass.services.async_call.await_args_list]
-    assert picked == ["Mine", "Test Kenya Hot"]
+    return patch.object(cm.er, "async_get", return_value=registry)
+
+
+def _picked(browser):
+    return [c.args[2]["option"] for c in browser._hass.services.async_call.await_args_list]
+
+
+async def _suggested(own, recipes=(LISTED, SECOND)):
+    browser, client, share, coordinator = _browser(recipes=recipes)
+    with patch.object(cm, "async_own_suggestions", AsyncMock(return_value=own)):
+        await browser.async_suggest_for_bag(_bag())
+    return browser, client, coordinator
+
+
+async def test_the_picker_lists_your_own_then_the_community_most_downloaded_first():
+    own = [cm.OwnSuggestion("Mine", 3, "this_bag", ""), cm.OwnSuggestion("Other", 1, "origin", "")]
+    browser, *_ = await _suggested(own)
+    assert browser.choice_keys() == ["own:Mine", "own:Other", "hub:4021", "hub:4022"]
+    assert browser.choice == "own:Mine", "your best one is chosen"
+    assert browser.picked_id == 4021, "the most downloaded, not a random one"
+
+
+async def test_using_your_own_choice_picks_it_by_name():
+    own = [cm.OwnSuggestion("Mine", 3, "this_bag", ""), cm.OwnSuggestion("Other", 1, "origin", "")]
+    browser, _, coordinator = await _suggested(own)
+    with _registry(browser):
+        await browser.async_choose("own:Other")
+        await browser.async_use_choice()
+    assert _picked(browser) == ["Other"]
+    coordinator.async_add_recipe.assert_not_awaited()
+
+
+async def test_using_a_community_choice_adds_it_then_picks_it():
+    browser, client, coordinator = await _suggested([])
+    assert browser.choice == "hub:4021", "with none of your own, the community's first"
+    with _registry(browser):
+        await browser.async_choose("hub:4022")
+        await browser.async_use_choice()
+    assert client.detail.await_args_list[-1].args[0] == 4022
+    coordinator.async_add_recipe.assert_awaited_once()
+    assert _picked(browser) == [browser.added]
+
+
+async def test_a_community_search_meanwhile_does_not_change_what_is_used():
+    browser, client, coordinator = await _suggested([])
+    await browser.async_choose("hub:4022")
+    await browser.async_search()  # the Community tab picks nothing, the results change
+    await browser.async_pick("Test Kenya Hot")
+    with _registry(browser):
+        await browser.async_use_choice()
+    assert client.detail.await_args_list[-1].args[0] == 4022
 
 
 async def test_use_without_a_suggestion_is_refused():
     browser, *_ = _browser()
-    browser.own = []
     with pytest.raises(HomeAssistantError) as caught:
-        await browser.async_use_own()
+        await browser.async_use_choice()
     assert caught.value.translation_key == "suggestion_none"
+
+
+async def test_a_community_choice_is_marked_in_the_picker():
+    browser, *_ = await _suggested([cm.OwnSuggestion("Mine", 3, "this_bag", "")])
+    select = ce.SuggestedRecipeSelect(browser)
+    select._community_marker = "community"
+    assert select.options == ["Mine", "Test Kenya Hot (community)", "Test Peru Iced (community)"]
+    assert select.current_option == "Mine"
+    assert select.extra_state_attributes == {"source": "own", "brews": 3, "matched": "this_bag"}
+    await select.async_select_option("Test Peru Iced (community)")
+    assert browser.choice == "hub:4022"
+    assert select.extra_state_attributes["source"] == "community"

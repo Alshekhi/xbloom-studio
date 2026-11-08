@@ -543,6 +543,9 @@
           "maybe": "ربما",
           "no": "لا"
         }
+      },
+      "suggested_recipe": {
+        "name": "الوصفة المقترحة"
       }
     },
     "sensor": {
@@ -763,9 +766,6 @@
       },
       "use_suggested_recipe": {
         "name": "استخدم الوصفة المقترحة"
-      },
-      "add_and_use_community_recipe": {
-        "name": "أضف وصفة المجتمع واستخدمها"
       },
       "use_next_change": {
         "name": "استخدم التعديل القادم"
@@ -1620,6 +1620,11 @@
         "again": "أكرّرها",
         "fine": "لا بأس بها",
         "not_again": "لن أكرّرها"
+      }
+    },
+    "suggestion_source": {
+      "options": {
+        "community": "من المجتمع"
       }
     }
   },

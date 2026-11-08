@@ -72,12 +72,10 @@ TEXT = {
         "r_question": "How was **{recipe}** with {bag}{changes}?", "r_at": ", at ",
         "r_grind": "grind {value} instead of {saved}", "r_ratio": "ratio 1:{value} instead of 1:{saved}",
         "r_dose": "{value} g instead of {saved} g",
-        "h_for_bag": "A recipe for this bag", "s_use": "Use my recipe",
-        "s_add_use": "Add and use the community recipe",
-        "s_confirm_add_use": "Add this community recipe to your library and pick it?",
-        "s_own": "From your recipes: **{name}**, brewed {times} {basis}.",
-        "s_also": "Also: {names}.", "s_none": "None of your recipes has been brewed with coffee like this.",
-        "s_hub": "To try from the community: **{name}**, shared by {by}.",
+        "h_for_bag": "A recipe for this bag", "s_use": "Use this recipe",
+        "s_own": "Brewed {times} {basis}.",
+        "s_none": "None of your recipes has been brewed with coffee like this.",
+        "s_hub": "From the community, shared by {by}. Using it adds it to your recipes.",
         "s_this_bag": "with this bag", "s_kind": "with {country} {process} coffee",
         "s_origin": "with coffee from {country}",
         "c_for": "Suggested for **{bag}**, matching {basis}.",
@@ -138,12 +136,10 @@ TEXT = {
         "r_question": "كيف كانت **{recipe}** مع {bag}{changes}؟", "r_at": "، ",
         "r_grind": "بدرجة طحن {value} بدل {saved}", "r_ratio": "بنسبة 1:{value} بدل 1:{saved}",
         "r_dose": "بجرعة {value} غ بدل {saved} غ",
-        "h_for_bag": "وصفة لهذا الكيس", "s_use": "استخدم وصفتي",
-        "s_add_use": "أضف وصفة المجتمع واستخدمها",
-        "s_confirm_add_use": "إضافة وصفة المجتمع هذه إلى مكتبتك واختيارها؟",
-        "s_own": "من وصفاتك: **{name}**، حُضّرت {times} {basis}.",
-        "s_also": "وأيضًا: {names}.", "s_none": "لم تُحضَّر أي وصفة من وصفاتك بقهوة مثل هذه.",
-        "s_hub": "لتجربة جديدة من المجتمع: **{name}**، شاركها {by}.",
+        "h_for_bag": "وصفة لهذا الكيس", "s_use": "استخدم هذه الوصفة",
+        "s_own": "حُضّرت {times} {basis}.",
+        "s_none": "لم تُحضَّر أي وصفة من وصفاتك بقهوة مثل هذه.",
+        "s_hub": "من المجتمع، شاركها {by}. استخدامها يضيفها إلى وصفاتك.",
         "s_this_bag": "مع هذا الكيس", "s_kind": "مع قهوة من {country} بمعالجة {process}",
         "s_origin": "مع قهوة من {country}",
         "c_for": "مقترحة لـ **{bag}**، بمطابقة {basis}.",
@@ -282,12 +278,13 @@ def brew_view(t: dict) -> dict:
         # until a recipe is used: picking one is what prepares it.
         section(t["h_for_bag"], [
             press(f"button.{E}_suggest_recipe", name=t["c_suggest"]),
+            # Every suggestion, your own first; the card below says why the
+            # chosen one was suggested, and Use picks it for brewing.
+            select(f"select.{E}_suggested_recipe", visibility=present(f"select.{E}_suggested_recipe")),
             {"type": "markdown", "content": suggestion_card(t, bag),
              "visibility": present(f"sensor.{E}_recipe_suggestions")},
-            press(f"button.{E}_use_suggested_recipe", name=t["s_use"], visibility=[
-                {"condition": "numeric_state", "entity": f"sensor.{E}_recipe_suggestions", "above": 0}]),
-            press(f"button.{E}_add_and_use_community_recipe", t["s_confirm_add_use"], name=t["s_add_use"],
-                  visibility=[*present(f"sensor.{E}_recipe_suggestions"), *present(f"select.{E}_community_recipe")]),
+            press(f"button.{E}_use_suggested_recipe", name=t["s_use"],
+                  visibility=present(f"select.{E}_suggested_recipe")),
         ], [*present(bag), *at_home()]),
         section(t["h_brew"], [
             select(f"select.{E}_recipe"),
@@ -660,9 +657,8 @@ def rating_card(t: dict) -> str:
 
 
 def suggestion_card(t: dict, bag: str) -> str:
-    """Your best recipe for the bag, why, and a community one to try."""
+    """Why the suggestion chosen in the picker was suggested."""
     sugg = f"sensor.{E}_recipe_suggestions"
-    hub = f"select.{E}_community_recipe"
     if t is TEXT["ar"]:
         # Arabic counted-noun agreement for how many times it was brewed.
         times = ("{% if o.brews == 1 %}مرة واحدة{% elif o.brews == 2 %}مرتين"
@@ -676,11 +672,10 @@ def suggestion_card(t: dict, bag: str) -> str:
         + "{% elif o.matched == 'origin_process' %}" + t["s_kind"].replace("{country}", country).replace("{process}", process)
         + "{% else %}" + t["s_origin"].replace("{country}", country) + "{% endif %}"
     )
-    own = t["s_own"].replace("{name}", "{{ e(o.name) }}").replace("{times}", times).replace("{basis}", basis)
-    also = t["s_also"].replace(
-        "{names}", "{% for x in rest %}{{ e(x.name) }}{% if not loop.last %}" + t["sep"] + "{% endif %}{% endfor %}")
-    by = "{{ 'xBloom' if (state_attr('" + hub + "', 'picked') or {}).get('official') else e((state_attr('" + hub + "', 'picked') or {}).get('author')) }}"
-    hub_line = t["s_hub"].replace("{name}", "{{ e(states('" + hub + "')) }}").replace("{by}", by)
+    own = t["s_own"].replace("{times}", times).replace("{basis}", basis)
+    pick = f"select.{E}_suggested_recipe"
+    by = "{{ 'xBloom' if state_attr('" + pick + "', 'official') else e(state_attr('" + pick + "', 'author')) }}"
+    hub_line = t["s_hub"].replace("{by}", by)
     verdicts = (
         "{% if v.verdict == 'again' %}" + t["verdict_again"]
         + "{% elif v.verdict == 'fine' %}" + t["verdict_fine"]
@@ -691,14 +686,15 @@ def suggestion_card(t: dict, bag: str) -> str:
         + "{% for v in o.versions %}" + version_words(t, "v") + " — " + verdicts
         + "{% if not loop.last %}; {% endif %}{% endfor %}.{% endif %}"
     )
+    # Why the chosen suggestion was suggested; its name is in the picker.
     return (
         ESCAPE
-        + f"{{% set own = state_attr('{sugg}', 'own') or [] %}}"
-        + "{% if own %}{% set o = own[0] %}{% set rest = own[1:] %}" + own
-        + "{% if rest %} " + also + "{% endif %}" + versions
-        + "{% else %}" + t["s_none"] + "{% endif %}"
-        + f"{{% if state_attr('{hub}', 'suggested') and states('{hub}') not in ['unknown', 'unavailable'] %}}\n\n"
-        + hub_line + "{% endif %}"
+        + f"{{% set source = state_attr('{pick}', 'source') %}}"
+        + f"{{% set chosen = states('{pick}') %}}"
+        + f"{{% set own = (state_attr('{sugg}', 'own') or []) | selectattr('name', 'eq', chosen) | list %}}"
+        + "{% if source == 'own' and own %}{% set o = own[0] %}" + own + versions
+        + "{% elif source == 'community' %}" + hub_line
+        + f"{{% elif not (state_attr('{sugg}', 'own') or []) %}}" + t["s_none"] + "{% endif %}"
     )
 
 

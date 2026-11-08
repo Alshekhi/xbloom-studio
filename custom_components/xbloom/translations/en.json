@@ -543,6 +543,9 @@
           "maybe": "Maybe",
           "no": "No"
         }
+      },
+      "suggested_recipe": {
+        "name": "Suggested Recipe"
       }
     },
     "sensor": {
@@ -763,9 +766,6 @@
       },
       "use_suggested_recipe": {
         "name": "Use Suggested Recipe"
-      },
-      "add_and_use_community_recipe": {
-        "name": "Add and Use Community Recipe"
       },
       "use_next_change": {
         "name": "Use Next Change"
@@ -1620,6 +1620,11 @@
         "again": "Again",
         "fine": "Fine",
         "not_again": "Not again"
+      }
+    },
+    "suggestion_source": {
+      "options": {
+        "community": "community"
       }
     }
   },

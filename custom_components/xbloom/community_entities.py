@@ -17,10 +17,11 @@ from homeassistant.components.text import TextEntity
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.translation import async_get_translations
 
 from xbloom.community import SORTS
 
-from .community import ANY_ORIGIN, CommunityBrowser
+from .community import ANY_ORIGIN, CommunityBrowser, hub_text
 from .const import DOMAIN
 
 
@@ -34,6 +35,7 @@ def entities_for(entry, platform: str) -> list:
             CommunityOriginSelect(browser),
             CommunitySortSelect(browser),
             CommunityRecipeSelect(browser),
+            SuggestedRecipeSelect(browser),
         ],
         "button": [
             CommunitySearchButton(browser),
@@ -41,7 +43,6 @@ def entities_for(entry, platform: str) -> list:
             CommunityAddButton(browser),
             SuggestRecipeButton(browser, entry),
             UseSuggestedRecipeButton(browser),
-            AddAndUseCommunityRecipeButton(browser),
         ],
         "sensor": [CommunityMatchesSensor(browser), RecipeSuggestionsSensor(browser)],
     }.get(platform, [])
@@ -241,26 +242,79 @@ class SuggestRecipeButton(_CommunityEntity, ButtonEntity):
         await self._browser.async_suggest_for_bag(getattr(self._entry.runtime_data, "coffee_lab", None))
 
 
+class SuggestedRecipeSelect(_CommunityEntity, SelectEntity):
+    """Every suggestion for the bag in use, your own first, the best chosen.
+
+    A community recipe is offered under its name with a marker saying so, in
+    Home Assistant's language, so it is never mistaken for one of your own.
+    Its attributes say why the chosen one was suggested.
+    """
+
+    _attr_translation_key = "suggested_recipe"
+    _attr_unique_id = "xbloom_suggested_recipe"
+    _attr_icon = "mdi:lightbulb-on-outline"
+    _community_marker = "community"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        strings = await async_get_translations(
+            self.hass, self.hass.config.language, "selector", {DOMAIN},
+        )
+        self._community_marker = strings.get(
+            f"component.{DOMAIN}.selector.suggestion_source.options.community",
+            self._community_marker,
+        )
+
+    def _labels(self) -> list[tuple[str, str]]:
+        """(label, key) for each choice; a repeated label is told apart by a number."""
+        seen: dict[str, int] = {}
+        out = []
+        for key in self._browser.choice_keys():
+            recipe = self._browser.suggestion(key)
+            if recipe is None:
+                label = key[4:]
+            else:
+                name = hub_text(recipe.get("name")) or str(recipe.get("id"))
+                label = f"{name} ({self._community_marker})"
+            seen[label] = seen.get(label, 0) + 1
+            out.append((label if seen[label] == 1 else f"{label} {seen[label]}", key))
+        return out
+
+    @property
+    def options(self) -> list[str]:
+        return [label for label, _ in self._labels()]
+
+    @property
+    def current_option(self) -> str | None:
+        return next((label for label, key in self._labels() if key == self._browser.choice), None)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        key = self._browser.choice
+        if key is None:
+            return {}
+        if key.startswith("own:"):
+            own = next((o for o in self._browser.own or [] if f"own:{o.name}" == key), None)
+            return {"source": "own", "brews": own.brews, "matched": own.matched} if own else {}
+        picked = self._browser.picked_facts()
+        return {"source": "community", "author": picked.get("author"),
+                "official": picked.get("official"), "likes": picked.get("likes")}
+
+    async def async_select_option(self, option: str) -> None:
+        key = next((key for label, key in self._labels() if label == option), None)
+        if key is not None:
+            await self._browser.async_choose(key)
+
+
 class UseSuggestedRecipeButton(_CommunityEntity, ButtonEntity):
-    """Pick your best-matching recipe in the recipe picker."""
+    """Pick the chosen suggestion for brewing, adding a community one first."""
 
     _attr_translation_key = "use_suggested_recipe"
     _attr_unique_id = "xbloom_use_suggested_recipe"
     _attr_icon = "mdi:check"
 
     async def async_press(self) -> None:
-        await self._browser.async_use_own()
-
-
-class AddAndUseCommunityRecipeButton(_CommunityEntity, ButtonEntity):
-    """Add the community recipe to the library and pick it in one press."""
-
-    _attr_translation_key = "add_and_use_community_recipe"
-    _attr_unique_id = "xbloom_add_and_use_community_recipe"
-    _attr_icon = "mdi:playlist-check"
-
-    async def async_press(self) -> None:
-        await self._browser.async_add_and_use()
+        await self._browser.async_use_choice()
 
 
 class RecipeSuggestionsSensor(_CommunityEntity, SensorEntity):

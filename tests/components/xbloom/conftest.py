@@ -200,6 +200,9 @@ def _inject_global_stubs() -> None:
     dispatcher.async_dispatcher_connect = MagicMock(return_value=MagicMock())
     dispatcher.async_dispatcher_send = MagicMock()
 
+    translation = _stub_mod("homeassistant.helpers.translation")
+    translation.async_get_translations = AsyncMock(return_value={})
+
     hev = _stub_mod("homeassistant.helpers.event")
     hev.async_track_state_change_event = MagicMock(return_value=MagicMock())
 

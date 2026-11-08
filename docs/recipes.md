@@ -35,8 +35,8 @@ dose, ratio, grind and pours — into that select's attributes, where the
 dashboard shows it. **Add Community Recipe** puts it in your recipe
 library — in the cloud when you are signed in — where it brews like any other.
 
-**Suggest Community Recipe** picks one without a search: the most downloaded
-Studio recipe for the origin and process of the bag in use, then for its
+**Suggest Community Recipe** fills the picker without a search, choosing the
+most downloaded Studio recipe for the origin and process of the bag in use, then for its
 origin alone, then any. A recipe already in your library, or one needing more
 coffee than the bag has left, is passed over, and recipes for the drippers your
 library already uses come first.

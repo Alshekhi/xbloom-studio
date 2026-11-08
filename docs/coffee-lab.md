@@ -94,10 +94,12 @@ Recipe** changes the saved recipe, **Save Version as New Recipe** keeps both.
 **Suggest Recipe** looks for a recipe for the bag in use: your own first,
 ranked by how close the bags they were brewed with are — this bag, then the
 same origin and process, then the same origin — and by their verdicts, with
-a recipe last rated **Not again** with this bag left out. **Recipe
-Suggestions** lists them, and **Use Suggested Recipe** picks the best. A
-[community recipe](recipes.md#community-recipes) is suggested beside them,
-which **Add and Use Community Recipe** adds and picks in one press.
+a recipe last rated **Not again** with this bag left out — and, after them,
+[community recipes](recipes.md#community-recipes) for coffee like it, most
+downloaded first. **Suggested Recipe** offers them all, your own first and
+each community one marked as such, with the best already chosen; its
+attributes say why the chosen one was suggested. **Use Suggested Recipe**
+picks it for brewing, adding a community recipe to your library first.
 
 ### Buy it again?
 

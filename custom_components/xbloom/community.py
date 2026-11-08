@@ -17,7 +17,6 @@ and are told of every change over one dispatcher signal.
 from __future__ import annotations
 
 import logging
-import random
 from typing import Any
 
 import aiohttp
@@ -208,6 +207,13 @@ class CommunityBrowser:
         # The Brew tab's suggestion: your own recipes for the bag, best first.
         # None until one is asked for.
         self.own: list[OwnSuggestion] | None = None
+        # The community recipes suggested beside them, most downloaded first:
+        # kept apart from `results`, which a search on the Community tab
+        # replaces.
+        self.suggestions: list[dict[str, Any]] = []
+        # The one chosen in the Brew tab's Suggested Recipe picker, as a key:
+        # "own:<name>" or "hub:<id>".
+        self.choice: str | None = None
 
     @callback
     def _changed(self) -> None:
@@ -270,8 +276,7 @@ class CommunityBrowser:
     async def async_suggest(self, lab: Any) -> None:
         """Fill the picker with suggestions for the bag in use, and pick one.
 
-        The pick is drawn at random from the suggestions, so asking again
-        offers something else rather than the same recipe every time.
+        The most downloaded is picked; the others are in the picker too.
         """
         self.added = None
         bag = await active_bag(lab)
@@ -296,8 +301,7 @@ class CommunityBrowser:
         self.detail = None
         self._changed()
         if self.results:
-            label, _ = random.choice(self.labelled())
-            await self.async_pick(label)
+            await self._async_pick_recipe(self.results[0])
 
     async def async_suggest_for_bag(self, lab: Any) -> None:
         """Your own recipes for the bag in use, and a community one beside them.
@@ -309,6 +313,8 @@ class CommunityBrowser:
         """
         bag = await active_bag(lab)
         self.own = await async_own_suggestions(lab, bag, self._coordinator.data or [])
+        self.suggestions = []
+        self.choice = None
         self._changed()
         try:
             await self.async_suggest(lab)
@@ -316,6 +322,48 @@ class CommunityBrowser:
             if not self.own:
                 raise
             _LOGGER.warning("xbloom suggestion: only your own recipes: %s", err)
+        else:
+            self.suggestions = list(self.results)
+        keys = self.choice_keys()
+        self.choice = keys[0] if keys else None
+        self._changed()
+
+    def choice_keys(self) -> list[str]:
+        """The Suggested Recipe picker's choices: your own, then the community's."""
+        return [f"own:{o.name}" for o in self.own or []] + [
+            f"hub:{r['id']}" for r in self.suggestions
+        ]
+
+    def suggestion(self, key: str | None) -> dict[str, Any] | None:
+        """The community suggestion a "hub:" key stands for."""
+        if not key or not key.startswith("hub:"):
+            return None
+        return next((r for r in self.suggestions if f"hub:{r['id']}" == key), None)
+
+    async def async_choose(self, key: str) -> None:
+        """Choose a suggestion; a community one is read in full to be shown."""
+        if key not in self.choice_keys():
+            return
+        self.choice = key
+        self._changed()
+        if (recipe := self.suggestion(key)) is not None:
+            await self._async_pick_recipe(recipe)
+
+    async def async_use_choice(self) -> None:
+        """Pick the chosen suggestion for brewing, adding a community one first."""
+        key = self.choice
+        if not key:
+            raise fail("suggestion_none")
+        if key.startswith("own:"):
+            await self.async_use(key[4:])
+            return
+        recipe = self.suggestion(key)
+        if recipe is None:
+            raise fail("suggestion_none")
+        # The Community tab may have picked another recipe since.
+        if self.picked_id != int(recipe["id"]) or self.detail is None:
+            await self._async_pick_recipe(recipe)
+        await self.async_add_and_use()
 
     async def async_use(self, name: str) -> None:
         """Pick a library recipe in the Brew tab's recipe picker.
@@ -329,11 +377,6 @@ class CommunityBrowser:
         await self._hass.services.async_call(
             "select", "select_option", {"entity_id": entity_id, "option": name}, blocking=True,
         )
-
-    async def async_use_own(self) -> None:
-        if not self.own:
-            raise fail("suggestion_none")
-        await self.async_use(self.own[0].name)
 
     async def async_add_and_use(self) -> None:
         await self.async_use(await self.async_add_picked())
@@ -359,6 +402,9 @@ class CommunityBrowser:
         recipe = next((r for lbl, r in self.labelled() if lbl == label), None)
         if recipe is None:
             return
+        await self._async_pick_recipe(recipe)
+
+    async def _async_pick_recipe(self, recipe: dict[str, Any]) -> None:
         self.added = None
         self.picked_id = int(recipe["id"])
         self.detail = None

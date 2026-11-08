@@ -326,16 +326,32 @@ views:
         perform_action: button.press
         target:
           entity_id: button.xbloom_studio_suggest_recipe
+    - type: tile
+      entity: select.xbloom_studio_suggested_recipe
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_suggested_recipe
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_suggested_recipe
+        state_not: unknown
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
-        ''\\\\\\1'') }}{% endmacro %}{% set own = state_attr(''sensor.xbloom_studio_recipe_suggestions'',
-        ''own'') or [] %}{% if own %}{% set o = own[0] %}{% set rest = own[1:] %}From your recipes: **{{
-        e(o.name) }}**, brewed {% if o.brews == 1 %}once{% elif o.brews == 2 %}twice{% else %}{{ o.brews
-        }} times{% endif %} {% if o.matched == ''this_bag'' %}with this bag{% elif o.matched == ''origin_process''
-        %}with {{ e(state_attr(''select.xbloom_studio_coffee_bag'', ''country'')) }} {{ e(state_attr(''select.xbloom_studio_coffee_bag'',
-        ''process'')) }} coffee{% else %}with coffee from {{ e(state_attr(''select.xbloom_studio_coffee_bag'',
-        ''country'')) }}{% endif %}.{% if rest %} Also: {% for x in rest %}{{ e(x.name) }}{% if not loop.last
-        %}, {% endif %}{% endfor %}.{% endif %}{% if o.versions %}
+        ''\\\\\\1'') }}{% endmacro %}{% set source = state_attr(''select.xbloom_studio_suggested_recipe'',
+        ''source'') %}{% set chosen = states(''select.xbloom_studio_suggested_recipe'') %}{% set own =
+        (state_attr(''sensor.xbloom_studio_recipe_suggestions'', ''own'') or []) | selectattr(''name'',
+        ''eq'', chosen) | list %}{% if source == ''own'' and own %}{% set o = own[0] %}Brewed {% if o.brews
+        == 1 %}once{% elif o.brews == 2 %}twice{% else %}{{ o.brews }} times{% endif %} {% if o.matched
+        == ''this_bag'' %}with this bag{% elif o.matched == ''origin_process'' %}with {{ e(state_attr(''select.xbloom_studio_coffee_bag'',
+        ''country'')) }} {{ e(state_attr(''select.xbloom_studio_coffee_bag'', ''process'')) }} coffee{%
+        else %}with coffee from {{ e(state_attr(''select.xbloom_studio_coffee_bag'', ''country'')) }}{%
+        endif %}.{% if o.versions %}
 
 
         Versions with this bag: {% for v in o.versions %}{{ [((''grind '' ~ ((v.grind | float) | round(1)
@@ -344,15 +360,10 @@ views:
         (('''' ~ ((v.dose_g | float) | round(1) | string | replace(''.0'', '''')) ~ '' g'') if v.dose_g
         is not none else '''')] | select | join('' · '') }} — {% if v.verdict == ''again'' %}Again{% elif
         v.verdict == ''fine'' %}Fine{% else %}Not again{% endif %}{% if not loop.last %}; {% endif %}{%
-        endfor %}.{% endif %}{% else %}None of your recipes has been brewed with coffee like this.{% endif
-        %}{% if state_attr(''select.xbloom_studio_community_recipe'', ''suggested'') and states(''select.xbloom_studio_community_recipe'')
-        not in [''unknown'', ''unavailable''] %}
-
-
-        To try from the community: **{{ e(states(''select.xbloom_studio_community_recipe'')) }}**, shared
-        by {{ ''xBloom'' if (state_attr(''select.xbloom_studio_community_recipe'', ''picked'') or {}).get(''official'')
-        else e((state_attr(''select.xbloom_studio_community_recipe'', ''picked'') or {}).get(''author''))
-        }}.{% endif %}'
+        endfor %}.{% endif %}{% elif source == ''community'' %}From the community, shared by {{ ''xBloom''
+        if state_attr(''select.xbloom_studio_suggested_recipe'', ''official'') else e(state_attr(''select.xbloom_studio_suggested_recipe'',
+        ''author'')) }}. Using it adds it to your recipes.{% elif not (state_attr(''sensor.xbloom_studio_recipe_suggestions'',
+        ''own'') or []) %}None of your recipes has been brewed with coffee like this.{% endif %}'
       visibility:
       - condition: state
         entity: sensor.xbloom_studio_recipe_suggestions
@@ -362,7 +373,7 @@ views:
         state_not: unknown
     - type: tile
       entity: button.xbloom_studio_use_suggested_recipe
-      name: Use my recipe
+      name: Use this recipe
       icon_tap_action:
         action: none
       hide_state: true
@@ -372,34 +383,11 @@ views:
         target:
           entity_id: button.xbloom_studio_use_suggested_recipe
       visibility:
-      - condition: numeric_state
-        entity: sensor.xbloom_studio_recipe_suggestions
-        above: 0
-    - type: tile
-      entity: button.xbloom_studio_add_and_use_community_recipe
-      name: Add and use the community recipe
-      icon_tap_action:
-        action: none
-      hide_state: true
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.xbloom_studio_add_and_use_community_recipe
-        confirmation:
-          text: Add this community recipe to your library and pick it?
-      visibility:
       - condition: state
-        entity: sensor.xbloom_studio_recipe_suggestions
+        entity: select.xbloom_studio_suggested_recipe
         state_not: unavailable
       - condition: state
-        entity: sensor.xbloom_studio_recipe_suggestions
-        state_not: unknown
-      - condition: state
-        entity: select.xbloom_studio_community_recipe
-        state_not: unavailable
-      - condition: state
-        entity: select.xbloom_studio_community_recipe
+        entity: select.xbloom_studio_suggested_recipe
         state_not: unknown
     visibility:
     - condition: state

@@ -8,7 +8,7 @@
 - **Selects** — Recipe, Recipe Action, Archived Recipe, Mode (auto / pro), Water Source (tank / tap), Temperature Unit (°C / °F), Weight Unit (g / oz / ml), Brew Pattern.
 - **Numbers** — Grind Size, Grind Speed, Brew Volume, Brew Temperature, Brew Flow Rate, and the brew-customizer overrides: Brew Dose, Brew Ratio, Brew Grind Size.
 - **Text** — New Recipe Name (used by the brew customizer's Save as New Recipe), Community Search.
-- **Community** — Community Search, Community Origin, Community Sort, Community Recipe, Community Matches, and the Search, Suggest, Add, and Add and Use Community Recipe buttons. See [Recipes](recipes.md#community-recipes).
+- **Community** — Community Search, Community Origin, Community Sort, Community Recipe, Community Matches, and the Search, Suggest and Add Community Recipe buttons; for the Brew tab, Suggest Recipe, Suggested Recipe and Use Suggested Recipe. See [Recipes](recipes.md#community-recipes).
 - **Coffee Lab** — while it is on, the bag, counting, rating, version and suggestion entities. See [Coffee Lab](coffee-lab.md).
 - **Buttons** — Start Brew, Cancel Brew, Pause Brew, Resume Brew, Cancel Preparation, Tare Scale, Back to Home, Grind, Brew (standalone), Refresh Recipes, Save as New Recipe, Run Recipe Action, Restore Archived Recipe, Delete Selected Recipe, plus BLE Connect / BLE Disconnect diagnostics.
 - **Switches** — Use Grinder, Connect (opens a live session that holds the BLE link and streams machine events for sensors, the dashboard, and optional spoken announcements). Machine Control: off, every action that starts, prepares or changes something on the machine is refused; stopping, pausing, cancelling, disconnecting and all recipe work still run.
