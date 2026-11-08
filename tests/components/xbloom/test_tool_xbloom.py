@@ -576,6 +576,16 @@ async def test_suggest_hub_passes_origin_and_process_and_keeps_text_apart():
     assert res["recipes"][0]["author_written"]["name"] == "Test Kenya Hot"
 
 
+async def test_suggest_hub_passes_variety_and_roast_and_says_what_each_recipe_shares():
+    hass = FakeHass(responses={"suggest_community": {
+        "ok": True, "bag": None, "origin": None, "process": None,
+        "recipes": [{**HUB_LISTED, "fits": {"roast": 1}}],
+    }})
+    res = await ACTIONS["suggest_hub"].run(_machine(hass), {"varietal": "Bourbon", "roast": "light"})
+    assert hass.calls == [("xbloom", "suggest_community", {"varietal": "Bourbon", "roast": "light"})]
+    assert res["recipes"][0]["fits"] == {"roast": 1}
+
+
 # ── What Home Assistant asks of a tool ───────────────────────────────────────
 
 

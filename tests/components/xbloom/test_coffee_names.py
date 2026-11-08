@@ -24,8 +24,13 @@ CRITERIA = {
     "en": {"originList": [{"name": "Ethiopia", "value": "7"}, {"name": "Colombia", "value": "4"}],
            "processingList": [{"name": "Natural", "value": "1"},
                               {"name": "Anaerobic Fermentation", "value": "6"},
-                              {"name": "Semi-Washed Process", "value": "4"}]},
-    "zh": {"originList": [{"name": "埃塞俄比亚", "value": "7"}], "processingList": []},
+                              {"name": "Semi-Washed Process", "value": "4"}],
+           "varietalList": [{"name": "Bourbon", "value": "2"}, {"name": "Geisha/Gesha", "value": "8"}],
+           "roastList": [{"name": "Light Roast", "value": "1"}, {"name": "Medium Roast", "value": "3"}],
+           "flavorList": [{"name": "Jasmine", "value": "16"}, {"name": "Dark Chocolate", "value": "7"},
+                          {"name": "Chocolate", "value": "40"}, {"name": "Honey", "value": "15"}]},
+    "zh": {"originList": [{"name": "埃塞俄比亚", "value": "7"}], "processingList": [],
+           "flavorList": [{"name": "茉莉", "value": "16"}]},
     "ar": {"originList": [], "processingList": []},
 }
 
@@ -173,3 +178,71 @@ async def test_english_names_still_work_when_another_language_fails():
 
 async def test_a_name_made_only_of_process_words_matches_nothing(hub):
     assert await hub.async_canonical("process", "Process") is None
+
+
+# ── Variety, roast and tasting notes ─────────────────────────────────────────
+
+
+async def test_a_variety_or_roast_in_any_form_becomes_the_hubs(hub):
+    assert await hub.async_canonical("varietal", "gesha") == "Geisha/Gesha"
+    assert await hub.async_canonical("varietal", "Geisha / Gesha") == "Geisha/Gesha"
+    assert await hub.async_canonical("roast", "light") == "Light Roast"
+    assert await hub.async_canonical("roast", "Roast") is None
+
+
+async def test_each_of_several_varieties_is_checked(hub):
+    lab = await _lab()
+    lab.hub_names = hub
+    facts = await actions.add_bean(lab, {"name": "Test Bag", "varietal": "bourbon, Test Variety",
+                                         "roast": "light"})
+    assert (facts["added"]["varietal"], facts["added"]["roast"]) == ("Bourbon, Test Variety", "Light Roast")
+    assert facts["not_on_hub"] == {"varietal": "Test Variety"}
+
+
+async def test_the_hubs_flavors_are_found_in_tasting_notes_as_whole_names(hub):
+    found = await hub.async_flavors_in("Jasmine, dark chocolate and a long finish")
+    assert found == {name_key("Jasmine"), name_key("Dark Chocolate")}
+    assert await hub.async_flavors_in("chocolate") == {name_key("Chocolate")}
+    assert await hub.async_flavors_in("") == set()
+
+
+def _recipe(rid, name, **coffee):
+    return {"id": rid, "name": name, "dose_g": 15, "cup_type": 2, **coffee}
+
+
+async def test_the_closest_recipes_come_first_and_say_why(hub):
+    client = MagicMock()
+    client.search = AsyncMock(return_value={"recipes": [  # most downloaded first
+        _recipe(1, "Plain"),
+        _recipe(2, "Same Roast", roast="Light Roast"),
+        _recipe(3, "Close", varietal=["Gesha"], flavor=["茉莉", "Honey"], roast="Medium Roast"),
+    ]})
+    found = await cm.suggest(client, [], "Ethiopia", None, names=hub, varietal="Bourbon, Geisha",
+                             roast="light", notes="Jasmine and honey")
+    assert [r["name"] for r in found["recipes"]] == ["Close", "Same Roast", "Plain"]
+    assert [r["fits"] for r in found["recipes"]] == [{"varietal": 1, "flavor": 2}, {"roast": 1}, {}]
+
+
+async def test_a_recipe_for_a_dripper_in_use_still_comes_before_a_closer_one(hub):
+    client = MagicMock()
+    client.search = AsyncMock(return_value={"recipes": [
+        {**_recipe(1, "Closer", roast="Light Roast"), "cup_type": 1},
+        _recipe(2, "Omni"),
+    ]})
+    found = await cm.suggest(client, [{"name": "Mine", "cup_type": 2}], None, None,
+                             names=hub, roast="light")
+    assert [r["name"] for r in found["recipes"]] == ["Omni", "Closer"]
+
+
+async def test_without_the_hubs_names_each_side_is_compared_as_typed_and_asked_once():
+    names = MagicMock(async_canonical=AsyncMock(side_effect=aiohttp.ClientError()),
+                      async_keys=AsyncMock(side_effect=aiohttp.ClientError()),
+                      async_flavors_in=AsyncMock(side_effect=aiohttp.ClientError()))
+    client = MagicMock()
+    client.search = AsyncMock(return_value={"recipes": [
+        _recipe(1, "Other"), _recipe(2, "Same", roast="Light Roast"),
+    ]})
+    found = await cm.suggest(client, [], None, None, names=names, roast="light roast", notes="honey")
+    assert [r["name"] for r in found["recipes"]] == ["Same", "Other"]
+    assert names.async_keys.await_count == 1, "the hub is not waited on once a recipe"
+    assert not names.async_flavors_in.await_count, "names gone, notes are not matched"

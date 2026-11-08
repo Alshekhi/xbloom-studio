@@ -83,17 +83,18 @@ ACTIONS: dict[str, Spec] = {
         actions.add_bean,
         "a new bag (kind: coffee, xpod — a box of xPods, counted in pods — or tea; "
         "bag_size_g, remaining_g to count it down, pods for an xPod box, status, roaster, "
-        "country, region, process, roaster_notes). An xPod brew takes one pod from the "
-        "xPod box in use, a tea brew its grams from the tea in use, never from a bag "
-        "of coffee. The country and process are kept "
+        "country, region, process, varietal, roast, roaster_notes). An xPod brew takes "
+        "one pod from the xPod box in use, a tea brew its grams from the tea in use, "
+        "never from a bag of coffee. The country, process, varietal and roast are kept "
         "in the community hub's English names; one the hub does not list is kept as "
-        "given and named in not_on_hub — ask the person once whether another name was meant",
+        "given and named in not_on_hub — ask the person once whether another name was meant. "
+        "Community suggestions for the bag match on all of them and on the tasting notes",
         ("name",),
     ),
     "update_bean": Spec(
         actions.update_bean,
         "correct a bag's details (new_name, kind, bag_size_g, status, roaster, country, "
-        "region, process, roaster_notes), the country and process as for add_bean",
+        "region, process, varietal, roast, roaster_notes), the hub's names as for add_bean",
         one_of=BAG,
     ),
 }
@@ -152,6 +153,8 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
     "country": (str, "Where it was grown, as a country name."),
     "region": (str, "The region within the country."),
     "process": (str, "How it was processed, such as washed or natural."),
+    "varietal": (str, "The coffee variety, such as Bourbon; several comma-separated."),
+    "roast": (str, "How dark it was roasted, such as light or medium."),
     "roaster_notes": (str, "The roaster's tasting notes."),
     "verdict": (vol.In(list(VERDICTS)), "For rate_brew: again, fine or not_again."),
     "buy_again": (vol.In(list(BUY_AGAIN)), "For rate_bag: yes, maybe or no."),

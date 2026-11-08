@@ -64,6 +64,10 @@ class Bean:
     country: str = ""
     region: str = ""
     process: str = ""
+    # The coffee variety, comma-separated when there are several, and how
+    # dark it was roasted, both in the community hub's words when it has them.
+    varietal: str = ""
+    roast: str = ""
     roaster_notes: str = ""
     opened_on: str = ""   # YYYY-MM-DD
     finished_on: str = ""   # YYYY-MM-DD

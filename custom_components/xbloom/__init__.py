@@ -67,7 +67,7 @@ from .versions import VersionDesk
 from .coffee_names import HubNames
 from .community import (
     HUB_ERRORS, CommunityBrowser, NotForThisMachine, active_bag, bag_remaining_g, hub_text,
-    studio_recipe, suggest,
+    studio_recipe, suggest, bag_coffee,
 )
 from . import llm_api
 from xbloom.client import XBloomClient
@@ -2103,16 +2103,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         """Community recipes to try, for the bag in use unless told otherwise."""
         bag = None
         country, process = call.data.get("origin"), call.data.get("process")
-        if not (country or process):
+        coffee = {k: call.data.get(k) for k in ("varietal", "roast")}
+        if not (country or process or any(coffee.values())):
             try:
                 bag = await active_bag(entry.runtime_data.coffee_lab)
             except STORE_UNREACHABLE as err:
                 return {"ok": False, "error": str(err) or type(err).__name__}
             country, process = getattr(bag, "country", None), getattr(bag, "process", None)
+            coffee = bag_coffee(bag)
         try:
             found = await suggest(
                 community, entry.runtime_data.coordinator.data or [], country, process,
-                bag_remaining_g(bag), entry.runtime_data.community.names,
+                bag_remaining_g(bag), entry.runtime_data.community.names, **coffee,
             )
         except HUB_ERRORS as err:
             _LOGGER.warning("xbloom.suggest_community: %s", err)
@@ -2343,7 +2345,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     )
     hass.services.async_register(
         DOMAIN, "suggest_community", handle_suggest_community,
-        schema=vol.Schema({vol.Optional("origin"): str, vol.Optional("process"): str}),
+        schema=vol.Schema({
+            vol.Optional(key): str for key in ("origin", "process", "varietal", "roast")
+        }),
         supports_response=SupportsResponse.ONLY,
     )
     async def handle_xbloom_picks(call) -> dict:

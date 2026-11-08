@@ -51,7 +51,9 @@ library — in the cloud when you are signed in — where it brews like any othe
 most downloaded Studio recipe for the origin and process of the bag in use, then for its
 origin alone, then any. A recipe already in your library, or one needing more
 coffee than the bag has left, is passed over, and recipes for the drippers your
-library already uses come first.
+library already uses come first. Among those, the recipes sharing most with
+the bag lead: its process, a varietal, its roast, and the flavors named in its
+roaster notes. The picked recipe's `fits` says which it shares.
 
 The actions are `xbloom.search_community`, `xbloom.get_community_recipe` and
 `xbloom.suggest_community`, each returning what it found as a response.

@@ -57,6 +57,8 @@ TEXT = {
         "c_many": "{n} recipes match.", "c_first": "The first {shown} are in the list below.",
         "c_by": "Shared by", "c_notes": "Notes", "c_grind": "grind", "c_at": "at",
         "c_rpm": "RPM", "c_pause": "Pause", "c_s": "s", "c_likes": "likes",
+        "c_fits": "Like this bag", "f_process": "process", "f_varietal": "variety",
+        "f_roast": "roast", "f_flavor": "tasting notes",
         "c_added": "Added to your recipes as **{name}**. Pick it on the Brew tab.",
         "c_suggest": "Suggest a recipe", "c_suggest_hub": "Suggest a community recipe",
         "h_for_you": "For you", "h_trending": "Trending recipes", "h_tea": "Tea recipes",
@@ -123,6 +125,8 @@ TEXT = {
         "c_many": "{n} وصفات تطابق البحث.", "c_first": "أول {shown} منها في القائمة أدناه.",
         "c_by": "شاركها", "c_notes": "النكهات", "c_grind": "درجة الطحن", "c_at": "بسرعة",
         "c_rpm": "دورة في الدقيقة", "c_pause": "الانتظار", "c_s": "ث", "c_likes": "إعجاب",
+        "c_fits": "تشبه هذا الكيس في", "f_process": "المعالجة", "f_varietal": "السلالة",
+        "f_roast": "درجة التحميص", "f_flavor": "النكهات",
         "c_added": "أضيفت إلى وصفاتك باسم **{name}**. اخترها من تبويب التحضير.",
         "c_suggest": "اقترح وصفة", "c_suggest_hub": "اقترح وصفة من المجتمع",
         "h_for_you": "مقترحة لك", "h_trending": "الوصفات الرائجة", "h_tea": "وصفات الشاي",
@@ -282,7 +286,7 @@ def brew_view(t: dict) -> dict:
             select(f"select.{E}_tea", visibility=[is_(kind, "tea")]),
             {"type": "markdown", "content": (
                 "{% set a = states['" + bag + "'].attributes if states['" + bag + "'] else {} %}"
-                "{{ [a.get('roaster'), [a.get('country'), a.get('region')] | select | join('" + t["sep"] + "'), a.get('process')]"
+                "{{ [a.get('roaster'), [a.get('country'), a.get('region')] | select | join('" + t["sep"] + "'), a.get('process'), a.get('varietal'), a.get('roast')]"
                 " | select | join(' · ') }}"
                 "{% if a.get('roaster_notes') %}\n\n{{ a.get('roaster_notes') }}{% endif %}"
             ), "visibility": present(bag)},
@@ -605,11 +609,16 @@ def picked_card(t: dict, picker: str) -> str:
         + f"{{% if state_attr('{picker}', 'suggested_for') and state_attr('{picker}', 'matched_origin') %}}{suggested}"
         + f"{{% else %}}{t['c_popular']}{{% endif %}}\n\n{{% endif %}}"
         + f"{t['c_by']} {{{{ 'xBloom' if a.get('official') else e(a.get('author')) }}}}"
-        + f"{{% set about = (a.get('origin') or []) + (a.get('process') or []) + ([a.get('roast')] if a.get('roast') else []) %}}"
+        + f"{{% set about = (a.get('origin') or []) + (a.get('process') or []) + (a.get('varietal') or []) + ([a.get('roast')] if a.get('roast') else []) %}}"
         + "{% if about %} · {% for x in about %}{{ e(x) }}{% if not loop.last %} · {% endif %}{% endfor %}{% endif %}"
         + f"{{% if a.get('likes') %}} · {{{{ a.get('likes') }}}} {t['c_likes']}{{% endif %}}\n\n"
         + f"{{% if a.get('flavor') %}}**{t['c_notes']}:** "
         + f"{{% for x in a.get('flavor') %}}{{{{ e(x) }}}}{{% if not loop.last %}}{t['sep']}{{% endif %}}{{% endfor %}}\n\n{{% endif %}}"
+        # What a suggested recipe shares with the bag; the names are ours, not the hub's.
+        + "{% set fits = a.get('fits') or {} %}{% if fits %}**" + t["c_fits"] + ":** "
+        + "{{ [" + ", ".join(
+            f"('{t['f_' + f]}' if fits.get('{f}') else '')" for f in ("process", "varietal", "roast", "flavor")
+        ) + "] | select | join('" + t["sep"] + "') }}\n\n{% endif %}"
         + "{% if a.get('description') %}{{ e(a.get('description')) }}\n\n{% endif %}"
         + recipe_lines(t)
     )

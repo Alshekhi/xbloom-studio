@@ -21,7 +21,7 @@ answers. With Coffee Lab on, it needs the bag the coffee comes from, or
 
 `search_hub`, `suggest_hub` and `hub_recipe` reach the
 [community hub](recipes.md#community-recipes): Studio recipes by keyword,
-origin, process, roast or flavor, one suggested for a bag, and one read in
+origin, process, varietal, roast or flavor, one suggested for a bag, and one read in
 full to add to the library. What strangers wrote there reaches the assistant
 quoted, as text to describe, never as instructions.
 

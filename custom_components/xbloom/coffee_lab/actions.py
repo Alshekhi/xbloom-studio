@@ -33,7 +33,9 @@ DEFAULT_BREW_HISTORY = 10
 DEFAULT_STATS_PERIOD = "this_month"
 
 # A bag's descriptive fields, which add_bean and update_bean both take.
-DESCRIPTIVE = ("roaster", "country", "region", "process", "roaster_notes")
+DESCRIPTIVE = ("roaster", "country", "region", "process", "varietal", "roast", "roaster_notes")
+# Those the community hub names, so a bag's are kept in its words.
+HUB_FIELDS = ("country", "process", "varietal", "roast")
 
 
 def bean_facts(bean: Bean) -> dict[str, Any]:
@@ -289,28 +291,27 @@ def _bag_values(args: dict[str, Any]) -> dict[str, Any]:
 
 
 async def in_hub_words(lab: CoffeeLab, values: dict[str, Any]) -> dict[str, Any]:
-    """Rewrite a bag's country and process to the hub's names, in place.
+    """Rewrite a bag's country, process, variety and roast to the hub's names, in place.
 
-    Returns what the caller should hear: `not_on_hub`, the names the hub does
-    not list (kept as typed), and `unchecked`, the fields the hub could not be
-    asked about.
+    A variety may be several, comma-separated, and each is checked. Returns
+    what the caller should hear: `not_on_hub`, the names the hub does not list
+    (kept as typed), and `unchecked`, the fields the hub could not be asked
+    about.
     """
-    from ..coffee_names import LISTS
-
     names, not_on_hub, unchecked = lab.hub_names, {}, []
-    for field in LISTS:
+    for field in HUB_FIELDS:
         text = str(values.get(field) or "").strip()
         if not text or names is None:
             continue
+        parts = [p.strip() for p in text.split(",") if p.strip()] if field == "varietal" else [text]
         try:
-            canonical = await names.async_canonical(field, text)
+            canonical = [await names.async_canonical(field, p) for p in parts]
         except (XBloomAPIError, aiohttp.ClientError, TimeoutError):
             unchecked.append(field)
             continue
-        if canonical:
-            values[field] = canonical
-        else:
-            not_on_hub[field] = text
+        values[field] = ", ".join(c or p for c, p in zip(canonical, parts))
+        if missing := [p for c, p in zip(canonical, parts) if not c]:
+            not_on_hub[field] = ", ".join(missing)
     return {k: v for k, v in (("not_on_hub", not_on_hub), ("unchecked", unchecked)) if v}
 
 

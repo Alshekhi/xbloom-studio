@@ -321,6 +321,14 @@ suggest_community:
       example: "Natural"
       selector:
         text:
+    varietal:
+      example: "Bourbon, Typica"
+      selector:
+        text:
+    roast:
+      example: "Light Roast"
+      selector:
+        text:
 
 xbloom_picks:
   fields:
@@ -586,6 +594,12 @@ add_bean:
     process:
       selector:
         text:
+    varietal:
+      selector:
+        text:
+    roast:
+      selector:
+        text:
     roaster_notes:
       selector:
         text:
@@ -640,6 +654,12 @@ update_bean:
       selector:
         text:
     process:
+      selector:
+        text:
+    varietal:
+      selector:
+        text:
+    roast:
       selector:
         text:
     roaster_notes:

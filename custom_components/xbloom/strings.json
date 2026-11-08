@@ -322,6 +322,8 @@
           "country": "Country",
           "region": "Region",
           "process": "Process",
+          "varietal": "Varietal",
+          "roast": "Roast",
           "roaster_notes": "Roaster notes"
         },
         "data_description": {
@@ -348,6 +350,8 @@
           "country": "Country",
           "region": "Region",
           "process": "Process",
+          "varietal": "Varietal",
+          "roast": "Roast",
           "roaster_notes": "Roaster notes"
         },
         "data_description": {
@@ -1096,6 +1100,14 @@
           "name": "Process",
           "description": "How it was processed, such as washed or natural."
         },
+        "varietal": {
+          "name": "Varietal",
+          "description": "The coffee variety, such as Bourbon; several separated by commas."
+        },
+        "roast": {
+          "name": "Roast",
+          "description": "How dark it was roasted, such as light or medium."
+        },
         "roaster_notes": {
           "name": "Roaster notes",
           "description": "The roaster's tasting notes."
@@ -1149,6 +1161,14 @@
         "process": {
           "name": "Process",
           "description": "How it was processed, such as washed or natural."
+        },
+        "varietal": {
+          "name": "Varietal",
+          "description": "The coffee variety, such as Bourbon; several separated by commas."
+        },
+        "roast": {
+          "name": "Roast",
+          "description": "How dark it was roasted, such as light or medium."
         },
         "roaster_notes": {
           "name": "Roaster notes",
@@ -1443,7 +1463,7 @@
     },
     "suggest_community": {
       "name": "Suggest Community Recipes",
-      "description": "Suggest Studio recipes from the xBloom community hub to try with a coffee: its most downloaded ones for the bag in use, or for the origin and process given, leaving out recipes already in the library. When nothing new matches both, origin alone is tried, then any recipe. The response says which origin and process were matched.",
+      "description": "Suggest Studio recipes from the xBloom community hub to try with a coffee: its most downloaded ones for the bag in use, or for the coffee described, leaving out recipes already in the library. When nothing new matches both origin and process, origin alone is tried, then any recipe. Recipes sharing the coffee's variety, roast or tasting notes come first. The response says which origin and process were matched, and what each recipe shares with the coffee.",
       "fields": {
         "origin": {
           "name": "Origin",
@@ -1452,6 +1472,14 @@
         "process": {
           "name": "Process",
           "description": "How it was processed, instead of the bag in use."
+        },
+        "varietal": {
+          "name": "Varietal",
+          "description": "The coffee variety, instead of the bag in use."
+        },
+        "roast": {
+          "name": "Roast",
+          "description": "How dark it was roasted, instead of the bag in use."
         }
       }
     },

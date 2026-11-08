@@ -133,7 +133,8 @@ def _page_from(props, page_id="p1", **extra):
 def test_a_bag_round_trips():
     values = {"name": "Kenya", "status": "open", "tracked": True, "remaining_g": 180.0,
               "bag_size_g": 250.0, "roaster": "R", "country": "Kenya", "region": "Nyeri",
-              "process": "Washed", "roaster_notes": "berry", "opened_on": "2026-09-20"}
+              "process": "Washed", "varietal": "SL28, SL34", "roast": "Light Roast",
+              "roaster_notes": "berry", "opened_on": "2026-09-20"}
     bean = bean_from_page(_page_from(bean_properties(values)))
     assert {k: getattr(bean, k) for k in values} == values
 
@@ -173,6 +174,25 @@ async def test_a_select_option_the_database_lacks_is_added_before_writing():
     assert {"name": "Carbonic"} in options and {"name": "Washed"} in options
     methods = [c[0] for c in notion.calls]
     assert methods.index("PATCH") < methods.index("POST"), "the option exists before the page"
+
+
+async def test_each_variety_is_an_option_of_the_variety_column_added_before_writing():
+    notion = FakeNotion({
+        ("GET", "/databases/b"): {"properties": {
+            "Variety": {"type": "multi_select", "multi_select": {"options": [{"name": "SL28"}]}},
+            "Status": {"type": "select", "select": {"options": [{"name": "Unopened"}]}},
+            "Inventory Tracking": {"type": "select", "select": {"options": [{"name": "Untracked"}]}},
+        }},
+        ("POST", "/pages"): lambda body: {"id": "new", "properties": body["properties"]},
+    })
+    store = NotionStore(notion, Databases("b", "r"))
+    await store.async_add_bean(name="Kenya", status="unopened", varietal="SL28, SL34")
+    patch_call = [c for c in notion.calls if c[0] == "PATCH"][0]
+    assert patch_call[2]["properties"] == {
+        "Variety": {"multi_select": {"options": [{"name": "SL28"}, {"name": "SL34"}]}},
+    }
+    post = [c for c in notion.calls if c[0] == "POST"][0]
+    assert post[2]["properties"]["Variety"] == {"multi_select": [{"name": "SL28"}, {"name": "SL34"}]}
 
 
 async def test_a_page_from_another_database_is_not_a_bag():

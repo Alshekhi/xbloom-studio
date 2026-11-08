@@ -76,6 +76,9 @@ BUY_AGAIN_COLUMN = "Buy Again"
 # one is written, so an older database needs nothing.
 KIND_COLUMN, PODS_COLUMN, POD_ID_COLUMN = "Kind", "Pods Left", "Pod ID"
 KIND = {"coffee": "Coffee", "xpod": "xPod", "tea": "Tea"}
+# A bag's varieties (a multi-select, one option each) and roast, added the
+# same way the first time one is written.
+VARIETAL_COLUMN, ROAST_COLUMN = "Variety", "Roast"
 # A Notion page id: 32 hex digits, with or without its dashes.
 _PAGE_ID = re.compile(r"[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}")
 NEXT_CHANGE = "Next Change"
@@ -186,6 +189,10 @@ def bean_from_page(page: dict) -> Bean:
         country=_plain(props.get("Country")),
         region=_plain(props.get("Region")),
         process=_select(props.get("Process")) or "",
+        varietal=", ".join(
+            o.get("name", "") for o in (props.get(VARIETAL_COLUMN) or {}).get("multi_select") or []
+        ),
+        roast=_select(props.get(ROAST_COLUMN)) or "",
         roaster_notes=_plain(props.get("Roaster Notes")),
         opened_on=_date(props.get("Opened Date")),
         finished_on=_date(props.get("Finished Date")),
@@ -211,6 +218,14 @@ def bean_properties(values: dict[str, Any]) -> dict[str, Any]:
             out["Remaining g" if key == "remaining_g" else "Bag Size g"] = {"number": value}
         elif key == "process":
             out["Process"] = _choice(value or None)
+        elif key == "roast":
+            out[ROAST_COLUMN] = _choice(value or None)
+        elif key == "varietal":
+            # Notion refuses a comma in an option, and commas are what
+            # separate a bag's varieties.
+            out[VARIETAL_COLUMN] = {"multi_select": [
+                {"name": part.strip()} for part in str(value or "").split(",") if part.strip()
+            ]}
         elif key == "buy_again":
             # Added to the database with its option the first time it is
             # written (`_ensure_options`), so an older database needs nothing.
@@ -491,29 +506,40 @@ class NotionStore(CoffeeLabStore):
             self._columns[database_id] |= set(missing)
 
     async def _ensure_options(self, database_id: str, props: dict[str, Any]) -> None:
-        wanted = {
-            name: value["select"]["name"] for name, value in props.items()
-            if isinstance(value, dict) and (value.get("select") or {}).get("name")
-        }
+        """Add the select and multi-select options `props` writes that the database lacks.
+
+        A column it lacks altogether is added with them.
+        """
+        wanted: dict[str, tuple[str, set[str]]] = {}
+        for name, value in props.items():
+            if not isinstance(value, dict):
+                continue
+            if (value.get("select") or {}).get("name"):
+                wanted[name] = ("select", {value["select"]["name"]})
+            elif value.get("multi_select"):
+                wanted[name] = ("multi_select", {o["name"] for o in value["multi_select"]})
         if not wanted:
             return
         async with self._schema_lock:
             if not all((database_id, n) in self._options for n in wanted):
                 schema = (await self._call("GET", f"/databases/{database_id}")).get("properties") or {}
-                for name in wanted:
-                    options = ((schema.get(name) or {}).get("select") or {}).get("options") or []
+                for name, (kind, _) in wanted.items():
+                    options = ((schema.get(name) or {}).get(kind) or {}).get("options") or []
                     self._options[(database_id, name)] = {o["name"] for o in options}
-            missing = {n: v for n, v in wanted.items() if v not in self._options[(database_id, n)]}
+            missing = {
+                n: (kind, values - self._options[(database_id, n)])
+                for n, (kind, values) in wanted.items()
+                if values - self._options[(database_id, n)]
+            }
             if not missing:
                 return
             await self._call("PATCH", f"/databases/{database_id}", {"properties": {
-                name: {"select": {"options": [
-                    *({"name": o} for o in sorted(self._options[(database_id, name)])),
-                    {"name": value},
-                ]}} for name, value in missing.items()
+                name: {kind: {"options": [
+                    {"name": o} for o in sorted(self._options[(database_id, name)] | values)
+                ]}} for name, (kind, values) in missing.items()
             }})
-            for name, value in missing.items():
-                self._options[(database_id, name)].add(value)
+            for name, (_, values) in missing.items():
+                self._options[(database_id, name)] |= values
 
     async def async_list_beans(self, *, selectable_only: bool = True) -> list[Bean]:
         body: dict[str, Any] = {}

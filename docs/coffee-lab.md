@@ -25,12 +25,15 @@ first. A finished bag keeps its brews.
 Bags are named by their name, or by their id when two bags share one; a shared
 name is refused rather than guessed.
 
-A bag's **country** and **process** are kept in the
+A bag's **country**, **process**, **varietal** and **roast** are kept in the
 [community hub](recipes.md#community-recipes)'s English names — "ethiopia",
-the country's name in Arabic or Chinese, or "Anaerobic" become "Ethiopia" and
-"Anaerobic Fermentation" — so bags of the same coffee match each other and the
-hub. A name the hub does not list is kept as typed, and the action's response
-names it under `not_on_hub`.
+the country's name in Arabic or Chinese, "Anaerobic", "gesha" or "light" become
+"Ethiopia", "Anaerobic Fermentation", "Geisha/Gesha" and "Light Roast" — so
+bags of the same coffee match each other and the hub. Several varieties are
+separated by commas, and each is checked. A name the hub does not list is kept
+as typed, and the action's response names it under `not_on_hub`. The
+**roaster notes** stay as written; the hub's flavor names found in them are
+what community suggestions match.
 
 ## Coffee, xPod boxes and tea
 
@@ -119,8 +122,8 @@ again: your own first,
 ranked by how close the bags they were brewed with are — this bag, then the
 same origin and process, then the same origin — and by their verdicts, with
 a recipe last rated **Not again** with this bag left out — and, after them,
-[community recipes](recipes.md#community-recipes) for coffee like it, most
-downloaded first. **Suggested Recipe** offers them all, your own first and
+[community recipes](recipes.md#community-recipes) for coffee like it, the
+closest to the bag's process, varietal, roast and roaster notes first. **Suggested Recipe** offers them all, your own first and
 each community one marked as such, with the best already chosen; its
 attributes say why the chosen one was suggested. **Use Suggested Recipe**
 picks it for brewing, adding a community recipe to your library first.
@@ -167,6 +170,7 @@ A field missing or of the wrong type is named when you set it up, and nothing
 is saved until it is fixed. The fields for ratings — Rating, Body, Acidity,
 Sweetness, Clarity, Hot, Warm, Cool and Overall Notes, Finish and Next Change
 in Brews, and Buy Again in Coffee Beans — are added the first time one is
-kept. A select option the database lacks — a new brewer,
+kept, as are Kind, Pods Left, Pod ID, Variety and Roast in Coffee Beans.
+A select option the database lacks — a new brewer,
 say — is added before it is used. A bag added or changed in Notion itself
 appears within ten minutes, or at once with **Refresh Coffee Bags**.

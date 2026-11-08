@@ -31,7 +31,7 @@ from xbloom.client import XBloomClient
 from xbloom.community import XBloomCommunityClient
 from xbloom.exceptions import XBloomAPIError
 
-from .coffee_names import HubNames
+from .coffee_names import HubNames, name_key
 from .const import COMMUNITY_MACHINE, DOMAIN
 from .suggestions import OwnSuggestion, async_own_suggestions
 from .tool_common import fail
@@ -141,10 +141,13 @@ async def studio_recipe(client: XBloomCommunityClient, recipe_id: int) -> dict[s
 
 
 # A suggestion is drawn from the most downloaded Studio recipes for the bag:
-# the first SUGGEST_POOL of them, less any already in the library, of which
-# SUGGESTIONS are offered.
-SUGGEST_POOL = 20
+# the first SUGGEST_POOL of them, less any already in the library, ordered by
+# how closely each fits the bag, of which SUGGESTIONS are offered.
+SUGGEST_POOL = 50
 SUGGESTIONS = 5
+# How many shared tasting notes count towards a recipe's fit: past this, a
+# long list of notes would outweigh the variety and the roast.
+FLAVORS_COUNTED = 3
 
 
 def library_cup_types(library: list[dict[str, Any]]) -> set[int]:
@@ -165,6 +168,10 @@ async def suggest(
     process: str | None,
     remaining_g: float | None = None,
     names: HubNames | None = None,
+    *,
+    varietal: str | None = None,
+    roast: str | None = None,
+    notes: str | None = None,
 ) -> dict[str, Any]:
     """Community recipes worth trying for a coffee of this origin and process.
 
@@ -177,6 +184,11 @@ async def suggest(
     Two fits narrow it further. A recipe needing more coffee than the bag has
     left (`remaining_g`, when the bag is counted down) is left out. Recipes
     for the drippers the library already uses come first, the rest after.
+
+    Within each, the recipes closest to the coffee come first: one point each
+    for the same process, a shared variety and the same roast, and one for
+    each tasting note in the bag's `notes` the recipe also names, up to
+    FLAVORS_COUNTED. Each recipe's `fits` says which of these it shares.
     """
     have = {str(r.get("name") or "").casefold() for r in library}
     cups = library_cup_types(library)
@@ -190,6 +202,7 @@ async def suggest(
             process = (await names.async_canonical("process", process) if process else None) or process
         except HUB_ERRORS as err:
             _LOGGER.debug("xbloom community names: %s", err)
+    fit = await _Fit.async_for(names, process, varietal, roast, notes)
     tried: list[tuple[str | None, str | None]] = []
     for attempt in ((country, process), (country, None), (None, None)):
         if attempt in tried:
@@ -207,15 +220,87 @@ async def suggest(
         except ValueError:
             continue
         fresh = [
-            r for r in page["recipes"]
+            {**r, "fits": await fit.async_fits(r)} for r in page["recipes"]
             if (library_name(r.get("name")) or "").casefold() not in have
             and (remaining_g is None or (r.get("dose_g") or 0) <= remaining_g)
         ]
-        # Stable, so the download order holds within each group.
-        fresh.sort(key=lambda r: r.get("cup_type") not in cups)
+        # Stable, so the download order holds among equally close recipes.
+        fresh.sort(key=lambda r: (r.get("cup_type") not in cups, -_Fit.score(r["fits"])))
         if fresh:
             return {"origin": origin, "process": proc, "recipes": fresh[:SUGGESTIONS]}
     return {"origin": None, "process": None, "recipes": []}
+
+
+class _Fit:
+    """What a hub recipe shares with a bag: its process, variety, roast and notes.
+
+    Both sides are compared in the hub's own names (`HubNames.async_keys`),
+    so a recipe written in another language still matches. When the hub's
+    names cannot be read, each side is compared as typed.
+    """
+
+    def __init__(self, names: HubNames | None, wanted: dict[str, set[str]]) -> None:
+        self._names = names
+        self._wanted = wanted
+
+    @classmethod
+    async def async_for(
+        cls, names: HubNames | None, process: str | None, varietal: str | None,
+        roast: str | None, notes: str | None,
+    ) -> _Fit:
+        fit = cls(names, {})
+        fit._wanted = {
+            "process": await fit._keys("process", [process] if process else []),
+            "varietal": await fit._keys("varietal", (varietal or "").split(",")),
+            "roast": await fit._keys("roast", [roast] if roast else []),
+            "flavor": await fit._flavors(notes or ""),
+        }
+        return fit
+
+    async def _keys(self, field: str, values: list[str]) -> set[str]:
+        if self._names is not None:
+            try:
+                return await self._names.async_keys(field, values)
+            except HUB_ERRORS as err:
+                _LOGGER.debug("xbloom community names: %s", err)
+                self._names = None
+        return {k for k in (name_key(v) for v in values) if k}
+
+    async def _flavors(self, notes: str) -> set[str]:
+        if self._names is None or not notes.strip():
+            return set()
+        try:
+            return await self._names.async_flavors_in(notes)
+        except HUB_ERRORS as err:
+            _LOGGER.debug("xbloom community names: %s", err)
+            self._names = None
+            return set()
+
+    async def async_fits(self, recipe: dict[str, Any]) -> dict[str, int]:
+        """Each shared field, with how many it shares: {"roast": 1, "flavor": 2}."""
+        fits = {}
+        for field in ("process", "varietal", "roast", "flavor"):
+            wanted = self._wanted.get(field)
+            if not wanted:
+                continue
+            value = recipe.get(field)
+            values = value if isinstance(value, list) else [value] if value else []
+            if shared := len(wanted & await self._keys(field, [str(v) for v in values])):
+                fits[field] = shared
+        return fits
+
+    @staticmethod
+    def score(fits: dict[str, int]) -> int:
+        return sum(min(n, FLAVORS_COUNTED) if f == "flavor" else 1 for f, n in fits.items())
+
+
+def bag_coffee(bag: Any) -> dict[str, str | None]:
+    """A bag's variety, roast and tasting notes, as `suggest` takes them."""
+    return {
+        "varietal": getattr(bag, "varietal", None) or None,
+        "roast": getattr(bag, "roast", None) or None,
+        "notes": getattr(bag, "roaster_notes", None) or None,
+    }
 
 
 def bag_remaining_g(bag: Any) -> float | None:
@@ -361,7 +446,7 @@ class CommunityBrowser:
             found = await suggest(
                 self._client, self._coordinator.data or [],
                 getattr(bag, "country", None), getattr(bag, "process", None),
-                bag_remaining_g(bag), self.names,
+                bag_remaining_g(bag), self.names, **bag_coffee(bag),
             )
         except HUB_ERRORS as err:
             _LOGGER.warning("xbloom community suggestion: %s", err)
@@ -723,10 +808,16 @@ class CommunityBrowser:
             return {}
         return {
             "id": d.get("id"),
+            # What a suggested recipe shares with the bag (`suggest`); a
+            # recipe found by searching has nothing to share.
+            "fits": next(
+                (r.get("fits") or {} for r in self.results if r.get("id") == self.picked_id), {},
+            ),
             "official": bool(d.get("official")),
             "author": hub_text(d.get("author")),
             "origin": hub_texts(d.get("origin")),
             "process": hub_texts(d.get("process")),
+            "varietal": hub_texts(d.get("varietal")),
             "roast": hub_text(d.get("roast")),
             "flavor": hub_texts(d.get("flavor")),
             "description": hub_text(d.get("description"), HUB_LONG),

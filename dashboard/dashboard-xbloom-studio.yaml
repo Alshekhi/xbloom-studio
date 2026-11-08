@@ -329,7 +329,8 @@ views:
     - type: markdown
       content: '{% set a = states[''select.xbloom_studio_coffee_bag''].attributes if states[''select.xbloom_studio_coffee_bag'']
         else {} %}{{ [a.get(''roaster''), [a.get(''country''), a.get(''region'')] | select | join('',
-        ''), a.get(''process'')] | select | join('' · '') }}{% if a.get(''roaster_notes'') %}
+        ''), a.get(''process''), a.get(''varietal''), a.get(''roast'')] | select | join('' · '') }}{%
+        if a.get(''roaster_notes'') %}
 
 
         {{ a.get(''roaster_notes'') }}{% endif %}'
@@ -1357,13 +1358,20 @@ views:
 
 
         {% endif %}Shared by {{ ''xBloom'' if a.get(''official'') else e(a.get(''author'')) }}{% set about
-        = (a.get(''origin'') or []) + (a.get(''process'') or []) + ([a.get(''roast'')] if a.get(''roast'')
-        else []) %}{% if about %} · {% for x in about %}{{ e(x) }}{% if not loop.last %} · {% endif %}{%
-        endfor %}{% endif %}{% if a.get(''likes'') %} · {{ a.get(''likes'') }} likes{% endif %}
+        = (a.get(''origin'') or []) + (a.get(''process'') or []) + (a.get(''varietal'') or []) + ([a.get(''roast'')]
+        if a.get(''roast'') else []) %}{% if about %} · {% for x in about %}{{ e(x) }}{% if not loop.last
+        %} · {% endif %}{% endfor %}{% endif %}{% if a.get(''likes'') %} · {{ a.get(''likes'') }} likes{%
+        endif %}
 
 
         {% if a.get(''flavor'') %}**Notes:** {% for x in a.get(''flavor'') %}{{ e(x) }}{% if not loop.last
         %}, {% endif %}{% endfor %}
+
+
+        {% endif %}{% set fits = a.get(''fits'') or {} %}{% if fits %}**Like this bag:** {{ [(''process''
+        if fits.get(''process'') else ''''), (''variety'' if fits.get(''varietal'') else ''''), (''roast''
+        if fits.get(''roast'') else ''''), (''tasting notes'' if fits.get(''flavor'') else '''')] | select
+        | join('', '') }}
 
 
         {% endif %}{% if a.get(''description'') %}{{ e(a.get(''description'')) }}

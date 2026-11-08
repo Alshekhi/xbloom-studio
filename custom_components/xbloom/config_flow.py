@@ -465,7 +465,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             ),
             **{
                 vol.Optional(key, description=suggested(key)): selector.TextSelector()
-                for key in ("roaster", "country", "region", "process")
+                for key in ("roaster", "country", "region", "process", "varietal", "roast")
             },
             vol.Optional("roaster_notes", description=suggested("roaster_notes")):
                 selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
