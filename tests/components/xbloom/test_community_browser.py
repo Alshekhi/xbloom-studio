@@ -165,7 +165,9 @@ def test_every_platform_gets_its_entities_and_nothing_without_a_browser():
 
 def _bag(country="Ethiopia", process="Natural", name="Test Bag"):
     lab = MagicMock()
-    lab.async_active_bean = AsyncMock(return_value=SimpleNamespace(country=country, process=process, name=name))
+    lab.active_bean_id = "bag"
+    lab.async_active_bean = AsyncMock(return_value=SimpleNamespace(
+        id="bag", country=country, process=process, name=name))
     return lab
 
 
@@ -338,3 +340,36 @@ async def test_a_community_choice_is_marked_in_the_picker():
     await select.async_select_option("Test Peru Iced (community)")
     assert browser.choice == "hub:4022"
     assert select.extra_state_attributes["source"] == "community"
+
+
+
+async def test_a_suggestion_for_a_bag_no_longer_in_use_is_dropped():
+    browser, client, *_ = _browser()
+    lab = _bag()
+
+    async def own_then_bag_changes(*args):
+        lab.active_bean_id = "other"  # the bag changed while the record was read
+        return [cm.OwnSuggestion("Mine", 3, "this_bag", "")]
+
+    with patch.object(cm, "async_own_suggestions", own_then_bag_changes):
+        await browser.async_suggest_for_bag(lab)
+    assert browser.own is None and browser.choice_keys() == []
+
+
+async def test_a_hub_timeout_still_offers_your_own_with_the_best_chosen():
+    browser, client, *_ = _browser()
+    client.search.side_effect = TimeoutError()
+    own = [cm.OwnSuggestion("Mine", 1, "origin", "")]
+    with patch.object(cm, "async_own_suggestions", AsyncMock(return_value=own)):
+        await browser.async_suggest_for_bag(_bag())
+    assert browser.choice == "own:Mine" and browser.failed
+
+
+async def test_a_hub_recipe_never_replaces_one_of_yours_with_the_same_name():
+    browser, client, share, coordinator = _browser()
+    coordinator.data = [{"name": "Test Kenya Hot"}, {"name": "Test Kenya Hot 2"}]
+    await browser.async_search()
+    await browser.async_pick("Test Kenya Hot")
+    name = await browser.async_add_picked()
+    assert name == "Test Kenya Hot 3"
+    assert coordinator.async_add_recipe.await_args.args[0]["name"] == "Test Kenya Hot 3"

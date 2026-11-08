@@ -4,7 +4,8 @@ A store kept in Notion can fail at any of its writes. These tests fail it on
 purpose — at reading the bag, at writing the bag, at writing the row — and
 check the brew is kept, retried, and in the end counted exactly once.
 """
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.exceptions import HomeAssistantError
@@ -160,6 +161,67 @@ async def test_a_brew_that_cannot_be_counted_does_not_hold_back_the_next():
     assert bad.result == "queued" and "KeyError" in bad.reason
     assert good.result == "counted"
     assert [e["run_id"] for e in lab.pending.entries] == ["bad"]
+
+
+async def test_a_brew_the_store_refuses_does_not_hold_back_the_next():
+    """Refused, not unreachable: kept, but stepped past, so later brews are saved."""
+    from custom_components.xbloom.coffee_lab.store import StoreRefused
+
+    lab, store, bag = await _lab()
+    real_create = store.async_create_brew
+
+    async def refuses_once(brew):
+        if brew.run_id == "refused":
+            raise StoreRefused("a value the store will not take")
+        return await real_create(brew)
+
+    store.async_create_brew = refuses_once
+    refused = await lab.async_consume(bean_id=bag.id, grams=17, run_id="refused")
+    later = await lab.async_consume(bean_id=bag.id, grams=20, run_id="later")
+    assert refused.result == "queued"
+    assert later.result == "counted"
+    assert [e["run_id"] for e in lab.pending.entries] == ["refused"]
+
+
+async def test_a_bag_write_that_landed_but_was_not_answered_is_not_taken_twice():
+    lab, store, bag = await _lab()
+    real_update = store.async_apply_bean_update
+    calls = []
+
+    async def lands_then_times_out(*args, **kwargs):
+        calls.append(1)
+        await real_update(*args, **kwargs)
+        if len(calls) == 1:
+            raise HomeAssistantError("timed out after writing")
+
+    store.async_apply_bean_update = lands_then_times_out
+    first = await lab.async_consume(bean_id=bag.id, grams=20, run_id="r1")
+    assert first.result == "queued" and await _remaining(store, bag) == 80.0
+    await lab.async_retry_pending()
+    assert await _remaining(store, bag) == 80.0, "the dose is taken once"
+    assert lab.pending.entries == [] and len(calls) == 1
+    assert [b.run_id for b in await store.async_list_brews()] == ["r1"]
+
+
+def test_notion_tells_a_refusal_from_being_unreachable():
+    from custom_components.xbloom.coffee_lab import notion
+    from custom_components.xbloom.coffee_lab.store import StoreRefused
+
+    client = MagicMock()
+    store = notion.NotionStore(client, MagicMock())
+    for status, refused in ((400, True), (404, True), (None, False), (429, False), (503, False)):
+        client.call = AsyncMock(side_effect=notion.NotionError(status, "x"))
+        with pytest.raises(HomeAssistantError) as raised:
+            asyncio.run(store._call("GET", "/x"))
+        assert isinstance(raised.value, StoreRefused) is refused, status
+
+
+async def test_a_brewer_name_the_store_cannot_keep_is_refused_before_counting():
+    lab, store, bag = await _lab()
+    with pytest.raises(HomeAssistantError) as raised:
+        await actions.consume(lab, {"bean_id": bag.id, "grams": 17, "brewer": "V60, Hario"})
+    assert raised.value.translation_key == "brewer_invalid"
+    assert await _remaining(store, bag) == 100.0
 
 
 # ── Before the queue: the bag must not have to be read ───────────────────────

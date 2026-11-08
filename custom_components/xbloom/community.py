@@ -50,6 +50,20 @@ ANY_ORIGIN = "any"
 RECIPE_SELECT = "xbloom_recipe_select"
 
 
+# What the hub client and its link reading raise when the hub cannot answer:
+# a timeout is a plain TimeoutError, not a ClientError.
+HUB_ERRORS = (XBloomAPIError, aiohttp.ClientError, TimeoutError)
+# `async_suggest` was not handed the bag: it reads it itself.
+_UNREAD = object()
+# The longest name a hub recipe is kept under in the library.
+LIBRARY_NAME = 60
+
+
+def library_name(value: Any) -> str | None:
+    """A hub recipe's name as the library keeps it: the same everywhere it is compared."""
+    return hub_text(value, LIBRARY_NAME)
+
+
 def hub_text(value: Any, limit: int = HUB_SHORT) -> str | None:
     """Stranger-typed text as one line of printable text, at most `limit`."""
     text = "".join(ch if ch.isprintable() else " " for ch in str(value or ""))
@@ -134,7 +148,7 @@ async def suggest(
         try:
             country = (await names.async_canonical("country", country) if country else None) or country
             process = (await names.async_canonical("process", process) if process else None) or process
-        except (XBloomAPIError, aiohttp.ClientError, TimeoutError) as err:
+        except HUB_ERRORS as err:
             _LOGGER.debug("xbloom community names: %s", err)
     tried: list[tuple[str | None, str | None]] = []
     for attempt in ((country, process), (country, None), (None, None)):
@@ -154,7 +168,7 @@ async def suggest(
             continue
         fresh = [
             r for r in page["recipes"]
-            if (hub_text(r.get("name")) or "").casefold() not in have
+            if (library_name(r.get("name")) or "").casefold() not in have
             and (remaining_g is None or (r.get("dose_g") or 0) <= remaining_g)
         ]
         # Stable, so the download order holds within each group.
@@ -241,7 +255,7 @@ class CommunityBrowser:
         """The hub's origin names, in the Home Assistant language."""
         try:
             criteria = await self._client.criteria()
-        except (XBloomAPIError, aiohttp.ClientError) as err:
+        except HUB_ERRORS as err:
             _LOGGER.warning("xbloom community: could not read the hub's origins: %s", err)
             return
         self.origins = [o["name"] for o in criteria.get("originList", []) if o.get("name")]
@@ -272,11 +286,11 @@ class CommunityBrowser:
                 sort=self.sort,
                 page_size=RESULTS_SHOWN,
             )
-        except (ValueError, XBloomAPIError, aiohttp.ClientError) as err:
+        except (ValueError, *HUB_ERRORS) as err:
             _LOGGER.warning("xbloom community search: %s", err)
             self.failed = True
             self._changed()
-            raise fail("community_failed", reason=str(err)) from err
+            raise fail("community_failed", reason=hub_text(str(err))) from err
         self.failed = False
         self.suggested = False
         self.suggested_for = None
@@ -287,24 +301,27 @@ class CommunityBrowser:
         self.detail = None
         self._changed()
 
-    async def async_suggest(self, lab: Any) -> None:
+    async def async_suggest(self, lab: Any, bag: Any = _UNREAD) -> None:
         """Fill the picker with suggestions for the bag in use, and pick one.
 
         The most downloaded is picked; the others are in the picker too.
+        `bag` is the bag already read by a caller, so both halves of one
+        suggestion are for the same bag.
         """
         self.added = None
-        bag = await active_bag(lab)
+        if bag is _UNREAD:
+            bag = await active_bag(lab)
         try:
             found = await suggest(
                 self._client, self._coordinator.data or [],
                 getattr(bag, "country", None), getattr(bag, "process", None),
                 bag_remaining_g(bag), self.names,
             )
-        except (XBloomAPIError, aiohttp.ClientError) as err:
+        except HUB_ERRORS as err:
             _LOGGER.warning("xbloom community suggestion: %s", err)
             self.failed = True
             self._changed()
-            raise fail("community_failed", reason=str(err)) from err
+            raise fail("community_failed", reason=hub_text(str(err))) from err
         self.failed = False
         self.suggested = True
         self.suggested_for = getattr(bag, "name", None)
@@ -325,22 +342,38 @@ class CommunityBrowser:
         are still offered and the failure is logged, not raised, since half an
         answer is still an answer here.
         """
-        bag = await active_bag(lab)
-        self.own = await async_own_suggestions(lab, bag, self._coordinator.data or [])
-        self.suggestions = []
-        self.choice = None
-        self._changed()
-        try:
-            await self.async_suggest(lab)
-        except HomeAssistantError as err:
-            if not self.own:
-                raise
-            _LOGGER.warning("xbloom suggestion: only your own recipes: %s", err)
-        else:
-            self.suggestions = list(self.results)
-        keys = self.choice_keys()
-        self.choice = keys[0] if keys else None
-        self._changed()
+        # One at a time, and kept only if the bag it was asked for is still
+        # the one in use when the answer comes back: a bag changed, cleared or
+        # finished meanwhile must not be shown another bag's suggestions.
+        async with self._resuggesting:
+            bag = await active_bag(lab)
+            wanted = getattr(bag, "id", None)
+
+            def current() -> bool:
+                return lab is None or getattr(lab, "active_bean_id", None) == wanted
+
+            own = await async_own_suggestions(lab, bag, self._coordinator.data or [])
+            if not current():
+                return
+            self.own, self.suggestions, self.choice = own, [], None
+            self._changed()
+            hub: list[dict[str, Any]] = []
+            try:
+                await self.async_suggest(lab, bag)
+            except HomeAssistantError as err:
+                if not self.own:
+                    raise
+                _LOGGER.warning("xbloom suggestion: only your own recipes: %s", err)
+            else:
+                hub = list(self.results)
+            if not current():
+                self.own = None
+                self._changed()
+                return
+            self.suggestions = hub
+            keys = self.choice_keys()
+            self.choice = keys[0] if keys else None
+            self._changed()
 
     @callback
     def bag_chosen(self, lab: Any, bean_id: str | None) -> None:
@@ -361,15 +394,13 @@ class CommunityBrowser:
             self._hass.async_create_task(self._async_resuggest(lab, bean_id))
 
     async def _async_resuggest(self, lab: Any, bean_id: str) -> None:
-        # One at a time, and only for the bag still in use: a quick change of
-        # mind must not leave the first bag's suggestions on the second.
-        async with self._resuggesting:
-            if lab.active_bean_id != bean_id:
-                return
-            try:
-                await self.async_suggest_for_bag(lab)
-            except HomeAssistantError as err:
-                _LOGGER.info("xbloom suggestion for the new bag: %s", err)
+        # Only for the bag still in use: a quick change of mind asks again.
+        if lab.active_bean_id != bean_id:
+            return
+        try:
+            await self.async_suggest_for_bag(lab)
+        except HomeAssistantError as err:
+            _LOGGER.info("xbloom suggestion for the new bag: %s", err)
 
     def choice_keys(self) -> list[str]:
         """The Suggested Recipe picker's choices: your own, then the community's."""
@@ -454,9 +485,9 @@ class CommunityBrowser:
         self._changed()
         try:
             self.detail = await studio_recipe(self._client, self.picked_id)
-        except (NotForThisMachine, XBloomAPIError, aiohttp.ClientError) as err:
+        except (NotForThisMachine, *HUB_ERRORS) as err:
             _LOGGER.warning("xbloom community recipe %s: %s", self.picked_id, err)
-            raise fail("community_failed", reason=str(err)) from err
+            raise fail("community_failed", reason=hub_text(str(err))) from err
         finally:
             self._changed()
 
@@ -465,18 +496,27 @@ class CommunityBrowser:
 
         Kept under the name it was picked by: the share link can carry a
         different one, and the recipe is looked for in the library by the name
-        it was seen under.
+        it was seen under. A name already in the library gets a number — the
+        library replaces a recipe added under an existing name, and one of
+        your own must never be replaced by a stranger's.
         """
-        link = hub_share_url(self.detail or {})
-        if self.detail is None or link is None:
+        # Its own copy: another pick on the Community tab while the link is
+        # read must not change what is added.
+        detail = self.detail
+        link = hub_share_url(detail or {})
+        if detail is None or link is None:
             raise fail("community_none_picked")
         try:
             recipe = await self._share_client.get_recipe_by_share_id(
                 self._share_client.share_id_from_url(link)
             )
-        except (ValueError, XBloomAPIError, aiohttp.ClientError) as err:
-            raise fail("community_failed", reason=str(err)) from err
-        name = hub_text(self.detail.get("name"), 60) or recipe.get("name")
+        except (ValueError, *HUB_ERRORS) as err:
+            raise fail("community_failed", reason=hub_text(str(err))) from err
+        name = library_name(detail.get("name")) or recipe.get("name")
+        taken = {str(r.get("name") or "").casefold() for r in self._coordinator.data or []}
+        base, number = name, 2
+        while name.casefold() in taken:
+            name, number = f"{base} {number}", number + 1
         await self._coordinator.async_add_recipe({**recipe, "name": name})
         self.added = name
         self._changed()

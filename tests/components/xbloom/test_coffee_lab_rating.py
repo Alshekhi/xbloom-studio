@@ -304,3 +304,45 @@ async def test_the_rate_brew_service_needs_no_bag_and_answers_the_question():
     await handler(call)
     [brew] = await store.async_list_brews()
     assert brew.rating == 3 and lab.rating_question is None
+
+
+async def test_a_cup_removed_from_the_record_does_not_block_the_answer():
+    lab, store, bag = await _lab()
+    first = await _brew(lab, bag, "run-1")
+    second = await _brew(lab, bag, "run-2")
+    store._brews = [b for b in store._brews if b.id != first.brew_id]
+    with _at(lab, 16):
+        await lab.async_rate(verdict="again")
+    assert [b.rating for b in await store.async_list_brews()] == [3]
+    assert lab.rating_questions == []
+
+
+async def test_an_answer_given_while_a_new_cup_is_saved_is_not_undone():
+    lab, store, bag = await _lab()
+    first = await _brew(lab, bag, "run-1")
+    real_get = store.async_get_bean
+
+    async def answered_meanwhile(bean_id):
+        if lab.question_of(first.brew_id):
+            await lab.async_rate(verdict="fine", brew_id=first.brew_id)
+        return await real_get(bean_id)
+
+    store.async_get_bean = answered_meanwhile
+    await _brew(lab, bag, "run-2", grind="52")
+    assert [q["recipe"] for q in lab.rating_questions] == ["Test Hot"]
+    assert lab.question_of(first.brew_id) is None, "the answered question stays answered"
+
+
+async def test_the_verdict_picker_rates_only_the_question_shown():
+    from custom_components.xbloom.coffee_lab.entities import RateBrewSelect
+
+    lab, store, bag = await _lab()
+    result = await _brew(lab, bag, "run-1")
+    select = RateBrewSelect(lab)
+    with pytest.raises(Exception) as raised:
+        await select.async_select_option("again")  # not due yet: not shown
+    assert raised.value.translation_key == "rating_none"
+    with _at(lab, 16):
+        await select.async_select_option("again")
+    [brew] = await store.async_list_brews()
+    assert (brew.id, brew.rating) == (result.brew_id, 3)

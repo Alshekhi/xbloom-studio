@@ -115,7 +115,9 @@ trigger:
 condition:
   - condition: template
     value_template: >
-      {% if trigger.id == 'due' %}{{ coffees | count > 0 }}
+      {% if trigger.id == 'due' %}{{ coffees | count > 0 and
+         ((method == 'phone' and notify_service | trim != '') or
+          (method == 'voice' and satellite | trim != '')) }}
       {% else %}{% set a = (trigger.event.data.action or '').split('|') %}
       {{ method == 'phone' and a | count == 3 and a[0] == prefix and a[1] in verdicts }}{% endif %}
 

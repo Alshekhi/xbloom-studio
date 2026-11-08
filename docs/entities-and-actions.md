@@ -19,7 +19,7 @@
 The integration registers its services under the `xbloom.` domain:
 
 - **Brewing** — `prepare_brew`, `cancel_preparation`, `start_brew`, `stop_brew`, `brew_pause`, `brew_resume`, `brew_standalone`, `write_slot`.
-- **Machine control** — `grind`, `tare`, `back_to_home`, `set_mode`, `set_water_source`, `set_temp_unit`, `set_weight_unit`.
+- **Machine settings and modules** — `grind`, `tare`, `back_to_home`, `set_mode`, `set_water_source`, `set_temp_unit`, `set_weight_unit`.
 - **Recipe library** — `list_recipes`, `get_recipe`, `build_recipe`, `add_recipe`, `update_recipe`, `delete_recipe`, `save_scaled_recipe`, `archive_recipe`, `restore_recipe`, `list_archived_recipes`.
 - **Community hub** — `search_community`, `get_community_recipe`, `suggest_community`.
 - **Coffee Lab**, while it is on — `add_bean`, `update_bean`, `set_active_bean`, `consume`, `start_tracking`, `finish_bag`, `rate_brew`.

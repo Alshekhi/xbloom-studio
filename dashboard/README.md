@@ -112,11 +112,12 @@ unavailable, so the card is hidden rather than shown broken.
 - **Every tile sets `icon_tap_action: {action: none}`**, so the icon is not a
   second control beside the tile's own action. Action tiles also set
   `hide_state: true`.
-- **Names come from the entities.** Tiles do not override them, so they are
-  translated — except on the Community tab, whose section heading already says
-  "community", so its tiles take short names from `TEXT` in each language.
+- **Names come from the entities**, so they are translated — except where a
+  section heading already gives the context (the Community tab, and the rating,
+  version and suggestion sections of the Brew tab), whose tiles take short
+  names from `TEXT` in each language.
 - **Destructive actions ask first** — Stop brew, Run recipe action,
-  Record manual brew.
+  Record manual brew, Make it the recipe, Add to my recipes.
 
 ## Editing it
 

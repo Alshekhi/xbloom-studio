@@ -25,7 +25,8 @@ import aiohttp
 from ..tool_common import fail
 from .models import TASTE_SCALES, REVIEW_REASONS, SELECTABLE, Bean, Brew, Review
 from .stats import moment
-from .store import UnknownBrew, CoffeeLabStore, UnknownBean, _check_changes
+from ..const import DOMAIN
+from .store import StoreRefused, UnknownBrew, CoffeeLabStore, UnknownBean, _check_changes
 
 API = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
@@ -79,6 +80,11 @@ TASTE_COLUMNS = {
     "hot_notes": "Hot Notes", "warm_notes": "Warm Notes", "cool_notes": "Cool Notes",
     "overall_notes": "Overall Notes", "finish": "Finish",
 }
+
+
+# Answers worth waiting out: a conflict, a rate limit, Notion itself failing.
+# Any other answer is a refusal that will not change on its own.
+TRANSIENT = {409, 429, 500, 502, 503, 504}
 
 
 class NotionError(Exception):
@@ -438,6 +444,11 @@ class NotionStore(CoffeeLabStore):
         try:
             return await self._client.call(method, path, body)
         except NotionError as err:
+            if err.status is not None and err.status not in TRANSIENT:
+                raise StoreRefused(
+                    translation_domain=DOMAIN, translation_key="notion_failed",
+                    translation_placeholders={"error": str(err)},
+                ) from err
             raise fail("notion_failed", error=str(err)) from err
 
     async def _ensure_columns(self, database_id: str, props: dict[str, Any]) -> None:

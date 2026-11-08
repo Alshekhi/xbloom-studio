@@ -67,15 +67,15 @@ views:
     - type: markdown
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
-        ''\\\\\\1'') }}{% endmacro %}How was **{{ e(states(''sensor.xbloom_studio_brew_to_rate'')) }}**
-        with {{ e(state_attr(''sensor.xbloom_studio_brew_to_rate'', ''bag'')) }}{% set cs = state_attr(''sensor.xbloom_studio_brew_to_rate'',
+        ''\\\\\\1'') }}{% endmacro %}**{{ e(states(''sensor.xbloom_studio_brew_to_rate'')) }}** with {{
+        e(state_attr(''sensor.xbloom_studio_brew_to_rate'', ''bag'')) }}{% set cs = state_attr(''sensor.xbloom_studio_brew_to_rate'',
         ''changes'') or [] %}{% if cs %}, at {% for c in cs %}{% if c.setting == ''grind'' %}grind {{
         (c.value | float) | round(1) | string | replace(''.0'', '''') }} instead of {{ (c.saved | float)
         | round(1) | string | replace(''.0'', '''') }}{% elif c.setting == ''ratio'' %}ratio 1:{{ (c.value
         | float) | round(1) | string | replace(''.0'', '''') }} instead of 1:{{ (c.saved | float) | round(1)
         | string | replace(''.0'', '''') }}{% else %}{{ (c.value | float) | round(1) | string | replace(''.0'',
         '''') }} g instead of {{ (c.saved | float) | round(1) | string | replace(''.0'', '''') }} g{%
-        endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}?'
+        endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}.'
     - type: tile
       entity: select.xbloom_studio_verdict
       name: Verdict
@@ -104,8 +104,7 @@ views:
     - type: markdown
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
-        ''\\\\\\1'') }}{% endmacro %}Would you buy **{{ e(states(''sensor.xbloom_studio_finished_bag''))
-        }}** again?'
+        ''\\\\\\1'') }}{% endmacro %}**{{ e(states(''sensor.xbloom_studio_finished_bag'')) }}** is finished.'
     - type: tile
       entity: select.xbloom_studio_buy_again
       name: Buy again
@@ -1030,7 +1029,7 @@ views:
       content: '## Find a community recipe'
     - type: tile
       entity: button.xbloom_studio_suggest_community_recipe
-      name: Suggest a recipe
+      name: Suggest a community recipe
       icon_tap_action:
         action: none
       hide_state: true

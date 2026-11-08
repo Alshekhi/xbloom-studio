@@ -45,7 +45,7 @@ from .const import (
 from .blueprint_install import async_install_blueprints
 from .callbacks import Callbacks, targets_from
 from .rating_calls import RatingAsker
-from .coffee_lab.lab import CoffeeLab
+from .coffee_lab.lab import STORE_UNREACHABLE, CoffeeLab
 from .coffee_lab.listener import async_count_completed_brews
 from .coffee_lab.notion import Databases, NotionClient, NotionStore
 from .coffee_lab.store import UnknownBean
@@ -66,7 +66,8 @@ from .coordinator import XBloomCoordinator
 from .versions import VersionDesk
 from .coffee_names import HubNames
 from .community import (
-    CommunityBrowser, NotForThisMachine, active_bag, bag_remaining_g, studio_recipe, suggest,
+    HUB_ERRORS, CommunityBrowser, NotForThisMachine, active_bag, bag_remaining_g, hub_text,
+    studio_recipe, suggest,
 )
 from . import llm_api
 from xbloom.client import XBloomClient
@@ -1481,7 +1482,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         from .ble_entities import send_live_frame
         from xbloom.ble import XBloomBleClient
 
-        if await send_live_frame(entry, packet):
+        # Machine control is checked where each service is registered
+        # (`_machine`), so pause, which is always allowed, is not refused here.
+        if await send_live_frame(entry, packet, guarded=False):
             _LOGGER.info("xbloom.%s: ✓ sent over the held Connect session", label)
             return
 
@@ -2043,9 +2046,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             result = await community.search(machine=COMMUNITY_MACHINE, **filters)
         except ValueError as err:  # a filter name the hub does not list
             return {"ok": False, "error": str(err)}
-        except (XBloomAPIError, aiohttp.ClientError) as err:
+        except HUB_ERRORS as err:
             _LOGGER.warning("xbloom.search_community: %s", err)
-            return {"ok": False, "error": str(err)}
+            return {"ok": False, "error": hub_text(str(err))}
         return {"ok": True, **result}
 
     async def handle_get_community_recipe(call) -> dict:
@@ -2055,9 +2058,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             recipe = await studio_recipe(community, call.data["recipe_id"])
         except NotForThisMachine as err:
             return {"ok": False, "error": str(err)}
-        except (XBloomAPIError, aiohttp.ClientError) as err:
+        except HUB_ERRORS as err:
             _LOGGER.warning("xbloom.get_community_recipe: %s", err)
-            return {"ok": False, "error": str(err)}
+            return {"ok": False, "error": hub_text(str(err))}
         return {"ok": True, "recipe": recipe}
 
     async def handle_suggest_community(call) -> dict:
@@ -2065,16 +2068,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         bag = None
         country, process = call.data.get("origin"), call.data.get("process")
         if not (country or process):
-            bag = await active_bag(entry.runtime_data.coffee_lab)
+            try:
+                bag = await active_bag(entry.runtime_data.coffee_lab)
+            except STORE_UNREACHABLE as err:
+                return {"ok": False, "error": str(err) or type(err).__name__}
             country, process = getattr(bag, "country", None), getattr(bag, "process", None)
         try:
             found = await suggest(
                 community, entry.runtime_data.coordinator.data or [], country, process,
-                bag_remaining_g(bag),
+                bag_remaining_g(bag), entry.runtime_data.community.names,
             )
-        except (XBloomAPIError, aiohttp.ClientError) as err:
+        except HUB_ERRORS as err:
             _LOGGER.warning("xbloom.suggest_community: %s", err)
-            return {"ok": False, "error": str(err)}
+            return {"ok": False, "error": hub_text(str(err))}
         return {"ok": True, "bag": getattr(bag, "name", None), **found}
 
     async def handle_build_recipe(call) -> dict:

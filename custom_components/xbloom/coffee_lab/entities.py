@@ -22,6 +22,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
 
+from ..tool_common import refuse
 from ..const import DOMAIN, SIGNAL_COFFEE_LAB_UPDATED
 from . import actions
 from .lab import CoffeeLab
@@ -223,7 +224,12 @@ class RateBrewSelect(CoffeeLabEntity, SelectEntity):
         super().__init__(lab, "rate_brew")
 
     async def async_select_option(self, option: str) -> None:
-        await self.lab.async_rate(verdict=option)
+        # Only the question the card shows: one not yet due is not shown, and
+        # with none open nothing is rated.
+        question = self.lab.rating_question_due()
+        if question is None:
+            raise refuse("rating_none")
+        await self.lab.async_rate(verdict=option, brew_id=question["brew_id"])
 
 
 class BagQuestionSensor(CoffeeLabEntity, SensorEntity):

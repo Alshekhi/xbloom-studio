@@ -13,6 +13,8 @@ __pycache__/
 # Working notes and tooling that are not part of the integration
 CLEANUP.md
 CLAUDE.md
+AGENTS.md
+.agents/
 .graphifyignore
 
 # Generated graph output

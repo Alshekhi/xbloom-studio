@@ -202,12 +202,13 @@ class XBloomFirmwareUpdate(UpdateEntity, RestoreEntity):
     # -- install ------------------------------------------------------------ #
     async def async_install(self, version, backup, **kwargs) -> None:
         """Download, verify, and flash the firmware over BLE."""
+        from .tool_common import fail, require_machine_control
+
         if not self._entry.data.get(CONF_ENABLE_FLASHING):
-            raise HomeAssistantError(
-                "Firmware flashing is disabled. Enable it in the integration's "
-                "Configure menu first (it's off by default because a flash can "
-                "brick the machine and isn't yet hardware-tested)."
-            )
+            raise fail("firmware_flashing_off")
+        # A flash takes the machine over entirely: refused like any other
+        # command while Machine control is off.
+        require_machine_control(self._entry)
         if self._flashing:
             raise HomeAssistantError("A firmware update is already in progress.")
         coordinator = self._entry.runtime_data.coordinator

@@ -149,7 +149,7 @@ async def rate_brew(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     tasting |= {k: str(args[k]).strip() for k in TASTE_NOTES if args.get(k)}
     next_change = str(args["next_change"]).strip() if args.get("next_change") else None
     if not (args.get("verdict") or tasting or next_change):
-        raise refuse("missing_arguments", action="rate_brew", arguments="verdict, a tasting note or next_change")
+        raise refuse("rate_brew_empty")
     try:
         brew = await lab.async_rate(
             verdict=args.get("verdict"), brew_id=args.get("brew_id"),
@@ -238,6 +238,11 @@ async def consume(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     An xBloom brew counts itself when it completes; reporting it here too
     would take its coffee twice.
     """
+    brewer = args.get("brewer")
+    # Kept as a select option in Notion, which refuses a comma; a name it
+    # refuses would wait in the queue to be saved and never be.
+    if brewer is not None and ("," in str(brewer) or len(str(brewer)) > 100):
+        raise refuse("brewer_invalid")
     bean_id, bean = await _bag_for_counting(lab, args)
     result = await lab.async_consume(
         bean_id=bean_id, grams=args["grams"],

@@ -28,7 +28,8 @@ from .models import SELECTABLE, VERDICTS, Bean, Brew, Review
 from .pending import PendingBrews
 from .stats import DEFAULT_PERIOD, PERIODS, Report, earliest_needed, period_report
 from .store import (
-    STORAGE_VERSION, CoffeeLabStore, ProcessedRuns, Storage, UnknownBean, UnknownBrew,
+    STORAGE_VERSION, CoffeeLabStore, ProcessedRuns, Storage, StoreRefused, UnknownBean,
+    UnknownBrew,
     async_local_store, async_processed_runs,
 )
 
@@ -127,6 +128,12 @@ def normalize_ratio(recipe: dict[str, Any]) -> float | None:
         return float(str(normalize_recipe(recipe).get("ratio")).split(":", 1)[1])
     except (IndexError, TypeError, ValueError):
         return None
+
+
+def _brew_day(brewed_at: str | None) -> str:
+    """The local date a brew happened on; today when its time is unknown."""
+    when = dt_util.parse_datetime(brewed_at) if brewed_at else None
+    return dt_util.as_local(when).date().isoformat() if when else dt_util.now().date().isoformat()
 
 
 @dataclass(frozen=True)
@@ -393,6 +400,9 @@ class CoffeeLab:
                 "due_at": (now + QUESTION_DELAY).isoformat(),
                 "expires_at": (now + QUESTION_LAPSE).isoformat(),
             }
+            # Read before the open questions are: an answer given while the
+            # store is asked would otherwise be overwritten by this write.
+            bean = await self.store.async_get_bean(done.bean_id)
             questions = self._open_questions()
             same = next((
                 q for q in questions
@@ -408,7 +418,6 @@ class CoffeeLab:
                 }
                 questions[questions.index(same)] = question
             else:
-                bean = await self.store.async_get_bean(done.bean_id)
                 question = {
                     "brew_id": done.brew_id, "brew_ids": [done.brew_id], "run_id": run_id,
                     "recipe": recipe, "bean_id": done.bean_id, "bag": bean.name,
@@ -446,10 +455,15 @@ class CoffeeLab:
         named = brew_id or targets[-1]
         rated = None
         for target in [t for t in targets if t != named] + [named]:
-            rated = await self.store.async_rate_brew(
-                target, rating=VERDICTS[verdict] if verdict else None,
-                tasting=tasting, next_change=next_change,
-            )
+            try:
+                rated = await self.store.async_rate_brew(
+                    target, rating=VERDICTS[verdict] if verdict else None,
+                    tasting=tasting, next_change=next_change,
+                )
+            except UnknownBrew:
+                # A cup removed from the record since: the others are rated.
+                if target == named:
+                    raise
         if question is not None and verdict:
             questions = [q for q in self._open_questions() if q["brew_id"] != question["brew_id"]]
             keeps = self.versions_to_keep
@@ -581,6 +595,17 @@ class CoffeeLab:
                     done = await self._async_stopped(entry["run_id"], **entry["args"])
                 else:
                     done = await self._async_consume(entry["run_id"], entry, **entry["args"])
+            except StoreRefused as err:
+                # The store refused this brew: kept, and tried again later,
+                # but stepped past like a fault in this code.
+                _LOGGER.warning("Coffee Lab: the store refused brew %s: %s", entry["run_id"], err)
+                reason = str(err) or type(err).__name__
+                await self.pending.async_update(
+                    entry["run_id"], attempts=entry["attempts"] + 1, last_error=reason,
+                )
+                if entry["run_id"] == wanted:
+                    result = Consumption("queued", reason=reason)
+                continue
             except STORE_UNREACHABLE as err:
                 reason = str(err) or type(err).__name__
                 await self.pending.async_update(
@@ -638,6 +663,19 @@ class CoffeeLab:
                 review=review,
             )
 
+        # The bag's new amount was sent on an earlier try and its answer lost
+        # — a timeout after Notion had written it. Read back, the amount shows
+        # whether it landed: if it did, only the row is left to write.
+        sent = entry.get("bag_sent")
+        if sent and not entry.get("bag"):
+            try:
+                now_g = (await self.store.async_get_bean(sent["bean_id"])).remaining_g
+            except UnknownBean:
+                now_g = None
+            if now_g is not None and now_g == sent["remaining_g"] != sent["from_g"]:
+                entry = {**entry, "bag": {k: v for k, v in sent.items() if k != "from_g"}}
+                await self.pending.async_update(run_id, bag=entry["bag"])
+
         # The bag was taken from on an earlier try and only the row is
         # missing: finish that, without deciding the subtraction again.
         if entry.get("bag"):
@@ -646,6 +684,11 @@ class CoffeeLab:
             if not await self.store.async_has_run(run_id):
                 written = await self.store.async_create_brew(record(bag["bean_id"]))
             await self._runs.async_add(run_id)
+            if bag.get("finished"):
+                try:
+                    await self._async_ask_about_bag(await self.store.async_get_bean(bag["bean_id"]))
+                except UnknownBean:
+                    pass
             self.on_change()
             return Consumption(
                 "counted", bean_id=bag["bean_id"], grams=bag["grams"],
@@ -699,10 +742,20 @@ class CoffeeLab:
             )
 
         assert isinstance(decision, Deduct)
+        # Noted before it is sent: if the answer is lost, the next try reads
+        # the bag back to learn whether this landed, rather than taking the
+        # dose a second time.
+        await self.pending.async_update(run_id, bag_sent={
+            "bean_id": decision.bean_id, "grams": decision.grams,
+            "from_g": bean.remaining_g if bean else None,
+            "remaining_g": decision.new_remaining_g,
+            "opened": decision.open_bag, "finished": decision.finish,
+        })
         await self.store.async_apply_bean_update(
             decision.bean_id, remaining_g=decision.new_remaining_g,
             open_bag=decision.open_bag, finish=decision.finish,
-            today=dt_util.now().date().isoformat(),
+            # The day it was brewed, not the day a waiting brew was saved.
+            today=_brew_day(brewed_at),
         )
         # Noted at once, so a retry after a failed row write does not take
         # from the bag again.

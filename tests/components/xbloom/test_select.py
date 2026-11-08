@@ -313,3 +313,17 @@ async def test_a_finished_brew_or_a_change_of_mind_unpicks_the_recipe() -> None:
     assert entity.current_option == "Kenya Hot"
     handlers[0]()
     assert entity.current_option is None
+
+
+@pytest.mark.asyncio
+async def test_a_setting_refused_by_machine_control_is_neither_shown_nor_announced() -> None:
+    from homeassistant.exceptions import HomeAssistantError
+
+    entity = _make(XBloomModeSelect)
+    entity._entry.runtime_data.machine_control = False
+    before = entity.current_option
+    with pytest.raises(HomeAssistantError):
+        await entity.async_select_option("pro")
+    entity.hass.services.async_call.assert_not_awaited()
+    entity.hass.bus.async_fire.assert_not_called()
+    assert entity.current_option == before

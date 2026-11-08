@@ -56,19 +56,24 @@ def signal_brew_lifecycle(entry_id: str) -> str:
     return f"xbloom_ble_brewlife_{entry_id}"
 
 
-async def send_live_frame(entry, frame: bytes) -> bool:
+async def send_live_frame(entry, frame: bytes, *, guarded: bool = True) -> bool:
     """Send any pre-built FFE1 frame over the HELD Connect session.
 
     Returns False (no-op) when no live session holds the link — callers use this
     for actions that only make sense while Connected (e.g. the module-enter
     navigation buttons). Fire-and-forget; the machine echoes but we don't gate.
+
+    Refused while Machine control is off, unless `guarded` is False: the
+    services' own commands are checked where they are registered, so pausing
+    a brew still reaches the machine.
     """
     from .tool_common import require_machine_control
 
     listener = held_session(entry)
     if listener is None:
         return False
-    require_machine_control(entry)
+    if guarded:
+        require_machine_control(entry)
     return await listener.send_live(frame)
 
 

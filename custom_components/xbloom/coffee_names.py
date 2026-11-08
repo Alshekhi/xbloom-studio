@@ -14,16 +14,21 @@ is a process" ("process", "fermentation", …) are ignored.
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from typing import Any
 
+import aiohttp
 from xbloom.community import XBloomCommunityClient
+from xbloom.exceptions import XBloomAPIError
 
 # The hub's lists, and which of a bag's fields each names.
 LISTS = {"country": "originList", "process": "processingList"}
 # The languages a name is accepted in: the hub's English names are the ones
 # kept, and the others it is spoken to in map onto them.
 LANGUAGES = ("en", "ar", "zh")
+# Adding a bag waits for this, so a hub that does not answer must not hold it.
+LOOKUP_TIMEOUT = 5
 _NOISE = {"process", "processing", "processed", "fermentation", "fermented", "method"}
 
 
@@ -44,24 +49,41 @@ class HubNames:
     async def _async_load(self) -> dict[str, dict[str, str]]:
         if self._names is not None:
             return self._names
-        english: dict[str, dict[str, str]] = {}  # list → value → English name
         names: dict[str, dict[str, str]] = {lst: {} for lst in LISTS.values()}
+        english: dict[str, dict[str, str]] = {}  # list → value → English name
+        complete = True
         for language in LANGUAGES:
-            criteria = await XBloomCommunityClient(self._session, language=language).criteria()
+            try:
+                async with asyncio.timeout(LOOKUP_TIMEOUT):
+                    criteria = await XBloomCommunityClient(self._session, language=language).criteria()
+            except (XBloomAPIError, aiohttp.ClientError, TimeoutError):
+                # Without English nothing can be named; another language only
+                # adds what a name may arrive as, so its names are used without
+                # it this time and asked for again next time.
+                if language == "en":
+                    raise
+                complete = False
+                continue
             for lst in LISTS.values():
                 for option in criteria.get(lst, []):
                     if language == "en":
                         english.setdefault(lst, {})[option["value"]] = option["name"]
                     canonical = english.get(lst, {}).get(option["value"])
-                    if canonical and option["name"]:
-                        names[lst].setdefault(name_key(option["name"]), canonical)
-        self._names = names
+                    key = name_key(option["name"])
+                    if canonical and key:
+                        names[lst].setdefault(key, canonical)
+        if complete:
+            self._names = names
         return names
 
     async def async_canonical(self, field: str, text: str) -> str | None:
         """The hub's English name for a bag's country or process; None if it has none.
 
-        Raises what the hub client raises when the hub cannot be read.
+        Raises what the hub client raises when the hub cannot be read, and a
+        TimeoutError after LOOKUP_TIMEOUT seconds a language.
         """
+        key = name_key(text)
+        if not key:
+            return None
         names = await self._async_load()
-        return names[LISTS[field]].get(name_key(text))
+        return names[LISTS[field]].get(key)

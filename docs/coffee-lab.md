@@ -62,14 +62,14 @@ Coffee made another way — a V60, say — is recorded with **Manual brewer**,
 brewers offered are yours to set in **Configure → Coffee Lab**.
 
 **A brew is never lost when the record cannot be reached** — Notion down, or
-the network away. It waits in Home Assistant with the time it was brewed, and
-is saved once, every five minutes being tried again. **Waiting brews** counts
+the network away. It waits in Home Assistant with the time it was brewed, is
+tried again every five minutes, and is saved once. **Waiting brews** counts
 them; after an hour a repair says so.
 
 ## How was it
 
 A while after a brew, Coffee Lab asks how it was: **Brew to rate** names the
-recipe and the bag a quarter of an hour after the brew, when the coffee can
+recipe and the bag a quarter of an hour after the last cup, when the coffee can
 have been tasted, and **Verdict** answers it — **Again**, **Fine** or **Not
 again**. Unanswered, the question goes after a day.
 

@@ -367,6 +367,14 @@ class _XBloomSettingSelect(SelectEntity, RestoreEntity):
                 self._attr_unique_id, option, self._attr_options,
             )
             return
+        # Refused here, before the option is shown as set: the service call
+        # below does not wait, so a refusal raised there would only be logged
+        # while the select showed (and the mode select announced) a change
+        # that never happened.
+        if self._entry is not None:
+            from .tool_common import require_machine_control
+
+            require_machine_control(self._entry)
         await self.hass.services.async_call(
             DOMAIN, self._service, {self._service_arg: option}, blocking=False,
         )

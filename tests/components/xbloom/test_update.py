@@ -252,8 +252,18 @@ async def test_install_refused_when_flashing_disabled() -> None:
     entity._latest = "1.2.3"
     entity._release_url = "https://example.invalid/fw.bin"
     entity._md5 = FIRMWARE_MD5
-    with pytest.raises(HomeAssistantError, match="disabled"):
+    with pytest.raises(HomeAssistantError) as raised:
         await entity.async_install(None, False)
+    assert raised.value.translation_key == "firmware_flashing_off"
+
+
+@pytest.mark.asyncio
+async def test_install_refused_while_machine_control_is_off() -> None:
+    entity = _armed_entity()
+    entity._entry.runtime_data.machine_control = False
+    with pytest.raises(HomeAssistantError) as raised:
+        await entity.async_install(None, False)
+    assert raised.value.translation_key == "machine_control_off"
 
 
 @pytest.mark.asyncio

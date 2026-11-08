@@ -67,15 +67,15 @@ views:
     - type: markdown
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
-        ''\\\\\\1'') }}{% endmacro %}كيف كانت **{{ e(states(''sensor.xbloom_studio_brew_to_rate'')) }}**
-        مع {{ e(state_attr(''sensor.xbloom_studio_brew_to_rate'', ''bag'')) }}{% set cs = state_attr(''sensor.xbloom_studio_brew_to_rate'',
+        ''\\\\\\1'') }}{% endmacro %}**{{ e(states(''sensor.xbloom_studio_brew_to_rate'')) }}** مع {{
+        e(state_attr(''sensor.xbloom_studio_brew_to_rate'', ''bag'')) }}{% set cs = state_attr(''sensor.xbloom_studio_brew_to_rate'',
         ''changes'') or [] %}{% if cs %}، {% for c in cs %}{% if c.setting == ''grind'' %}بدرجة طحن {{
         (c.value | float) | round(1) | string | replace(''.0'', '''') }} بدل {{ (c.saved | float) | round(1)
         | string | replace(''.0'', '''') }}{% elif c.setting == ''ratio'' %}بنسبة 1:{{ (c.value | float)
         | round(1) | string | replace(''.0'', '''') }} بدل 1:{{ (c.saved | float) | round(1) | string
         | replace(''.0'', '''') }}{% else %}بجرعة {{ (c.value | float) | round(1) | string | replace(''.0'',
         '''') }} غ بدل {{ (c.saved | float) | round(1) | string | replace(''.0'', '''') }} غ{% endif %}{%
-        if not loop.last %}، {% endif %}{% endfor %}{% endif %}؟'
+        if not loop.last %}، {% endif %}{% endfor %}{% endif %}.'
     - type: tile
       entity: select.xbloom_studio_verdict
       name: الحكم
@@ -100,12 +100,11 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## هل تشتريها مجددًا؟'
+      content: '## هل تشتريها مجددا؟'
     - type: markdown
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
-        ''\\\\\\1'') }}{% endmacro %}هل تشتري **{{ e(states(''sensor.xbloom_studio_finished_bag'')) }}**
-        مرة أخرى؟'
+        ''\\\\\\1'') }}{% endmacro %}انتهى **{{ e(states(''sensor.xbloom_studio_finished_bag'')) }}**.'
     - type: tile
       entity: select.xbloom_studio_buy_again
       name: الشراء مرة أخرى
@@ -1031,7 +1030,7 @@ views:
       content: '## البحث عن وصفة من المجتمع'
     - type: tile
       entity: button.xbloom_studio_suggest_community_recipe
-      name: اقترح وصفة
+      name: اقترح وصفة من المجتمع
       icon_tap_action:
         action: none
       hide_state: true

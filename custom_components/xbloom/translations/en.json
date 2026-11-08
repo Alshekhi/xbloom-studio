@@ -920,6 +920,18 @@
     },
     "version_none": {
       "message": "There is no version waiting to be kept."
+    },
+    "firmware_flashing_off": {
+      "message": "Firmware flashing is turned off. Turn it on in the integration's Configure menu first."
+    },
+    "brewer_invalid": {
+      "message": "A brewer's name can't contain a comma or be longer than 100 characters."
+    },
+    "rating_none": {
+      "message": "No brew is waiting to be rated."
+    },
+    "rate_brew_empty": {
+      "message": "Say how it was: a verdict, a tasting note or what to change next time."
     }
   },
   "services": {
@@ -1642,7 +1654,7 @@
     },
     "brews_waiting": {
       "title": "Coffee Lab brews are waiting to be saved",
-      "description": "Some brews could not be saved to Coffee Lab's store, so Home Assistant is keeping them and trying again every few minutes. Nothing needs doing for them to be saved once the store can be reached.\n\nNumber waiting: {count}\n\nLast error: {error}"
+      "description": "Some brews could not be saved to Coffee Lab's store, so Home Assistant is keeping them and trying again every few minutes. If the last error is the store refusing a value, correct that value in the store and they are saved at the next try.\n\nNumber waiting: {count}\n\nLast error: {error}"
     }
   }
 }

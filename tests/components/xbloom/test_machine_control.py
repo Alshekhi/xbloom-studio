@@ -135,3 +135,15 @@ async def test_off_refuses_a_command_over_a_held_session():
 
     assert _refused(raised.value)
     entry.runtime_data.live_session_listener.send_live.assert_not_awaited()
+
+
+async def test_off_still_pauses_a_brew_over_a_held_connect_session():
+    with _machine_found(), patch("xbloom.ble.XBloomBleClient", _FakeBle):
+        handlers, entry = await _handlers_with_control(False)
+        session = MagicMock(is_running=True, send_live=AsyncMock(return_value=True))
+        entry.runtime_data.live_session_listener = session
+        await handlers["brew_pause"](MagicMock(data={}))
+        with pytest.raises(HomeAssistantError) as raised:
+            await handlers["tare"](MagicMock(data={}))
+    session.send_live.assert_awaited_once()
+    assert _refused(raised.value), "a command that sets the machine going is still refused"

@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
 
 from ..const import DOMAIN
@@ -39,6 +40,14 @@ class UnknownBrew(LookupError):
 
 class UnknownBean(LookupError):
     """No bag has that id."""
+
+
+class StoreRefused(HomeAssistantError):
+    """The store answered, and refused: asking again will not change it.
+
+    Kept apart from a store that cannot be reached, which is waited for: a
+    refused brew waiting in front would hold back every brew after it.
+    """
 
 
 class Storage(Protocol):

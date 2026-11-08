@@ -156,3 +156,20 @@ async def test_no_bag_in_use_clears_and_asks_nothing():
     with patch.object(cm, "async_dispatcher_send"):
         browser.bag_chosen(SimpleNamespace(active_bean_id=None), None)
     assert browser.own is None and not hass.async_create_task.called
+
+
+async def test_english_names_still_work_when_another_language_fails():
+    class ChineseDown(FakeHubClient):
+        async def criteria(self):
+            if self.language == "zh":
+                raise aiohttp.ClientError()
+            return await super().criteria()
+
+    with patch.object(coffee_names, "XBloomCommunityClient", ChineseDown):
+        names = HubNames(MagicMock())
+        assert await names.async_canonical("country", "ethiopia") == "Ethiopia"
+        assert names._names is None, "asked for again next time"
+
+
+async def test_a_name_made_only_of_process_words_matches_nothing(hub):
+    assert await hub.async_canonical("process", "Process") is None
