@@ -74,7 +74,7 @@ TEXT = {
         "k_dose": "{value} g", "verdict_again": "Again", "verdict_fine": "Fine",
         "verdict_not_again": "Not again",
         "h_buy_again": "Buy it again?", "b_question": "**{bag}** is finished.",
-        "b_answer": "Buy again",
+        "b_answer": "Answer",
         "r_question": "**{recipe}** with {bag}{changes}.", "r_at": ", at ",
         "r_grind": "grind {value} instead of {saved}", "r_ratio": "ratio 1:{value} instead of 1:{saved}",
         "r_dose": "{value} g instead of {saved} g",
@@ -143,7 +143,7 @@ TEXT = {
         "k_dose": "{value} غ", "verdict_again": "أكرّرها", "verdict_fine": "لا بأس بها",
         "verdict_not_again": "لن أكرّرها",
         "h_buy_again": "هل تشتريه مجددًا؟", "b_question": "انتهى **{bag}**.",
-        "b_answer": "الشراء مرة أخرى",
+        "b_answer": "الإجابة",
         "r_question": "**{recipe}** مع {bag}{changes}.", "r_at": "، ",
         "r_grind": "بدرجة طحن {value} بدل {saved}", "r_ratio": "بنسبة 1:{value} بدل 1:{saved}",
         "r_dose": "بجرعة {value} غ بدل {saved} غ",
@@ -279,7 +279,8 @@ def brew_view(t: dict) -> dict:
             {"type": "markdown", "text_only": True, "content": ESCAPE + t["w_which"].replace(
                 "{recipe}", f"{{{{ e(state_attr('select.{E}_what_was_wrong', 'recipe')) }}}}"
             ).replace("{bag}", f"{{{{ e(state_attr('select.{E}_what_was_wrong', 'bag')) }}}}")},
-            select(f"select.{E}_what_was_wrong", name=t["r_issue"]),
+            # Named apart from the heading above it, or it is said twice.
+            select(f"select.{E}_what_was_wrong", name=t["b_answer"]),
         ], [*present(f"select.{E}_what_was_wrong"), *not_busy()]),
         section(t["h_buy_again"], [
             {"type": "markdown", "text_only": True, "content": ESCAPE + t["b_question"].replace(
@@ -705,7 +706,7 @@ def _num(expr: str) -> str:
 
 
 def version_words(t: dict, var: str) -> str:
-    """One version in a few words: "grind 52 · 1:15 · 18 g", only what it has."""
+    """One version in a few words: "grind 52, 1:15, 18 g", only what it has."""
     parts = []
     for key, text in (("grind", "k_grind"), ("ratio", "k_ratio"), ("dose_g", "k_dose")):
         before, after = t[text].split("{value}")
@@ -864,11 +865,27 @@ def dashboard(lang: str) -> dict:
     return {"views": [brew_view(t), stats_view(t), bags_view(t), community_view(t), xbloom_view(t), archive_view(t)]}
 
 
+def spoken_separators(node, sep: str):
+    """Every " · " between words becomes the language's comma.
+
+    Spoken, a comma keeps a pause between the words; a middle dot is spoken
+    as "dot", or not at all and the words run together.
+    """
+    if isinstance(node, str):
+        return node.replace(" · ", sep)
+    if isinstance(node, list):
+        return [spoken_separators(x, sep) for x in node]
+    if isinstance(node, dict):
+        return {k: spoken_separators(v, sep) for k, v in node.items()}
+    return node
+
+
 def main() -> None:
     assert TEXT["en"].keys() == TEXT["ar"].keys(), "every language carries every string"
     for lang in TEXT:
         name = "dashboard-xbloom-studio.yaml" if lang == "en" else f"dashboard-xbloom-studio.{lang}.yaml"
-        body = yaml.safe_dump(dashboard(lang), allow_unicode=True, sort_keys=False, width=100)
+        body = yaml.safe_dump(spoken_separators(dashboard(lang), TEXT[lang]["sep"]),
+                              allow_unicode=True, sort_keys=False, width=100)
         (HERE / name).write_text(
             "# Built by dashboard/build.py — edit that, not this file.\n" + body, encoding="utf-8"
         )

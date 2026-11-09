@@ -201,6 +201,8 @@ class RemainingSensor(CoffeeLabEntity, SensorEntity):
 
     _attr_device_class = SensorDeviceClass.WEIGHT
     _attr_native_unit_of_measurement = UnitOfMass.GRAMS
+    # Whole grams: "142 g", not "142.0 g" read out in full.
+    _attr_suggested_display_precision = 0
     _attr_icon = "mdi:scale"
 
     def __init__(self, lab: CoffeeLab) -> None:
