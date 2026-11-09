@@ -172,7 +172,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## هل تشتريها مجددا؟'
+      content: '## هل تشتريه مجددًا؟'
     - type: markdown
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
@@ -497,8 +497,7 @@ views:
         elif v.verdict == ''fine'' %}لا بأس بها{% else %}لن أكرّرها{% endif %}{% if not loop.last %};
         {% endif %}{% endfor %}.{% endif %}{% elif source == ''community'' %}من المجتمع، شاركها {{ ''xBloom''
         if state_attr(''select.xbloom_studio_suggested_recipe'', ''official'') else e(state_attr(''select.xbloom_studio_suggested_recipe'',
-        ''author'')) }}. استخدامها يضيفها إلى وصفاتك.{% elif not (state_attr(''sensor.xbloom_studio_recipe_suggestions'',
-        ''own'') or []) %}لم تُحضَّر أي وصفة من وصفاتك بقهوة مثل هذه.{% endif %}'
+        ''author'')) }}. استخدامها يضيفها إلى وصفاتك.{% endif %}'
       visibility:
       - condition: state
         entity: sensor.xbloom_studio_recipe_suggestions
@@ -1485,7 +1484,7 @@ views:
         %}، {% endif %}{% endfor %}
 
 
-        {% endif %}{% set fits = a.get(''fits'') or {} %}{% if fits %}**تشبه هذا الكيس في:** {{ [(''المعالجة''
+        {% endif %}{% set fits = a.get(''fits'') or {} %}{% if fits %}**تطابق هذا الكيس في:** {{ [(''المعالجة''
         if fits.get(''process'') else ''''), (''السلالة'' if fits.get(''varietal'') else ''''), (''درجة
         التحميص'' if fits.get(''roast'') else ''''), (''النكهات'' if fits.get(''flavor'') else '''')]
         | select | join(''، '') }}

@@ -53,7 +53,7 @@ origin alone, then any. A recipe already in your library, or one needing more
 coffee than the bag has left, is passed over, and recipes for the drippers your
 library already uses come first. **Drink**, beside it, keeps them to hot or
 iced recipes. Among those, the recipes sharing most with
-the bag lead: its process, a varietal, its roast, and the flavors named in its
+the bag lead: its process, a variety, its roast, and the flavors named in its
 roaster notes. The picked recipe's `fits` says which it shares.
 
 The actions are `xbloom.search_community`, `xbloom.get_community_recipe` and

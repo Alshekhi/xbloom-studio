@@ -25,7 +25,7 @@ first. A finished bag keeps its brews.
 Bags are named by their name, or by their id when two bags share one; a shared
 name is refused rather than guessed.
 
-A bag's **country**, **process**, **varietal** and **roast** are kept in the
+A bag's **country**, **process**, **variety** and **roast** are kept in the
 [community hub](recipes.md#community-recipes)'s English names — "ethiopia",
 the country's name in Arabic or Chinese, "Anaerobic", "gesha" or "light" become
 "Ethiopia", "Anaerobic Fermentation", "Geisha/Gesha" and "Light Roast" — so
@@ -151,7 +151,7 @@ ranked by how close the bags they were brewed with are — this bag, then the
 same origin and process, then the same origin — and by their verdicts, with
 a recipe last rated **Not again** with this bag left out — and, after them,
 [community recipes](recipes.md#community-recipes) for coffee like it, the
-closest to the bag's process, varietal, roast and roaster notes first. **Suggested Recipe** offers them all, your own first and
+closest to the bag's process, variety, roast and roaster notes first. **Suggested Recipe** offers them all, your own first and
 each community one marked as such, with the best already chosen; its
 attributes say why the chosen one was suggested. **Use Suggested Recipe**
 picks it for brewing, adding a community recipe to your library first.

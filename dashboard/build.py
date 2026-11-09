@@ -55,9 +55,9 @@ TEXT = {
         "c_confirm_add": "Add this recipe to your library?",
         "c_none": "No recipes match.", "c_one": "1 recipe matches.",
         "c_many": "{n} recipes match.", "c_first": "The first {shown} are in the list below.",
-        "c_by": "Shared by", "c_notes": "Notes", "c_grind": "grind", "c_at": "at",
+        "c_by": "Shared by", "c_notes": "Tasting notes", "c_grind": "grind", "c_at": "at",
         "c_rpm": "RPM", "c_pause": "Pause", "c_s": "s", "c_likes": "likes",
-        "c_fits": "Like this bag", "f_process": "process", "f_varietal": "variety",
+        "c_fits": "Same as this bag", "f_process": "process", "f_varietal": "variety",
         "f_roast": "roast", "f_flavor": "tasting notes",
         "c_added": "Added to your recipes as **{name}**. Pick it on the Brew tab.",
         "c_suggest": "Suggest a recipe", "c_suggest_hub": "Suggest a community recipe",
@@ -80,7 +80,6 @@ TEXT = {
         "r_dose": "{value} g instead of {saved} g",
         "h_for_bag": "A recipe for this bag", "s_use": "Use this recipe",
         "s_own": "Brewed {times} {basis}.",
-        "s_none": "None of your recipes has been brewed with coffee like this.",
         "s_hub": "From the community, shared by {by}. Using it adds it to your recipes.",
         "s_this_bag": "with this bag", "s_kind": "with {country} {process} coffee",
         "s_origin": "with coffee from {country}",
@@ -127,7 +126,7 @@ TEXT = {
         "c_many": "{n} وصفات تطابق البحث.", "c_first": "أول {shown} منها في القائمة أدناه.",
         "c_by": "شاركها", "c_notes": "النكهات", "c_grind": "درجة الطحن", "c_at": "بسرعة",
         "c_rpm": "دورة في الدقيقة", "c_pause": "الانتظار", "c_s": "ث", "c_likes": "إعجاب",
-        "c_fits": "تشبه هذا الكيس في", "f_process": "المعالجة", "f_varietal": "السلالة",
+        "c_fits": "تطابق هذا الكيس في", "f_process": "المعالجة", "f_varietal": "السلالة",
         "f_roast": "درجة التحميص", "f_flavor": "النكهات",
         "c_added": "أضيفت إلى وصفاتك باسم **{name}**. اخترها من تبويب التحضير.",
         "c_suggest": "اقترح وصفة", "c_suggest_hub": "اقترح وصفة من المجتمع",
@@ -143,14 +142,13 @@ TEXT = {
         "v_versions": "النسخ مع هذا الكيس:", "k_grind": "درجة طحن {value}", "k_ratio": "1:{value}",
         "k_dose": "{value} غ", "verdict_again": "أكرّرها", "verdict_fine": "لا بأس بها",
         "verdict_not_again": "لن أكرّرها",
-        "h_buy_again": "هل تشتريها مجددا؟", "b_question": "انتهى **{bag}**.",
+        "h_buy_again": "هل تشتريه مجددًا؟", "b_question": "انتهى **{bag}**.",
         "b_answer": "الشراء مرة أخرى",
         "r_question": "**{recipe}** مع {bag}{changes}.", "r_at": "، ",
         "r_grind": "بدرجة طحن {value} بدل {saved}", "r_ratio": "بنسبة 1:{value} بدل 1:{saved}",
         "r_dose": "بجرعة {value} غ بدل {saved} غ",
         "h_for_bag": "وصفة لهذا الكيس", "s_use": "استخدم هذه الوصفة",
         "s_own": "حُضّرت {times} {basis}.",
-        "s_none": "لم تُحضَّر أي وصفة من وصفاتك بقهوة مثل هذه.",
         "s_hub": "من المجتمع، شاركها {by}. استخدامها يضيفها إلى وصفاتك.",
         "s_this_bag": "مع هذا الكيس", "s_kind": "مع قهوة من {country} بمعالجة {process}",
         "s_origin": "مع قهوة من {country}",
@@ -772,7 +770,7 @@ def suggestion_card(t: dict, bag: str) -> str:
         + f"{{% set own = (state_attr('{sugg}', 'own') or []) | selectattr('name', 'eq', chosen) | list %}}"
         + "{% if source == 'own' and own %}{% set o = own[0] %}" + own + versions
         + "{% elif source == 'community' %}" + hub_line
-        + f"{{% elif not (state_attr('{sugg}', 'own') or []) %}}" + t["s_none"] + "{% endif %}"
+        + "{% endif %}"
     )
 
 

@@ -322,13 +322,13 @@
           "country": "Country",
           "region": "Region",
           "process": "Process",
-          "varietal": "Varietal",
+          "varietal": "Variety",
           "roast": "Roast",
           "roaster_notes": "Roaster notes"
         },
         "data_description": {
           "remaining_g": "Weighed. Leave blank to record brews without counting the bag down.",
-          "pods": "For a box of xPods: how many pods it holds now. A bag of coffee or tea uses Remaining instead."
+          "pods": "Only for a box of xPods: how many pods it holds now."
         }
       },
       "edit_bag": {
@@ -350,13 +350,13 @@
           "country": "Country",
           "region": "Region",
           "process": "Process",
-          "varietal": "Varietal",
+          "varietal": "Variety",
           "roast": "Roast",
           "roaster_notes": "Roaster notes"
         },
         "data_description": {
           "remaining_g": "Weighed. Leave blank to record brews without counting the bag down.",
-          "pods": "For a box of xPods: how many pods it holds now. A bag of coffee or tea uses Remaining instead."
+          "pods": "Only for a box of xPods: how many pods it holds now."
         }
       },
       "add_callback_target": {
@@ -1008,7 +1008,7 @@
       "message": "No brew is waiting to be rated."
     },
     "rate_brew_empty": {
-      "message": "Say how it was: a verdict, a tasting note or what to change next time."
+      "message": "Say how it was: a verdict, what was wrong, a tasting note or what to change next time."
     },
     "account_signed_out": {
       "message": "Sign in to the xBloom account in the integration's Configure menu first."
@@ -1020,7 +1020,7 @@
       "message": "{name} still has pods left: {pods}. Finish the box once they are used."
     },
     "notion_column_type": {
-      "message": "The {column} column in Notion is of another type ({type}). Rename it there, and it is added again as needed."
+      "message": "The {column} column in Notion is a {type} column, which Coffee Lab can't write to. Rename it in Notion, and Coffee Lab adds its own."
     }
   },
   "services": {
@@ -1078,7 +1078,7 @@
         },
         "pods": {
           "name": "Pods",
-          "description": "For a box of xPods: how many pods it holds now."
+          "description": "Only for a box of xPods: how many pods it holds now."
         }
       }
     },
@@ -1133,7 +1133,7 @@
           "description": "How it was processed, such as washed or natural."
         },
         "varietal": {
-          "name": "Varietal",
+          "name": "Variety",
           "description": "The coffee variety, such as Bourbon; several separated by commas."
         },
         "roast": {
@@ -1150,7 +1150,7 @@
         },
         "pods": {
           "name": "Pods",
-          "description": "For a box of xPods: how many pods it holds now."
+          "description": "Only for a box of xPods: how many pods it holds now."
         }
       }
     },
@@ -1195,7 +1195,7 @@
           "description": "How it was processed, such as washed or natural."
         },
         "varietal": {
-          "name": "Varietal",
+          "name": "Variety",
           "description": "The coffee variety, such as Bourbon; several separated by commas."
         },
         "roast": {
@@ -1460,8 +1460,8 @@
           "description": "Countries the coffee was grown in."
         },
         "varietals": {
-          "name": "Varietals",
-          "description": "Coffee varietals."
+          "name": "Varieties",
+          "description": "Coffee varieties."
         },
         "processes": {
           "name": "Processes",
@@ -1506,7 +1506,7 @@
           "description": "How it was processed, instead of the bag in use."
         },
         "varietal": {
-          "name": "Varietal",
+          "name": "Variety",
           "description": "The coffee variety, instead of the bag in use."
         },
         "roast": {
@@ -1673,7 +1673,7 @@
     },
     "rate_brew": {
       "name": "Rate a brew",
-      "description": "Keep how a brew was: its verdict, how it tasted, and what to change next time.",
+      "description": "Keep how a brew was: its verdict, what was wrong, how it tasted, and what to change next time.",
       "fields": {
         "brew_id": {
           "name": "Brew id",
@@ -1685,7 +1685,7 @@
         },
         "issue": {
           "name": "What was wrong",
-          "description": "What was wrong with it. Sets what to change next time with this recipe and bag: a finer grind for sour, coarser for bitter, a stronger ratio for too weak, a lighter one for too strong."
+          "description": "Sets the change for next time with this recipe and bag: a finer grind for sour, a coarser one for bitter, a stronger ratio for too weak, a lighter one for too strong."
         },
         "body": {
           "name": "Body",
@@ -1741,7 +1741,7 @@
     },
     "save_shared_recipe": {
       "name": "Save a shared recipe",
-      "description": "Put the recipe an xBloom share link holds in the recipe library.",
+      "description": "Add the recipe from an xBloom share link to the recipe library.",
       "fields": {
         "share_url": {
           "name": "Share link",

@@ -496,8 +496,7 @@ views:
         v.verdict == ''fine'' %}Fine{% else %}Not again{% endif %}{% if not loop.last %}; {% endif %}{%
         endfor %}.{% endif %}{% elif source == ''community'' %}From the community, shared by {{ ''xBloom''
         if state_attr(''select.xbloom_studio_suggested_recipe'', ''official'') else e(state_attr(''select.xbloom_studio_suggested_recipe'',
-        ''author'')) }}. Using it adds it to your recipes.{% elif not (state_attr(''sensor.xbloom_studio_recipe_suggestions'',
-        ''own'') or []) %}None of your recipes has been brewed with coffee like this.{% endif %}'
+        ''author'')) }}. Using it adds it to your recipes.{% endif %}'
       visibility:
       - condition: state
         entity: sensor.xbloom_studio_recipe_suggestions
@@ -1192,7 +1191,7 @@ views:
         %}
 
 
-        {% if c.get(''flavor'') %}**Notes:** {{ e(c.get(''flavor'')) }}
+        {% if c.get(''flavor'') %}**Tasting notes:** {{ e(c.get(''flavor'')) }}
 
 
         {% endif %}{% endif %}{% if a.get(''dose_g'') %}**Coffee:** {{ a.get(''dose_g'') | round(1) }}
@@ -1260,7 +1259,7 @@ views:
         c.get(''process''), c.get(''varietal'')] if x %} · {{ e(x) }}{% endfor %}
 
 
-        {% if c.get(''flavor'') %}**Notes:** {{ e(c.get(''flavor'')) }}
+        {% if c.get(''flavor'') %}**Tasting notes:** {{ e(c.get(''flavor'')) }}
 
 
         {% endif %}{% endif %}{% if a.get(''dose_g'') %}**Coffee:** {{ a.get(''dose_g'') | round(1) }}
@@ -1325,7 +1324,7 @@ views:
         c.get(''process''), c.get(''varietal'')] if x %} · {{ e(x) }}{% endfor %}
 
 
-        {% if c.get(''flavor'') %}**Notes:** {{ e(c.get(''flavor'')) }}
+        {% if c.get(''flavor'') %}**Tasting notes:** {{ e(c.get(''flavor'')) }}
 
 
         {% endif %}{% endif %}{% if a.get(''dose_g'') %}**Coffee:** {{ a.get(''dose_g'') | round(1) }}
@@ -1477,11 +1476,11 @@ views:
         endif %}
 
 
-        {% if a.get(''flavor'') %}**Notes:** {% for x in a.get(''flavor'') %}{{ e(x) }}{% if not loop.last
-        %}, {% endif %}{% endfor %}
+        {% if a.get(''flavor'') %}**Tasting notes:** {% for x in a.get(''flavor'') %}{{ e(x) }}{% if not
+        loop.last %}, {% endif %}{% endfor %}
 
 
-        {% endif %}{% set fits = a.get(''fits'') or {} %}{% if fits %}**Like this bag:** {{ [(''process''
+        {% endif %}{% set fits = a.get(''fits'') or {} %}{% if fits %}**Same as this bag:** {{ [(''process''
         if fits.get(''process'') else ''''), (''variety'' if fits.get(''varietal'') else ''''), (''roast''
         if fits.get(''roast'') else ''''), (''tasting notes'' if fits.get(''flavor'') else '''')] | select
         | join('', '') }}
