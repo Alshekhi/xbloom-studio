@@ -71,9 +71,19 @@ jobs:
         # history. Every sentence here can be written about what the software
         # does, or what the change does, instead.
         # LICENSE and the codeowner are deliberate credits and are exempt.
+        env:
+          PRIVATE: ${{ secrets.PRIVATE_TEXT_PATTERNS }}
         run: |
           set -u
-          PAT='voiceover|screen.reader|blind (user|person)|/Users/|[0-9A-F]{2}:79:C4:[0-9A-F]{2}|59A022|J15A01G'
+          # The generic words are here; the words and identifiers that must
+          # not be written in a public file either come from a repository
+          # secret, which a pull request from a fork cannot read.
+          PAT='/Users/'
+          if [ -n "$PRIVATE" ]; then
+            PAT="$PAT|$PRIVATE"
+          else
+            echo "::warning::The private word list is not available to this run; checking the generic words only."
+          fi
           PAT="$PAT"'|personal|my (machine|setup|install|own|house)|local tooling|\bindexer\b|household'
           fail=0
           if git grep -n -i -E "$PAT" -- . ':!LICENSE' ':!.github/workflows/validate.yml'; then
