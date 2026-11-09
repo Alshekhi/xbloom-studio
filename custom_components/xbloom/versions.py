@@ -214,6 +214,12 @@ class VersionDesk:
         await self._lab.async_clear_version_to_keep()
         return scaled["name"]
 
+    async def async_leave_recipe(self) -> None:
+        """Neither: the saved recipe stays as it is, and this version is not offered again."""
+        if self._lab.version_to_keep is None:
+            raise fail("version_none")
+        await self._lab.async_clear_version_to_keep()
+
 
 # ── Entities ─────────────────────────────────────────────────────────────────
 
@@ -225,7 +231,7 @@ def entities_for(entry, platform: str) -> list:
     return {
         "sensor": [NextChangeSensor(desk), VersionToKeepSensor(desk)],
         "button": [UseNextChangeButton(desk), KeepVersionButton(desk, as_new=False),
-                   KeepVersionButton(desk, as_new=True)],
+                   KeepVersionButton(desk, as_new=True), LeaveRecipeButton(desk)],
     }.get(platform, [])
 
 
@@ -334,3 +340,14 @@ class KeepVersionButton(_VersionEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         await self._desk.async_keep_version(as_new=self._as_new)
+
+
+class LeaveRecipeButton(_VersionEntity, ButtonEntity):
+    """The version is not kept: the saved recipe stays as it is."""
+
+    _attr_translation_key = "leave_recipe_unchanged"
+    _attr_unique_id = "xbloom_leave_recipe_unchanged"
+    _attr_icon = "mdi:close-circle-outline"
+
+    async def async_press(self) -> None:
+        await self._desk.async_leave_recipe()

@@ -201,7 +201,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Keep this version?'
+      content: '## Save this change?'
     - type: markdown
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
@@ -213,7 +213,7 @@ views:
         loop.last %}, {% endif %}{% endfor %} is worth brewing again.'
     - type: tile
       entity: button.xbloom_studio_make_version_the_recipe
-      name: Make it the recipe
+      name: Update the saved recipe
       icon_tap_action:
         action: none
       hide_state: true
@@ -223,7 +223,7 @@ views:
         target:
           entity_id: button.xbloom_studio_make_version_the_recipe
         confirmation:
-          text: Replace the saved recipe with this version?
+          text: Change the saved recipe to these settings?
     - type: tile
       entity: button.xbloom_studio_save_version_as_new_recipe
       name: Save as a new recipe
@@ -235,6 +235,17 @@ views:
         perform_action: button.press
         target:
           entity_id: button.xbloom_studio_save_version_as_new_recipe
+    - type: tile
+      entity: button.xbloom_studio_leave_recipe_unchanged
+      name: Leave the recipe as it is
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_leave_recipe_unchanged
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_version_to_keep

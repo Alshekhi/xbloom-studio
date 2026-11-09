@@ -201,7 +201,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## هل تحفظ هذه النسخة؟'
+      content: '## هل تحفظ هذا التعديل؟'
     - type: markdown
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
@@ -213,7 +213,7 @@ views:
         if not loop.last %}، {% endif %}{% endfor %} تستحق التكرار.'
     - type: tile
       entity: button.xbloom_studio_make_version_the_recipe
-      name: اجعلها الوصفة
+      name: حدّث الوصفة المحفوظة
       icon_tap_action:
         action: none
       hide_state: true
@@ -223,7 +223,7 @@ views:
         target:
           entity_id: button.xbloom_studio_make_version_the_recipe
         confirmation:
-          text: استبدال الوصفة المحفوظة بهذه النسخة؟
+          text: تغيير الوصفة المحفوظة إلى هذه الإعدادات؟
     - type: tile
       entity: button.xbloom_studio_save_version_as_new_recipe
       name: احفظها كوصفة جديدة
@@ -235,6 +235,17 @@ views:
         perform_action: button.press
         target:
           entity_id: button.xbloom_studio_save_version_as_new_recipe
+    - type: tile
+      entity: button.xbloom_studio_leave_recipe_unchanged
+      name: أبقِ الوصفة كما هي
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_leave_recipe_unchanged
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_version_to_keep

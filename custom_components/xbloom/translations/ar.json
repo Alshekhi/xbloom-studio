@@ -849,6 +849,9 @@
       },
       "add_for_you_recipe": {
         "name": "أضف الوصفة المقترحة لك"
+      },
+      "leave_recipe_unchanged": {
+        "name": "أبقِ الوصفة كما هي"
       }
     },
     "text": {

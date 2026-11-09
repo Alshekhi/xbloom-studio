@@ -140,7 +140,8 @@ change asked for, and **Use Next Change** sets the Brew tab's one-off
 adjustments to it; the saved recipe stays as it is. The versions tried and
 their verdicts are side by side on the Brew tab. A changed version rated
 **Again** is offered to keep, as **Version to Keep**: **Make Version the
-Recipe** changes the saved recipe, **Save Version as New Recipe** keeps both.
+Recipe** changes the saved recipe, **Save Version as New Recipe** keeps both,
+and **Leave Recipe Unchanged** keeps neither and closes the offer.
 
 ### A recipe for this bag
 

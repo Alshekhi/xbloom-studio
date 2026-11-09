@@ -849,6 +849,9 @@
       },
       "add_for_you_recipe": {
         "name": "Add For You Recipe"
+      },
+      "leave_recipe_unchanged": {
+        "name": "Leave Recipe Unchanged"
       }
     },
     "text": {

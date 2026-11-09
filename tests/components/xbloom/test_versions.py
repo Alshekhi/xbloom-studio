@@ -128,6 +128,19 @@ async def test_keeping_a_version_rescales_the_saved_recipe(as_new):
     assert lab.version_to_keep is None
 
 
+async def test_leaving_the_recipe_as_it_is_closes_the_offer_and_changes_nothing():
+    lab, store, bag = await _lab()
+    await _brew(lab, bag, "run-1", grind="54")
+    await lab.async_rate(verdict="again")
+    desk, hass, coordinator, registry = _desk(lab, [SAVED])
+    await desk.async_leave_recipe()
+    assert lab.version_to_keep is None
+    coordinator.async_add_recipe.assert_not_awaited()
+    coordinator.async_replace_recipe.assert_not_awaited()
+    with pytest.raises(HomeAssistantError):
+        await desk.async_leave_recipe()
+
+
 async def test_an_xpod_recipe_s_next_change_is_the_one_asked_with_the_box_in_use():
     lab, store, bag = await _lab()
     box = await store.async_add_bean(name="Test Box", status="open", kind="xpod", tracked=True, pods_left=4)
