@@ -1088,8 +1088,11 @@ views:
         state_not: unknown
     visibility:
     - condition: state
-      entity: select.xbloom_studio_manual_brewer
+      entity: select.xbloom_studio_coffee_bag
       state_not: unavailable
+    - condition: state
+      entity: select.xbloom_studio_coffee_bag
+      state_not: unknown
 - title: الإحصاءات
   path: stats
   icon: mdi:chart-bar

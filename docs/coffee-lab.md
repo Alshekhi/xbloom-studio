@@ -89,8 +89,9 @@ with the reason in its attributes. A brew started from the machine's own
 controls runs no Home Assistant brew and is not counted.
 
 Coffee made another way — a V60, say — is recorded with **Manual brewer**,
-**Manual brew dose** and **Record manual brew**, or `xbloom.consume`. The
-brewers offered are yours to set in **Configure → Coffee Lab**.
+**Manual brew dose** and **Record manual brew**, or `xbloom.consume`; it takes
+its coffee from the bag in use, so the Brew tab offers it once a bag is
+chosen. The brewers offered are yours to set in **Configure → Coffee Lab**.
 
 **A brew is never lost when the record cannot be reached** — Notion down, or
 the network away. It waits in Home Assistant with the time it was brewed, is

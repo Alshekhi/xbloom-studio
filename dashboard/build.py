@@ -437,7 +437,9 @@ def brew_view(t: dict) -> dict:
             slider(f"number.{E}_manual_brew_dose", visibility=[is_(manual, "on")], grid_options={"columns": 6}),
             press(f"button.{E}_record_manual_brew", t["confirm_record"], visibility=[is_(manual, "on")]),
             tile(f"sensor.{E}_last_brew_counted", visibility=[is_(manual, "on"), *present(f"sensor.{E}_last_brew_counted")]),
-        ], present(f"select.{E}_manual_brewer")[:1]),
+        # A manual brew takes its coffee from the bag in use, so it is offered
+        # only once one is chosen.
+        ], present(bag)),
     ]}
 
 
