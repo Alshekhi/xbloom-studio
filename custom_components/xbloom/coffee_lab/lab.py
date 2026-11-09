@@ -247,9 +247,6 @@ class CoffeeLab:
         # Told when the bag in use changes, with its id or None, so what was
         # suggested for the last one is not shown for the next.
         self.on_bag_chosen: Callable[[str | None], None] = lambda bean_id: None
-        # What was wrong, as answered for each open question, by its brew id:
-        # shown beside its verdict until the question is answered.
-        self.issues: dict[str, str] = {}
         # Told of each question opened, so it can be asked of whoever started
         # the brew once it is due (rating_calls.py).
         self.on_question: Callable[[dict[str, Any]], None] = lambda question: None
@@ -527,14 +524,21 @@ class CoffeeLab:
         A question's answer is kept on every cup it covers. With no question
         and no brew named, the most recent brew. `issue`, what was wrong
         (ISSUES), sets the Next Change from the version brewed unless one is
-        given in words (`issue_change`); the question stays open for its
-        verdict.
+        given in words (`issue_change`). A verdict of Fine or Not again leaves
+        what was wrong to be asked next (`issue_question`); an issue given
+        alone answers that.
         """
         question = self.question_of(brew_id) if brew_id else (
             self.rating_question_due() or self.rating_question
         )
-        if question is not None:
-            targets = question["brew_ids"]
+        follow = None
+        if question is None and issue and (asked := self.issue_question) is not None and (
+            brew_id is None or brew_id in asked["brew_ids"]
+        ):
+            follow = asked
+        source = question or follow
+        if source is not None:
+            targets = source["brew_ids"]
         elif brew_id is not None:
             targets = [brew_id]
         else:
@@ -542,10 +546,10 @@ class CoffeeLab:
             if not latest:
                 raise UnknownBrew("")
             targets = [latest[0].id]
-        named = brew_id or targets[-1]
-        if issue and next_change is None and question is not None:
+        named = brew_id or (follow["brew_id"] if follow else targets[-1])
+        if issue and next_change is None and source is not None:
             next_change = issue_change(
-                issue, question.get("version") or {}, self._saved_recipe(question.get("recipe")),
+                issue, source.get("version") or {}, self._saved_recipe(source.get("recipe")),
             )
         rated = None
         for target in [t for t in targets if t != named] + [named]:
@@ -558,17 +562,14 @@ class CoffeeLab:
                 # A cup removed from the record since: the others are rated.
                 if target == named:
                     raise
-        if issue and next_change is None and question is None and rated is not None:
+        if issue and next_change is None and source is None and rated is not None:
             # No question to read the version from: the brew's own record.
             change = issue_change(
                 issue, brew_version(rated.dose_g, rated.settings), self._saved_recipe(rated.recipe),
             )
             if change:
                 rated = await self.store.async_rate_brew(named, rating=None, tasting=None, next_change=change)
-        if question is not None and issue:
-            self.issues[question["brew_id"]] = issue
         if question is not None and verdict:
-            self.issues.pop(question["brew_id"], None)
             questions = [q for q in self._open_questions() if q["brew_id"] != question["brew_id"]]
             keeps = self.versions_to_keep
             changes = question.get("changes") or []
@@ -581,9 +582,29 @@ class CoffeeLab:
             ):
                 keeps.append({"recipe": question["recipe"], "version": question["version"],
                               "changes": changes, "label": change_label(changes)})
-            await self._async_set_questions(questions, versions_to_keep=keeps, version_to_keep=None)
+            # Not liked, and nothing said about why: what was wrong is asked
+            # next, for as long as the question would have stayed open.
+            follow_up = None
+            if verdict in ("fine", "not_again") and not issue and next_change is None:
+                follow_up = {
+                    key: question.get(key) for key in ("brew_id", "brew_ids", "recipe", "bag", "version")
+                } | {"expires_at": (dt_util.utcnow() + QUESTION_LAPSE).isoformat()}
+            await self._async_set_questions(
+                questions, versions_to_keep=keeps, version_to_keep=None, issue_question=follow_up,
+            )
+        elif follow is not None:
+            await self._async_set_state(issue_question=None)
         self.on_change()
         return rated
+
+    @property
+    def issue_question(self) -> dict[str, Any] | None:
+        """A brew rated Fine or Not again, waiting to be asked what was wrong."""
+        asked = self._state.get("issue_question")
+        if not asked:
+            return None
+        expires = dt_util.parse_datetime(asked.get("expires_at") or "")
+        return dict(asked) if expires is None or dt_util.utcnow() < expires else None
 
     @property
     def versions_to_keep(self) -> list[dict[str, Any]]:

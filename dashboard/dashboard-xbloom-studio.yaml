@@ -119,13 +119,6 @@ views:
         '''') }} g instead of {{ (c.saved | float) | round(1) | string | replace(''.0'', '''') }} g{%
         endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}.'
     - type: tile
-      entity: select.xbloom_studio_what_was_wrong
-      name: What was wrong
-      icon_tap_action:
-        action: none
-      features:
-      - type: select-options
-    - type: tile
       entity: select.xbloom_studio_verdict
       name: Verdict
       icon_tap_action:
@@ -138,6 +131,36 @@ views:
       state_not: unavailable
     - condition: state
       entity: sensor.xbloom_studio_brew_to_rate
+      state_not: unknown
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: grinding
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: brewing
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## What was wrong'
+    - type: markdown
+      text_only: true
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{{ e(state_attr(''select.xbloom_studio_what_was_wrong'', ''recipe''))
+        }} with {{ e(state_attr(''select.xbloom_studio_what_was_wrong'', ''bag'')) }}'
+    - type: tile
+      entity: select.xbloom_studio_what_was_wrong
+      name: What was wrong
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    visibility:
+    - condition: state
+      entity: select.xbloom_studio_what_was_wrong
+      state_not: unavailable
+    - condition: state
+      entity: select.xbloom_studio_what_was_wrong
       state_not: unknown
     - condition: state
       entity: sensor.xbloom_studio_brew_status

@@ -37,18 +37,47 @@ def test_the_ratio_stays_within_the_machine_s():
     assert issue_change("strong", {"ratio": 25.0}, SAVED) is None
 
 
-async def test_what_was_wrong_sets_the_next_change_and_leaves_the_question_open():
+async def test_what_was_wrong_is_asked_after_fine_or_not_again_and_sets_the_next_change():
     lab, store, bag = await _lab()
     await _brew(lab, bag, "run-1", grind="50")
     with _at(lab, 16):
         question = lab.rating_question_due()
-        await lab.async_rate(issue="sour", brew_id=question["brew_id"])
-        assert lab.rating_question_due() is not None, "still waiting for its verdict"
-        assert lab.issues[question["brew_id"]] == "sour"
+        assert lab.issue_question is None, "not before the verdict"
+        await lab.async_rate(verdict="fine", brew_id=question["brew_id"])
+        asked = lab.issue_question
+        assert (asked["brew_id"], asked["recipe"], asked["bag"]) == (question["brew_id"], "Test Hot", "Kenya")
+        await lab.async_rate(issue="sour", brew_id=asked["brew_id"])
+        assert lab.issue_question is None, "answered, it goes"
         brews = await store.async_list_brews()
         assert pending_change(brews, "Test Hot", bag.id)["settings"] == {"grind": 47.0}
-        await lab.async_rate(verdict="fine", brew_id=question["brew_id"])
-        assert question["brew_id"] not in lab.issues
+
+
+@pytest.mark.parametrize("verdict", ["again"])
+async def test_a_cup_liked_is_not_asked_what_was_wrong(verdict):
+    lab, store, bag = await _lab()
+    await _brew(lab, bag, "run-1")
+    with _at(lab, 16):
+        await lab.async_rate(verdict=verdict)
+    assert lab.issue_question is None
+
+
+async def test_nothing_wrong_sets_nothing_and_closes_the_question():
+    lab, store, bag = await _lab()
+    await _brew(lab, bag, "run-1")
+    with _at(lab, 16):
+        await lab.async_rate(verdict="not_again")
+        await lab.async_rate(issue="none")
+    assert lab.issue_question is None
+    assert pending_change(await store.async_list_brews(), "Test Hot", bag.id) is None
+
+
+async def test_an_issue_given_with_the_verdict_is_not_asked_again():
+    lab, store, bag = await _lab()
+    await _brew(lab, bag, "run-1", grind="50")
+    with _at(lab, 16):
+        await lab.async_rate(verdict="fine", issue="bitter")
+    assert lab.issue_question is None
+    assert pending_change(await store.async_list_brews(), "Test Hot", bag.id)["settings"] == {"grind": 53.0}
 
 
 async def test_the_action_says_what_it_set_and_takes_an_issue_alone():

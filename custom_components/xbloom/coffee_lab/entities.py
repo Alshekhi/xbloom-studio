@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from typing import Any
 from datetime import timedelta
 
 from homeassistant.components.button import ButtonEntity
@@ -288,27 +289,33 @@ class RateBrewSelect(CoffeeLabEntity, SelectEntity):
 
 
 class CupIssueSelect(CoffeeLabEntity, SelectEntity):
-    """What was wrong with the brew in question; picking one sets its Next Change.
+    """What was wrong with a brew just rated Fine or Not again.
 
-    The question stays open for its verdict: this only says what to change.
+    Available only while one waits to be asked; picking an answer sets its
+    Next Change (Nothing sets none) and the question goes.
     """
 
     _attr_icon = "mdi:help-circle-outline"
     _attr_options = list(ISSUES)
+    _attr_current_option = None
 
     def __init__(self, lab: CoffeeLab) -> None:
         super().__init__(lab, "cup_issue")
 
     @property
-    def current_option(self) -> str | None:
-        question = self.lab.rating_question_due()
-        return self.lab.issues.get(question["brew_id"]) if question else None
+    def available(self) -> bool:
+        return self.lab.issue_question is not None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        asked = self.lab.issue_question or {}
+        return {"recipe": asked.get("recipe"), "bag": asked.get("bag")}
 
     async def async_select_option(self, option: str) -> None:
-        question = self.lab.rating_question_due()
-        if question is None:
+        asked = self.lab.issue_question
+        if asked is None:
             raise refuse("rating_none")
-        await self.lab.async_rate(issue=option, brew_id=question["brew_id"])
+        await self.lab.async_rate(issue=option, brew_id=asked["brew_id"])
 
 
 class BagQuestionSensor(CoffeeLabEntity, SensorEntity):

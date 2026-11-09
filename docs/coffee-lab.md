@@ -110,8 +110,9 @@ clarity, how it was hot, warm and cool, overall, the finish — and a **Next
 change**, such as "grind 52", with the `xbloom.rate_brew` action or by telling
 an AI assistant. Only what is given is kept.
 
-**What was wrong**, asked on the card before the verdict, sets the Next
-change for you, counted from the grind and ratio the cup was brewed at:
+After a verdict of **Fine** or **Not again**, **What was wrong** is asked
+next, for as long as the question would have stayed open. Its answer sets the
+Next change for you, counted from the grind and ratio the cup was brewed at:
 
 | Answer | Next change |
 |---|---|

@@ -119,13 +119,6 @@ views:
         '''') }} غ بدل {{ (c.saved | float) | round(1) | string | replace(''.0'', '''') }} غ{% endif %}{%
         if not loop.last %}، {% endif %}{% endfor %}{% endif %}.'
     - type: tile
-      entity: select.xbloom_studio_what_was_wrong
-      name: ما المشكلة
-      icon_tap_action:
-        action: none
-      features:
-      - type: select-options
-    - type: tile
       entity: select.xbloom_studio_verdict
       name: الحكم
       icon_tap_action:
@@ -138,6 +131,36 @@ views:
       state_not: unavailable
     - condition: state
       entity: sensor.xbloom_studio_brew_to_rate
+      state_not: unknown
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: grinding
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: brewing
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## ما المشكلة'
+    - type: markdown
+      text_only: true
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{{ e(state_attr(''select.xbloom_studio_what_was_wrong'', ''recipe''))
+        }} مع {{ e(state_attr(''select.xbloom_studio_what_was_wrong'', ''bag'')) }}'
+    - type: tile
+      entity: select.xbloom_studio_what_was_wrong
+      name: ما المشكلة
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+    visibility:
+    - condition: state
+      entity: select.xbloom_studio_what_was_wrong
+      state_not: unavailable
+    - condition: state
+      entity: select.xbloom_studio_what_was_wrong
       state_not: unknown
     - condition: state
       entity: sensor.xbloom_studio_brew_status

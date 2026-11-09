@@ -63,7 +63,7 @@ TEXT = {
         "c_suggest": "Suggest a recipe", "c_suggest_hub": "Suggest a community recipe",
         "h_for_you": "For you", "h_trending": "Trending recipes", "h_tea": "Tea recipes",
         "a_another": "Another", "a_pod": "Pod",
-        "h_how_was": "How was it?", "r_verdict": "Verdict", "r_issue": "What was wrong",
+        "h_how_was": "How was it?", "r_verdict": "Verdict", "r_issue": "What was wrong", "w_which": "{recipe} with {bag}",
         "n_grind": "grind {value}", "n_ratio": "ratio 1:{value}", "n_dose": "{value} g of coffee",
         "v_wanted": "Last time you wanted: {text}.", "v_use": "Use that change",
         "h_keep": "Keep this version?", "v_keep": "**{recipe}** {changes} is worth brewing again.",
@@ -132,7 +132,7 @@ TEXT = {
         "c_suggest": "اقترح وصفة", "c_suggest_hub": "اقترح وصفة من المجتمع",
         "h_for_you": "مقترحة لك", "h_trending": "الوصفات الرائجة", "h_tea": "وصفات الشاي",
         "a_another": "اقتراح آخر", "a_pod": "الكبسولة",
-        "h_how_was": "كيف كانت؟", "r_verdict": "الحكم", "r_issue": "ما المشكلة",
+        "h_how_was": "كيف كانت؟", "r_verdict": "الحكم", "r_issue": "ما المشكلة", "w_which": "{recipe} مع {bag}",
         "n_grind": "درجة طحن {value}", "n_ratio": "نسبة 1:{value}", "n_dose": "{value} غ من البن",
         "v_wanted": "في المرة السابقة أردت: {text}.", "v_use": "استخدم هذا التعديل",
         "h_keep": "هل تحفظ هذه النسخة؟", "v_keep": "**{recipe}** {changes} تستحق التكرار.",
@@ -250,11 +250,15 @@ def brew_view(t: dict) -> dict:
         # Due a while after a brew; never while one is running.
         section(t["h_how_was"], [
             {"type": "markdown", "text_only": True, "content": rating_card(t)},
-            # Before the verdict, which answers the question and closes it:
-            # what was wrong sets what to change next time.
-            select(f"select.{E}_what_was_wrong", name=t["r_issue"]),
             select(f"select.{E}_verdict", name=t["r_verdict"]),
         ], [*present(f"sensor.{E}_brew_to_rate"), *not_busy()]),
+        # After a Fine or Not again: what was wrong sets what to change next time.
+        section(t["r_issue"], [
+            {"type": "markdown", "text_only": True, "content": ESCAPE + t["w_which"].replace(
+                "{recipe}", f"{{{{ e(state_attr('select.{E}_what_was_wrong', 'recipe')) }}}}"
+            ).replace("{bag}", f"{{{{ e(state_attr('select.{E}_what_was_wrong', 'bag')) }}}}")},
+            select(f"select.{E}_what_was_wrong", name=t["r_issue"]),
+        ], [*present(f"select.{E}_what_was_wrong"), *not_busy()]),
         section(t["h_buy_again"], [
             {"type": "markdown", "text_only": True, "content": ESCAPE + t["b_question"].replace(
                 "{bag}", f"{{{{ e(states('sensor.{E}_finished_bag')) }}}}")},
