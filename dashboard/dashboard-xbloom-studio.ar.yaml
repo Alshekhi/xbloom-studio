@@ -2204,35 +2204,6 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## أدوات الاتصال'
-    - type: tile
-      entity: button.xbloom_studio_ble_connect
-      name:
-        type: entity
-      icon_tap_action:
-        action: none
-      hide_state: true
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.xbloom_studio_ble_connect
-    - type: tile
-      entity: button.xbloom_studio_ble_disconnect
-      name:
-        type: entity
-      icon_tap_action:
-        action: none
-      hide_state: true
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.xbloom_studio_ble_disconnect
-  - type: grid
-    cards:
-    - type: markdown
-      text_only: true
       content: '## الإعلانات الصوتية'
     - type: tile
       entity: automation.xbloom_brew_announcements
