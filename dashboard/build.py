@@ -48,6 +48,8 @@ TEXT = {
         "sep": ", ", "g": "g", "ml": "ml",
         "in_use": "in use", "unopened": "unopened", "open": "open", "g_left": "g left",
         "not_tracked": "not tracked", "no_bags": "No open or unopened bags.",
+        "g_of": "{left} of {size} g left", "opened_0": "opened today", "opened_1": "opened yesterday",
+        "opened_2": "opened 2 days ago", "opened_few": "opened {n} days ago", "opened_n": "opened {n} days ago",
         "speak_brew": "Speak brew progress", "speak_faults": "Speak machine faults",
         "speak_live": "Speak live readings",
         "view_community": "Community",
@@ -118,6 +120,8 @@ TEXT = {
         "sep": "، ", "g": "غ", "ml": "مل",
         "in_use": "قيد الاستخدام", "unopened": "غير مفتوح", "open": "مفتوح", "g_left": "غ متبقية",
         "not_tracked": "غير متتبع", "no_bags": "لا توجد أكياس مفتوحة أو غير مفتوحة.",
+        "g_of": "متبقٍ {left} من {size} غ", "opened_0": "فُتح اليوم", "opened_1": "فُتح أمس",
+        "opened_2": "فُتح قبل يومين", "opened_few": "فُتح قبل {n} أيام", "opened_n": "فُتح قبل {n} يومًا",
         "speak_brew": "إعلان سير التحضير", "speak_faults": "إعلان أعطال الماكينة",
         "speak_live": "إعلان القراءات المباشرة",
         "view_community": "المجتمع",
@@ -496,24 +500,57 @@ def chart(title: str, period: str, days: int, series: list[tuple[str, str]]) -> 
     }
 
 
+def opened_ago(t: dict) -> str:
+    """How long ago bag `b` was opened, counted the language's way, from `days`."""
+    n = "{{ days }}"
+    if t is TEXT["ar"]:
+        # Arabic counted-noun agreement: today, yesterday, two, three to ten, eleven and up.
+        return (
+            f"{{% if days == 0 %}}{t['opened_0']}{{% elif days == 1 %}}{t['opened_1']}"
+            f"{{% elif days == 2 %}}{t['opened_2']}{{% elif days <= 10 %}}{t['opened_few'].replace('{n}', n)}"
+            f"{{% else %}}{t['opened_n'].replace('{n}', n)}{{% endif %}}"
+        )
+    return (
+        f"{{% if days == 0 %}}{t['opened_0']}{{% elif days == 1 %}}{t['opened_1']}"
+        f"{{% else %}}{t['opened_n'].replace('{n}', n)}{{% endif %}}"
+    )
+
+
 def bags_view(t: dict) -> dict:
+    """What is on hand: each bag, how much is left and how long it has been open.
+
+    Choosing the bag to brew with is the Brew tab's; this tab only lists.
+    """
     bags = f"sensor.{E}_coffee_bags"
     bag = f"select.{E}_coffee_bag"
+    left = t["g_of"].replace("{left}", "' ~ (b.remaining_g | round(0) | int) ~ '").replace("{size}", "' ~ (b.bag_size_g | round(0) | int) ~ '")
+    pods = t["pods_left"].replace("{n}", "' ~ b.pods_left ~ '")
+    line = (
+        "- **{{ b.name }}**"
+        f"{{% if b.kind == 'xpod' %}} ({t['k_xpod']}){{% elif b.kind == 'tea' %}} ({t['k_tea']}){{% endif %}}"
+        f"{{{{ ' ({t['in_use']})' if b.id in current }}}}"
+        # Where it is from; "Other" says nothing about the process.
+        "{% for x in [b.country, b.process] if x and x != 'Other' %} · {{ x }}{% endfor %}"
+        " · {% if b.kind == 'xpod' %}{{ ('" + pods + "') if b.pods_left is not none else '" + t["not_tracked"] + "' }}"
+        "{% elif b.remaining_g is none %}" + t["not_tracked"]
+        + "{% elif b.bag_size_g %}{{ '" + left + "' }}"
+        + "{% else %}{{ b.remaining_g | round(0) | int }} " + t["g_left"] + "{% endif %}"
+        + "{% if b.status == 'unopened' %} · " + t["unopened"]
+        + "{% elif b.opened_on %}{% set days = (now().date() - as_datetime(b.opened_on).date()).days %} · "
+        + opened_ago(t) + "{% endif %}\n"
+    )
     return {"title": t["view_bags"], "path": "bags", "icon": "mdi:shopping", "type": "sections", "max_columns": 2, "sections": [
         section(t["h_bags"], [
             {"type": "markdown", "content": (
                 f"{{% set current = [state_attr('{bag}','id'), state_attr('select.{E}_xpod_box','id'), state_attr('select.{E}_tea','id')] %}}"
-                f"{{% for b in state_attr('{bags}','bags') or [] %}}"
-                f"- **{{{{ b.name }}}}**"
-                f"{{% if b.kind == 'xpod' %}} ({t['k_xpod']}){{% elif b.kind == 'tea' %}} ({t['k_tea']}){{% endif %}}"
-                f"{{{{ ' ({t['in_use']})' if b.id in current }}}} — "
-                f"{{{{ '{t['unopened']}' if b.status == 'unopened' else '{t['open']}' }}}}{t['sep']}"
-                "{% if b.kind == 'xpod' %}{{ ('" + t['pods_left'].replace('{n}', "' ~ b.pods_left ~ '") + "') if b.pods_left is not none else '" + t['not_tracked'] + "' }}"
-                f"{{% else %}}{{{{ (b.remaining_g | round(0) | int ~ ' {t['g_left']}') if b.remaining_g is not none else '{t['not_tracked']}' }}}}{{% endif %}}\n"
-                f"{{% else %}}{t['no_bags']}{{% endfor %}}"
+                f"{{% set all = state_attr('{bags}','bags') or [] %}}"
+                # The bag in use first, then the rest from least left; untracked last.
+                "{% set in_use = all | selectattr('id', 'in', current) | list %}"
+                "{% set rest = all | rejectattr('id', 'in', current) | list %}"
+                "{% set ordered = in_use + (rest | rejectattr('remaining_g', 'none') | sort(attribute='remaining_g') | list)"
+                " + (rest | selectattr('remaining_g', 'none') | list) %}"
+                "{% for b in ordered %}" + line + f"{{% else %}}{t['no_bags']}{{% endfor %}}"
             )},
-            # With no bags the picker has nothing to offer and is unavailable.
-            select(bag, visibility=[is_not(bag, "unavailable")]),
             press(f"button.{E}_refresh_coffee_bags", visibility=[
                 {"condition": "state", "entity": f"button.{E}_refresh_coffee_bags", "state_not": "unavailable"},
             ]),

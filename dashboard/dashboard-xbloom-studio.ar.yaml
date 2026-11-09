@@ -1238,29 +1238,22 @@ views:
       content: '## الأكياس المتوفرة'
     - type: markdown
       content: '{% set current = [state_attr(''select.xbloom_studio_coffee_bag'',''id''), state_attr(''select.xbloom_studio_xpod_box'',''id''),
-        state_attr(''select.xbloom_studio_tea'',''id'')] %}{% for b in state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'')
-        or [] %}- **{{ b.name }}**{% if b.kind == ''xpod'' %} (علبة xPod){% elif b.kind == ''tea'' %}
-        (شاي){% endif %}{{ '' (قيد الاستخدام)'' if b.id in current }} — {{ ''غير مفتوح'' if b.status ==
-        ''unopened'' else ''مفتوح'' }}، {% if b.kind == ''xpod'' %}{{ (''الكبسولات المتبقية: '' ~ b.pods_left
-        ~ '''') if b.pods_left is not none else ''غير متتبع'' }}{% else %}{{ (b.remaining_g | round(0)
-        | int ~ '' غ متبقية'') if b.remaining_g is not none else ''غير متتبع'' }}{% endif %}
+        state_attr(''select.xbloom_studio_tea'',''id'')] %}{% set all = state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'')
+        or [] %}{% set in_use = all | selectattr(''id'', ''in'', current) | list %}{% set rest = all |
+        rejectattr(''id'', ''in'', current) | list %}{% set ordered = in_use + (rest | rejectattr(''remaining_g'',
+        ''none'') | sort(attribute=''remaining_g'') | list) + (rest | selectattr(''remaining_g'', ''none'')
+        | list) %}{% for b in ordered %}- **{{ b.name }}**{% if b.kind == ''xpod'' %} (علبة xPod){% elif
+        b.kind == ''tea'' %} (شاي){% endif %}{{ '' (قيد الاستخدام)'' if b.id in current }}{% for x in
+        [b.country, b.process] if x and x != ''Other'' %}، {{ x }}{% endfor %}، {% if b.kind == ''xpod''
+        %}{{ (''الكبسولات المتبقية: '' ~ b.pods_left ~ '''') if b.pods_left is not none else ''غير متتبع''
+        }}{% elif b.remaining_g is none %}غير متتبع{% elif b.bag_size_g %}{{ ''متبقٍ '' ~ (b.remaining_g
+        | round(0) | int) ~ '' من '' ~ (b.bag_size_g | round(0) | int) ~ '' غ'' }}{% else %}{{ b.remaining_g
+        | round(0) | int }} غ متبقية{% endif %}{% if b.status == ''unopened'' %}، غير مفتوح{% elif b.opened_on
+        %}{% set days = (now().date() - as_datetime(b.opened_on).date()).days %}، {% if days == 0 %}فُتح
+        اليوم{% elif days == 1 %}فُتح أمس{% elif days == 2 %}فُتح قبل يومين{% elif days <= 10 %}فُتح قبل
+        {{ days }} أيام{% else %}فُتح قبل {{ days }} يومًا{% endif %}{% endif %}
 
         {% else %}لا توجد أكياس مفتوحة أو غير مفتوحة.{% endfor %}'
-    - type: tile
-      entity: select.xbloom_studio_coffee_bag
-      name:
-        type: entity
-      icon_tap_action:
-        action: none
-      features:
-      - type: select-options
-      visibility:
-      - condition: state
-        entity: select.xbloom_studio_coffee_bag
-        state_not: unavailable
-      hide_state: true
-      tap_action:
-        action: none
     - type: tile
       entity: button.xbloom_studio_refresh_coffee_bags
       name:

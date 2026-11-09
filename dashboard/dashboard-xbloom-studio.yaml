@@ -1237,29 +1237,21 @@ views:
       content: '## Bags on hand'
     - type: markdown
       content: '{% set current = [state_attr(''select.xbloom_studio_coffee_bag'',''id''), state_attr(''select.xbloom_studio_xpod_box'',''id''),
-        state_attr(''select.xbloom_studio_tea'',''id'')] %}{% for b in state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'')
-        or [] %}- **{{ b.name }}**{% if b.kind == ''xpod'' %} (xPod box){% elif b.kind == ''tea'' %} (tea){%
-        endif %}{{ '' (in use)'' if b.id in current }} — {{ ''unopened'' if b.status == ''unopened'' else
-        ''open'' }}, {% if b.kind == ''xpod'' %}{{ (''Pods left: '' ~ b.pods_left ~ '''') if b.pods_left
-        is not none else ''not tracked'' }}{% else %}{{ (b.remaining_g | round(0) | int ~ '' g left'')
-        if b.remaining_g is not none else ''not tracked'' }}{% endif %}
+        state_attr(''select.xbloom_studio_tea'',''id'')] %}{% set all = state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'')
+        or [] %}{% set in_use = all | selectattr(''id'', ''in'', current) | list %}{% set rest = all |
+        rejectattr(''id'', ''in'', current) | list %}{% set ordered = in_use + (rest | rejectattr(''remaining_g'',
+        ''none'') | sort(attribute=''remaining_g'') | list) + (rest | selectattr(''remaining_g'', ''none'')
+        | list) %}{% for b in ordered %}- **{{ b.name }}**{% if b.kind == ''xpod'' %} (xPod box){% elif
+        b.kind == ''tea'' %} (tea){% endif %}{{ '' (in use)'' if b.id in current }}{% for x in [b.country,
+        b.process] if x and x != ''Other'' %}, {{ x }}{% endfor %}, {% if b.kind == ''xpod'' %}{{ (''Pods
+        left: '' ~ b.pods_left ~ '''') if b.pods_left is not none else ''not tracked'' }}{% elif b.remaining_g
+        is none %}not tracked{% elif b.bag_size_g %}{{ '''' ~ (b.remaining_g | round(0) | int) ~ '' of
+        '' ~ (b.bag_size_g | round(0) | int) ~ '' g left'' }}{% else %}{{ b.remaining_g | round(0) | int
+        }} g left{% endif %}{% if b.status == ''unopened'' %}, unopened{% elif b.opened_on %}{% set days
+        = (now().date() - as_datetime(b.opened_on).date()).days %}, {% if days == 0 %}opened today{% elif
+        days == 1 %}opened yesterday{% else %}opened {{ days }} days ago{% endif %}{% endif %}
 
         {% else %}No open or unopened bags.{% endfor %}'
-    - type: tile
-      entity: select.xbloom_studio_coffee_bag
-      name:
-        type: entity
-      icon_tap_action:
-        action: none
-      features:
-      - type: select-options
-      visibility:
-      - condition: state
-        entity: select.xbloom_studio_coffee_bag
-        state_not: unavailable
-      hide_state: true
-      tap_action:
-        action: none
     - type: tile
       entity: button.xbloom_studio_refresh_coffee_bags
       name:
