@@ -1241,8 +1241,8 @@ views:
         or [] %}- **{{ b.name }}**{% if b.kind == ''xpod'' %} (xPod box){% elif b.kind == ''tea'' %} (tea){%
         endif %}{{ '' (in use)'' if b.id in current }} — {{ ''unopened'' if b.status == ''unopened'' else
         ''open'' }}, {% if b.kind == ''xpod'' %}{{ (''Pods left: '' ~ b.pods_left ~ '''') if b.pods_left
-        is not none else ''{t[''not_tracked'']}'' }}}}{% else %}{{ (b.remaining_g | round(0) | int ~ ''
-        g left'') if b.remaining_g is not none else ''not tracked'' }}{% endif %}
+        is not none else ''not tracked'' }}{% else %}{{ (b.remaining_g | round(0) | int ~ '' g left'')
+        if b.remaining_g is not none else ''not tracked'' }}{% endif %}
 
         {% else %}No open or unopened bags.{% endfor %}'
     - type: tile

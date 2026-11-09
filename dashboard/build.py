@@ -508,7 +508,7 @@ def bags_view(t: dict) -> dict:
                 f"{{% if b.kind == 'xpod' %}} ({t['k_xpod']}){{% elif b.kind == 'tea' %}} ({t['k_tea']}){{% endif %}}"
                 f"{{{{ ' ({t['in_use']})' if b.id in current }}}} — "
                 f"{{{{ '{t['unopened']}' if b.status == 'unopened' else '{t['open']}' }}}}{t['sep']}"
-                f"{{% if b.kind == 'xpod' %}}{{{{ ('" + t['pods_left'].replace('{n}', "' ~ b.pods_left ~ '") + "') if b.pods_left is not none else '{t['not_tracked']}' }}}}"
+                "{% if b.kind == 'xpod' %}{{ ('" + t['pods_left'].replace('{n}', "' ~ b.pods_left ~ '") + "') if b.pods_left is not none else '" + t['not_tracked'] + "' }}"
                 f"{{% else %}}{{{{ (b.remaining_g | round(0) | int ~ ' {t['g_left']}') if b.remaining_g is not none else '{t['not_tracked']}' }}}}{{% endif %}}\n"
                 f"{{% else %}}{t['no_bags']}{{% endfor %}}"
             )},

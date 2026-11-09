@@ -1242,8 +1242,8 @@ views:
         or [] %}- **{{ b.name }}**{% if b.kind == ''xpod'' %} (علبة xPod){% elif b.kind == ''tea'' %}
         (شاي){% endif %}{{ '' (قيد الاستخدام)'' if b.id in current }} — {{ ''غير مفتوح'' if b.status ==
         ''unopened'' else ''مفتوح'' }}، {% if b.kind == ''xpod'' %}{{ (''الكبسولات المتبقية: '' ~ b.pods_left
-        ~ '''') if b.pods_left is not none else ''{t[''not_tracked'']}'' }}}}{% else %}{{ (b.remaining_g
-        | round(0) | int ~ '' غ متبقية'') if b.remaining_g is not none else ''غير متتبع'' }}{% endif %}
+        ~ '''') if b.pods_left is not none else ''غير متتبع'' }}{% else %}{{ (b.remaining_g | round(0)
+        | int ~ '' غ متبقية'') if b.remaining_g is not none else ''غير متتبع'' }}{% endif %}
 
         {% else %}لا توجد أكياس مفتوحة أو غير مفتوحة.{% endfor %}'
     - type: tile
