@@ -23,25 +23,6 @@ views:
       icon_tap_action:
         action: none
     - type: tile
-      entity: select.xbloom_studio_coffee_bag
-      name:
-        type: entity
-      icon_tap_action:
-        action: none
-      visibility:
-      - condition: state
-        entity: select.xbloom_studio_coffee_bag
-        state_not: unavailable
-      - condition: state
-        entity: select.xbloom_studio_coffee_bag
-        state_not: unknown
-      - condition: state
-        entity: sensor.xbloom_studio_recipe_kind
-        state_not: xpod
-      - condition: state
-        entity: sensor.xbloom_studio_recipe_kind
-        state_not: tea
-    - type: tile
       entity: sensor.xbloom_studio_coffee_left
       name:
         type: entity
@@ -127,6 +108,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_brew_to_rate
@@ -158,6 +141,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     visibility:
     - condition: state
       entity: select.xbloom_studio_what_was_wrong
@@ -188,6 +173,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_finished_bag
@@ -376,6 +363,8 @@ views:
         entity: sensor.xbloom_studio_recipe_kind
         state_not: tea
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: select.xbloom_studio_xpod_box
       name:
@@ -400,6 +389,8 @@ views:
         entity: select.xbloom_studio_xpod_box
         state_not: unavailable
       hide_state: true
+      tap_action:
+        action: none
     - type: markdown
       text_only: true
       content: '{% set n = state_attr(''select.xbloom_studio_xpod_box'', ''pods_left'') %}{% if n is not
@@ -446,6 +437,8 @@ views:
         entity: select.xbloom_studio_tea
         state_not: unavailable
       hide_state: true
+      tap_action:
+        action: none
     - type: markdown
       content: '{% set a = states[''select.xbloom_studio_coffee_bag''].attributes if states[''select.xbloom_studio_coffee_bag'']
         else {} %}{{ [a.get(''roaster''), [a.get(''country''), a.get(''region'')] | select | join('',
@@ -511,6 +504,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: button.xbloom_studio_suggest_recipe
       name: Suggest a recipe
@@ -538,6 +533,8 @@ views:
         entity: select.xbloom_studio_suggested_recipe
         state_not: unknown
       hide_state: true
+      tap_action:
+        action: none
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set source = state_attr(''select.xbloom_studio_suggested_recipe'',
@@ -621,6 +618,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: markdown
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
@@ -853,6 +852,8 @@ views:
         entity: switch.xbloom_studio_use_grinder
         state: 'on'
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: number.xbloom_studio_brew_grind_size
       name:
@@ -908,11 +909,11 @@ views:
 
         - **Water:** {{ (water * 0.033814) | round(1) }} oz
 
-        {% else %}- **Coffee:** {{ dose | round(1) }} g
+        {% else %}- **Coffee:** {{ (dose | float) | round(1) | string | replace(''.0'', '''') }} g
 
         - **Water:** {{ water | round(0) | int }} ml
 
-        {% endif %}- **Ratio:** 1:{{ ratio | round(1) }}'
+        {% endif %}- **Ratio:** 1:{{ (ratio | float) | round(1) | string | replace(''.0'', '''') }}'
     - type: tile
       entity: input_boolean.xbloom_show_per_pour
       name: Show each pour
@@ -1053,6 +1054,8 @@ views:
       grid_options:
         columns: 6
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: number.xbloom_studio_manual_brew_dose
       name:
@@ -1129,6 +1132,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: sensor.xbloom_studio_brews
       name:
@@ -1244,6 +1249,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: button.xbloom_studio_refresh_coffee_bags
       name:
@@ -1285,17 +1292,22 @@ views:
         }}
 
 
-        {% set c = a.get(''coffee'') or {} %}{% if c.get(''name'') %}**Pod:** {{ e(c.get(''name'')) }}{%
-        for x in [c.get(''origin''), c.get(''process''), c.get(''varietal'')] if x %}, {{ e(x) }}{% endfor
-        %}
+        {% set tea = (a.get(''cup'') or '''') | lower == ''tea'' %}{% set c = a.get(''coffee'') or {}
+        %}{% if c.get(''name'') %}**{% if tea %}Tea{% else %}Pod{% endif %}:** {{ e(c.get(''name'')) }}{%
+        for x in [c.get(''origin''), c.get(''process''), c.get(''varietal'')] if x and (x | upper) !=
+        ''NONE'' %}, {{ e(x) }}{% endfor %}
 
 
-        {% if c.get(''flavor'') %}**Tasting notes:** {{ e(c.get(''flavor'')) }}
+        {% set notes = c.get(''flavor'') or '''' %}{% if notes and (notes | upper) != ''NONE'' %}**Tasting
+        notes:** {{ e(notes | regex_replace(''\s*·\s*'', '', '')) }}
 
 
-        {% endif %}{% endif %}{% if a.get(''dose_g'') %}**Coffee:** {{ a.get(''dose_g'') | round(1) }}
-        g{% if a.get(''ratio'') %}, **Ratio:** 1:{{ a.get(''ratio'') | round(1) }}{% endif %}{% if a.get(''grind_size'')
-        %}, grind {{ a.get(''grind_size'') | round(0) | int }} at {{ a.get(''rpm'') }} RPM{% endif %}
+        {% endif %}{% endif %}{% set tea = (a.get(''cup'') or '''') | lower == ''tea'' %}{% if a.get(''dose_g'')
+        %}**{% if tea %}Tea{% else %}Coffee{% endif %}:** {{ (a.get(''dose_g'') | float) | round(1) |
+        string | replace(''.0'', '''') }} g{% if a.get(''ratio'') %}, **Ratio:** 1:{{ (a.get(''ratio'')
+        | float) | round(1) | string | replace(''.0'', '''') }}{% endif %}{% if a.get(''grind_size'')
+        and not tea %}, grind {{ a.get(''grind_size'') | round(0) | int }} at {{ a.get(''rpm'') }} RPM{%
+        endif %}
 
 
         {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause
@@ -1351,20 +1363,28 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_trending_recipes''].attributes
-        if states[''select.xbloom_studio_trending_recipes''] is defined else {} %}{% set c = a.get(''coffee'')
-        or {} %}{% if c.get(''name'') %}**Pod:** {{ e(c.get(''name'')) }}{% for x in [c.get(''origin''),
-        c.get(''process''), c.get(''varietal'')] if x %}, {{ e(x) }}{% endfor %}
+        if states[''select.xbloom_studio_trending_recipes''] is defined else {} %}{% set tea = (a.get(''cup'')
+        or '''') | lower == ''tea'' %}{% set c = a.get(''coffee'') or {} %}{% if c.get(''name'') %}**{%
+        if tea %}Tea{% else %}Pod{% endif %}:** {{ e(c.get(''name'')) }}{% for x in [c.get(''origin''),
+        c.get(''process''), c.get(''varietal'')] if x and (x | upper) != ''NONE'' %}, {{ e(x) }}{% endfor
+        %}
 
 
-        {% if c.get(''flavor'') %}**Tasting notes:** {{ e(c.get(''flavor'')) }}
+        {% set notes = c.get(''flavor'') or '''' %}{% if notes and (notes | upper) != ''NONE'' %}**Tasting
+        notes:** {{ e(notes | regex_replace(''\s*·\s*'', '', '')) }}
 
 
-        {% endif %}{% endif %}{% if a.get(''dose_g'') %}**Coffee:** {{ a.get(''dose_g'') | round(1) }}
-        g{% if a.get(''ratio'') %}, **Ratio:** 1:{{ a.get(''ratio'') | round(1) }}{% endif %}{% if a.get(''grind_size'')
-        %}, grind {{ a.get(''grind_size'') | round(0) | int }} at {{ a.get(''rpm'') }} RPM{% endif %}
+        {% endif %}{% endif %}{% set tea = (a.get(''cup'') or '''') | lower == ''tea'' %}{% if a.get(''dose_g'')
+        %}**{% if tea %}Tea{% else %}Coffee{% endif %}:** {{ (a.get(''dose_g'') | float) | round(1) |
+        string | replace(''.0'', '''') }} g{% if a.get(''ratio'') %}, **Ratio:** 1:{{ (a.get(''ratio'')
+        | float) | round(1) | string | replace(''.0'', '''') }}{% endif %}{% if a.get(''grind_size'')
+        and not tea %}, grind {{ a.get(''grind_size'') | round(0) | int }} at {{ a.get(''rpm'') }} RPM{%
+        endif %}
 
 
         {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause
@@ -1417,20 +1437,28 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_tea_recipes''].attributes
-        if states[''select.xbloom_studio_tea_recipes''] is defined else {} %}{% set c = a.get(''coffee'')
-        or {} %}{% if c.get(''name'') %}**Pod:** {{ e(c.get(''name'')) }}{% for x in [c.get(''origin''),
-        c.get(''process''), c.get(''varietal'')] if x %}, {{ e(x) }}{% endfor %}
+        if states[''select.xbloom_studio_tea_recipes''] is defined else {} %}{% set tea = (a.get(''cup'')
+        or '''') | lower == ''tea'' %}{% set c = a.get(''coffee'') or {} %}{% if c.get(''name'') %}**{%
+        if tea %}Tea{% else %}Pod{% endif %}:** {{ e(c.get(''name'')) }}{% for x in [c.get(''origin''),
+        c.get(''process''), c.get(''varietal'')] if x and (x | upper) != ''NONE'' %}, {{ e(x) }}{% endfor
+        %}
 
 
-        {% if c.get(''flavor'') %}**Tasting notes:** {{ e(c.get(''flavor'')) }}
+        {% set notes = c.get(''flavor'') or '''' %}{% if notes and (notes | upper) != ''NONE'' %}**Tasting
+        notes:** {{ e(notes | regex_replace(''\s*·\s*'', '', '')) }}
 
 
-        {% endif %}{% endif %}{% if a.get(''dose_g'') %}**Coffee:** {{ a.get(''dose_g'') | round(1) }}
-        g{% if a.get(''ratio'') %}, **Ratio:** 1:{{ a.get(''ratio'') | round(1) }}{% endif %}{% if a.get(''grind_size'')
-        %}, grind {{ a.get(''grind_size'') | round(0) | int }} at {{ a.get(''rpm'') }} RPM{% endif %}
+        {% endif %}{% endif %}{% set tea = (a.get(''cup'') or '''') | lower == ''tea'' %}{% if a.get(''dose_g'')
+        %}**{% if tea %}Tea{% else %}Coffee{% endif %}:** {{ (a.get(''dose_g'') | float) | round(1) |
+        string | replace(''.0'', '''') }} g{% if a.get(''ratio'') %}, **Ratio:** 1:{{ (a.get(''ratio'')
+        | float) | round(1) | string | replace(''.0'', '''') }}{% endif %}{% if a.get(''grind_size'')
+        and not tea %}, grind {{ a.get(''grind_size'') | round(0) | int }} at {{ a.get(''rpm'') }} RPM{%
+        endif %}
 
 
         {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause
@@ -1476,6 +1504,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: button.xbloom_studio_suggest_community_recipe
       name: Suggest a community recipe
@@ -1500,6 +1530,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: select.xbloom_studio_community_sort
       name: Sort
@@ -1508,6 +1540,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: button.xbloom_studio_search_community
       name: Search
@@ -1549,6 +1583,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     visibility:
     - condition: numeric_state
       entity: sensor.xbloom_studio_community_matches
@@ -1594,9 +1630,12 @@ views:
         {% endif %}{% if a.get(''description'') %}{{ e(a.get(''description'')) }}
 
 
-        {% endif %}{% if a.get(''dose_g'') %}**Coffee:** {{ a.get(''dose_g'') | round(1) }} g{% if a.get(''ratio'')
-        %}, **Ratio:** 1:{{ a.get(''ratio'') | round(1) }}{% endif %}{% if a.get(''grind_size'') %}, grind
-        {{ a.get(''grind_size'') | round(0) | int }} at {{ a.get(''rpm'') }} RPM{% endif %}
+        {% endif %}{% set tea = (a.get(''cup'') or '''') | lower == ''tea'' %}{% if a.get(''dose_g'')
+        %}**{% if tea %}Tea{% else %}Coffee{% endif %}:** {{ (a.get(''dose_g'') | float) | round(1) |
+        string | replace(''.0'', '''') }} g{% if a.get(''ratio'') %}, **Ratio:** 1:{{ (a.get(''ratio'')
+        | float) | round(1) | string | replace(''.0'', '''') }}{% endif %}{% if a.get(''grind_size'')
+        and not tea %}, grind {{ a.get(''grind_size'') | round(0) | int }} at {{ a.get(''rpm'') }} RPM{%
+        endif %}
 
 
         {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause
@@ -1864,6 +1903,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: number.xbloom_studio_brew_volume
       name:
@@ -1891,6 +1932,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: button.xbloom_studio_brew_standalone
       name:
@@ -1985,6 +2028,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: select.xbloom_studio_recipe_action
       name:
@@ -1994,6 +2039,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: button.xbloom_studio_run_recipe_action
       name:
@@ -2051,6 +2098,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: select.xbloom_studio_temperature_unit
       name:
@@ -2060,6 +2109,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: select.xbloom_studio_weight_unit
       name:
@@ -2069,6 +2120,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
   - type: grid
     cards:
     - type: markdown
@@ -2217,6 +2270,8 @@ views:
       features:
       - type: select-options
       hide_state: true
+      tap_action:
+        action: none
     - type: tile
       entity: button.xbloom_studio_restore_archived_recipe
       name:

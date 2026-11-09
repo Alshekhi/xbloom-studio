@@ -62,7 +62,7 @@ TEXT = {
         "c_added": "Added to your recipes as **{name}**. Pick it on the Brew tab.",
         "c_suggest": "Suggest a recipe", "c_suggest_hub": "Suggest a community recipe",
         "h_for_you": "For you", "h_trending": "Trending recipes", "h_tea": "Tea recipes",
-        "a_another": "Another", "a_pod": "Pod",
+        "a_another": "Another", "a_pod": "Pod", "a_tea": "Tea",
         "h_how_was": "How was it?", "r_verdict": "Verdict", "r_issue": "What was wrong", "w_which": "{recipe} with {bag}",
         "n_grind": "grind {value}", "n_ratio": "ratio 1:{value}", "n_dose": "{value} g of coffee",
         "v_wanted": "Last time you wanted: {text}.", "v_use": "Use that change",
@@ -131,7 +131,7 @@ TEXT = {
         "c_added": "أضيفت إلى وصفاتك باسم **{name}**. اخترها من تبويب التحضير.",
         "c_suggest": "اقترح وصفة", "c_suggest_hub": "اقترح وصفة من المجتمع",
         "h_for_you": "مقترحة لك", "h_trending": "الوصفات الرائجة", "h_tea": "وصفات الشاي",
-        "a_another": "اقتراح آخر", "a_pod": "الكبسولة",
+        "a_another": "اقتراح آخر", "a_pod": "الكبسولة", "a_tea": "الشاي",
         "h_how_was": "كيف كانت؟", "r_verdict": "الحكم", "r_issue": "ما المشكلة", "w_which": "{recipe} مع {bag}",
         "n_grind": "درجة طحن {value}", "n_ratio": "نسبة 1:{value}", "n_dose": "{value} غ من البن",
         "v_wanted": "في المرة السابقة أردت: {text}.", "v_use": "استخدم هذا التعديل",
@@ -193,6 +193,9 @@ def select(entity: str, **extra) -> dict:
     # The dropdown shows what is chosen; a state line would only repeat it,
     # spoken twice, or read "Unknown" before anything is.
     extra.setdefault("hide_state", True)
+    # No tap action either: the card is then its name and its dropdown, not
+    # also a button repeating the name.
+    extra.setdefault("tap_action", {"action": "none"})
     return tile(entity, features=[{"type": "select-options"}], **extra)
 
 
@@ -261,7 +264,6 @@ def brew_view(t: dict) -> dict:
             tile(f"sensor.{E}_brew_status"),
             tile(f"binary_sensor.{E}_in_range", name=t["machine"]),
             # What the picked recipe draws from: the bag, the xPod box or the tea.
-            tile(bag, visibility=[*present(bag), *coffee]),
             tile(f"sensor.{E}_coffee_left", visibility=[*present(f"sensor.{E}_coffee_left"), *coffee]),
             tile(f"select.{E}_xpod_box", visibility=[is_(kind, "xpod"), *present(f"select.{E}_xpod_box")]),
             tile(f"select.{E}_tea", visibility=[is_(kind, "tea"), *present(f"select.{E}_tea")]),
@@ -406,9 +408,9 @@ def brew_view(t: dict) -> dict:
                 f"### {t['this_brew']}\n"
                 f"{{% if wu == 'oz' %}}- **{t['coffee']}:** {{{{ (dose * 0.035274) | round(2) }}}} oz\n"
                 f"- **{t['water']}:** {{{{ (water * 0.033814) | round(1) }}}} oz\n"
-                f"{{% else %}}- **{t['coffee']}:** {{{{ dose | round(1) }}}} {t['g']}\n"
+                f"{{% else %}}- **{t['coffee']}:** {_num('dose')} {t['g']}\n"
                 f"- **{t['water']}:** {{{{ water | round(0) | int }}}} {t['ml']}\n"
-                f"{{% endif %}}- **{t['ratio']}:** 1:{{{{ ratio | round(1) }}}}"
+                f"{{% endif %}}- **{t['ratio']}:** 1:{_num('ratio')}"
             )},
             toggle("input_boolean.xbloom_show_per_pour", name=t["show_per_pour"]),
             {"type": "markdown", "visibility": [is_("input_boolean.xbloom_show_per_pour", "on")], "content": (
@@ -677,9 +679,11 @@ def picked_card(t: dict, picker: str) -> str:
 def recipe_lines(t: dict) -> str:
     """A recipe's dose, ratio, grind and pours, read from `a`."""
     return (
-        f"{{% if a.get('dose_g') %}}**{t['coffee']}:** {{{{ a.get('dose_g') | round(1) }}}} {t['g']}"
-        + f"{{% if a.get('ratio') %}} · **{t['ratio']}:** 1:{{{{ a.get('ratio') | round(1) }}}}{{% endif %}}"
-        + f"{{% if a.get('grind_size') %}} · {t['c_grind']} {{{{ a.get('grind_size') | round(0) | int }}}} {t['c_at']} {{{{ a.get('rpm') }}}} {t['c_rpm']}{{% endif %}}\n\n{{% endif %}}"
+        # Tea is weighed as tea and not ground.
+        "{% set tea = (a.get('cup') or '') | lower == 'tea' %}"
+        + f"{{% if a.get('dose_g') %}}**{{% if tea %}}{t['a_tea']}{{% else %}}{t['coffee']}{{% endif %}}:** {_num("a.get('dose_g')")} {t['g']}"
+        + f"{{% if a.get('ratio') %}} · **{t['ratio']}:** 1:{_num("a.get('ratio')")}{{% endif %}}"
+        + f"{{% if a.get('grind_size') and not tea %}} · {t['c_grind']} {{{{ a.get('grind_size') | round(0) | int }}}} {t['c_at']} {{{{ a.get('rpm') }}}} {t['c_rpm']}{{% endif %}}\n\n{{% endif %}}"
         + f"{{% set pours = a.get('pours') or [] %}}{{% if pours %}}"
         + f"| {t['pour']} | {t['water']} | {t['temp']} | {t['c_pause']} |\n|:--:|:--:|:--:|:--:|\n"
         + "{% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} " + t["ml"]
@@ -693,10 +697,13 @@ def account_card(t: dict, entity: str, with_name: bool = False) -> str:
         ESCAPE
         + f"{{% set a = states['{entity}'].attributes if states['{entity}'] is defined else {{}} %}}"
         + (f"### {{{{ e(states('{entity}')) }}}}\n\n" if with_name else "")
+        + "{% set tea = (a.get('cup') or '') | lower == 'tea' %}"
+        # The app fills an empty field with the word NONE; it is left out.
         + "{% set c = a.get('coffee') or {} %}{% if c.get('name') %}"
-        + f"**{t['a_pod']}:** {{{{ e(c.get('name')) }}}}"
-        + "{% for x in [c.get('origin'), c.get('process'), c.get('varietal')] if x %} · {{ e(x) }}{% endfor %}\n\n"
-        + f"{{% if c.get('flavor') %}}**{t['c_notes']}:** {{{{ e(c.get('flavor')) }}}}\n\n{{% endif %}}{{% endif %}}"
+        + f"**{{% if tea %}}{t['a_tea']}{{% else %}}{t['a_pod']}{{% endif %}}:** {{{{ e(c.get('name')) }}}}"
+        + "{% for x in [c.get('origin'), c.get('process'), c.get('varietal')] if x and (x | upper) != 'NONE' %} · {{ e(x) }}{% endfor %}\n\n"
+        + "{% set notes = c.get('flavor') or '' %}{% if notes and (notes | upper) != 'NONE' %}"
+        + f"**{t['c_notes']}:** {{{{ e(notes | regex_replace('\\s*·\\s*', '{t['sep']}')) }}}}\n\n{{% endif %}}{{% endif %}}"
         + recipe_lines(t)
     )
 
