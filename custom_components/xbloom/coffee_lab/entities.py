@@ -121,6 +121,12 @@ class ActiveBagSelect(CoffeeLabEntity, SelectEntity):
         self._attr_current_option = labels.get(active.id) if active else None
         self._attr_extra_state_attributes = actions.bean_facts(active) if active else {}
 
+    @property
+    def available(self) -> bool:
+        # With nothing of its kind to choose, there is no picker: the Brew tab
+        # then offers the recipe without asking for one.
+        return bool(self._attr_options)
+
     async def async_select_option(self, option: str) -> None:
         await self.lab.async_select(self._ids_by_label[option])
 

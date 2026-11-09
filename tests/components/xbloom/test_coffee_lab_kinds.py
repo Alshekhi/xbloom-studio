@@ -185,3 +185,17 @@ async def test_grams_taken_from_a_tea_by_hand_come_off_the_tea():
     facts = await actions.consume(lab, {"bean_id": tea.id, "grams": 4, "brewer": "Test Teapot"})
     assert (await store.async_get_bean(tea.id)).remaining_g == 46.0
     assert (await store.async_get_bean(coffee.id)).remaining_g == 200.0
+
+
+async def test_a_picker_with_nothing_of_its_kind_is_unavailable():
+    from custom_components.xbloom.coffee_lab.entities import ActiveTeaSelect, ActiveXpodBoxSelect
+    lab, store, coffee = await _lab()
+    box = ActiveXpodBoxSelect(lab)
+    await box.async_read()
+    assert box.available is False, "no box: no picker, and the recipe is offered at once"
+    await store.async_add_bean(name="Test Box", status="open", kind="xpod", pods_left=8)
+    await box.async_read()
+    assert box.available is True
+    tea = ActiveTeaSelect(lab)
+    await tea.async_read()
+    assert tea.available is False

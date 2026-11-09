@@ -210,6 +210,10 @@ def is_(entity: str, state: str) -> dict:
     return {"condition": "state", "entity": entity, "state": state}
 
 
+def is_not(entity: str, state: str) -> dict:
+    return {"condition": "state", "entity": entity, "state_not": state}
+
+
 def not_busy() -> list[dict]:
     return [{"condition": "state", "entity": f"sensor.{E}_brew_status", "state_not": s} for s in BUSY]
 
@@ -232,8 +236,15 @@ def brew_view(t: dict) -> dict:
     bag = f"select.{E}_coffee_bag"
     kind = f"sensor.{E}_recipe_kind"
     manual = "input_boolean.xbloom_show_manual_brew"
+    box, tea = f"select.{E}_xpod_box", f"select.{E}_tea"
     # Shown while the picked recipe draws from a bag of coffee.
     coffee = [{"condition": "state", "entity": kind, "state_not": k} for k in ("xpod", "tea")]
+
+    def kind_or_none(k: str) -> dict:
+        """The picked recipe draws from this kind, or no recipe is picked yet."""
+        return {"condition": "or", "conditions": [
+            is_(kind, k), is_(kind, "unknown"), is_(kind, "unavailable"),
+        ]}
     return {"title": t["view_brew"], "path": "brew", "icon": "mdi:coffee", "type": "sections", "max_columns": 2, "sections": [
         section(t["h_now"], [
             tile(f"sensor.{E}_brew_status"),
@@ -290,13 +301,15 @@ def brew_view(t: dict) -> dict:
         section(t["h_bag"], [
             # The picker for what the picked recipe draws from: a bag of
             # coffee, an xPod box, or a tea.
+            # Before a recipe is picked, every kind there is to choose from
+            # shows, so a box or a tea can be chosen first too.
             select(bag, visibility=coffee),
-            select(f"select.{E}_xpod_box", visibility=[is_(kind, "xpod")]),
+            select(box, visibility=[kind_or_none("xpod"), is_not(box, "unavailable")]),
             {"type": "markdown", "text_only": True, "content": (
-                "{% set n = state_attr('select." + E + "_xpod_box', 'pods_left') %}"
+                "{% set n = state_attr('" + box + "', 'pods_left') %}"
                 "{% if n is not none %}" + t["pods_left"].replace("{n}", "{{ n }}") + "{% endif %}"
-            ), "visibility": [is_(kind, "xpod"), *present(f"select.{E}_xpod_box")]},
-            select(f"select.{E}_tea", visibility=[is_(kind, "tea")]),
+            ), "visibility": [kind_or_none("xpod"), *present(box)]},
+            select(tea, visibility=[kind_or_none("tea"), is_not(tea, "unavailable")]),
             {"type": "markdown", "content": (
                 "{% set a = states['" + bag + "'].attributes if states['" + bag + "'] else {} %}"
                 "{{ [a.get('roaster'), [a.get('country'), a.get('region')] | select | join('" + t["sep"] + "'), a.get('process'), a.get('varietal'), a.get('roast')]"
@@ -320,8 +333,15 @@ def brew_view(t: dict) -> dict:
             press(f"button.{E}_use_suggested_recipe", name=t["s_use"],
                   visibility=present(f"select.{E}_suggested_recipe")),
         ], [*present(bag), *at_home()]),
+        # With Coffee Lab on, the recipe is offered once what it draws from is
+        # chosen — or when there is nothing to choose, or a recipe is already
+        # picked (from a suggestion, an assistant or an automation).
         section(t["h_brew"], [
-            select(f"select.{E}_recipe"),
+            select(f"select.{E}_recipe", visibility=[{"condition": "or", "conditions": [
+                is_(bag, "unavailable"),
+                {"condition": "and", "conditions": present(f"select.{E}_recipe")},
+                *({"condition": "and", "conditions": present(item)} for item in (bag, box, tea)),
+            ]}]),
             # What was asked for last time with this bag; one press sets it as
             # this brew's adjustment, the saved recipe untouched.
             {"type": "markdown", "text_only": True, "content": next_change_card(t),

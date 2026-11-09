@@ -43,8 +43,13 @@ takes: a coffee brew takes its dose from **Coffee bag**, an xPod brew takes
 **one pod** from **xPod box**, and a tea brew takes its grams from **Tea**.
 An xPod or tea brew is never charged to a bag of coffee, and with nothing of
 its kind in use it is recorded against nothing. Only a coffee recipe needs a
-bag chosen before it is prepared; the Brew tab shows the picker the picked
-recipe needs.
+bag chosen before it is prepared.
+
+On the Brew tab, what you brew from comes first: the bag, and the xPod box or
+tea when there are any. The recipe is offered once one is chosen, or at once
+when there is nothing to choose, or when a recipe was already picked from a
+suggestion, an assistant or an automation. Once a recipe is picked, only the
+picker for what it draws from stays.
 
 A box is counted in **pods** — give how many it holds when adding it — and is
 finished when the last is used. When the machine reads a pod's recipe card
