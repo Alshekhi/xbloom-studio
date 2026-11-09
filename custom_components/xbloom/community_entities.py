@@ -39,6 +39,7 @@ def entities_for(entry, platform: str) -> list:
             CommunityRecipeSelect(browser),
             SuggestedRecipeSelect(browser),
             DrinkSelect(browser, entry),
+            CommunityListSelect(browser),
             AccountRecipeSelect(browser, "trending"),
             AccountRecipeSelect(browser, "tea"),
         ],
@@ -374,6 +375,44 @@ class RecipeSuggestionsSensor(_CommunityEntity, SensorEntity):
 
 
 # ── The app's Recipes tab, for a signed-in account ──────────────────────────
+
+
+# What the Community tab shows, one list at a time. The account's lists need
+# a sign-in; searching the hub does not.
+COMMUNITY_LISTS = ("for_you", "trending", "tea", "search")
+
+
+class CommunityListSelect(_CommunityEntity, SelectEntity, RestoreEntity):
+    """Which list the Community tab shows: For You, Trending, Tea or a search.
+
+    Signed out only the search is offered, and it is what is shown.
+    """
+
+    _attr_translation_key = "community_list"
+    _attr_unique_id = "xbloom_community_list"
+    _attr_icon = "mdi:view-list"
+
+    def __init__(self, browser: CommunityBrowser) -> None:
+        super().__init__(browser)
+        self._choice = COMMUNITY_LISTS[0]
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        if last is not None and last.state in COMMUNITY_LISTS:
+            self._choice = last.state
+
+    @property
+    def options(self) -> list[str]:
+        return list(COMMUNITY_LISTS) if self._browser.signed_in else ["search"]
+
+    @property
+    def current_option(self) -> str:
+        return self._choice if self._choice in self.options else self.options[0]
+
+    async def async_select_option(self, option: str) -> None:
+        self._choice = option
+        self.async_write_ha_state()
 
 
 class _AccountEntity(_CommunityEntity):

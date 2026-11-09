@@ -27,11 +27,13 @@ works); signed out, in the local library.
 
 Signed in, the **Community** tab offers what the xBloom app's Recipes tab
 offers the account — chosen by xBloom for it, so its country's roasters and
-pods: **For You**, one recipe at a time, with **Another** to ask for a
-different one; **Trending Recipes**; and **Tea Recipes**. Each shows the
-recipe and, for a pod, its coffee, and **Add** puts it in your recipe
-library. xPod recipes are marked as such and shown unless **Show xPod
-Recipes** is turned off. Signed out, these are not shown.
+pods. **Browse** picks the list shown: **For You**, one recipe at a time,
+with **Another Suggestion** to ask for a different one; **Trending**;
+**Tea**; or a search of the community hub. Each shows the recipe and, for a
+pod, its coffee, with its pours folded under **Pours and notes**, and **Add**
+puts it in your recipe library. xPod recipes are marked as such and shown
+unless **Show xPod Recipes** is turned off. Signed out, only the search is
+offered.
 
 ### The community hub
 

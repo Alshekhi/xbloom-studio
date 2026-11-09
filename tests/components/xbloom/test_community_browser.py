@@ -155,8 +155,9 @@ def test_every_platform_gets_its_entities_and_nothing_without_a_browser():
         "SuggestRecipeButton", "UseSuggestedRecipeButton", "AnotherForYouButton",
         "AddAccountRecipeButton", "AddAccountRecipeButton", "AddAccountRecipeButton",
     ]
-    assert [type(e).__name__ for e in ce.entities_for(entry, "select")][-4:] == [
-        "SuggestedRecipeSelect", "DrinkSelect", "AccountRecipeSelect", "AccountRecipeSelect",
+    assert [type(e).__name__ for e in ce.entities_for(entry, "select")][-5:] == [
+        "SuggestedRecipeSelect", "DrinkSelect", "CommunityListSelect",
+        "AccountRecipeSelect", "AccountRecipeSelect",
     ]
     assert [type(e).__name__ for e in ce.entities_for(entry, "switch")] == ["ShowXpodRecipesSwitch"]
     entry.runtime_data.community = None
@@ -521,3 +522,17 @@ async def test_choosing_a_drink_suggests_again_for_the_bag_in_use_from_its_own_r
         await tasks[0]
     assert seen == [["Mine Iced"]]
     assert client.search.await_args.kwargs["page_size"] == cm.ICED_POOL
+
+
+async def test_browse_offers_the_accounts_lists_only_signed_in():
+    browser = MagicMock(signed_in=True)
+    select = ce.CommunityListSelect(browser)
+    select.async_write_ha_state = MagicMock()
+    assert select.options == ["for_you", "trending", "tea", "search"]
+    assert select.current_option == "for_you"
+    await select.async_select_option("tea")
+    assert select.current_option == "tea"
+    browser.signed_in = False
+    assert select.options == ["search"] and select.current_option == "search"
+    browser.signed_in = True
+    assert select.current_option == "tea"

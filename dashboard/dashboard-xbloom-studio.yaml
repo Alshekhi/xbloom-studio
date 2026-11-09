@@ -1291,9 +1291,23 @@ views:
   sections:
   - type: grid
     cards:
-    - type: markdown
-      text_only: true
-      content: '## For you'
+    - type: tile
+      entity: select.xbloom_studio_browse
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+      hide_state: true
+      tap_action:
+        action: none
+    visibility:
+    - condition: state
+      entity: button.xbloom_studio_refresh_recipes
+      state_not: unavailable
+  - type: grid
+    cards:
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''sensor.xbloom_studio_for_you''].attributes if
@@ -1319,26 +1333,7 @@ views:
         endif %}
 
 
-        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause
-        |
-
-        |:--:|:--:|:--:|:--:|
-
-        {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} ml | {{ p.temperature_c
-        | round(0) | int }}°C | {{ p.pause_s | int(0) }} s |
-
-        {% endfor %}{% endif %}'
-    - type: tile
-      entity: button.xbloom_studio_another_for_you
-      name: Another
-      icon_tap_action:
-        action: none
-      hide_state: true
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.xbloom_studio_another_for_you
+        {% endif %}'
     - type: tile
       entity: button.xbloom_studio_add_for_you_recipe
       name: Add to my recipes
@@ -1352,7 +1347,39 @@ views:
           entity_id: button.xbloom_studio_add_for_you_recipe
         confirmation:
           text: Add this recipe to your library?
+    - type: tile
+      entity: button.xbloom_studio_another_for_you
+      name: Another suggestion
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_another_for_you
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = states[''sensor.xbloom_studio_for_you''].attributes if
+        states[''sensor.xbloom_studio_for_you''] is defined else {} %}{% if a.get(''pours'') or a.get(''description'')
+        %}<details><summary>Pours and notes</summary>
+
+
+        {% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause |
+
+        |:--:|:--:|:--:|:--:|
+
+        {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} ml | {{ p.temperature_c
+        | round(0) | int }}°C | {{ p.pause_s | int(0) }} s |
+
+        {% endfor %}{% endif %}
+
+
+        </details>{% endif %}'
     visibility:
+    - condition: state
+      entity: select.xbloom_studio_browse
+      state: for_you
     - condition: state
       entity: sensor.xbloom_studio_for_you
       state_not: unavailable
@@ -1361,9 +1388,6 @@ views:
       state_not: unknown
   - type: grid
     cards:
-    - type: markdown
-      text_only: true
-      content: '## Trending recipes'
     - type: tile
       entity: select.xbloom_studio_trending_recipes
       name: Recipe
@@ -1371,9 +1395,36 @@ views:
         action: none
       features:
       - type: select-options
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unknown
       hide_state: true
       tap_action:
         action: none
+    - type: tile
+      entity: button.xbloom_studio_add_trending_recipe
+      name: Add to my recipes
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_trending_recipe
+        confirmation:
+          text: Add this recipe to your library?
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unknown
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_trending_recipes''].attributes
@@ -1396,37 +1447,39 @@ views:
         endif %}
 
 
-        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause
-        |
+        {% endif %}'
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unknown
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_trending_recipes''].attributes
+        if states[''select.xbloom_studio_trending_recipes''] is defined else {} %}{% if a.get(''pours'')
+        or a.get(''description'') %}<details><summary>Pours and notes</summary>
+
+
+        {% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause |
 
         |:--:|:--:|:--:|:--:|
 
         {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} ml | {{ p.temperature_c
         | round(0) | int }}°C | {{ p.pause_s | int(0) }} s |
 
-        {% endfor %}{% endif %}'
-    - type: tile
-      entity: button.xbloom_studio_add_trending_recipe
-      name: Add to my recipes
-      icon_tap_action:
-        action: none
-      hide_state: true
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.xbloom_studio_add_trending_recipe
-        confirmation:
-          text: Add this recipe to your library?
-    visibility:
-    - condition: state
-      entity: select.xbloom_studio_trending_recipes
-      state_not: unavailable
-    - condition: state
-      entity: select.xbloom_studio_trending_recipes
-      state_not: unknown
-  - type: grid
-    cards:
+        {% endfor %}{% endif %}
+
+
+        </details>{% endif %}'
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unknown
     - type: tile
       entity: switch.xbloom_studio_show_xpod_recipes
       name:
@@ -1437,13 +1490,10 @@ views:
         action: toggle
     visibility:
     - condition: state
-      entity: button.xbloom_studio_refresh_recipes
-      state_not: unavailable
+      entity: select.xbloom_studio_browse
+      state: trending
   - type: grid
     cards:
-    - type: markdown
-      text_only: true
-      content: '## Tea recipes'
     - type: tile
       entity: select.xbloom_studio_tea_recipes
       name: Recipe
@@ -1454,6 +1504,19 @@ views:
       hide_state: true
       tap_action:
         action: none
+    - type: tile
+      entity: button.xbloom_studio_add_tea_recipe
+      name: Add to my recipes
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_tea_recipe
+        confirmation:
+          text: Add this recipe to your library?
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_tea_recipes''].attributes
@@ -1476,29 +1539,29 @@ views:
         endif %}
 
 
-        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause
-        |
+        {% endif %}'
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_tea_recipes''].attributes
+        if states[''select.xbloom_studio_tea_recipes''] is defined else {} %}{% if a.get(''pours'') or
+        a.get(''description'') %}<details><summary>Pours and notes</summary>
+
+
+        {% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause |
 
         |:--:|:--:|:--:|:--:|
 
         {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} ml | {{ p.temperature_c
         | round(0) | int }}°C | {{ p.pause_s | int(0) }} s |
 
-        {% endfor %}{% endif %}'
-    - type: tile
-      entity: button.xbloom_studio_add_tea_recipe
-      name: Add to my recipes
-      icon_tap_action:
-        action: none
-      hide_state: true
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.xbloom_studio_add_tea_recipe
-        confirmation:
-          text: Add this recipe to your library?
+        {% endfor %}{% endif %}
+
+
+        </details>{% endif %}'
     visibility:
+    - condition: state
+      entity: select.xbloom_studio_browse
+      state: tea
     - condition: state
       entity: select.xbloom_studio_tea_recipes
       state_not: unavailable
@@ -1507,9 +1570,6 @@ views:
       state_not: unknown
   - type: grid
     cards:
-    - type: markdown
-      text_only: true
-      content: '## Find a community recipe'
     - type: tile
       entity: select.xbloom_studio_drink
       name:
@@ -1583,8 +1643,8 @@ views:
         state_not: unknown
     visibility:
     - condition: state
-      entity: text.xbloom_studio_community_search
-      state_not: unavailable
+      entity: select.xbloom_studio_browse
+      state: search
   - type: grid
     cards:
     - type: markdown
@@ -1600,15 +1660,26 @@ views:
       hide_state: true
       tap_action:
         action: none
-    visibility:
-    - condition: numeric_state
-      entity: sensor.xbloom_studio_community_matches
-      above: 0
-  - type: grid
-    cards:
-    - type: markdown
-      text_only: true
-      content: '## Chosen recipe'
+    - type: tile
+      entity: button.xbloom_studio_add_community_recipe
+      name: Add to my recipes
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_community_recipe
+        confirmation:
+          text: Add this recipe to your library?
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_community_recipe
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_community_recipe
+        state_not: unknown
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = state_attr(''select.xbloom_studio_community_recipe'',
@@ -1642,15 +1713,30 @@ views:
         | join('', '') }}
 
 
-        {% endif %}{% if a.get(''description'') %}{{ e(a.get(''description'')) }}
-
-
         {% endif %}{% set tea = (a.get(''cup'') or '''') | lower == ''tea'' %}{% if a.get(''dose_g'')
         %}**{% if tea %}Tea{% else %}Coffee{% endif %}:** {{ (a.get(''dose_g'') | float) | round(1) |
         string | replace(''.0'', '''') }} g{% if a.get(''ratio'') %}, **Ratio:** 1:{{ (a.get(''ratio'')
         | float) | round(1) | string | replace(''.0'', '''') }}{% endif %}{% if a.get(''grind_size'')
         and not tea %}, grind {{ a.get(''grind_size'') | round(0) | int }} at {{ a.get(''rpm'') }} RPM{%
         endif %}
+
+
+        {% endif %}'
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_community_recipe
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_community_recipe
+        state_not: unknown
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = state_attr(''select.xbloom_studio_community_recipe'',
+        ''picked'') or {} %}{% if a.get(''pours'') or a.get(''description'') %}<details><summary>Pours
+        and notes</summary>
+
+
+        {% if a.get(''description'') %}{{ e(a.get(''description'')) }}
 
 
         {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause
@@ -1661,30 +1747,24 @@ views:
         {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} ml | {{ p.temperature_c
         | round(0) | int }}°C | {{ p.pause_s | int(0) }} s |
 
-        {% endfor %}{% endif %}'
-    - type: tile
-      entity: button.xbloom_studio_add_community_recipe
-      name: Add to my recipes
-      icon_tap_action:
-        action: none
-      hide_state: true
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.xbloom_studio_add_community_recipe
-        confirmation:
-          text: Add this recipe to your library?
+        {% endfor %}{% endif %}
+
+
+        </details>{% endif %}'
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_community_recipe
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_community_recipe
+        state_not: unknown
     visibility:
+    - condition: state
+      entity: select.xbloom_studio_browse
+      state: search
     - condition: numeric_state
       entity: sensor.xbloom_studio_community_matches
       above: 0
-    - condition: state
-      entity: select.xbloom_studio_community_recipe
-      state_not: unavailable
-    - condition: state
-      entity: select.xbloom_studio_community_recipe
-      state_not: unknown
 - title: xBloom
   path: xbloom
   icon: mdi:coffee-maker

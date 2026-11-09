@@ -1292,9 +1292,23 @@ views:
   sections:
   - type: grid
     cards:
-    - type: markdown
-      text_only: true
-      content: '## مقترحة لك'
+    - type: tile
+      entity: select.xbloom_studio_browse
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+      hide_state: true
+      tap_action:
+        action: none
+    visibility:
+    - condition: state
+      entity: button.xbloom_studio_refresh_recipes
+      state_not: unavailable
+  - type: grid
+    cards:
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''sensor.xbloom_studio_for_you''].attributes if
@@ -1320,26 +1334,7 @@ views:
         }} دورة في الدقيقة{% endif %}
 
 
-        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| الصبة | الماء | الحرارة | الانتظار
-        |
-
-        |:--:|:--:|:--:|:--:|
-
-        {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} مل | {{ p.temperature_c
-        | round(0) | int }}°C | {{ p.pause_s | int(0) }} ث |
-
-        {% endfor %}{% endif %}'
-    - type: tile
-      entity: button.xbloom_studio_another_for_you
-      name: اقتراح آخر
-      icon_tap_action:
-        action: none
-      hide_state: true
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.xbloom_studio_another_for_you
+        {% endif %}'
     - type: tile
       entity: button.xbloom_studio_add_for_you_recipe
       name: أضفها إلى وصفاتي
@@ -1353,7 +1348,39 @@ views:
           entity_id: button.xbloom_studio_add_for_you_recipe
         confirmation:
           text: إضافة هذه الوصفة إلى مكتبتك؟
+    - type: tile
+      entity: button.xbloom_studio_another_for_you
+      name: اقتراح آخر
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_another_for_you
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = states[''sensor.xbloom_studio_for_you''].attributes if
+        states[''sensor.xbloom_studio_for_you''] is defined else {} %}{% if a.get(''pours'') or a.get(''description'')
+        %}<details><summary>الصبات والملاحظات</summary>
+
+
+        {% set pours = a.get(''pours'') or [] %}{% if pours %}| الصبة | الماء | الحرارة | الانتظار |
+
+        |:--:|:--:|:--:|:--:|
+
+        {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} مل | {{ p.temperature_c
+        | round(0) | int }}°C | {{ p.pause_s | int(0) }} ث |
+
+        {% endfor %}{% endif %}
+
+
+        </details>{% endif %}'
     visibility:
+    - condition: state
+      entity: select.xbloom_studio_browse
+      state: for_you
     - condition: state
       entity: sensor.xbloom_studio_for_you
       state_not: unavailable
@@ -1362,9 +1389,6 @@ views:
       state_not: unknown
   - type: grid
     cards:
-    - type: markdown
-      text_only: true
-      content: '## الوصفات الرائجة'
     - type: tile
       entity: select.xbloom_studio_trending_recipes
       name: الوصفة
@@ -1372,9 +1396,36 @@ views:
         action: none
       features:
       - type: select-options
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unknown
       hide_state: true
       tap_action:
         action: none
+    - type: tile
+      entity: button.xbloom_studio_add_trending_recipe
+      name: أضفها إلى وصفاتي
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_trending_recipe
+        confirmation:
+          text: إضافة هذه الوصفة إلى مكتبتك؟
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unknown
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_trending_recipes''].attributes
@@ -1397,37 +1448,39 @@ views:
         }} دورة في الدقيقة{% endif %}
 
 
-        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| الصبة | الماء | الحرارة | الانتظار
-        |
+        {% endif %}'
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unknown
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_trending_recipes''].attributes
+        if states[''select.xbloom_studio_trending_recipes''] is defined else {} %}{% if a.get(''pours'')
+        or a.get(''description'') %}<details><summary>الصبات والملاحظات</summary>
+
+
+        {% set pours = a.get(''pours'') or [] %}{% if pours %}| الصبة | الماء | الحرارة | الانتظار |
 
         |:--:|:--:|:--:|:--:|
 
         {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} مل | {{ p.temperature_c
         | round(0) | int }}°C | {{ p.pause_s | int(0) }} ث |
 
-        {% endfor %}{% endif %}'
-    - type: tile
-      entity: button.xbloom_studio_add_trending_recipe
-      name: أضفها إلى وصفاتي
-      icon_tap_action:
-        action: none
-      hide_state: true
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.xbloom_studio_add_trending_recipe
-        confirmation:
-          text: إضافة هذه الوصفة إلى مكتبتك؟
-    visibility:
-    - condition: state
-      entity: select.xbloom_studio_trending_recipes
-      state_not: unavailable
-    - condition: state
-      entity: select.xbloom_studio_trending_recipes
-      state_not: unknown
-  - type: grid
-    cards:
+        {% endfor %}{% endif %}
+
+
+        </details>{% endif %}'
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_trending_recipes
+        state_not: unknown
     - type: tile
       entity: switch.xbloom_studio_show_xpod_recipes
       name:
@@ -1438,13 +1491,10 @@ views:
         action: toggle
     visibility:
     - condition: state
-      entity: button.xbloom_studio_refresh_recipes
-      state_not: unavailable
+      entity: select.xbloom_studio_browse
+      state: trending
   - type: grid
     cards:
-    - type: markdown
-      text_only: true
-      content: '## وصفات الشاي'
     - type: tile
       entity: select.xbloom_studio_tea_recipes
       name: الوصفة
@@ -1455,6 +1505,19 @@ views:
       hide_state: true
       tap_action:
         action: none
+    - type: tile
+      entity: button.xbloom_studio_add_tea_recipe
+      name: أضفها إلى وصفاتي
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_tea_recipe
+        confirmation:
+          text: إضافة هذه الوصفة إلى مكتبتك؟
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_tea_recipes''].attributes
@@ -1477,29 +1540,29 @@ views:
         }} دورة في الدقيقة{% endif %}
 
 
-        {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| الصبة | الماء | الحرارة | الانتظار
-        |
+        {% endif %}'
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_tea_recipes''].attributes
+        if states[''select.xbloom_studio_tea_recipes''] is defined else {} %}{% if a.get(''pours'') or
+        a.get(''description'') %}<details><summary>الصبات والملاحظات</summary>
+
+
+        {% set pours = a.get(''pours'') or [] %}{% if pours %}| الصبة | الماء | الحرارة | الانتظار |
 
         |:--:|:--:|:--:|:--:|
 
         {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} مل | {{ p.temperature_c
         | round(0) | int }}°C | {{ p.pause_s | int(0) }} ث |
 
-        {% endfor %}{% endif %}'
-    - type: tile
-      entity: button.xbloom_studio_add_tea_recipe
-      name: أضفها إلى وصفاتي
-      icon_tap_action:
-        action: none
-      hide_state: true
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.xbloom_studio_add_tea_recipe
-        confirmation:
-          text: إضافة هذه الوصفة إلى مكتبتك؟
+        {% endfor %}{% endif %}
+
+
+        </details>{% endif %}'
     visibility:
+    - condition: state
+      entity: select.xbloom_studio_browse
+      state: tea
     - condition: state
       entity: select.xbloom_studio_tea_recipes
       state_not: unavailable
@@ -1508,9 +1571,6 @@ views:
       state_not: unknown
   - type: grid
     cards:
-    - type: markdown
-      text_only: true
-      content: '## البحث عن وصفة من المجتمع'
     - type: tile
       entity: select.xbloom_studio_drink
       name:
@@ -1585,8 +1645,8 @@ views:
         state_not: unknown
     visibility:
     - condition: state
-      entity: text.xbloom_studio_community_search
-      state_not: unavailable
+      entity: select.xbloom_studio_browse
+      state: search
   - type: grid
     cards:
     - type: markdown
@@ -1602,15 +1662,26 @@ views:
       hide_state: true
       tap_action:
         action: none
-    visibility:
-    - condition: numeric_state
-      entity: sensor.xbloom_studio_community_matches
-      above: 0
-  - type: grid
-    cards:
-    - type: markdown
-      text_only: true
-      content: '## الوصفة المختارة'
+    - type: tile
+      entity: button.xbloom_studio_add_community_recipe
+      name: أضفها إلى وصفاتي
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_add_community_recipe
+        confirmation:
+          text: إضافة هذه الوصفة إلى مكتبتك؟
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_community_recipe
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_community_recipe
+        state_not: unknown
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = state_attr(''select.xbloom_studio_community_recipe'',
@@ -1643,15 +1714,30 @@ views:
         | select | join(''، '') }}
 
 
-        {% endif %}{% if a.get(''description'') %}{{ e(a.get(''description'')) }}
-
-
         {% endif %}{% set tea = (a.get(''cup'') or '''') | lower == ''tea'' %}{% if a.get(''dose_g'')
         %}**{% if tea %}الشاي{% else %}القهوة{% endif %}:** {{ (a.get(''dose_g'') | float) | round(1)
         | string | replace(''.0'', '''') }} غ{% if a.get(''ratio'') %}، **النسبة:** 1:{{ (a.get(''ratio'')
         | float) | round(1) | string | replace(''.0'', '''') }}{% endif %}{% if a.get(''grind_size'')
         and not tea %}، درجة الطحن {{ a.get(''grind_size'') | round(0) | int }} بسرعة {{ a.get(''rpm'')
         }} دورة في الدقيقة{% endif %}
+
+
+        {% endif %}'
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_community_recipe
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_community_recipe
+        state_not: unknown
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = state_attr(''select.xbloom_studio_community_recipe'',
+        ''picked'') or {} %}{% if a.get(''pours'') or a.get(''description'') %}<details><summary>الصبات
+        والملاحظات</summary>
+
+
+        {% if a.get(''description'') %}{{ e(a.get(''description'')) }}
 
 
         {% endif %}{% set pours = a.get(''pours'') or [] %}{% if pours %}| الصبة | الماء | الحرارة | الانتظار
@@ -1662,30 +1748,24 @@ views:
         {% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} مل | {{ p.temperature_c
         | round(0) | int }}°C | {{ p.pause_s | int(0) }} ث |
 
-        {% endfor %}{% endif %}'
-    - type: tile
-      entity: button.xbloom_studio_add_community_recipe
-      name: أضفها إلى وصفاتي
-      icon_tap_action:
-        action: none
-      hide_state: true
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.xbloom_studio_add_community_recipe
-        confirmation:
-          text: إضافة هذه الوصفة إلى مكتبتك؟
+        {% endfor %}{% endif %}
+
+
+        </details>{% endif %}'
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_community_recipe
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_community_recipe
+        state_not: unknown
     visibility:
+    - condition: state
+      entity: select.xbloom_studio_browse
+      state: search
     - condition: numeric_state
       entity: sensor.xbloom_studio_community_matches
       above: 0
-    - condition: state
-      entity: select.xbloom_studio_community_recipe
-      state_not: unavailable
-    - condition: state
-      entity: select.xbloom_studio_community_recipe
-      state_not: unknown
 - title: xBloom
   path: xbloom
   icon: mdi:coffee-maker

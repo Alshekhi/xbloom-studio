@@ -50,11 +50,11 @@ TEXT = {
         "not_tracked": "not tracked", "no_bags": "No open or unopened bags.",
         "speak_brew": "Speak brew progress", "speak_faults": "Speak machine faults",
         "speak_live": "Speak live readings",
-        "view_community": "Community", "h_find": "Find a community recipe",
-        "h_results": "Matching recipes", "h_picked": "Chosen recipe",
+        "view_community": "Community",
+        "h_results": "Matching recipes",
         "c_words": "Search words", "c_origin": "Origin", "c_sort": "Sort", "c_search": "Search",
         "c_recipe": "Recipe", "c_add": "Add to my recipes",
-        "c_confirm_add": "Add this recipe to your library?",
+        "c_confirm_add": "Add this recipe to your library?", "c_details": "Pours and notes",
         "c_none": "No recipes match.", "c_one": "1 recipe matches.",
         "c_many": "{n} recipes match.", "c_first": "The first {shown} are in the list below.",
         "c_by": "Shared by", "c_notes": "Tasting notes", "c_grind": "grind", "c_at": "at",
@@ -63,8 +63,7 @@ TEXT = {
         "f_roast": "roast", "f_flavor": "tasting notes",
         "c_added": "Added to your recipes as **{name}**. Pick it on the Brew tab.",
         "c_suggest": "Suggest a recipe", "c_suggest_hub": "Suggest a community recipe",
-        "h_for_you": "For you", "h_trending": "Trending recipes", "h_tea": "Tea recipes",
-        "a_another": "Another", "a_pod": "Pod", "a_tea": "Tea",
+        "a_another": "Another suggestion", "a_pod": "Pod", "a_tea": "Tea",
         "h_how_was": "How was it?", "r_verdict": "Verdict", "r_issue": "What was wrong", "w_which": "{recipe} with {bag}",
         "n_grind": "grind {value}", "n_ratio": "ratio 1:{value}", "n_dose": "{value} g of coffee",
         "v_wanted": "Last time you wanted: {text}.", "v_use": "Use that change",
@@ -121,11 +120,11 @@ TEXT = {
         "not_tracked": "غير متتبع", "no_bags": "لا توجد أكياس مفتوحة أو غير مفتوحة.",
         "speak_brew": "إعلان سير التحضير", "speak_faults": "إعلان أعطال الماكينة",
         "speak_live": "إعلان القراءات المباشرة",
-        "view_community": "المجتمع", "h_find": "البحث عن وصفة من المجتمع",
-        "h_results": "الوصفات المطابقة", "h_picked": "الوصفة المختارة",
+        "view_community": "المجتمع",
+        "h_results": "الوصفات المطابقة",
         "c_words": "كلمات البحث", "c_origin": "المنشأ", "c_sort": "الترتيب", "c_search": "ابحث",
         "c_recipe": "الوصفة", "c_add": "أضفها إلى وصفاتي",
-        "c_confirm_add": "إضافة هذه الوصفة إلى مكتبتك؟",
+        "c_confirm_add": "إضافة هذه الوصفة إلى مكتبتك؟", "c_details": "الصبات والملاحظات",
         "c_none": "لا توجد وصفات مطابقة.", "c_one": "وصفة واحدة تطابق البحث.",
         "c_many": "{n} وصفات تطابق البحث.", "c_first": "أول {shown} منها في القائمة أدناه.",
         "c_by": "شاركها", "c_notes": "النكهات", "c_grind": "درجة الطحن", "c_at": "بسرعة",
@@ -134,7 +133,7 @@ TEXT = {
         "f_roast": "درجة التحميص", "f_flavor": "النكهات",
         "c_added": "أضيفت إلى وصفاتك باسم **{name}**. اخترها من تبويب التحضير.",
         "c_suggest": "اقترح وصفة", "c_suggest_hub": "اقترح وصفة من المجتمع",
-        "h_for_you": "مقترحة لك", "h_trending": "الوصفات الرائجة", "h_tea": "وصفات الشاي",
+       
         "a_another": "اقتراح آخر", "a_pod": "الكبسولة", "a_tea": "الشاي",
         "h_how_was": "كيف كانت؟", "r_verdict": "الحكم", "r_issue": "ما المشكلة", "w_which": "{recipe} مع {bag}",
         "n_grind": "درجة طحن {value}", "n_ratio": "نسبة 1:{value}", "n_dose": "{value} غ من البن",
@@ -683,20 +682,35 @@ def picked_card(t: dict, picker: str) -> str:
         + "{{ [" + ", ".join(
             f"('{t['f_' + f]}' if fits.get('{f}') else '')" for f in ("process", "varietal", "roast", "flavor")
         ) + "] | select | join('" + t["sep"] + "') }}\n\n{% endif %}"
-        + "{% if a.get('description') %}{{ e(a.get('description')) }}\n\n{% endif %}"
-        + recipe_lines(t)
+        + dose_line(t)
     )
+
+
+def picked_details(t: dict, picker: str) -> dict:
+    return folded(t, f"state_attr('{picker}', 'picked') or {{}}",
+                  "{% if a.get('description') %}{{ e(a.get('description')) }}\n\n{% endif %}" + pour_table(t))
 
 
 def recipe_lines(t: dict) -> str:
     """A recipe's dose, ratio, grind and pours, read from `a`."""
+    return dose_line(t) + pour_table(t)
+
+
+def dose_line(t: dict) -> str:
+    """A recipe's dose, ratio and grind, read from `a`."""
     return (
         # Tea is weighed as tea and not ground.
         "{% set tea = (a.get('cup') or '') | lower == 'tea' %}"
         + f"{{% if a.get('dose_g') %}}**{{% if tea %}}{t['a_tea']}{{% else %}}{t['coffee']}{{% endif %}}:** {_num("a.get('dose_g')")} {t['g']}"
         + f"{{% if a.get('ratio') %}} · **{t['ratio']}:** 1:{_num("a.get('ratio')")}{{% endif %}}"
         + f"{{% if a.get('grind_size') and not tea %}} · {t['c_grind']} {{{{ a.get('grind_size') | round(0) | int }}}} {t['c_at']} {{{{ a.get('rpm') }}}} {t['c_rpm']}{{% endif %}}\n\n{{% endif %}}"
-        + f"{{% set pours = a.get('pours') or [] %}}{{% if pours %}}"
+    )
+
+
+def pour_table(t: dict) -> str:
+    """A recipe's pours as a table, read from `a`."""
+    return (
+        f"{{% set pours = a.get('pours') or [] %}}{{% if pours %}}"
         + f"| {t['pour']} | {t['water']} | {t['temp']} | {t['c_pause']} |\n|:--:|:--:|:--:|:--:|\n"
         + "{% for p in pours %}| {{ loop.index }} | {{ p.volume_ml | round(0) | int }} " + t["ml"]
         + " | {{ p.temperature_c | round(0) | int }}°C | {{ p.pause_s | int(0) }} " + t["c_s"] + " |\n{% endfor %}{% endif %}"
@@ -716,8 +730,25 @@ def account_card(t: dict, entity: str, with_name: bool = False) -> str:
         + "{% for x in [c.get('origin'), c.get('process'), c.get('varietal')] if x and (x | upper) != 'NONE' %} · {{ e(x) }}{% endfor %}\n\n"
         + "{% set notes = c.get('flavor') or '' %}{% if notes and (notes | upper) != 'NONE' %}"
         + f"**{t['c_notes']}:** {{{{ e(notes | regex_replace('\\s*·\\s*', '{t['sep']}')) }}}}\n\n{{% endif %}}{{% endif %}}"
-        + recipe_lines(t)
+        + dose_line(t)
     )
+
+
+def folded(t: dict, attrs: str, body: str) -> dict:
+    """A recipe's pours (and description), folded until opened.
+
+    A disclosure: announced as collapsed or expanded, opened in place, so the
+    recipe's name and its Add button stay a short swipe apart.
+    """
+    return {"type": "markdown", "content": (
+        ESCAPE + "{% set a = " + attrs + " %}"
+        + "{% if a.get('pours') or a.get('description') %}"
+        + f"<details><summary>{t['c_details']}</summary>\n\n" + body + "\n\n</details>{% endif %}"
+    )}
+
+
+def account_details(t: dict, entity: str) -> dict:
+    return folded(t, f"states['{entity}'].attributes if states['{entity}'] is defined else {{}}", pour_table(t))
 
 
 def _num(expr: str) -> str:
@@ -836,30 +867,41 @@ def community_view(t: dict) -> dict:
     picker = f"select.{E}_community_recipe"
     trending, tea = f"select.{E}_trending_recipes", f"select.{E}_tea_recipes"
     for_you = f"sensor.{E}_for_you"
+    browse = f"select.{E}_browse"
+    signed_in = is_not(f"button.{E}_refresh_recipes", "unavailable")
+    showing = lambda name: is_(browse, name)  # noqa: E731
     return {"title": t["view_community"], "path": "community", "icon": "mdi:account-group",
             "type": "sections", "max_columns": 2, "sections": [
-        # Signed in to the xBloom account: what the app's Recipes tab offers
-        # it. Signed out, these entities are unavailable and the sections hidden.
-        section(t["h_for_you"], [
+        # One list at a time, chosen here; the menu names it, so no heading
+        # repeats it. Signed out only the search is offered, and the menu,
+        # with nothing to choose, is hidden.
+        {"type": "grid", "cards": [select(browse)], "visibility": [signed_in]},
+        # In each list: what the recipe is, then Add, then its pours folded,
+        # so Add is a swipe or two away, not past a table.
+        {"type": "grid", "cards": [
             {"type": "markdown", "content": account_card(t, for_you, with_name=True)},
-            press(f"button.{E}_another_for_you", name=t["a_another"]),
             press(f"button.{E}_add_for_you_recipe", t["c_confirm_add"], name=t["c_add"]),
-        ], present(for_you)),
-        section(t["h_trending"], [
-            select(trending, name=t["c_recipe"]),
-            {"type": "markdown", "content": account_card(t, trending)},
-            press(f"button.{E}_add_trending_recipe", t["c_confirm_add"], name=t["c_add"]),
-        ], present(trending)),
-        # Outside Trending: when every trending recipe is an xPod and this is
-        # off, Trending is empty and hidden, and this must stay reachable.
-        {"type": "grid", "cards": [toggle(f"switch.{E}_show_xpod_recipes")],
-         "visibility": [is_not(f"button.{E}_refresh_recipes", "unavailable")]},
-        section(t["h_tea"], [
+            press(f"button.{E}_another_for_you", name=t["a_another"]),
+            account_details(t, for_you),
+        ], "visibility": [showing("for_you"), *present(for_you)]},
+        {"type": "grid", "cards": [
+            select(trending, name=t["c_recipe"], visibility=present(trending)),
+            press(f"button.{E}_add_trending_recipe", t["c_confirm_add"], name=t["c_add"],
+                  visibility=present(trending)),
+            {"type": "markdown", "content": account_card(t, trending), "visibility": present(trending)},
+            {**account_details(t, trending), "visibility": present(trending)},
+            # Kept outside the list's own condition: with every trending
+            # recipe an xPod and this off, the list is empty and this must
+            # still be reachable.
+            toggle(f"switch.{E}_show_xpod_recipes"),
+        ], "visibility": [showing("trending")]},
+        {"type": "grid", "cards": [
             select(tea, name=t["c_recipe"]),
-            {"type": "markdown", "content": account_card(t, tea)},
             press(f"button.{E}_add_tea_recipe", t["c_confirm_add"], name=t["c_add"]),
-        ], present(tea)),
-        section(t["h_find"], [
+            {"type": "markdown", "content": account_card(t, tea)},
+            account_details(t, tea),
+        ], "visibility": [showing("tea"), *present(tea)]},
+        {"type": "grid", "cards": [
             # First: one press, a recipe to try with the bag in use, for the
             # drink chosen — here too, since without Coffee Lab the Brew
             # tab's bag section, where Drink also is, is not shown.
@@ -871,14 +913,14 @@ def community_view(t: dict) -> dict:
             press(f"button.{E}_search_community", name=t["c_search"]),
             {"type": "markdown", "text_only": True, "content": matches_sentence(t, sensor, picker),
              "visibility": present(sensor)},
-        ], present(f"text.{E}_community_search")[:1]),
+        ], "visibility": [showing("search")]},
         section(t["h_results"], [
             select(picker, name=t["c_recipe"]),
-        ], [{"condition": "numeric_state", "entity": sensor, "above": 0}]),
-        section(t["h_picked"], [
-            {"type": "markdown", "content": picked_card(t, picker)},
-            press(f"button.{E}_add_community_recipe", t["c_confirm_add"], name=t["c_add"]),
-        ], [{"condition": "numeric_state", "entity": sensor, "above": 0}, *present(picker)]),
+            press(f"button.{E}_add_community_recipe", t["c_confirm_add"], name=t["c_add"],
+                  visibility=present(picker)),
+            {"type": "markdown", "content": picked_card(t, picker), "visibility": present(picker)},
+            {**picked_details(t, picker), "visibility": present(picker)},
+        ], [showing("search"), {"condition": "numeric_state", "entity": sensor, "above": 0}]),
     ]}
 
 

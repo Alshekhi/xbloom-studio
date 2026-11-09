@@ -589,6 +589,15 @@
           "weak": "Too weak",
           "strong": "Too strong"
         }
+      },
+      "community_list": {
+        "name": "Browse",
+        "state": {
+          "for_you": "For you",
+          "trending": "Trending",
+          "tea": "Tea",
+          "search": "Search the community"
+        }
       }
     },
     "sensor": {
@@ -837,7 +846,7 @@
         "name": "Save Version as New Recipe"
       },
       "another_for_you": {
-        "name": "Another For You"
+        "name": "Another Suggestion"
       },
       "add_trending_recipe": {
         "name": "Add Trending Recipe"
