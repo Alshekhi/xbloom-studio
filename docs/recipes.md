@@ -13,8 +13,9 @@ Recipe sync is event-driven, not polled: changes you make in Home Assistant appl
 ## Archiving a recipe
 
 A recipe you are not using can be archived instead of deleted: it leaves the
-recipe list and is kept whole in Home Assistant, to restore later. Signed in
-to the xBloom cloud, you choose whether it also leaves the cloud — kept there,
+recipe list and is kept whole in Home Assistant, to restore later. Pick it in
+**Recipe to Manage**, then press **Archive Recipe**. Signed in to the xBloom
+cloud, **Archive and Remove from xBloom Cloud** takes it off the cloud too — kept there,
 it stays in the xBloom app and is only hidden in Home Assistant. Restoring
 puts it back where the library is: signed in, in the cloud (created again if
 it was removed, under a new cloud id, so an older share link to it no longer

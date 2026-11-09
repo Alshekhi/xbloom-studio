@@ -33,7 +33,9 @@ TEXT = {
         "not_taken": "The machine did not take the recipe. Pick it again.",
         "show_manual": "Show manual brew",
         "confirm_stop": "Stop the brew in progress?", "confirm_record": "Record this manual brew?",
-        "confirm_run": "Run the chosen action on the selected recipe?",
+        "confirm_archive": "Archive this recipe?",
+        "confirm_archive_remove": "Archive this recipe and remove it from the xBloom cloud?",
+        "confirm_delete": "Delete this recipe? It cannot be brought back.",
         "add_recipes": "Add or edit recipes", "add_bags": "Add or edit bags",
         "h_archive": "Archived recipes",
         "this_brew": "This brew", "coffee": "Coffee", "water": "Water", "ratio": "Ratio",
@@ -102,7 +104,9 @@ TEXT = {
         "not_taken": "لم تقبل الماكينة الوصفة. اخترها مرة أخرى.",
         "show_manual": "إظهار التحضير اليدوي",
         "confirm_stop": "إيقاف التحضير الجاري؟", "confirm_record": "تسجيل هذا التحضير اليدوي؟",
-        "confirm_run": "تنفيذ الإجراء المختار على الوصفة المختارة؟",
+        "confirm_archive": "أرشفة هذه الوصفة؟",
+        "confirm_archive_remove": "أرشفة هذه الوصفة وحذفها من سحابة xBloom؟",
+        "confirm_delete": "حذف هذه الوصفة؟ لا يمكن استعادتها.",
         "add_recipes": "إضافة الوصفات أو تعديلها", "add_bags": "إضافة الأكياس أو تعديلها",
         "h_archive": "الوصفات المؤرشفة",
         "this_brew": "هذا التحضير", "coffee": "القهوة", "water": "الماء", "ratio": "النسبة",
@@ -380,7 +384,7 @@ def brew_view(t: dict) -> dict:
             press(f"button.{E}_start_brew", grid_options={"columns": 6},
                   visibility=[is_(f"binary_sensor.{E}_recipe_ready", "on")]),
             press(f"button.{E}_cancel_preparation", grid_options={"columns": 6},
-                  visibility=present(f"select.{E}_recipe")),
+                  visibility=[is_(f"binary_sensor.{E}_recipe_ready", "on")]),
             # Signed in, a recipe added in the xBloom app is read again when a
             # bag is chosen; with no bag to choose, here.
             press(f"button.{E}_refresh_recipes", grid_options={"columns": 6}, visibility=[
@@ -509,7 +513,8 @@ def bags_view(t: dict) -> dict:
                 f"{{% else %}}{{{{ (b.remaining_g | round(0) | int ~ ' {t['g_left']}') if b.remaining_g is not none else '{t['not_tracked']}' }}}}{{% endif %}}\n"
                 f"{{% else %}}{t['no_bags']}{{% endfor %}}"
             )},
-            select(bag),
+            # With no bags the picker has nothing to offer and is unavailable.
+            select(bag, visibility=[is_not(bag, "unavailable")]),
             press(f"button.{E}_refresh_coffee_bags", visibility=[
                 {"condition": "state", "entity": f"button.{E}_refresh_coffee_bags", "state_not": "unavailable"},
             ]),
@@ -534,6 +539,8 @@ def xbloom_view(t: dict) -> dict:
     live = is_(f"switch.{E}_connect", "on")
     on = lambda module: [live, is_(f"sensor.{E}_current_module", module), *not_busy()]  # noqa: E731
     back = press(f"button.{E}_back_to_home")
+    manage = f"select.{E}_recipe_to_manage"
+    signed_in = is_not(f"button.{E}_refresh_recipes", "unavailable")
     voice = [
         ("automation.xbloom_brew_announcements", t["speak_brew"]),
         ("automation.xbloom_machine_fault_announcements", t["speak_faults"]),
@@ -573,27 +580,32 @@ def xbloom_view(t: dict) -> dict:
             tile(f"sensor.{E}_scale_weight", visibility=present(f"sensor.{E}_scale_weight")),
             press(f"button.{E}_tare_scale"),
         ], on("scale")),
+        # Its own picker: choosing a recipe here never prepares it on the
+        # machine. Each action shows once a recipe is picked, and none while
+        # the machine grinds or brews.
         section(t["h_library"], [
-            select(f"select.{E}_recipe"),
-            select(f"select.{E}_recipe_action"),
-            press(f"button.{E}_run_recipe_action", t["confirm_run"]),
-            press(f"button.{E}_refresh_recipes", visibility=[is_not(f"button.{E}_refresh_recipes", "unavailable")]),
+            select(manage),
+            press(f"button.{E}_archive_recipe", t["confirm_archive"], visibility=present(manage)),
+            press(f"button.{E}_archive_and_remove_from_xbloom_cloud", t["confirm_archive_remove"],
+                  visibility=[*present(manage), signed_in]),
+            press(f"button.{E}_delete_selected_recipe", t["confirm_delete"], visibility=present(manage)),
+            press(f"button.{E}_refresh_recipes", visibility=[signed_in]),
             {"type": "markdown", "text_only": True, "content": f"[{t['add_recipes']}]({INTEGRATION})"},
             # The archive is a page of its own, reached from here, so what is
             # archived stays out of the library; the link shows only while
             # there is something in it.
             {"type": "markdown", "text_only": True, "content": f"[{t['h_archive']}](archive)",
              "visibility": present(f"select.{E}_archived_recipe")},
-        ]),
+        ], not_busy()),
+        # Settings the machine holds: changed only while connected.
         section(t["h_settings"], [
             select(f"select.{E}_mode"),
             select(f"select.{E}_temperature_unit"),
             select(f"select.{E}_weight_unit"),
-        ]),
+        ], [live]),
         section(t["h_tools"], [
             press(f"button.{E}_ble_connect"),
             press(f"button.{E}_ble_disconnect"),
-            press(f"button.{E}_back_to_home"),
         ]),
         section(t["h_voice"], [
             toggle(entity, name=name, visibility=[
@@ -840,8 +852,11 @@ def community_view(t: dict) -> dict:
             select(trending, name=t["c_recipe"]),
             {"type": "markdown", "content": account_card(t, trending)},
             press(f"button.{E}_add_trending_recipe", t["c_confirm_add"], name=t["c_add"]),
-            toggle(f"switch.{E}_show_xpod_recipes"),
         ], present(trending)),
+        # Outside Trending: when every trending recipe is an xPod and this is
+        # off, Trending is empty and hidden, and this must stay reachable.
+        {"type": "grid", "cards": [toggle(f"switch.{E}_show_xpod_recipes")],
+         "visibility": [is_not(f"button.{E}_refresh_recipes", "unavailable")]},
         section(t["h_tea"], [
             select(tea, name=t["c_recipe"]),
             {"type": "markdown", "content": account_card(t, tea)},

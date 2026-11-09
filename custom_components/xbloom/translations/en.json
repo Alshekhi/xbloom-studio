@@ -510,13 +510,8 @@
       "recipe": {
         "name": "Recipe"
       },
-      "recipe_action": {
-        "name": "Recipe Action",
-        "state": {
-          "archive": "Archive",
-          "archive_remove_from_cloud": "Archive and Remove from xBloom Cloud",
-          "delete": "Delete"
-        }
+      "library_recipe": {
+        "name": "Recipe to Manage"
       },
       "archived_recipe": {
         "name": "Archived Recipe"
@@ -800,13 +795,16 @@
         "name": "Save as New Recipe"
       },
       "delete_selected_recipe": {
-        "name": "Delete Selected Recipe"
+        "name": "Delete Recipe"
       },
       "coffee_lab_refresh_bags": {
         "name": "Refresh Coffee Bags"
       },
-      "run_recipe_action": {
-        "name": "Run Recipe Action"
+      "archive_recipe": {
+        "name": "Archive Recipe"
+      },
+      "archive_recipe_remove_from_cloud": {
+        "name": "Archive and Remove from xBloom Cloud"
       },
       "restore_archived_recipe": {
         "name": "Restore Archived Recipe"
@@ -967,9 +965,6 @@
     },
     "archived_recipe_not_found": {
       "message": "There is no archived recipe called {name}."
-    },
-    "no_recipe_action_selected": {
-      "message": "Choose an action first."
     },
     "no_archived_recipe_selected": {
       "message": "No archived recipe is selected."

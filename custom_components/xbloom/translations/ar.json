@@ -510,13 +510,8 @@
       "recipe": {
         "name": "الوصفة"
       },
-      "recipe_action": {
-        "name": "إجراء الوصفة",
-        "state": {
-          "archive": "أرشفة",
-          "archive_remove_from_cloud": "أرشفة وحذف من سحابة xBloom",
-          "delete": "حذف"
-        }
+      "library_recipe": {
+        "name": "الوصفة المراد إدارتها"
       },
       "archived_recipe": {
         "name": "الوصفة المؤرشفة"
@@ -800,13 +795,16 @@
         "name": "حفظ كوصفة جديدة"
       },
       "delete_selected_recipe": {
-        "name": "حذف الوصفة المختارة"
+        "name": "حذف الوصفة"
       },
       "coffee_lab_refresh_bags": {
         "name": "تحديث أكياس القهوة"
       },
-      "run_recipe_action": {
-        "name": "تنفيذ إجراء الوصفة"
+      "archive_recipe": {
+        "name": "أرشفة الوصفة"
+      },
+      "archive_recipe_remove_from_cloud": {
+        "name": "أرشفة وحذف من سحابة xBloom"
       },
       "restore_archived_recipe": {
         "name": "استعادة الوصفة المؤرشفة"
@@ -967,9 +965,6 @@
     },
     "archived_recipe_not_found": {
       "message": "لا توجد وصفة مؤرشفة باسم {name}."
-    },
-    "no_recipe_action_selected": {
-      "message": "اختر الإجراء أولا."
     },
     "no_archived_recipe_selected": {
       "message": "لا توجد وصفة مؤرشفة مختارة."

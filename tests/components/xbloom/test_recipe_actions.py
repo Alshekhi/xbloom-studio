@@ -1,4 +1,4 @@
-"""The recipe menu: an action, a Run button, and Restore for the archive."""
+"""Managing recipes: a picker of its own, a button per action, Restore for the archive."""
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -8,17 +8,18 @@ from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.xbloom import button as button_module
 from custom_components.xbloom.button import (
+    XBloomArchiveRecipeButton,
+    XBloomDeleteSelectedRecipeButton,
     XBloomRestoreArchivedRecipeButton,
-    XBloomRunRecipeActionButton,
 )
 from custom_components.xbloom.select import (
     XBloomArchivedRecipeSelect,
-    XBloomRecipeActionSelect,
+    XBloomLibraryRecipeSelect,
 )
 
 SELECTS = {
     "xbloom_recipe_select": "select.xbloom_studio_recipe",
-    "xbloom_recipe_action_select": "select.xbloom_studio_recipe_action",
+    "xbloom_library_recipe_select": "select.xbloom_studio_recipe_to_manage",
     "xbloom_archived_recipe_select": "select.xbloom_studio_archived_recipe",
 }
 
@@ -41,40 +42,51 @@ def _state(value, **attributes):
     return SimpleNamespace(state=value, attributes=attributes)
 
 
-@pytest.mark.parametrize("action, remove", [("archive", False), ("archive_remove_from_cloud", True)])
-async def test_run_archives_the_picked_recipe(action, remove):
-    entity, coordinator, registry = _press(XBloomRunRecipeActionButton, {
-        "select.xbloom_studio_recipe": _state("Kenya", id="r-2"),
-        "select.xbloom_studio_recipe_action": _state(action),
+@pytest.mark.parametrize("remove", [False, True])
+async def test_archive_acts_on_the_recipe_to_manage(remove):
+    entity, coordinator, registry = _press(XBloomArchiveRecipeButton, {
+        "select.xbloom_studio_recipe": _state("Ethiopia", id="r-1"),
+        "select.xbloom_studio_recipe_to_manage": _state("Kenya", id="r-2"),
     })
+    entity._remove = remove
     with patch.object(button_module.er, "async_get", return_value=registry):
         await entity.async_press()
     coordinator.async_archive_recipe.assert_awaited_once_with("r-2", remove_from_cloud=remove)
 
 
-async def test_run_deletes_by_id():
-    entity, coordinator, registry = _press(XBloomRunRecipeActionButton, {
-        "select.xbloom_studio_recipe": _state("Kenya", id="r-2"),
-        "select.xbloom_studio_recipe_action": _state("delete"),
+async def test_delete_acts_on_the_recipe_to_manage():
+    entity, coordinator, registry = _press(XBloomDeleteSelectedRecipeButton, {
+        "select.xbloom_studio_recipe": _state("Ethiopia", id="r-1"),
+        "select.xbloom_studio_recipe_to_manage": _state("Kenya", id="r-2"),
     })
     with patch.object(button_module.er, "async_get", return_value=registry):
         await entity.async_press()
     coordinator.async_delete_recipe.assert_awaited_once_with("r-2")
 
 
-@pytest.mark.parametrize("states, key", [
-    ({"select.xbloom_studio_recipe_action": _state("delete")}, "no_recipe_selected"),
-    ({"select.xbloom_studio_recipe": _state("Kenya", id="r-2"),
-      "select.xbloom_studio_recipe_action": _state("unknown")}, "no_recipe_action_selected"),
-])
-async def test_run_does_nothing_without_both_picks(states, key):
-    entity, coordinator, registry = _press(XBloomRunRecipeActionButton, states)
+@pytest.mark.parametrize("cls", [XBloomArchiveRecipeButton, XBloomDeleteSelectedRecipeButton])
+async def test_nothing_is_done_until_a_recipe_to_manage_is_picked(cls):
+    entity, coordinator, registry = _press(cls, {
+        "select.xbloom_studio_recipe": _state("Ethiopia", id="r-1"),
+        "select.xbloom_studio_recipe_to_manage": _state("unknown"),
+    })
+    entity._remove = False
     with patch.object(button_module.er, "async_get", return_value=registry):
         with pytest.raises(HomeAssistantError) as caught:
             await entity.async_press()
-    assert caught.value.translation_key == key
+    assert caught.value.translation_key == "no_recipe_selected"
     coordinator.async_delete_recipe.assert_not_called()
     coordinator.async_archive_recipe.assert_not_called()
+
+
+@pytest.mark.parametrize("remove, signed_in, available", [
+    (False, False, True), (False, True, True), (True, False, False), (True, True, True),
+])
+def test_removing_from_the_cloud_is_offered_only_signed_in(remove, signed_in, available):
+    entity = XBloomArchiveRecipeButton.__new__(XBloomArchiveRecipeButton)
+    entity.coordinator = MagicMock(last_update_success=True, cloud_logged_in=signed_in)
+    entity._remove = remove
+    assert entity.available is available
 
 
 async def test_restore_brings_back_the_picked_archived_recipe():
@@ -110,10 +122,14 @@ def _select(cls, *, signed_in=False, archived=()):
     return entity
 
 
-def test_removing_from_the_cloud_is_offered_only_signed_in():
-    assert _select(XBloomRecipeActionSelect).options == ["archive", "delete"]
-    assert _select(XBloomRecipeActionSelect, signed_in=True).options == [
-        "archive", "archive_remove_from_cloud", "delete"]
+async def test_the_recipe_to_manage_starts_empty_and_is_picked_by_id():
+    entity = _select(XBloomLibraryRecipeSelect)
+    entity.coordinator.data = [{"id": "a", "name": "Kenya"}, {"id": "b", "name": "Kenya"}]
+    assert entity.current_option is None
+    assert entity.extra_state_attributes is None
+    await entity.async_select_option("Kenya (2)")
+    assert entity.current_option == "Kenya (2)"
+    assert entity.extra_state_attributes == {"id": "b"}
 
 
 async def test_an_archived_recipe_is_picked_by_id_even_under_a_shared_name():

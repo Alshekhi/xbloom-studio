@@ -1,7 +1,7 @@
 """Select entities for the xBloom Studio integration.
 
   * XBloomRecipeSelect — recipe library
-  * XBloomRecipeActionSelect — what the Run button does to the picked recipe
+  * XBloomLibraryRecipeSelect — a recipe to archive or delete, never prepared
   * XBloomArchivedRecipeSelect — the archived recipes, for Restore
   * XBloomModeSelect / XBloomWaterSourceSelect / XBloomTempUnitSelect /
     XBloomWeightUnitSelect — machine settings. Each calls
@@ -46,7 +46,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     coordinator = entry.runtime_data.coordinator
     async_add_entities([
         XBloomRecipeSelect(coordinator),
-        XBloomRecipeActionSelect(coordinator),
+        XBloomLibraryRecipeSelect(coordinator),
         XBloomArchivedRecipeSelect(coordinator),
         # Machine setting selects — pass entry so they can sync their
         # current value from the machine's heartbeat (signal_event).
@@ -84,41 +84,51 @@ def _device() -> DeviceInfo:
     return DeviceInfo(identifiers={(DOMAIN, "xbloom_studio")})
 
 
-# What the Run button can do to the picked recipe. Removing from the cloud is
-# offered only while signed in, since only then is there a cloud to reach.
-ACTION_ARCHIVE = "archive"
-ACTION_ARCHIVE_REMOVE = "archive_remove_from_cloud"
-ACTION_DELETE = "delete"
+class XBloomLibraryRecipeSelect(CoordinatorEntity, SelectEntity):
+    """A recipe to archive or delete, picked apart from the one to brew.
 
-
-class XBloomRecipeActionSelect(CoordinatorEntity, SelectEntity):
-    """The action the Run Recipe Action button applies to the picked recipe."""
+    Picking it changes nothing on the machine, unlike the Recipe select,
+    which prepares what it holds. Held by id; nothing is picked until one is,
+    so a dashboard shows the recipe's actions only then.
+    """
 
     _attr_has_entity_name = True
-    _attr_translation_key = "recipe_action"
-    _attr_unique_id = "xbloom_recipe_action_select"
-    _attr_icon = "mdi:dots-vertical"
+    _attr_translation_key = "library_recipe"
+    _attr_unique_id = "xbloom_library_recipe_select"
+    _attr_icon = "mdi:book-open-variant"
 
     def __init__(self, coordinator: XBloomCoordinator) -> None:
         super().__init__(coordinator)
-        self._action: str | None = None
+        self._current_id: str | None = None
 
     @property
     def device_info(self) -> DeviceInfo:
         return _device()
 
+    def _labels(self) -> list[tuple[str, dict]]:
+        return labelled(self.coordinator.data or [])
+
+    def _pick(self) -> tuple[str, dict] | None:
+        return next((lr for lr in self._labels() if str(lr[1].get("id")) == self._current_id), None)
+
     @property
     def options(self) -> list[str]:
-        if self.coordinator.cloud_logged_in:
-            return [ACTION_ARCHIVE, ACTION_ARCHIVE_REMOVE, ACTION_DELETE]
-        return [ACTION_ARCHIVE, ACTION_DELETE]
+        return [label for label, _ in self._labels()]
 
     @property
     def current_option(self) -> str | None:
-        return self._action if self._action in self.options else None
+        picked = self._pick()
+        return picked[0] if picked else None
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        picked = self._pick()
+        return {"id": str(picked[1].get("id"))} if picked else None
 
     async def async_select_option(self, option: str) -> None:
-        self._action = option
+        self._current_id = next(
+            (str(recipe.get("id")) for label, recipe in self._labels() if label == option), None,
+        )
         self.async_write_ha_state()
 
 
