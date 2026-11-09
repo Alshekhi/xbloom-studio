@@ -479,6 +479,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         def _bag_chosen(bean_id: str | None) -> None:
             reset_taste(hass, entry)
             browser.bag_chosen(lab, bean_id)
+            # The recipe is picked next: a recipe added in the xBloom app
+            # since the last read is in the list by then.
+            if bean_id is not None and coordinator.cloud_logged_in is True:
+                hass.async_create_task(coordinator.async_request_refresh())
 
         lab.on_bag_chosen = _bag_chosen
         entry.async_on_unload(async_count_completed_brews(hass, lab))

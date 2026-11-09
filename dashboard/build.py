@@ -240,6 +240,14 @@ def brew_view(t: dict) -> dict:
     # Shown while the picked recipe draws from a bag of coffee.
     coffee = [{"condition": "state", "entity": kind, "state_not": k} for k in ("xpod", "tea")]
 
+    # The recipe, and the section it is in, once what it brews from is
+    # chosen — or with nothing to choose, or a recipe already picked.
+    recipe_offered = {"condition": "or", "conditions": [
+        is_(bag, "unavailable"),
+        {"condition": "and", "conditions": present(f"select.{E}_recipe")},
+        *({"condition": "and", "conditions": present(item)} for item in (bag, box, tea)),
+    ]}
+
     def kind_or_none(k: str) -> dict:
         """The picked recipe draws from this kind, or no recipe is picked yet."""
         return {"condition": "or", "conditions": [
@@ -303,13 +311,15 @@ def brew_view(t: dict) -> dict:
             # coffee, an xPod box, or a tea.
             # Before a recipe is picked, every kind there is to choose from
             # shows, so a box or a tea can be chosen first too.
-            select(bag, visibility=coffee),
-            select(box, visibility=[kind_or_none("xpod"), is_not(box, "unavailable")]),
+            # The dropdown shows what is chosen; the state line would only
+            # repeat it, or read "Unknown" before anything is.
+            select(bag, visibility=coffee, hide_state=True),
+            select(box, visibility=[kind_or_none("xpod"), is_not(box, "unavailable")], hide_state=True),
             {"type": "markdown", "text_only": True, "content": (
                 "{% set n = state_attr('" + box + "', 'pods_left') %}"
                 "{% if n is not none %}" + t["pods_left"].replace("{n}", "{{ n }}") + "{% endif %}"
             ), "visibility": [kind_or_none("xpod"), *present(box)]},
-            select(tea, visibility=[kind_or_none("tea"), is_not(tea, "unavailable")]),
+            select(tea, visibility=[kind_or_none("tea"), is_not(tea, "unavailable")], hide_state=True),
             {"type": "markdown", "content": (
                 "{% set a = states['" + bag + "'].attributes if states['" + bag + "'] else {} %}"
                 "{{ [a.get('roaster'), [a.get('country'), a.get('region')] | select | join('" + t["sep"] + "'), a.get('process'), a.get('varietal'), a.get('roast')]"
@@ -317,6 +327,8 @@ def brew_view(t: dict) -> dict:
                 "{% if a.get('roaster_notes') %}\n\n{{ a.get('roaster_notes') }}{% endif %}"
             ), "visibility": [*present(bag), *coffee]},
             tile(f"sensor.{E}_last_brew_counted", visibility=[is_(f"sensor.{E}_last_brew_counted", "flagged")]),
+            # A bag added or changed in Notion itself shows here at once.
+            press(f"button.{E}_refresh_coffee_bags", visibility=[is_not(f"button.{E}_refresh_coffee_bags", "unavailable")]),
         # Not hidden while no bag is chosen: this is where one is chosen.
         ], present(bag)[:1]),
         # Asked for here, where the bag is chosen. Nothing reaches the machine
@@ -337,11 +349,7 @@ def brew_view(t: dict) -> dict:
         # chosen — or when there is nothing to choose, or a recipe is already
         # picked (from a suggestion, an assistant or an automation).
         section(t["h_brew"], [
-            select(f"select.{E}_recipe", visibility=[{"condition": "or", "conditions": [
-                is_(bag, "unavailable"),
-                {"condition": "and", "conditions": present(f"select.{E}_recipe")},
-                *({"condition": "and", "conditions": present(item)} for item in (bag, box, tea)),
-            ]}]),
+            select(f"select.{E}_recipe"),
             # What was asked for last time with this bag; one press sets it as
             # this brew's adjustment, the saved recipe untouched.
             {"type": "markdown", "text_only": True, "content": next_change_card(t),
@@ -366,14 +374,14 @@ def brew_view(t: dict) -> dict:
                   visibility=[is_(f"binary_sensor.{E}_recipe_ready", "on")]),
             press(f"button.{E}_cancel_preparation", grid_options={"columns": 6},
                   visibility=present(f"select.{E}_recipe")),
-            press(f"button.{E}_refresh_recipes", grid_options={"columns": 6}),
-            # With Coffee Lab kept in Notion, bags changed there are re-read here.
-            press(f"button.{E}_refresh_coffee_bags", visibility=[
-                {"condition": "state", "entity": f"button.{E}_refresh_coffee_bags", "state_not": "unavailable"},
+            # Signed in, a recipe added in the xBloom app is read again when a
+            # bag is chosen; with no bag to choose, here.
+            press(f"button.{E}_refresh_recipes", grid_options={"columns": 6}, visibility=[
+                is_(bag, "unavailable"), is_not(f"button.{E}_refresh_recipes", "unavailable"),
             ]),
             toggle("input_boolean.xbloom_show_advanced", name=t["show_advanced"],
                    visibility=present(f"select.{E}_recipe")),
-        ], at_home()),
+        ], [*at_home(), recipe_offered]),
         section(t["h_brew"], [
             {"type": "markdown", "text_only": True, "content": t["go_home"]},
         ], [
@@ -560,6 +568,7 @@ def xbloom_view(t: dict) -> dict:
             select(f"select.{E}_recipe"),
             select(f"select.{E}_recipe_action"),
             press(f"button.{E}_run_recipe_action", t["confirm_run"]),
+            press(f"button.{E}_refresh_recipes", visibility=[is_not(f"button.{E}_refresh_recipes", "unavailable")]),
             {"type": "markdown", "text_only": True, "content": f"[{t['add_recipes']}]({INTEGRATION})"},
             # The archive is a page of its own, reached from here, so what is
             # archived stays out of the library; the link shows only while

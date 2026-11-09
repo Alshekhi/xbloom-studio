@@ -104,8 +104,8 @@ under a second on a real install.
 **The iOS app can't connect.** Turn off the **Connect** switch — it holds the Bluetooth link
 open, and the machine only accepts one connection at a time.
 
-**A recipe you added on your phone isn't in the list.** Press the **Refresh Recipes** button.
-Cloud sync is event-driven, not polled.
+**A recipe you added on your phone isn't in the list.** Choosing a bag reads the recipes again;
+without Coffee Lab, press **Refresh Recipes** on the Brew tab or the xBloom tab.
 
 ## Firmware updates
 

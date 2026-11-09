@@ -199,3 +199,11 @@ async def test_a_picker_with_nothing_of_its_kind_is_unavailable():
     tea = ActiveTeaSelect(lab)
     await tea.async_read()
     assert tea.available is False
+
+
+@pytest.mark.parametrize(("signed_in", "available"), [(True, True), (False, False)])
+def test_refresh_recipes_is_offered_only_when_signed_in(signed_in, available):
+    from custom_components.xbloom.button import XBloomRefreshButton
+    coordinator = MagicMock(cloud_logged_in=signed_in, last_update_success=True)
+    button = XBloomRefreshButton(coordinator)
+    assert button.available is available

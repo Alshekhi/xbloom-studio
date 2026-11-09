@@ -86,6 +86,12 @@ class XBloomRefreshButton(CoordinatorEntity, ButtonEntity):
             model="Studio",
         )
 
+    @property
+    def available(self) -> bool:
+        # Recipes are read again only to pick up ones changed in the xBloom
+        # app, which happens only while signed in to the account.
+        return bool(self.coordinator.last_update_success) and self.coordinator.cloud_logged_in is True
+
     async def async_press(self) -> None:
         """Trigger an immediate recipe list refresh."""
         _LOGGER.debug("Manual recipe refresh requested")
