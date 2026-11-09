@@ -2265,7 +2265,7 @@ views:
       visibility:
       - condition: state
         entity: update.xbloom_studio_update
-        state_not: unavailable
+        state: 'on'
     - type: tile
       entity: update.xbloom_studio_firmware
       name:
@@ -2277,7 +2277,16 @@ views:
       visibility:
       - condition: state
         entity: update.xbloom_studio_firmware
-        state_not: unavailable
+        state: 'on'
+    visibility:
+    - condition: or
+      conditions:
+      - condition: state
+        entity: update.xbloom_studio_update
+        state: 'on'
+      - condition: state
+        entity: update.xbloom_studio_firmware
+        state: 'on'
   - type: grid
     cards:
     - type: markdown

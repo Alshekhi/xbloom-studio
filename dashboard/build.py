@@ -540,6 +540,7 @@ def xbloom_view(t: dict) -> dict:
     on = lambda module: [live, is_(f"sensor.{E}_current_module", module), *not_busy()]  # noqa: E731
     back = press(f"button.{E}_back_to_home")
     manage = f"select.{E}_recipe_to_manage"
+    updates = [f"update.{E}_update", f"update.{E}_firmware"]
     signed_in = is_not(f"button.{E}_refresh_recipes", "unavailable")
     voice = [
         ("automation.xbloom_brew_announcements", t["speak_brew"]),
@@ -608,12 +609,12 @@ def xbloom_view(t: dict) -> dict:
                 {"condition": "state", "entity": entity, "state_not": "unavailable"}]) for entity, name in voice
         ], [{"condition": "or", "conditions": [
             {"condition": "state", "entity": entity, "state_not": "unavailable"} for entity, _ in voice]}]),
+        # Only while there is an update to act on: "Up-to-date" with two
+        # disabled buttons is nothing to do.
         section(t["h_updates"], [
-            tile(f"update.{E}_update", features=[{"type": "update-actions"}],
-                 visibility=[{"condition": "state", "entity": f"update.{E}_update", "state_not": "unavailable"}]),
-            tile(f"update.{E}_firmware", features=[{"type": "update-actions"}],
-                 visibility=[{"condition": "state", "entity": f"update.{E}_firmware", "state_not": "unavailable"}]),
-        ]),
+            tile(update, features=[{"type": "update-actions"}], visibility=[is_(update, "on")])
+            for update in updates
+        ], [{"condition": "or", "conditions": [is_(update, "on") for update in updates]}]),
         section(t["h_events"], [
             {"type": "logbook", "target": {"entity_id": [f"sensor.{E}_brew_status", f"event.{E}_brew_event"]},
              "hours_to_show": 24},
