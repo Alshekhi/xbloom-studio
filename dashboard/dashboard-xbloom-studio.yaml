@@ -1362,7 +1362,8 @@ views:
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''sensor.xbloom_studio_for_you''].attributes if
         states[''sensor.xbloom_studio_for_you''] is defined else {} %}{% if a.get(''pours'') or a.get(''description'')
-        %}<details><summary>Pours and notes</summary>
+        %}<details><summary>{% if a.get(''description'') %}Description and pours{% else %}Pours{% endif
+        %}</summary>
 
 
         {% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause |
@@ -1459,7 +1460,8 @@ views:
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_trending_recipes''].attributes
         if states[''select.xbloom_studio_trending_recipes''] is defined else {} %}{% if a.get(''pours'')
-        or a.get(''description'') %}<details><summary>Pours and notes</summary>
+        or a.get(''description'') %}<details><summary>{% if a.get(''description'') %}Description and pours{%
+        else %}Pours{% endif %}</summary>
 
 
         {% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause |
@@ -1544,7 +1546,8 @@ views:
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_tea_recipes''].attributes
         if states[''select.xbloom_studio_tea_recipes''] is defined else {} %}{% if a.get(''pours'') or
-        a.get(''description'') %}<details><summary>Pours and notes</summary>
+        a.get(''description'') %}<details><summary>{% if a.get(''description'') %}Description and pours{%
+        else %}Pours{% endif %}</summary>
 
 
         {% set pours = a.get(''pours'') or [] %}{% if pours %}| Pour | Water | Temp | Pause |
@@ -1732,8 +1735,8 @@ views:
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = state_attr(''select.xbloom_studio_community_recipe'',
-        ''picked'') or {} %}{% if a.get(''pours'') or a.get(''description'') %}<details><summary>Pours
-        and notes</summary>
+        ''picked'') or {} %}{% if a.get(''pours'') or a.get(''description'') %}<details><summary>{% if
+        a.get(''description'') %}Description and pours{% else %}Pours{% endif %}</summary>
 
 
         {% if a.get(''description'') %}{{ e(a.get(''description'')) }}

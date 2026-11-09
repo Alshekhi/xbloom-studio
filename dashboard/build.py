@@ -54,7 +54,7 @@ TEXT = {
         "h_results": "Matching recipes",
         "c_words": "Search words", "c_origin": "Origin", "c_sort": "Sort", "c_search": "Search",
         "c_recipe": "Recipe", "c_add": "Add to my recipes",
-        "c_confirm_add": "Add this recipe to your library?", "c_details": "Pours and notes",
+        "c_confirm_add": "Add this recipe to your library?", "c_pours": "Pours", "c_desc_pours": "Description and pours",
         "c_none": "No recipes match.", "c_one": "1 recipe matches.",
         "c_many": "{n} recipes match.", "c_first": "The first {shown} are in the list below.",
         "c_by": "Shared by", "c_notes": "Tasting notes", "c_grind": "grind", "c_at": "at",
@@ -124,7 +124,7 @@ TEXT = {
         "h_results": "الوصفات المطابقة",
         "c_words": "كلمات البحث", "c_origin": "المنشأ", "c_sort": "الترتيب", "c_search": "ابحث",
         "c_recipe": "الوصفة", "c_add": "أضفها إلى وصفاتي",
-        "c_confirm_add": "إضافة هذه الوصفة إلى مكتبتك؟", "c_details": "الصبات والملاحظات",
+        "c_confirm_add": "إضافة هذه الوصفة إلى مكتبتك؟", "c_pours": "الصبات", "c_desc_pours": "الوصف والصبات",
         "c_none": "لا توجد وصفات مطابقة.", "c_one": "وصفة واحدة تطابق البحث.",
         "c_many": "{n} وصفات تطابق البحث.", "c_first": "أول {shown} منها في القائمة أدناه.",
         "c_by": "شاركها", "c_notes": "النكهات", "c_grind": "درجة الطحن", "c_at": "بسرعة",
@@ -735,7 +735,7 @@ def account_card(t: dict, entity: str, with_name: bool = False) -> str:
 
 
 def folded(t: dict, attrs: str, body: str) -> dict:
-    """A recipe's pours (and description), folded until opened.
+    """A recipe's pours, and a hub recipe's description, folded until opened.
 
     A disclosure: announced as collapsed or expanded, opened in place, so the
     recipe's name and its Add button stay a short swipe apart.
@@ -743,7 +743,9 @@ def folded(t: dict, attrs: str, body: str) -> dict:
     return {"type": "markdown", "content": (
         ESCAPE + "{% set a = " + attrs + " %}"
         + "{% if a.get('pours') or a.get('description') %}"
-        + f"<details><summary>{t['c_details']}</summary>\n\n" + body + "\n\n</details>{% endif %}"
+        # Named after what it holds: a hub recipe can carry a description.
+        + "<details><summary>{% if a.get('description') %}" + t["c_desc_pours"]
+        + "{% else %}" + t["c_pours"] + "{% endif %}</summary>\n\n" + body + "\n\n</details>{% endif %}"
     )}
 
 
