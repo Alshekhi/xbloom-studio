@@ -868,6 +868,8 @@ views:
       - condition: state
         entity: switch.xbloom_studio_use_grinder
         state: 'on'
+      tap_action:
+        action: none
     - type: tile
       entity: number.xbloom_studio_brew_ratio
       name:
@@ -877,6 +879,8 @@ views:
       features:
       - type: numeric-input
         style: slider
+      tap_action:
+        action: none
     - type: tile
       entity: number.xbloom_studio_brew_dose
       name:
@@ -893,6 +897,8 @@ views:
       - condition: state
         entity: number.xbloom_studio_brew_dose
         state_not: unknown
+      tap_action:
+        action: none
     - type: markdown
       content: '{% set rdose = state_attr(''select.xbloom_studio_recipe'',''dose_g'') | float(0) %}
 
@@ -1072,6 +1078,8 @@ views:
         state: 'on'
       grid_options:
         columns: 6
+      tap_action:
+        action: none
     - type: tile
       entity: button.xbloom_studio_record_manual_brew
       name:
@@ -1835,6 +1843,8 @@ views:
       features:
       - type: numeric-input
         style: slider
+      tap_action:
+        action: none
     - type: tile
       entity: number.xbloom_studio_grind_speed
       name:
@@ -1844,6 +1854,8 @@ views:
       features:
       - type: numeric-input
         style: slider
+      tap_action:
+        action: none
     - type: tile
       entity: button.xbloom_studio_grind
       name:
@@ -1895,6 +1907,8 @@ views:
       features:
       - type: numeric-input
         style: slider
+      tap_action:
+        action: none
     - type: tile
       entity: select.xbloom_studio_brew_pattern
       name:
@@ -1915,6 +1929,8 @@ views:
       features:
       - type: numeric-input
         style: slider
+      tap_action:
+        action: none
     - type: tile
       entity: number.xbloom_studio_brew_flow_rate
       name:
@@ -1924,6 +1940,8 @@ views:
       features:
       - type: numeric-input
         style: slider
+      tap_action:
+        action: none
     - type: tile
       entity: select.xbloom_studio_water_source
       name:

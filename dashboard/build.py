@@ -200,6 +200,9 @@ def select(entity: str, **extra) -> dict:
 
 
 def slider(entity: str, **extra) -> dict:
+    # No tap action: the card is its name, its value and the slider, not also
+    # a button repeating the name.
+    extra.setdefault("tap_action", {"action": "none"})
     return tile(entity, features=[{"type": "numeric-input", "style": "slider"}], **extra)
 
 
