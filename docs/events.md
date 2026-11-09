@@ -129,7 +129,9 @@ unanswered, the card stays.
 Most automations only need `sensor.xbloom_studio_brew_status`
 (`idle` → `grinding` → `brewing` → `done`) or
 `sensor.xbloom_studio_machine_status` (`ok`, `no_water`, `no_beans`,
-`dose_water_error`, `gear_position_error`). The rest is here for anything more detailed.
+`dose_water_error`, `gear_position_error`). Brew status stays `done` for 30
+minutes, then goes back to `idle`, so trigger on the change to `done` rather
+than testing for it later. The rest is here for anything more detailed.
 
 **`event.xbloom_studio_brew_event`** fires the per-stage brew lifecycle. Its *state* is a
 timestamp, not the event name, so `to: "brew_done"` never matches — trigger on any state

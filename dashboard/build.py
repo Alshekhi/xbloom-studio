@@ -18,7 +18,7 @@ HERE = Path(__file__).parent
 
 TEXT = {
     "en": {
-        "view_brew": "Brew", "view_stats": "Stats", "view_bags": "Bags", "view_xbloom": "xBloom",
+        "machine": "Machine", "view_brew": "Brew", "view_stats": "Stats", "view_bags": "Bags", "view_xbloom": "xBloom",
         "h_now": "Right now", "h_in_progress": "Brew in progress", "h_bag": "Current bag", "pods_left": "Pods left: {n}", "k_xpod": "xPod box", "k_tea": "tea",
         "h_brew": "Brew with the xBloom", "h_adjust": "Adjust this brew",
         "h_save": "Save as a new recipe", "h_manual": "Manual brew", "h_stats": "Coffee stats",
@@ -87,7 +87,7 @@ TEXT = {
         "c_popular": "The most downloaded Studio recipes.",
     },
     "ar": {
-        "view_brew": "التحضير", "view_stats": "الإحصاءات", "view_bags": "الأكياس", "view_xbloom": "xBloom",
+        "machine": "الآلة", "view_brew": "التحضير", "view_stats": "الإحصاءات", "view_bags": "الأكياس", "view_xbloom": "xBloom",
         "h_now": "الآن", "h_in_progress": "تحضير جار", "h_bag": "الكيس الحالي", "pods_left": "الكبسولات المتبقية: {n}", "k_xpod": "علبة xPod", "k_tea": "شاي",
         "h_brew": "التحضير بماكينة xBloom", "h_adjust": "تعديل هذا التحضير",
         "h_save": "حفظ كوصفة جديدة", "h_manual": "تحضير يدوي", "h_stats": "إحصاءات القهوة",
@@ -190,6 +190,9 @@ def toggle(entity: str, **extra) -> dict:
 
 
 def select(entity: str, **extra) -> dict:
+    # The dropdown shows what is chosen; a state line would only repeat it,
+    # spoken twice, or read "Unknown" before anything is.
+    extra.setdefault("hide_state", True)
     return tile(entity, features=[{"type": "select-options"}], **extra)
 
 
@@ -256,7 +259,7 @@ def brew_view(t: dict) -> dict:
     return {"title": t["view_brew"], "path": "brew", "icon": "mdi:coffee", "type": "sections", "max_columns": 2, "sections": [
         section(t["h_now"], [
             tile(f"sensor.{E}_brew_status"),
-            tile(f"binary_sensor.{E}_in_range"),
+            tile(f"binary_sensor.{E}_in_range", name=t["machine"]),
             # What the picked recipe draws from: the bag, the xPod box or the tea.
             tile(bag, visibility=[*present(bag), *coffee]),
             tile(f"sensor.{E}_coffee_left", visibility=[*present(f"sensor.{E}_coffee_left"), *coffee]),
@@ -311,15 +314,13 @@ def brew_view(t: dict) -> dict:
             # coffee, an xPod box, or a tea.
             # Before a recipe is picked, every kind there is to choose from
             # shows, so a box or a tea can be chosen first too.
-            # The dropdown shows what is chosen; the state line would only
-            # repeat it, or read "Unknown" before anything is.
-            select(bag, visibility=coffee, hide_state=True),
-            select(box, visibility=[kind_or_none("xpod"), is_not(box, "unavailable")], hide_state=True),
+            select(bag, visibility=coffee),
+            select(box, visibility=[kind_or_none("xpod"), is_not(box, "unavailable")]),
             {"type": "markdown", "text_only": True, "content": (
                 "{% set n = state_attr('" + box + "', 'pods_left') %}"
                 "{% if n is not none %}" + t["pods_left"].replace("{n}", "{{ n }}") + "{% endif %}"
             ), "visibility": [kind_or_none("xpod"), *present(box)]},
-            select(tea, visibility=[kind_or_none("tea"), is_not(tea, "unavailable")], hide_state=True),
+            select(tea, visibility=[kind_or_none("tea"), is_not(tea, "unavailable")]),
             {"type": "markdown", "content": (
                 "{% set a = states['" + bag + "'].attributes if states['" + bag + "'] else {} %}"
                 "{{ [a.get('roaster'), [a.get('country'), a.get('region')] | select | join('" + t["sep"] + "'), a.get('process'), a.get('varietal'), a.get('roast')]"

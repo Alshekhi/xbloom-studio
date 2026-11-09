@@ -35,6 +35,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import UnitOfMass
 from homeassistant.core import callback
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.util import dt as dt_util
@@ -266,6 +267,10 @@ def _device_info(entry_id: str) -> DeviceInfo:
 # --------------------------------------------------------------------- #
 # sensor.xbloom_studio_brew_status                                      #
 # --------------------------------------------------------------------- #
+# How long Brew Status says "done" before it goes back to "idle".
+DONE_HOLD_S = 30 * 60
+
+
 class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
     """Live brew state — updates during the brew, returns to idle after.
 
@@ -284,6 +289,7 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
     def __init__(self, entry) -> None:
         self._entry = entry
         self._attr_native_value = "idle"
+        self._unsub_idle: Any = None
         # The machine is on its grinder, brewer or scale screen. The frames a
         # standalone grind or pour sends overlap a recipe brew's — a grind
         # sends the "brewer started" frame, a pour ends in ENJOY — so while it
@@ -304,9 +310,10 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
             # is no brew in progress that HA is tracking, so resurrecting a
             # transient in-progress state wedges the UI (the dashboard hides
             # Start while brewing). Normalize any in-progress or out-of-options
-            # value (e.g. MQTT-mode "offline") to "idle"; only a terminal "done"
-            # carries meaning across a restart.
-            if value not in self._attr_options or value in ("grinding", "brewing"):
+            # value (e.g. MQTT-mode "offline") to "idle", and a "done" too: it
+            # says a coffee has just been made, which after a restart it has
+            # not (DONE_HOLD_S).
+            if value not in self._attr_options or value in ("grinding", "brewing", "done"):
                 value = "idle"
             self._attr_native_value = value
 
@@ -412,6 +419,30 @@ class XBloomBrewStatusBleSensor(RestoreSensor, SensorEntity):
         self.async_on_remove(
             self.hass.bus.async_listen("xbloom_brew_completed", _on_completed)
         )
+        self.async_on_remove(self._cancel_idle)
+
+    @callback
+    def async_write_ha_state(self) -> None:
+        # "done" says the coffee has just been made: after DONE_HOLD_S it is
+        # not news, and the sensor goes back to "idle". Anything newer cancels
+        # the wait.
+        self._cancel_idle()
+        if self._attr_native_value == "done" and self.hass is not None:
+            self._unsub_idle = async_call_later(self.hass, DONE_HOLD_S, self._back_to_idle)
+        super().async_write_ha_state()
+
+    @callback
+    def _back_to_idle(self, _now=None) -> None:
+        self._unsub_idle = None
+        if self._attr_native_value == "done":
+            self._attr_native_value = "idle"
+            self.async_write_ha_state()
+
+    @callback
+    def _cancel_idle(self) -> None:
+        if self._unsub_idle is not None:
+            self._unsub_idle()
+            self._unsub_idle = None
 
 
 # --------------------------------------------------------------------- #

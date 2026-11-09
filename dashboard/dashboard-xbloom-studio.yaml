@@ -19,8 +19,7 @@ views:
         action: none
     - type: tile
       entity: binary_sensor.xbloom_studio_in_range
-      name:
-        type: entity
+      name: Machine
       icon_tap_action:
         action: none
     - type: tile
@@ -125,6 +124,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_brew_to_rate
@@ -155,6 +155,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     visibility:
     - condition: state
       entity: select.xbloom_studio_what_was_wrong
@@ -184,6 +185,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_finished_bag
@@ -498,6 +500,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: button.xbloom_studio_suggest_recipe
       name: Suggest a recipe
@@ -524,6 +527,7 @@ views:
       - condition: state
         entity: select.xbloom_studio_suggested_recipe
         state_not: unknown
+      hide_state: true
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set source = state_attr(''select.xbloom_studio_suggested_recipe'',
@@ -606,6 +610,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: markdown
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
@@ -837,6 +842,7 @@ views:
       - condition: state
         entity: switch.xbloom_studio_use_grinder
         state: 'on'
+      hide_state: true
     - type: tile
       entity: number.xbloom_studio_brew_grind_size
       name:
@@ -1036,6 +1042,7 @@ views:
         state: 'on'
       grid_options:
         columns: 6
+      hide_state: true
     - type: tile
       entity: number.xbloom_studio_manual_brew_dose
       name:
@@ -1111,6 +1118,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: sensor.xbloom_studio_brews
       name:
@@ -1225,6 +1233,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: button.xbloom_studio_refresh_coffee_bags
       name:
@@ -1331,6 +1340,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_trending_recipes''].attributes
@@ -1396,6 +1406,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = states[''select.xbloom_studio_tea_recipes''].attributes
@@ -1454,6 +1465,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: button.xbloom_studio_suggest_community_recipe
       name: Suggest a community recipe
@@ -1477,6 +1489,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: select.xbloom_studio_community_sort
       name: Sort
@@ -1484,6 +1497,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: button.xbloom_studio_search_community
       name: Search
@@ -1524,6 +1538,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     visibility:
     - condition: numeric_state
       entity: sensor.xbloom_studio_community_matches
@@ -1827,6 +1842,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: number.xbloom_studio_brew_volume
       name:
@@ -1853,6 +1869,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: button.xbloom_studio_brew_standalone
       name:
@@ -1931,6 +1948,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: select.xbloom_studio_recipe_action
       name:
@@ -1939,6 +1957,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: button.xbloom_studio_run_recipe_action
       name:
@@ -1995,6 +2014,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: select.xbloom_studio_temperature_unit
       name:
@@ -2003,6 +2023,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: select.xbloom_studio_weight_unit
       name:
@@ -2011,6 +2032,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
   - type: grid
     cards:
     - type: markdown
@@ -2158,6 +2180,7 @@ views:
         action: none
       features:
       - type: select-options
+      hide_state: true
     - type: tile
       entity: button.xbloom_studio_restore_archived_recipe
       name:

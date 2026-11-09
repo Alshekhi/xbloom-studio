@@ -72,3 +72,36 @@ async def test_completion_after_reconciliation_still_sets_done():
     listeners["xbloom_brew_completed"](MagicMock(data={"outcome": "presumed"}))
 
     assert sensor._attr_native_value == "done"
+
+
+def test_done_goes_back_to_idle_after_the_hold_and_a_restored_done_is_idle():
+    """"done" says a coffee has just been made: not two hours later."""
+    from unittest.mock import patch
+    from custom_components.xbloom import ble_entities as be
+
+    entry = MagicMock()
+    entry.entry_id = "test_entry"
+    sensor = XBloomBrewStatusBleSensor(entry)
+    sensor.hass = MagicMock()
+    timers = []
+
+    def _later(hass, delay, action):
+        timers.append((delay, action))
+        return lambda: None
+
+    written = []
+    with patch.object(be, "async_call_later", _later), \
+            patch.object(be.RestoreSensor, "async_write_ha_state", lambda self: written.append(self._attr_native_value), create=True):
+        sensor._attr_native_value = "done"
+        sensor.async_write_ha_state()
+        assert timers and timers[0][0] == be.DONE_HOLD_S
+        timers[0][1](None)
+    assert sensor._attr_native_value == "idle" and written[-1] == "idle"
+
+
+@pytest.mark.asyncio
+async def test_a_done_restored_after_a_restart_reads_idle():
+    sensor, _ = _make_sensor()
+    sensor.async_get_last_sensor_data = AsyncMock(return_value=MagicMock(native_value="done"))
+    await sensor.async_added_to_hass()
+    assert sensor._attr_native_value == "idle"
