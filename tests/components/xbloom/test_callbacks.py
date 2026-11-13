@@ -78,8 +78,8 @@ def test_progress_only_when_asked_but_faults_always():
         cb.on_event(_event("xbloom_brew_started", run_id="r1", recipe_name="K", total_pours=3))
         cb.on_brew_status("idle", "grinding")
         cb.on_brew_event({"event_type": "pour_started", "pour_index": 0})
-        cb.on_machine_status("ok", "no_water")
-        cb.on_machine_status("no_water", "ok")
+        cb.on_machine_status("ok", "no_beans")
+        cb.on_machine_status("no_beans", "ok")
         events = [m.payload["data"]["event"] for m in _sent(cb)]
         expected = ["fault", "fault_cleared"]
         assert events == (["grinding", "pour", *expected] if progress else expected)
@@ -140,16 +140,12 @@ def _armed(progress=False):
     return cb
 
 
-def test_no_water_that_will_finish_is_not_a_fault():
+def test_low_water_during_a_brew_is_left_to_the_water_events():
+    """The status can change before the brew has worked out the amounts."""
     cb = _armed()
-    cb.on_machine_status("ok", "no_water", {"water_enough_to_finish": True})
+    cb.on_machine_status("ok", "no_water")
+    cb.on_machine_status("no_water", "ok")
     assert _sent(cb) == []
-
-
-def test_no_water_that_will_not_finish_is_a_fault():
-    cb = _armed()
-    cb.on_machine_status("ok", "no_water", {"water_enough_to_finish": False})
-    assert [m.payload["data"]["event"] for m in _sent(cb)] == ["fault"]
 
 
 def test_water_short_and_paused_reach_every_callback():

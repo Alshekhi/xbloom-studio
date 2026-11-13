@@ -74,29 +74,35 @@ class WaterTracker:
             self._paused_since = None
 
         # A "water" reading that held is a refill made while still pouring.
-        if (self._high_since is not None and self._switch_low is False
-                and now - self._high_since >= WATER_REFILL_HOLD_S):
+        if self._tripped_at is not None and self._water_held(now):
             self._tripped_at = None
-            self._high_since = None
         return decision
 
+    def _water_held(self, now: float) -> bool:
+        return (self._switch_low is False and self._high_since is not None
+                and now - self._high_since >= WATER_REFILL_HOLD_S)
+
     def _switch(self, low: bool, now: float) -> tuple[str, dict] | None:
+        # A low reading trips the switch only after a steady "water" — or
+        # with no reading before it. A "water" blip shorter than the hold is
+        # slosh, whether the tank had already tripped or started out low.
+        steady = self._switch_low is None or self._water_held(now)
         was_low = self._switch_low
         self._switch_low = low
         if low:
             self._high_since = None
-            if was_low is not True and self._pouring and self._tripped_at is None:
+            if (steady and self._pouring and self._tripped_at is None
+                    and self._paused_since is None):
                 self._tripped_at = self._dispensed
                 return ("water_low", self.state)
             return None
+        if was_low is not False:
+            self._high_since = now
         if self._paused_since is not None:
             self._tripped_at = None
             if not self._refilled:
                 self._refilled = True
                 return ("water_refilled", {})
-            return None
-        if was_low and self._tripped_at is not None and self._high_since is None:
-            self._high_since = now
         return None
 
     def _needed(self) -> float:

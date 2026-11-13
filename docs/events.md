@@ -88,9 +88,9 @@ the recipe still needs, and the brew event entity fires `water_low` with the
 amounts instead of `error_no_water`. A brew that runs the tank dry pauses until
 it is refilled *and* the knob is pressed: `water_paused`, then `water_refilled`
 once water is back. While the switch has tripped, Machine Status carries
-`water_left_ml`, `water_needed_ml` and `water_enough_to_finish`; `no_water` with
-`water_enough_to_finish: true` is not treated as a fault by callbacks or the
-agent tools. In tap mode none of this applies. A brew started at the machine,
+`water_left_ml`, `water_needed_ml` and `water_enough_to_finish`. The agent tools
+do not treat `no_water` with `water_enough_to_finish: true` as a fault, and
+callbacks relay the water events rather than `no_water` itself. In tap mode none of this applies. A brew started at the machine,
 whose recipe Home Assistant does not know, still reports `error_no_water`.
 
 **A fault the machine cannot brew through ends the brew.** With no beans in the

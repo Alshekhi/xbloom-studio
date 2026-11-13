@@ -294,11 +294,9 @@ class Callbacks:
                           {"pour": index + 1, "pours": pending.total_pours})
 
     @callback
-    def on_machine_status(
-        self, before: str | None, after: str | None, attributes: dict | None = None,
-    ) -> None:
+    def on_machine_status(self, before: str | None, after: str | None) -> None:
         current = self._current()
-        if current is None or after in (None, "unknown", "unavailable"):
+        if current is None or after in (None, "unknown", "unavailable") or before == after:
             return
         run_id, pending = current
         if after == spec.MACHINE_OK:
@@ -306,10 +304,9 @@ class Callbacks:
                 self._enqueue(run_id, pending, "fault_cleared", False, {"status": pending.fault})
                 pending.fault = None
             return
-        if after == WATER_STATUS and (attributes or {}).get("water_enough_to_finish") is True:
-            # The switch is low, but the brew has the water it needs.
-            return
-        if pending.fault == after:
+        if after == WATER_STATUS:
+            # A brew Home Assistant started reports its tank as water events,
+            # with the amounts; the status changes before those are known.
             return
         pending.fault = after
         # The machine waits on a person over a fault, so it is sent whether or
@@ -358,7 +355,7 @@ class Callbacks:
             if kind == "status":
                 self.on_brew_status(before, new.state)
             elif kind == "machine":
-                self.on_machine_status(before, new.state, dict(new.attributes))
+                self.on_machine_status(before, new.state)
             elif before not in (None, "unknown", "unavailable"):
                 # An event entity's state is when it fired; one restored from
                 # unavailable is not a firing.

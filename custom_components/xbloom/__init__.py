@@ -186,20 +186,29 @@ def pour_time_s(first_pour: datetime | None, end: datetime | None) -> float | No
 
 
 async def _wait_for_enjoy(
-    ble_client, extra_wait_s: Callable[[], float] | None = None,
+    ble_client,
+    extra_wait_s: Callable[[], float] | None = None,
+    clock: Callable[[], float] | None = None,
 ) -> bool:
     """RD_ENJOY within 600 s, not counting time the brew waited for water.
 
     A brew that runs the tank dry waits until it is refilled and the knob
     pressed, however long that takes. `extra_wait_s` reports that waiting
     time; each budget that runs out while some of it accrued is extended by
-    exactly that much, and no more.
+    exactly that much, and no more. A wait that ends before its budget is
+    up means the client can no longer hear the end — its link is gone — so
+    it is never extended.
     """
+    if clock is None:
+        clock = asyncio.get_running_loop().time
     timeout = 600.0
     while True:
         before = extra_wait_s() if extra_wait_s is not None else 0.0
+        started = clock()
         if await ble_client.wait_for_completion(timeout=timeout):
             return True
+        if clock() - started < timeout:
+            return False
         accrued = (extra_wait_s() - before) if extra_wait_s is not None else 0.0
         if accrued <= 0:
             return False
@@ -213,6 +222,7 @@ async def _await_brew_outcome(
     fault_stopped: asyncio.Event,
     stopped_home: asyncio.Event | None = None,
     extra_wait_s: Callable[[], float] | None = None,
+    clock: Callable[[], float] | None = None,
 ) -> str | None:
     """Wait for the brew to end, and report which signal said so.
 
@@ -233,7 +243,7 @@ async def _await_brew_outcome(
     was stopped at the machine: ``cancelled``, unless a fault it gives up on
     arrives within BREW_STOP_GRACE_S, which makes it ``stopped``.
     """
-    enjoy = asyncio.ensure_future(_wait_for_enjoy(ble_client, extra_wait_s))
+    enjoy = asyncio.ensure_future(_wait_for_enjoy(ble_client, extra_wait_s, clock))
     ended = asyncio.ensure_future(brew_end_seen.wait())
     stopped = asyncio.ensure_future(fault_stopped.wait())
     left = asyncio.ensure_future((stopped_home or asyncio.Event()).wait())
@@ -1088,13 +1098,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
         async def _observe(decoded: dict) -> None:
             """What this brew learns from a frame: its pours, its end, a fault."""
-            if water is not None:
-                decision = water.feed(decoded, hass.loop.time())
-                state = water.state
-                if decision is not None:
-                    _send_water(decision[0], decision[1], state)
-                elif _water_key(state) != water_sent["state"]:
-                    _send_water(None, {}, state)
             fault = spec.FAULTS.get(decoded.get("cmd"))
             if fault and fault[0] in BREW_STOPPING_FAULTS:
                 stopped_by.setdefault("status", fault[0])
@@ -1135,11 +1138,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 and decoded.get("activity") in ACTIVITY_HOME_STATES
             ):
                 went_home.set()
+            # The tank last: what it decides must never cost the brew its
+            # pours, its end or its faults.
+            if water is not None:
+                decision = water.feed(decoded, hass.loop.time())
+                state = water.state
+                if decision is not None:
+                    _send_water(decision[0], decision[1], state)
+                elif _water_key(state) != water_sent["state"]:
+                    _send_water(None, {}, state)
 
         async def _on_event(decoded: dict) -> None:
             # A link of the brew's own: nothing else passes its frames on.
-            await _observe(decoded)
-            async_dispatcher_send(hass, signal_event(entry.entry_id), decoded)
+            try:
+                await _observe(decoded)
+            finally:
+                async_dispatcher_send(hass, signal_event(entry.entry_id), decoded)
 
         if adopted is not None:
             # The press that started it has already been heard, before this
@@ -1264,6 +1278,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                             None if water is None
                             else lambda: water.paused_seconds(hass.loop.time())
                         ),
+                        clock=hass.loop.time,
                     )
                 completed = outcome == "confirmed"
                 # A fault the machine stops for (no beans) used no coffee even

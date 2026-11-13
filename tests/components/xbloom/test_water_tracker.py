@@ -113,3 +113,17 @@ def test_completion_with_water_says_nothing():
 def test_recipe_water_is_the_pours_only():
     assert recipe_water_ml({"pours": [{"volume_ml": 125}] * 4,
                             "bypass_volume_ml": 30}) == 500
+
+
+def test_a_flicker_from_an_already_low_tank_is_not_a_trip():
+    t = WaterTracker(200)
+    events = run(t, [(0, LOW), (1, pour(0)), (2, poured(50)), (5, HIGH), (5.3, LOW),
+                     (6, poured(80))])
+    assert events == []
+    assert t.completion_fields() == {"tank_low": True}
+
+
+def test_a_low_blip_during_a_refill_is_not_a_new_trip():
+    t = tripped_at(112)
+    run(t, [(50, poured(394.9)), (100, screen(12)), (170, HIGH)])
+    assert run(t, [(170.5, LOW), (171, HIGH), (172, screen(31))]) == []

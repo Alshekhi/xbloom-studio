@@ -22,6 +22,8 @@ from .test_brew_completion_contract import (
 
 LOW = {"cmd": 40522, "water_enough": 0}
 POURS_500 = [{"volume_ml": 125, "temperature_c": 93}] * 4
+# Home Assistant's loop clock during a test brew: frames move it on.
+NOW = [1000.0]
 
 
 def _frames(*frames):
@@ -30,7 +32,7 @@ def _frames(*frames):
     class _Brewing(_FakeBle):
         async def brew(self, recipe):
             for clock, frame in frames:
-                self.hass.loop.time = lambda c=clock: c
+                NOW[0] = clock
                 await self.on_event(frame)
 
     return _Brewing
@@ -38,6 +40,8 @@ def _frames(*frames):
 
 async def _brew(fake, *, water_source="tank"):
     hass, entry = _make_hass(), _Entry()
+    NOW[0] = 1000.0
+    hass.loop.time = lambda: NOW[0]
     plain_get = hass.states.get
 
     def _get_state(entity_id):
@@ -140,8 +144,8 @@ async def test_a_water_pause_does_not_time_out_the_brew():
         async def wait_for_completion(self, timeout=600.0):
             _LongPause.calls += 1
             if _LongPause.calls == 1:
-                # The 600 s budget ran out, 120 s of it waiting for water.
-                self.hass.loop.time = lambda: 1120.0
+                # The 600 s budget ran out, all of it waiting for water.
+                NOW[0] = 1600.0
                 return False
             await self.on_event({"cmd": 9011})
             return True
@@ -159,3 +163,36 @@ async def test_the_brew_ending_clears_the_water_state():
         (1002, LOW),
     ))
     assert sent[-1] == (None, {}, None)
+
+
+async def test_a_client_that_stops_listening_mid_pause_ends_the_wait():
+    """The link drops while the brew waits for water: no spinning."""
+    from custom_components.xbloom import _wait_for_enjoy
+
+    class _Gone:
+        calls = 0
+
+        async def wait_for_completion(self, timeout=600.0):
+            _Gone.calls += 1
+            if _Gone.calls > 5:
+                raise RuntimeError("the wait kept being extended")
+            return False          # returned at once: the session is gone
+
+    waited = iter(range(1, 100))
+    assert await _wait_for_enjoy(_Gone(), lambda: float(next(waited))) is False
+    assert _Gone.calls == 1
+
+
+async def test_a_tracker_failure_does_not_cost_the_brew_its_pours():
+    class _Swallowing(_FakeBle):
+        async def brew(self, recipe):
+            for frame in ({"cmd": 40510, "pour_index": 0},):
+                try:          # the real client drops a callback's exception
+                    await self.on_event(frame)
+                except Exception:  # noqa: BLE001
+                    pass
+
+    with patch("custom_components.xbloom.water.WaterTracker.feed",
+               side_effect=RuntimeError("tracker")):
+        hass, _ = await _brew(_Swallowing)
+    assert _bus(hass, "xbloom_brew_completed")[0]["first_pour_at"] is not None
