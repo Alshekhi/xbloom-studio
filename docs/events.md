@@ -7,8 +7,8 @@ can your own automations or a service outside Home Assistant.
 | Event | When | Payload |
 |---|---|---|
 | `xbloom_brew_started` | the machine has accepted the brew — every step, including execute | `recipe_name`, `total_pours` |
-| `xbloom_brew_completed` | **The brew finished.** Key on this one. | `recipe_id`, `recipe_name`, `dose_g`, `cup_type`, `outcome`, `started_at`, `first_pour_at`, `ended_at`, `duration_s` (first pour to the machine's end signal; empty when either went unheard), and what it was made with: `grind`, `water_ml`, `ratio`, `temperature_c`, `flow_rate` (a value the pours disagree on is omitted rather than guessed) |
-| `xbloom_brew_failed` | The brew could not start, or the machine gave up on it | `reason`, `recipe_name`, sometimes `step` / `error` |
+| `xbloom_brew_completed` | **The brew finished.** Key on this one. | `recipe_id`, `recipe_name`, `dose_g`, `cup_type`, `outcome`, `started_at`, `first_pour_at`, `ended_at`, `duration_s` (first pour to the machine's end signal; empty when either went unheard), and what it was made with: `grind`, `water_ml`, `ratio`, `temperature_c`, `flow_rate` (a value the pours disagree on is omitted rather than guessed). When the tank's low-water switch read low at the end, also `tank_low: true`, and `water_left_ml` when the switch tripped during this brew |
+| `xbloom_brew_failed` | The brew could not start, or the machine gave up on it | `reason`, `recipe_name`, sometimes `step` / `error`; with `reason: no_water`, `water_needed_ml`, the recipe's water |
 | `xbloom_brew_stopped` | Someone stopped the brew | `by`, `recipe_name`, `ground` (whether the grinder had run), `dose_g` |
 | `xbloom_brew_timeout` | Ten minutes passed with no ending heard from the machine | `recipe_name` |
 | `xbloom_rating_due` | With Coffee Lab on: a quarter of an hour after the last cup of a sitting, for every brew still waiting for its verdict, whoever started it. The **Ask how the coffee was** blueprint is built on it | `brews`: each question as `brew_id`, `recipe`, `bag`, `changes`, `cups`. Answer one with the `xbloom.rate_brew` action and its `brew_id` |
@@ -72,20 +72,34 @@ the step as `step`:
 
 Executing anyway would grind at whatever size the machine last held.
 
-**Low water is a live reading.** The machine reports the level continuously, but
-only while Home Assistant holds the Bluetooth link — which it releases when a
-brew ends. So `sensor.xbloom_studio_machine_status` drops a water fault at that
-point, and does not restore one across a restart, rather than asserting a level
-nobody is still reading; an empty tank
-reports itself again on the next connection, and immediately at the next brew.
-The other faults are reported once and stay until a brew starts.
+**Low water is a live reading, from a switch.** The machine has no water-level
+sensor: one switch reports "water" or "low", and it trips with about 270 ml
+still in the tank. It reports the switch only while Home Assistant holds the
+Bluetooth link — which it releases when a brew ends. So
+`sensor.xbloom_studio_machine_status` drops a water fault at that point, and does
+not restore one across a restart, rather than asserting a level nobody is still
+reading; a low tank reports itself again on the next connection, and
+immediately at the next brew. The other faults are reported once and stay until
+a brew starts.
+
+**A brew Home Assistant started follows its tank.** When the switch trips, the
+integration counts the water poured since and compares what is left with what
+the recipe still needs, and the brew event entity fires `water_low` with the
+amounts instead of `error_no_water`. A brew that runs the tank dry pauses until
+it is refilled *and* the knob is pressed: `water_paused`, then `water_refilled`
+once water is back. While the switch has tripped, Machine Status carries
+`water_left_ml`, `water_needed_ml` and `water_enough_to_finish`; `no_water` with
+`water_enough_to_finish: true` is not treated as a fault by callbacks or the
+agent tools. In tap mode none of this applies. A brew started at the machine,
+whose recipe Home Assistant does not know, still reports `error_no_water`.
 
 **A fault the machine cannot brew through ends the brew.** With no beans in the
 hopper it stops the grinder and does nothing further, so waiting for an ending
 would leave a brew showing as in progress until it was cancelled by hand: that
 fires `xbloom_brew_failed` with the fault as its reason, and `brew_status`
 returns to `idle`. A fault it *does* brew through — low water, which the machine
-reports mid-pour and carries on — changes nothing.
+reports mid-pour and carries on — changes nothing; a pause for water stops the
+brew's ten-minute limit until the brew resumes.
 
 **A brew started on the machine itself fires none of these.** It runs no Home
 Assistant brew task, so there is nothing to report it; `sensor.xbloom_studio_brew_status`
@@ -101,9 +115,11 @@ Devices & services → xBloom Studio → Configure → Add a callback target**: 
 name, the URL to post to, and a [Standard Webhooks](https://www.standardwebhooks.com)
 secret (`whsec_…`). Then start the brew with `notify_target` set to that name.
 
-The target receives that brew's faults and exactly one ending — `completed`,
-`failed`, `stopped` or `timeout` — and, with `notify_progress`, grinding and
-each pour. Each is a signed POST, retried if the receiver is briefly away, of
+The target receives that brew's faults, its water warnings that need someone
+at the tank (`water`, with `water_event` set to `water_low` when the cup will
+not finish, `water_paused` or `water_refilled`, and the amounts), and exactly
+one ending — `completed`, `failed`, `stopped` or `timeout` — and, with
+`notify_progress`, grinding and each pour. Each is a signed POST, retried if the receiver is briefly away, of
 the form `{"type": "xbloom.brew.<event>", "timestamp", "data": {"event",
 "final", "run_id", "recipe", …}, "context"}`, where `data` holds the same facts
 as the event and `context` is what `start_brew` was given. A caller names a
@@ -146,7 +162,10 @@ change and test `trigger.to_state.attributes.event_type`:
 | `pour_started` | each pour begins | `pour_index` (0-based) |
 | `bypass_started` | a bypass pour begins | |
 | `brew_ended` | the brew sequence finishes | |
-| `error_no_water` / `error_no_beans` / `error_dose_water` / `error_gear_position` | a fault is reported | |
+| `error_no_water` / `error_no_beans` / `error_dose_water` / `error_gear_position` | a fault is reported (`error_no_water` only outside a brew Home Assistant started) | |
+| `water_low` | the low-water switch trips during a brew Home Assistant started | `enough_to_finish`, `water_left_ml`, `water_needed_ml`, `water_short_ml` |
+| `water_paused` | that brew pauses because the tank ran dry | `water_needed_ml` |
+| `water_refilled` | the switch reports water again while it is paused | |
 
 **Bus events** come from the live session and fire **only while the Connect switch is on**:
 

@@ -2,8 +2,9 @@ blueprint:
   name: "xBloom — Machine fault announcements"
   description: >
     Speaks the machine's faults as they happen, in English or Arabic: the tank
-    empty, the grinder empty, the water and coffee amounts not matching, or
-    the grinder out of position.
+    too low to finish a brew and by how much, a brew paused for water, the
+    grinder empty, the water and coffee amounts not matching, or the grinder
+    out of position.
   domain: automation
   author: xbloom-studio-controler
   source_url: https://github.com/Alshekhi/xbloom-studio/blob/main/custom_components/xbloom/blueprints/machine_fault_announce.yaml
@@ -87,9 +88,29 @@ variables:
   # rejecting the whole automation. A template is validated as a string and
   # resolved at runtime, so the unused branch stays inert.
   tts_engine: !input tts_engine
+  # The water a warning is about, rounded to the nearest 10 ml since the tank
+  # is only known to about that. In Arabic the counted noun follows the
+  # number: a round hundred takes the genitive singular, a number ending in
+  # 10 the plural, and 20 to 90 the accusative singular.
+  amount: >-
+    {%- set a = trigger.to_state.attributes -%}
+    {%- set ml = a.get('water_short_ml') if ev == 'water_low' else a.get('water_needed_ml') -%}
+    {{ [((ml | float(0)) / 10) | round(0) * 10, 10] | max | int }}
+  unit_ar: >-
+    {%- set n = amount | int -%}
+    {{ 'مليلتر' if n % 100 == 0 else ('مليلترات' if n % 100 == 10 else 'مليلترًا') }}
   message: >-
-    {%- if lang == 'ar' -%}
-      {%- if ev == 'error_no_water' -%}
+    {%- set a = trigger.to_state.attributes -%}
+    {%- if ev == 'water_low' and a.get('enough_to_finish') -%}
+    {#- The cup will finish: the brew announcement says what is left. -#}
+    {%- elif lang == 'ar' -%}
+      {%- if ev == 'water_low' -%}
+        الماء لا يكفي لإكمال الوصفة، ينقصه نحو {{ amount }} {{ unit_ar }}. املأ الخزان الآن
+      {%- elif ev == 'water_paused' -%}
+        توقف التحضير لنفاد الماء ويحتاج إلى نحو {{ amount }} {{ unit_ar }}. املأ الخزان ثم اضغط المقبض للمتابعة
+      {%- elif ev == 'water_refilled' -%}
+        امتلأ الخزان، اضغط المقبض للمتابعة
+      {%- elif ev == 'error_no_water' -%}
         الخزان فارغ، أضف ماءً
       {%- elif ev == 'error_no_beans' -%}
         المطحنة فارغة، أضف البن
@@ -99,7 +120,13 @@ variables:
         المطحنة ليست في موضعها
       {%- endif -%}
     {%- else -%}
-      {%- if ev == 'error_no_water' -%}
+      {%- if ev == 'water_low' -%}
+        Not enough water to finish. About {{ amount }} millilitres short. Refill the tank now.
+      {%- elif ev == 'water_paused' -%}
+        Paused for water. It needs about {{ amount }} millilitres more. Refill the tank and press the knob to continue.
+      {%- elif ev == 'water_refilled' -%}
+        Tank refilled. Press the knob to continue.
+      {%- elif ev == 'error_no_water' -%}
         The xBloom is out of water. Please refill the tank.
       {%- elif ev == 'error_no_beans' -%}
         No beans detected in the grinder.
@@ -118,10 +145,9 @@ trigger:
     not_from: "unavailable"
 
 condition:
+  # Every event this blueprint speaks has a message; any other has none.
   - condition: template
-    value_template: >
-      {{ trigger.to_state.attributes.get('event_type') in
-         ['error_no_water', 'error_no_beans', 'error_dose_water', 'error_gear_position'] }}
+    value_template: "{{ message | trim != '' }}"
 
 action:
   - choose:

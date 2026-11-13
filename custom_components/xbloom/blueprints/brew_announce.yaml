@@ -149,6 +149,7 @@ variables:
   announce_pours: !input announce_pours
   announce_duration: !input announce_duration
   status_entity: !input xbloom_status_entity
+  paused_entity_id: !input paused_entity
   method: !input delivery_method
   notify_service: !input notify_service
   # Carried as a variable, not used as `!input` directly in `target:`. Home
@@ -185,7 +186,19 @@ variables:
       'no_reply': ('the machine did not answer', 'لم يرد الجهاز'),
     } -%}
     {%- set reason = trigger.event.data.get('reason', '') if trigger.id == 'failed' else '' -%}
-    {%- if reason in reasons -%}
+    {%- set needed = trigger.event.data.get('water_needed_ml') if trigger.id == 'failed' else none -%}
+    {%- if reason == 'no_water' and needed is number and needed > 0 -%}
+      {#- What the recipe needs, exactly: it is the recipe's own water. -#}
+      {%- set n = needed | int -%}
+      {%- if lang == 'ar' -%}
+        {#- The counted noun follows the number's last two digits: 0, 1 and 2
+            take the singular, 3 to 10 the plural, 11 to 99 the accusative. -#}
+        {%- set r = n % 100 -%}
+        الماء لا يكفي، تحتاج الوصفة إلى {{ n }} {{ 'مليلتر' if r <= 2 else ('مليلترات' if r <= 10 else 'مليلترًا') }}. املأ الخزان
+      {%- else -%}
+        not enough water, the recipe needs {{ n }} millilitres. Refill the tank
+      {%- endif -%}
+    {%- elif reason in reasons -%}
       {{ reasons[reason][1] if lang == 'ar' else reasons[reason][0] }}
     {%- elif reason -%}
       {%- if lang == 'ar' %}توقف التحضير{% else %}the brew stopped{% endif -%}
@@ -261,8 +274,24 @@ variables:
       {%- endif -%}
     {%- elif trigger.id == 'machine_started' -%}
       {%- if lang == 'ar' %}بدأ التحضير{% else %}Brew started{% endif -%}
-    {%- elif trigger.id == 'paused' -%}
+    {#- A pause for water is announced by the fault announcements, with what
+        to do; read now rather than from the trigger, since the water screen
+        arrives a moment after the pause itself. -#}
+    {%- elif trigger.id == 'paused' and state_attr(paused_entity_id, 'reason') != 'water' -%}
       {%- if lang == 'ar' %}التحضير متوقف مؤقتا{% else %}Brew paused{% endif -%}
+    {#- What is left in the tank after a brew that ran it low. -#}
+    {%- elif trigger.id == 'tank' and trigger.event.data.get('tank_low') -%}
+      {%- set left = trigger.event.data.get('water_left_ml') -%}
+      {%- if left is number -%}
+        {%- set n = [((left / 10) | round(0) * 10) | int, 10] | max -%}
+        {%- if lang == 'ar' -%}
+          بقي في الخزان نحو {{ n }} {{ 'مليلتر' if n % 100 == 0 else ('مليلترات' if n % 100 == 10 else 'مليلترًا') }}، املأه قبل الكوب القادم
+        {%- else -%}
+          About {{ n }} millilitres left in the tank. Refill before your next cup.
+        {%- endif -%}
+      {%- else -%}
+        {%- if lang == 'ar' %}الخزان منخفض، املأه قبل الكوب القادم{% else %}The tank is low. Refill before your next cup.{% endif -%}
+      {%- endif -%}
     {#- The pause also ends when the brew does; only a brew still running
         was resumed. -#}
     {%- elif trigger.id == 'resumed' and states(status_entity) in ['grinding', 'brewing'] -%}
@@ -358,6 +387,10 @@ trigger:
   - platform: event
     event_type: xbloom_brew_failed
     id: failed
+  # The tank after a brew that ran it low, said once the coffee is announced.
+  - platform: event
+    event_type: xbloom_brew_completed
+    id: tank
   # A brew started from one of the machine's own recipe slots: Home Assistant
   # does not know the recipe, so it is announced without a name.
   - platform: event
