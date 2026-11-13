@@ -163,6 +163,10 @@ BREW_END_GRACE_S = 120.0
 # and reports the fault a moment later; that fault is the real ending, and a
 # stop decided at once would drop it.
 BREW_STOP_GRACE_S = 10.0
+# The longest a brew's ten minutes is extended for a wait for water. A brew
+# left on the water screen beyond it is reported as a timeout, so it does not
+# hold the machine's brew for good.
+WATER_WAIT_MAX_S = 3600.0
 
 # A second grinder-start frame this soon after one that began a brew belongs to
 # the same press: no brew is started again that quickly.
@@ -195,13 +199,14 @@ async def _wait_for_enjoy(
     A brew that runs the tank dry waits until it is refilled and the knob
     pressed, however long that takes. `extra_wait_s` reports that waiting
     time; each budget that runs out while some of it accrued is extended by
-    exactly that much, and no more. A wait that ends before its budget is
-    up means the client can no longer hear the end — its link is gone — so
-    it is never extended.
+    exactly that much, and no more, up to WATER_WAIT_MAX_S in all. A wait
+    that ends before its budget is up means the client can no longer hear
+    the end — its link is gone — so it is never extended.
     """
     if clock is None:
         clock = asyncio.get_running_loop().time
     timeout = 600.0
+    extended = 0.0
     while True:
         before = extra_wait_s() if extra_wait_s is not None else 0.0
         started = clock()
@@ -210,9 +215,10 @@ async def _wait_for_enjoy(
         if clock() - started < timeout:
             return False
         accrued = (extra_wait_s() - before) if extra_wait_s is not None else 0.0
-        if accrued <= 0:
+        timeout = min(accrued, WATER_WAIT_MAX_S - extended)
+        if timeout <= 0:
             return False
-        timeout = accrued
+        extended += timeout
 
 
 async def _await_brew_outcome(

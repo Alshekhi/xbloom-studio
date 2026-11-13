@@ -68,3 +68,19 @@ def test_spoken_water_text_has_no_dashes():
         for line in text.splitlines():
             if "millilitres" in line or "مليلتر" in line:
                 assert "—" not in line and " - " not in line, line
+
+
+def test_the_knob_is_named_as_elsewhere_in_arabic():
+    text = (BLUEPRINTS / "machine_fault_announce.yaml").read_text(encoding="utf-8")
+    assert "المقبض" not in text
+    assert text.count("اضغط المفتاح الأيمن") == 2
+
+
+def test_a_pause_while_the_tank_is_low_is_left_to_the_water_announcement():
+    """The pause frame can arrive before the water screen says why."""
+    bp = _load("brew_announce.yaml")
+    assert bp["blueprint"]["input"]["entities"]["input"]["machine_status_entity"]["default"] \
+        == "sensor.xbloom_studio_machine_status"
+    message = bp["variables"]["message"]
+    paused = message[message.index("trigger.id == 'paused'"):message.index("trigger.id == 'tank'")]
+    assert "no_water" in paused

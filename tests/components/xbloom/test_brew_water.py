@@ -196,3 +196,24 @@ async def test_a_tracker_failure_does_not_cost_the_brew_its_pours():
                side_effect=RuntimeError("tracker")):
         hass, _ = await _brew(_Swallowing)
     assert _bus(hass, "xbloom_brew_completed")[0]["first_pour_at"] is not None
+
+
+async def test_a_wait_for_water_is_not_endless():
+    """A brew left on the water screen gives up after WATER_WAIT_MAX_S."""
+    from custom_components.xbloom import WATER_WAIT_MAX_S, _wait_for_enjoy
+
+    clock = [0.0]
+
+    class _Waiting:
+        calls = 0
+
+        async def wait_for_completion(self, timeout=600.0):
+            _Waiting.calls += 1
+            if _Waiting.calls > 50:
+                raise RuntimeError("never gave up")
+            clock[0] += timeout   # the whole budget, all of it paused
+            return False
+
+    paused = lambda: clock[0]   # noqa: E731 — paused from the start
+    assert await _wait_for_enjoy(_Waiting(), paused, lambda: clock[0]) is False
+    assert clock[0] == 600.0 + WATER_WAIT_MAX_S

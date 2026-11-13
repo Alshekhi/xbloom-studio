@@ -99,7 +99,7 @@ would leave a brew showing as in progress until it was cancelled by hand: that
 fires `xbloom_brew_failed` with the fault as its reason, and `brew_status`
 returns to `idle`. A fault it *does* brew through — low water, which the machine
 reports mid-pour and carries on — changes nothing; a pause for water stops the
-brew's ten-minute limit until the brew resumes.
+brew's ten-minute limit until the brew resumes, for up to an hour.
 
 **A brew started on the machine itself fires none of these.** It runs no Home
 Assistant brew task, so there is nothing to report it; `sensor.xbloom_studio_brew_status`

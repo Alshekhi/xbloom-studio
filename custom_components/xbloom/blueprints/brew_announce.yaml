@@ -142,6 +142,12 @@ blueprint:
           selector:
             entity:
               domain: sensor
+        machine_status_entity:
+          name: Machine status
+          default: sensor.xbloom_studio_machine_status
+          selector:
+            entity:
+              domain: sensor
 
 variables:
   lang: !input language
@@ -150,6 +156,7 @@ variables:
   announce_duration: !input announce_duration
   status_entity: !input xbloom_status_entity
   paused_entity_id: !input paused_entity
+  machine_status_id: !input machine_status_entity
   method: !input delivery_method
   notify_service: !input notify_service
   # Carried as a variable, not used as `!input` directly in `target:`. Home
@@ -275,9 +282,11 @@ variables:
     {%- elif trigger.id == 'machine_started' -%}
       {%- if lang == 'ar' %}بدأ التحضير{% else %}Brew started{% endif -%}
     {#- A pause for water is announced by the fault announcements, with what
-        to do; read now rather than from the trigger, since the water screen
-        arrives a moment after the pause itself. -#}
-    {%- elif trigger.id == 'paused' and state_attr(paused_entity_id, 'reason') != 'water' -%}
+        to do. The water screen that says so can come a moment after the
+        pause itself, so a pause while the tank already reads low is taken
+        as one too. -#}
+    {%- elif trigger.id == 'paused' and state_attr(paused_entity_id, 'reason') != 'water'
+            and states(machine_status_id) != 'no_water' -%}
       {%- if lang == 'ar' %}التحضير متوقف مؤقتا{% else %}Brew paused{% endif -%}
     {#- What is left in the tank after a brew that ran it low. -#}
     {%- elif trigger.id == 'tank' and trigger.event.data.get('tank_low') -%}
