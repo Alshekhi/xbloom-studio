@@ -42,6 +42,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from xbloom import spec
+from xbloom.ble import NOTIFY_MACHINE_INFO
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -253,6 +254,10 @@ ACTIVITY_BREW_DONE  = 36
 # paused. Seen before every start with the machine's button, and after every
 # pause made at the machine.
 ACTIVITY_RECIPE_READY = 31
+# The water-shortage screen: a recipe brew that ran the tank dry mid-pour
+# waits here, after 40515, until it is refilled (then 31) and the knob pressed.
+# Seen live 2026-11-13 on V12.0D.500.
+ACTIVITY_WATER_SHORTAGE = 12
 
 
 def _device_info(entry_id: str) -> DeviceInfo:
@@ -635,9 +640,9 @@ class XBloomLastUpdatedSensor(RestoreSensor, SensorEntity):
 
         @callback
         def _on_event(decoded: dict) -> None:
-            # "water_enough" appears only in the RD_MachineInfo heartbeat decode
-            # — a reliable marker that we just synced machine status.
-            if "water_enough" in decoded:
+            # The RD_MachineInfo heartbeat carries the whole machine status;
+            # the low-water report carries the same switch but nothing else.
+            if decoded.get("cmd") == NOTIFY_MACHINE_INFO:
                 self._attr_native_value = dt_util.utcnow()
                 self.async_write_ha_state()
 
@@ -722,6 +727,9 @@ class XBloomBrewEventBleEntity(EventEntity):
 
             # Fire granular event if applicable
             granular = self._CMD_TO_GRANULAR.get(cmd)
+            # The low-water report is sent for water coming back too.
+            if granular == WATER_FAULT_EVENT and decoded.get("water_enough") == 1:
+                granular = None
             if granular:
                 if granular in FAULT_EVENTS:
                     if granular in self._active_faults:

@@ -28,6 +28,7 @@ from . import _resolve_ble_name, remember_address
 from .ble_entities import (
     ACTIVITY_HOME_STATES,
     ACTIVITY_RECIPE_READY,
+    ACTIVITY_WATER_SHORTAGE,
     CMD_GRINDER_START,
     CMD_MACHINE_ACTIVITY,
     _device_info,
@@ -188,7 +189,7 @@ class XBloomBrewPausedSensor(BinarySensorEntity):
                     self._brew_running = False
                     self._set(False)
                 elif self._brew_running:
-                    self._set(activity == ACTIVITY_RECIPE_READY)
+                    self._set(activity in (ACTIVITY_RECIPE_READY, ACTIVITY_WATER_SHORTAGE))
             elif cmd in (NOTIFY_BREW_PAUSED, NOTIFY_GRINDER_PAUSED, NOTIFY_BREWER_PAUSED):
                 self._set(True)
             elif cmd in (NOTIFY_BREW_RESUMED, NOTIFY_MACHINE_RESUMED):
