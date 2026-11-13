@@ -58,6 +58,16 @@ def signal_brew_lifecycle(entry_id: str) -> str:
     return f"xbloom_ble_brewlife_{entry_id}"
 
 
+def signal_water(entry_id: str) -> str:
+    """The tank during a brew Home Assistant started.
+
+    Payload `(event_type, attributes, state)`: a water event to fire, or None;
+    its attributes; and the amounts while the switch has tripped, or None.
+    `(None, {}, None)` when the brew ends.
+    """
+    return f"xbloom_water_{entry_id}"
+
+
 async def send_live_frame(entry, frame: bytes, *, guarded: bool = True) -> bool:
     """Send any pre-built FFE1 frame over the HELD Connect session.
 

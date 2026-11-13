@@ -21,6 +21,7 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -184,12 +185,34 @@ def pour_time_s(first_pour: datetime | None, end: datetime | None) -> float | No
     return round((end - first_pour).total_seconds(), 1)
 
 
+async def _wait_for_enjoy(
+    ble_client, extra_wait_s: Callable[[], float] | None = None,
+) -> bool:
+    """RD_ENJOY within 600 s, not counting time the brew waited for water.
+
+    A brew that runs the tank dry waits until it is refilled and the knob
+    pressed, however long that takes. `extra_wait_s` reports that waiting
+    time; each budget that runs out while some of it accrued is extended by
+    exactly that much, and no more.
+    """
+    timeout = 600.0
+    while True:
+        before = extra_wait_s() if extra_wait_s is not None else 0.0
+        if await ble_client.wait_for_completion(timeout=timeout):
+            return True
+        accrued = (extra_wait_s() - before) if extra_wait_s is not None else 0.0
+        if accrued <= 0:
+            return False
+        timeout = accrued
+
+
 async def _await_brew_outcome(
     ble_client,
     brew_end_seen: asyncio.Event,
     went_home: asyncio.Event,
     fault_stopped: asyncio.Event,
     stopped_home: asyncio.Event | None = None,
+    extra_wait_s: Callable[[], float] | None = None,
 ) -> str | None:
     """Wait for the brew to end, and report which signal said so.
 
@@ -210,7 +233,7 @@ async def _await_brew_outcome(
     was stopped at the machine: ``cancelled``, unless a fault it gives up on
     arrives within BREW_STOP_GRACE_S, which makes it ``stopped``.
     """
-    enjoy = asyncio.ensure_future(ble_client.wait_for_completion(timeout=600.0))
+    enjoy = asyncio.ensure_future(_wait_for_enjoy(ble_client, extra_wait_s))
     ended = asyncio.ensure_future(brew_end_seen.wait())
     stopped = asyncio.ensure_future(fault_stopped.wait())
     left = asyncio.ensure_future((stopped_home or asyncio.Event()).wait())
@@ -895,7 +918,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             CMD_MACHINE_ACTIVITY,
             signal_brew_lifecycle,
             signal_event,
+            signal_water,
         )
+        from .water import WaterTracker, recipe_water_ml
         from xbloom.ble import (
             NOTIFY_GRINDER_PAUSED,
             NOTIFY_MACHINE_RESUMED,
@@ -1040,9 +1065,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         # its pours: first pour to ENJOY, or to BREW_END when ENJOY never
         # comes — not the connecting, sending and grinding before them.
         heard: dict[str, datetime] = {}
+        # The tank, unless the machine draws from the tap. What it decides goes
+        # out on signal_water; amounts are re-sent only when one moves by
+        # 10 ml or more, not on every volume frame.
+        source = hass.states.get("select.xbloom_studio_water_source")
+        water = (
+            None if source is not None and source.state == "tap"
+            else WaterTracker(recipe_water_ml(recipe))
+        )
+        water_sent: dict = {"state": None}
+
+        def _water_key(state: dict | None) -> tuple | None:
+            if state is None:
+                return None
+            return tuple((k, v // 10 if isinstance(v, int) and not isinstance(v, bool) else v)
+                         for k, v in sorted(state.items()))
+
+        def _send_water(event_type: str | None, attrs: dict, state: dict | None) -> None:
+            water_sent["state"] = _water_key(state)
+            async_dispatcher_send(
+                hass, signal_water(entry.entry_id), (event_type, attrs, state))
 
         async def _observe(decoded: dict) -> None:
             """What this brew learns from a frame: its pours, its end, a fault."""
+            if water is not None:
+                decision = water.feed(decoded, hass.loop.time())
+                state = water.state
+                if decision is not None:
+                    _send_water(decision[0], decision[1], state)
+                elif _water_key(state) != water_sent["state"]:
+                    _send_water(None, {}, state)
             fault = spec.FAULTS.get(decoded.get("cmd"))
             if fault and fault[0] in BREW_STOPPING_FAULTS:
                 stopped_by.setdefault("status", fault[0])
@@ -1208,6 +1260,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     started = True
                     outcome = await _await_brew_outcome(
                         ble_client, brew_end_seen, went_home, fault_stopped, stopped_home,
+                        extra_wait_s=(
+                            None if water is None
+                            else lambda: water.paused_seconds(hass.loop.time())
+                        ),
                     )
                 completed = outcome == "confirmed"
                 # A fault the machine stops for (no beans) used no coffee even
@@ -1278,6 +1334,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                             # either frame went unheard.
                             "duration_s": pour_time_s(heard.get("first_pour"), end),
                             **_brew_settings(recipe),
+                            # The tank, when its switch read low at the end.
+                            **(water.completion_fields() if water is not None else {}),
                             **meta,
                         },
                     )
@@ -1288,7 +1346,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 _LOGGER.error(
                     "xbloom.start_brew: '%s' not started — %s", recipe_name, err,
                 )
-                _fire_failed(err.reason, recipe_name, step=err.step)
+                extra = {"step": err.step}
+                if err.reason == "no_water":
+                    # What the recipe needs, so a refusal can say how much.
+                    extra["water_needed_ml"] = round(recipe_water_ml(recipe))
+                _fire_failed(err.reason, recipe_name, **extra)
             except Exception as err:  # noqa: BLE001
                 _LOGGER.error(
                     "xbloom.start_brew: BLE dispatch failed for '%s': %s",
@@ -1308,6 +1370,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 raise
             finally:
                 brew_session["client"] = None
+                if water is not None:
+                    # Nobody reads the tank once the brew is over.
+                    _send_water(None, {}, None)
                 async_dispatcher_send(hass, signal_brew_lifecycle(entry.entry_id), "ended")
                 if ending["report"]:
                     hass.async_create_task(preparer.async_brew_ended(ending["used"]))
