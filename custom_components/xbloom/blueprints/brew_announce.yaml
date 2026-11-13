@@ -16,7 +16,7 @@ blueprint:
     name and how long the brew took are said too.
 
 
-    A brew that cannot start says why, such as "the tank needs water".
+    A brew that cannot start says why, such as "not enough water".
   domain: automation
   author: xbloom-studio-controler
   source_url: https://github.com/Alshekhi/xbloom-studio/blob/main/custom_components/xbloom/blueprints/brew_announce.yaml
@@ -188,7 +188,7 @@ variables:
       'restore_incomplete': ('the machine has not finished recovering — put it back on its standby screen',
                              'لم تكمل الآلة استعادة حالتها، أعدها إلى شاشة الانتظار'),
       'not_on_home_screen': ('the machine is not on its standby screen', 'الآلة ليست على شاشة الانتظار'),
-      'no_water': ('the tank needs water', 'الخزان يحتاج إلى ماء'),
+      'no_water': ('not enough water', 'الماء لا يكفي'),
       'recipe_rejected': ('the machine did not accept the recipe', 'لم تقبل الآلة الوصفة'),
       'no_reply': ('the machine did not answer', 'لم يرد الجهاز'),
     } -%}
@@ -201,9 +201,9 @@ variables:
         {#- The counted noun follows the number's last two digits: 0, 1 and 2
             take the singular, 3 to 10 the plural, 11 to 99 the accusative. -#}
         {%- set r = n % 100 -%}
-        الماء لا يكفي، تحتاج الوصفة إلى {{ n }} {{ 'مليلتر' if r <= 2 else ('مليلترات' if r <= 10 else 'مليلترًا') }}. املأ الخزان
+        الماء لا يكفي، تحتاج الوصفة إلى {{ n }} {{ 'مليلتر' if r <= 2 else ('مليلترات' if r <= 10 else 'مليلترًا') }}
       {%- else -%}
-        not enough water, the recipe needs {{ n }} millilitres. Refill the tank
+        not enough water, the recipe needs {{ n }} millilitres
       {%- endif -%}
     {%- elif reason in reasons -%}
       {{ reasons[reason][1] if lang == 'ar' else reasons[reason][0] }}
@@ -294,12 +294,12 @@ variables:
       {%- if left is number -%}
         {%- set n = [((left / 10) | round(0) * 10) | int, 10] | max -%}
         {%- if lang == 'ar' -%}
-          بقي في الخزان نحو {{ n }} {{ 'مليلتر' if n % 100 == 0 else ('مليلترات' if n % 100 == 10 else 'مليلترًا') }}، املأه قبل الكوب القادم
+          بقي نحو {{ n }} {{ 'مليلتر' if n % 100 == 0 else ('مليلترات' if n % 100 == 10 else 'مليلترًا') }} من الماء، أضف ماءً قبل الكوب القادم
         {%- else -%}
-          About {{ n }} millilitres left in the tank. Refill before your next cup.
+          About {{ n }} millilitres of water left. Add water before your next cup.
         {%- endif -%}
       {%- else -%}
-        {%- if lang == 'ar' %}الخزان منخفض، املأه قبل الكوب القادم{% else %}The tank is low. Refill before your next cup.{% endif -%}
+        {%- if lang == 'ar' %}الماء قليل، أضف ماءً قبل الكوب القادم{% else %}The water is low. Add water before your next cup.{% endif -%}
       {%- endif -%}
     {#- The pause also ends when the brew does; only a brew still running
         was resumed. -#}

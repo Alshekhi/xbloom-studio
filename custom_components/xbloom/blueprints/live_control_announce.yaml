@@ -134,7 +134,7 @@ variables:
       'not_ready': ('the machine is not ready after a power cut', 'الآلة غير جاهزة بعد انقطاع الكهرباء'),
       'restore_incomplete': ('the machine has not finished recovering', 'لم تكمل الآلة استعادة حالتها'),
       'not_on_home_screen': ('the machine is not on its standby screen', 'الآلة ليست على شاشة الانتظار'),
-      'no_water': ('the tank needs water', 'الخزان يحتاج إلى ماء'),
+      'no_water': ('not enough water', 'الماء لا يكفي'),
       'recipe_rejected': ('the machine did not accept the recipe', 'لم تقبل الآلة الوصفة'),
       'no_reply': ('the device did not answer', 'لم يرد الجهاز'),
     } -%}

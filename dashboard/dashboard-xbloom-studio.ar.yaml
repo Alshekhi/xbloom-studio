@@ -287,6 +287,19 @@ views:
       - condition: state
         entity: sensor.xbloom_studio_brew_time
         state_not: unknown
+    - type: markdown
+      text_only: true
+      show_empty: false
+      content: '{% set a = states[''sensor.xbloom_studio_machine_status''].attributes if states[''sensor.xbloom_studio_machine_status'']
+        else {} %}{% set left = a.get(''water_left_ml'') %}{% if left is number %}{% set short = [a.get(''water_needed_ml'',
+        0) - left, 0] | max %}{% macro ml(n) %}{{ n }} {{ ''مليلتر'' if n % 100 <= 2 else (''مليلترات''
+        if n % 100 <= 10 else ''مليلترًا'') }}{% endmacro %}**الماء:** {% if left > 0 %}بقي {{ ml(left)
+        }}{% else %}نفد{% endif %}، {% if a.get(''water_enough_to_finish'') %}يكفي لإكمال الوصفة{% else
+        %}ينقص {{ ml(short) }}{% endif %}{% endif %}'
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_machine_status
+        state: no_water
     - type: tile
       entity: button.xbloom_studio_pause_brew
       name:
@@ -662,8 +675,8 @@ views:
         elif r is none %}لم تقبل الماكينة الوصفة. اخترها مرة أخرى.{% elif r == ''no_bag'' %}اختر كيسا
         لتجهيز هذه الوصفة.{% elif r in [''machine_not_found'', ''machine_unreachable''] %}الماكينة خارج
         النطاق.{% elif r == ''refused_not_on_home_screen'' %}أعد الماكينة إلى شاشتها الرئيسية لتحضير وصفة.{%
-        elif r == ''refused_no_water'' %}املأ خزان الماء.{% else %}لم تقبل الماكينة الوصفة. اخترها مرة
-        أخرى.{% endif %}'
+        elif r == ''refused_no_water'' %}أضف ماءً.{% else %}لم تقبل الماكينة الوصفة. اخترها مرة أخرى.{%
+        endif %}'
       visibility:
       - condition: state
         entity: select.xbloom_studio_recipe

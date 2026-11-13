@@ -105,13 +105,13 @@ variables:
     {#- The cup will finish: the brew announcement says what is left. -#}
     {%- elif lang == 'ar' -%}
       {%- if ev == 'water_low' -%}
-        الماء لا يكفي لإكمال الوصفة، ينقصه نحو {{ amount }} {{ unit_ar }}. املأ الخزان الآن
+        الماء لا يكفي لإكمال الوصفة، ينقصه نحو {{ amount }} {{ unit_ar }}. أضف ماءً الآن
       {%- elif ev == 'water_paused' -%}
-        توقف التحضير لنفاد الماء ويحتاج إلى نحو {{ amount }} {{ unit_ar }}. املأ الخزان ثم اضغط المفتاح الأيمن للمتابعة
+        توقف التحضير لنفاد الماء ويحتاج إلى نحو {{ amount }} {{ unit_ar }}. أضف ماءً ثم اضغط المفتاح الأيمن للمتابعة
       {%- elif ev == 'water_refilled' -%}
-        امتلأ الخزان، اضغط المفتاح الأيمن للمتابعة
+        اضغط المفتاح الأيمن للمتابعة
       {%- elif ev == 'error_no_water' -%}
-        الخزان فارغ، أضف ماءً
+        نفد الماء، أضف ماءً
       {%- elif ev == 'error_no_beans' -%}
         المطحنة فارغة، أضف البن
       {%- elif ev == 'error_dose_water' -%}
@@ -121,13 +121,13 @@ variables:
       {%- endif -%}
     {%- else -%}
       {%- if ev == 'water_low' -%}
-        Not enough water to finish. About {{ amount }} millilitres short. Refill the tank now.
+        Not enough water to finish. About {{ amount }} millilitres short. Add water now.
       {%- elif ev == 'water_paused' -%}
-        Paused for water. It needs about {{ amount }} millilitres more. Refill the tank and press the knob to continue.
+        Paused for water. It needs about {{ amount }} millilitres more. Add water, then press the knob to continue.
       {%- elif ev == 'water_refilled' -%}
-        Tank refilled. Press the knob to continue.
+        Press the knob to continue.
       {%- elif ev == 'error_no_water' -%}
-        The xBloom is out of water. Please refill the tank.
+        The xBloom is out of water. Add water.
       {%- elif ev == 'error_no_beans' -%}
         No beans detected in the grinder.
       {%- elif ev == 'error_dose_water' -%}

@@ -29,7 +29,8 @@ TEXT = {
         "go_home": "Return the machine to its home screen to brew a recipe.",
         "show_advanced": "Show brew adjustments", "show_per_pour": "Show each pour",
         "preparing": "Preparing the recipe.", "need_bag": "Pick a bag to prepare this recipe.",
-        "out_of_range": "The machine is out of range.", "need_water": "Fill the water tank.",
+        "out_of_range": "The machine is out of range.", "need_water": "Add water.",
+        "w_water": "**Water:** {% if left > 0 %}{{ left }} ml left{% else %}none left{% endif %}, {% if a.get('water_enough_to_finish') %}enough to finish{% else %}{{ short }} ml short{% endif %}",
         "not_taken": "The machine did not take the recipe. Pick it again.",
         "show_manual": "Show manual brew",
         "confirm_stop": "Stop the brew in progress?", "confirm_record": "Record this manual brew?",
@@ -101,7 +102,8 @@ TEXT = {
         "go_home": "أعد الماكينة إلى شاشتها الرئيسية لتحضير وصفة.",
         "show_advanced": "إظهار تعديلات التحضير", "show_per_pour": "إظهار كل صبة",
         "preparing": "يجري تجهيز الوصفة.", "need_bag": "اختر كيسا لتجهيز هذه الوصفة.",
-        "out_of_range": "الماكينة خارج النطاق.", "need_water": "املأ خزان الماء.",
+        "out_of_range": "الماكينة خارج النطاق.", "need_water": "أضف ماءً.",
+        "w_water": "{% macro ml(n) %}{{ n }} {{ 'مليلتر' if n % 100 <= 2 else ('مليلترات' if n % 100 <= 10 else 'مليلترًا') }}{% endmacro %}**الماء:** {% if left > 0 %}بقي {{ ml(left) }}{% else %}نفد{% endif %}، {% if a.get('water_enough_to_finish') %}يكفي لإكمال الوصفة{% else %}ينقص {{ ml(short) }}{% endif %}",
         "not_taken": "لم تقبل الماكينة الوصفة. اخترها مرة أخرى.",
         "show_manual": "إظهار التحضير اليدوي",
         "confirm_stop": "إيقاف التحضير الجاري؟", "confirm_record": "تسجيل هذا التحضير اليدوي؟",
@@ -317,6 +319,10 @@ def brew_view(t: dict) -> dict:
                 f"{{% set s = states('sensor.{E}_brew_time') | int(0) %}}"
                 f"**{t['brew_time']} {{{{ s // 60 }}}}:{{{{ '%02d' % (s % 60) }}}}**"
             ), "visibility": present(f"sensor.{E}_brew_time")},
+            # The water left and what the recipe still needs, once the
+            # low-water switch has tripped; empty, and hidden, otherwise.
+            {"type": "markdown", "text_only": True, "show_empty": False, "content": water_card(t),
+             "visibility": [is_(f"sensor.{E}_machine_status", "no_water")]},
             # One of the two, by whether the machine reports the brew paused.
             press(f"button.{E}_pause_brew", visibility=[is_(f"binary_sensor.{E}_brew_paused", "off")]),
             press(f"button.{E}_resume_brew", visibility=[is_(f"binary_sensor.{E}_brew_paused", "on")]),
@@ -498,6 +504,18 @@ def chart(title: str, period: str, days: int, series: list[tuple[str, str]]) -> 
         "period": period, "days_to_show": days, "stat_types": ["change"],
         "entities": [{"entity": sid, "name": name} for sid, name in series],
     }
+
+
+def water_card(t: dict) -> str:
+    """The water left and the shortfall, exactly, while a brew's switch has tripped."""
+    return (
+        f"{{% set a = states['sensor.{E}_machine_status'].attributes "
+        f"if states['sensor.{E}_machine_status'] else {{}} %}}"
+        "{% set left = a.get('water_left_ml') %}"
+        "{% if left is number %}"
+        "{% set short = [a.get('water_needed_ml', 0) - left, 0] | max %}"
+        + t["w_water"] + "{% endif %}"
+    )
 
 
 def opened_ago(t: dict) -> str:

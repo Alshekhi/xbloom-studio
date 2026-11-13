@@ -639,7 +639,7 @@
         "name": "Machine Status",
         "state": {
           "ok": "OK",
-          "no_water": "No water",
+          "no_water": "Low water",
           "no_beans": "No beans",
           "dose_water_error": "Dose/water error",
           "gear_position_error": "Gear position error"
@@ -883,7 +883,7 @@
       "message": "The xBloom refused the command: it is not on its home screen. Return it to the home screen and try again."
     },
     "refused_no_water": {
-      "message": "The xBloom refused the command: it needs water. Fill the tank and try again."
+      "message": "The xBloom refused the command: it needs water. Add water and try again."
     },
     "refused_recipe_rejected": {
       "message": "The xBloom refused the settings it was sent. Check the water amount and pour settings."
