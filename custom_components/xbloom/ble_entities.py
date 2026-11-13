@@ -568,6 +568,28 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
             async_dispatcher_connect(self.hass, signal_brew_lifecycle(eid), _on_lifecycle)
         )
 
+        @callback
+        def _on_water(update: tuple) -> None:
+            # The amounts while a brew's switch has tripped; gone with the brew.
+            _event_type, _attrs, state = update
+            attrs = {k: v for k, v in (self._attr_extra_state_attributes or {}).items()
+                     if k not in WATER_ATTRIBUTES}
+            if state is not None:
+                attrs["water_left_ml"] = state["water_left_ml"]
+                attrs["water_needed_ml"] = state["water_needed_ml"]
+                attrs["water_enough_to_finish"] = state["enough_to_finish"]
+            if attrs != (self._attr_extra_state_attributes or {}):
+                self._attr_extra_state_attributes = attrs
+                self.async_write_ha_state()
+
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, signal_water(eid), _on_water)
+        )
+
+
+# Machine Status attributes that describe the tank during a brew.
+WATER_ATTRIBUTES = ("water_left_ml", "water_needed_ml", "water_enough_to_finish")
+
 
 # --------------------------------------------------------------------- #
 # sensor.xbloom_studio_scale_weight                                     #
@@ -691,6 +713,10 @@ class XBloomBrewEventBleEntity(EventEntity):
         "brew_ended",
         # Fault notifications (machine → phone), derived from spec.FAULTS:
         *[event_type for (_status, event_type) in spec.FAULTS.values()],
+        # The tank during a brew Home Assistant started: see signal_water.
+        "water_low",
+        "water_paused",
+        "water_refilled",
     ]
     _attr_should_poll = False
 
@@ -715,6 +741,9 @@ class XBloomBrewEventBleEntity(EventEntity):
         self._first_pour_at = None
         # On a grinder, brewer or scale screen: see module_screen_after.
         self._on_module_screen = False
+        # A brew Home Assistant started is under way, so its tank is reported
+        # as water events rather than the bare low-water fault.
+        self._followed = False
         # Faults currently asserted. The machine reports a fault for as long as
         # it holds, the way a low-fuel light stays lit, so the frames after the
         # first carry no news — relaying each one made one dry tank announce
@@ -737,8 +766,11 @@ class XBloomBrewEventBleEntity(EventEntity):
 
             # Fire granular event if applicable
             granular = self._CMD_TO_GRANULAR.get(cmd)
-            # The low-water report is sent for water coming back too.
-            if granular == WATER_FAULT_EVENT and decoded.get("water_enough") == 1:
+            # The low-water report is sent for water coming back too, and a
+            # brew Home Assistant started reports the tank as water events.
+            if granular == WATER_FAULT_EVENT and (
+                decoded.get("water_enough") == 1 or self._followed
+            ):
                 granular = None
             if granular:
                 if granular in FAULT_EVENTS:
@@ -838,6 +870,7 @@ class XBloomBrewEventBleEntity(EventEntity):
 
         @callback
         def _on_lifecycle(phase: str) -> None:
+            self._followed = phase == "started"
             if phase == "ended":
                 _release_water_latch()
             # Reset both latches at the start of each brew
@@ -862,6 +895,17 @@ class XBloomBrewEventBleEntity(EventEntity):
         )
         self.async_on_remove(
             async_dispatcher_connect(self.hass, signal_brew_lifecycle(eid), _on_lifecycle)
+        )
+
+        @callback
+        def _on_water(update: tuple) -> None:
+            event_type, attrs, _state = update
+            if event_type:
+                self._trigger_event(event_type, dict(attrs))
+                self.async_write_ha_state()
+
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, signal_water(eid), _on_water)
         )
         self.async_on_remove(
             self.hass.bus.async_listen("xbloom_brew_started", _on_brew_started_bus)

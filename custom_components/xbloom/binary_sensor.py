@@ -155,6 +155,8 @@ class XBloomBrewPausedSensor(BinarySensorEntity):
         # module_screen_after.
         self._on_module_screen = False
         self._brew_running = False
+        # "water" while the brew waits for the tank to be refilled.
+        self._reason: str | None = None
 
     @property
     def device_info(self):
@@ -164,10 +166,16 @@ class XBloomBrewPausedSensor(BinarySensorEntity):
     def icon(self) -> str:
         return "mdi:pause-circle" if self.is_on else "mdi:play-circle"
 
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {"reason": self._reason}
+
     @callback
-    def _set(self, paused: bool) -> None:
-        if self._attr_is_on != paused:
+    def _set(self, paused: bool, reason: str | None = None) -> None:
+        reason = reason if paused else None
+        if self._attr_is_on != paused or self._reason != reason:
             self._attr_is_on = paused
+            self._reason = reason
             self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
@@ -188,10 +196,13 @@ class XBloomBrewPausedSensor(BinarySensorEntity):
                 if activity in ACTIVITY_HOME_STATES:
                     self._brew_running = False
                     self._set(False)
+                elif activity == ACTIVITY_WATER_SHORTAGE and self._brew_running:
+                    self._set(True, "water")
                 elif self._brew_running:
-                    self._set(activity in (ACTIVITY_RECIPE_READY, ACTIVITY_WATER_SHORTAGE))
+                    # A refill brings the recipe screen; the wait goes on.
+                    self._set(activity == ACTIVITY_RECIPE_READY, self._reason)
             elif cmd in (NOTIFY_BREW_PAUSED, NOTIFY_GRINDER_PAUSED, NOTIFY_BREWER_PAUSED):
-                self._set(True)
+                self._set(True, self._reason)
             elif cmd in (NOTIFY_BREW_RESUMED, NOTIFY_MACHINE_RESUMED):
                 self._set(False)
             elif cmd in (NOTIFY_ENJOY, NOTIFY_BREW_ABANDONED):
