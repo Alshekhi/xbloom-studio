@@ -41,9 +41,13 @@ from homeassistant.util import dt as dt_util
 
 from xbloom import spec
 
+from .ble_entities import WATER_STATUS
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# The brew event entity's reports on the tank: see water.py.
+WATER_EVENTS = ("water_low", "water_paused", "water_refilled")
 
 NAME = re.compile(r"^[a-z0-9_]+$")
 SECRET_PREFIX = "whsec_"
@@ -269,24 +273,43 @@ class Callbacks:
     @callback
     def on_brew_event(self, attributes: dict[str, Any]) -> None:
         current = self._current()
-        if current is None or attributes.get("event_type") != "pour_started":
+        if current is None:
             return
         run_id, pending = current
+        event_type = attributes.get("event_type")
+        if event_type in WATER_EVENTS:
+            # Low water the cup will finish on needs nobody; a shortfall or a
+            # wait for water needs someone at the tank, progress or not.
+            if event_type == "water_low" and attributes.get("enough_to_finish"):
+                return
+            facts = {k: v for k, v in attributes.items() if k.startswith("water_")}
+            self._enqueue(run_id, pending, "water", False,
+                          {"water_event": event_type, **facts})
+            return
+        if event_type != "pour_started":
+            return
         index = attributes.get("pour_index")
         if pending.progress and isinstance(index, int):
             self._enqueue(run_id, pending, "pour", False,
                           {"pour": index + 1, "pours": pending.total_pours})
 
     @callback
-    def on_machine_status(self, before: str | None, after: str | None) -> None:
+    def on_machine_status(
+        self, before: str | None, after: str | None, attributes: dict | None = None,
+    ) -> None:
         current = self._current()
-        if current is None or after in (None, "unknown", "unavailable") or before == after:
+        if current is None or after in (None, "unknown", "unavailable"):
             return
         run_id, pending = current
         if after == spec.MACHINE_OK:
             if pending.fault is not None:
                 self._enqueue(run_id, pending, "fault_cleared", False, {"status": pending.fault})
                 pending.fault = None
+            return
+        if after == WATER_STATUS and (attributes or {}).get("water_enough_to_finish") is True:
+            # The switch is low, but the brew has the water it needs.
+            return
+        if pending.fault == after:
             return
         pending.fault = after
         # The machine waits on a person over a fault, so it is sent whether or
@@ -335,7 +358,7 @@ class Callbacks:
             if kind == "status":
                 self.on_brew_status(before, new.state)
             elif kind == "machine":
-                self.on_machine_status(before, new.state)
+                self.on_machine_status(before, new.state, dict(new.attributes))
             elif before not in (None, "unknown", "unavailable"):
                 # An event entity's state is when it fired; one restored from
                 # unavailable is not a firing.

@@ -833,11 +833,18 @@ async def machine_status(machine: Machine, args: dict[str, Any]) -> dict[str, An
         # "ok" for a machine switched off. Out of range, there is no status.
         return {"in_range": False}
     status = machine.state("sensor", "xbloom_machine_status")
-    return {
+    attrs = machine.attributes("sensor", "xbloom_machine_status")
+    # Low water the brew under way will finish on is not a fault.
+    will_finish = status == "no_water" and attrs.get("water_enough_to_finish") is True
+    facts = {
         "in_range": in_range,
         "machine_status": status,
-        "fault": status is not None and status != spec.MACHINE_OK,
+        "fault": status is not None and status != spec.MACHINE_OK and not will_finish,
     }
+    for key in ("water_left_ml", "water_needed_ml"):
+        if key in attrs:
+            facts[key] = attrs[key]
+    return facts
 
 
 async def refresh_status(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:

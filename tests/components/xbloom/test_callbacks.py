@@ -129,3 +129,39 @@ def test_a_completed_brew_s_caller_is_remembered_for_its_rating():
     cb.on_event(_event("xbloom_brew_failed", run_id="r2", reason="no_water"))
     assert cb.caller_of("r1") == ("receiver", {"member": "m"})
     assert cb.caller_of("r2") is None, "only a brew that made coffee is asked about"
+
+
+# The tank during a brew: low water that will still finish the cup is not a
+# fault; a shortfall and a pause for water are, and reach every receiver.
+def _armed(progress=False):
+    cb = _callbacks()
+    cb.arm("r1", "receiver", None, progress=progress)
+    cb.on_event(_event("xbloom_brew_started", run_id="r1", recipe_name="K", total_pours=4))
+    return cb
+
+
+def test_no_water_that_will_finish_is_not_a_fault():
+    cb = _armed()
+    cb.on_machine_status("ok", "no_water", {"water_enough_to_finish": True})
+    assert _sent(cb) == []
+
+
+def test_no_water_that_will_not_finish_is_a_fault():
+    cb = _armed()
+    cb.on_machine_status("ok", "no_water", {"water_enough_to_finish": False})
+    assert [m.payload["data"]["event"] for m in _sent(cb)] == ["fault"]
+
+
+def test_water_short_and_paused_reach_every_callback():
+    cb = _armed(progress=False)
+    cb.on_brew_event({"event_type": "water_low", "enough_to_finish": True,
+                      "water_left_ml": 270, "water_needed_ml": 200, "water_short_ml": 0})
+    cb.on_brew_event({"event_type": "water_low", "enough_to_finish": False,
+                      "water_left_ml": 270, "water_needed_ml": 388, "water_short_ml": 118})
+    cb.on_brew_event({"event_type": "water_paused", "water_needed_ml": 105})
+    cb.on_brew_event({"event_type": "water_refilled"})
+    sent = [m.payload["data"] for m in _sent(cb)]
+    assert [(d["event"], d["water_event"]) for d in sent] == [
+        ("water", "water_low"), ("water", "water_paused"), ("water", "water_refilled")]
+    assert sent[0]["water_short_ml"] == 118
+    assert sent[1]["water_needed_ml"] == 105

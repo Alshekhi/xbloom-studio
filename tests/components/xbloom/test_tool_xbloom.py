@@ -611,3 +611,24 @@ async def test_a_tool_answers_with_a_tool_result_where_home_assistant_has_one():
     with patch.object(llm_api, "_TOOL_RESULT", None):
         plain = await tool.async_call(hass, tool_input, SimpleNamespace(context=None))
     assert isinstance(wrapped, ToolResult) and wrapped.data == plain
+
+
+async def test_agent_machine_status_is_not_a_fault_when_the_cup_will_finish():
+    hass = FakeHass(states={
+        "binary_sensor.xbloom_in_range": "on",
+        "sensor.xbloom_machine_status": ("no_water", {
+            "water_left_ml": 270, "water_needed_ml": 200, "water_enough_to_finish": True}),
+    })
+    facts = await ACTIONS["machine_status"].run(_machine(hass), {})
+    assert facts["fault"] is False
+
+
+async def test_agent_machine_status_reports_the_amounts():
+    hass = FakeHass(states={
+        "binary_sensor.xbloom_in_range": "on",
+        "sensor.xbloom_machine_status": ("no_water", {
+            "water_left_ml": 70, "water_needed_ml": 188, "water_enough_to_finish": False}),
+    })
+    facts = await ACTIONS["machine_status"].run(_machine(hass), {})
+    assert facts == {"in_range": True, "machine_status": "no_water", "fault": True,
+                     "water_left_ml": 70, "water_needed_ml": 188}
