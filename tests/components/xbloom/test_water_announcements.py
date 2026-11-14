@@ -49,8 +49,14 @@ def test_the_brew_blueprint_says_what_is_left_after_the_coffee():
     bp = _load("brew_announce.yaml")
     triggers = {t.get("id"): t for t in bp["trigger"]}
     assert triggers["tank"]["event_type"] == "xbloom_brew_completed"
-    message = bp["variables"]["message"]
-    assert "water_left_ml" in message and "tank_low" in message
+    variables = bp["variables"]
+    assert "water_left_ml" in variables["tank_line"] and "tank_low" in variables["tank_line"]
+    # Part of the finish, so the two are one announcement, in order.
+    finish = variables["message"][variables["message"].index("trigger.id == 'done_recipe'"):]
+    assert finish.count("{{ tank_line }}") >= 2
+    # On its own only beside the plain finish, which comes before the tank is known.
+    tank = variables["message"][variables["message"].index("trigger.id == 'tank'"):]
+    assert tank.startswith("trigger.id == 'tank' and not (announce_recipe or announce_duration)")
 
 
 def test_the_brew_blueprint_says_how_much_water_a_refused_recipe_needs():

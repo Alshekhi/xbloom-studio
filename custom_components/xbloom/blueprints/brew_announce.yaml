@@ -212,6 +212,23 @@ variables:
     {%- endif -%}
   # How long the brew took: "3 minutes and 12 seconds". Empty when the brew event carries no duration —
   # its first pour went unheard — so the announcement never guesses.
+  # What is left after a brew that ran the water low, said with the finish.
+  tank_line: >-
+    {%- set d = trigger.to_state.attributes if trigger.id == 'done_recipe'
+         else (trigger.event.data if trigger.id == 'tank' else {}) -%}
+    {%- if d.get('tank_low') -%}
+      {%- set left = d.get('water_left_ml') -%}
+      {%- if left is number -%}
+        {%- set n = [((left / 10) | round(0) * 10) | int, 10] | max -%}
+        {%- if lang == 'ar' -%}
+          بقي نحو {{ n }} {{ 'مليلتر' if n % 100 == 0 else ('مليلترات' if n % 100 == 10 else 'مليلترًا') }} من الماء، أضف ماءً قبل الكوب القادم
+        {%- else -%}
+          About {{ n }} millilitres of water left. Add water before your next cup.
+        {%- endif -%}
+      {%- else -%}
+        {%- if lang == 'ar' %}الماء قليل، أضف ماءً قبل الكوب القادم{% else %}The water is low. Add water before your next cup.{% endif -%}
+      {%- endif -%}
+    {%- endif -%}
   duration: >-
     {%- set secs = trigger.to_state.attributes.get('duration_s')
          if trigger.id == 'done_recipe' and announce_duration else none -%}
@@ -266,9 +283,9 @@ variables:
             and trigger.to_state.attributes.get('event_type') == 'brew_done' -%}
       {%- set name = recipe_name if announce_recipe else '' -%}
       {%- if lang == 'ar' -%}
-        {%- if name %}انتهى تحضير {{ name }}{% else %}انتهى تحضير قهوتك{% endif %}{% if duration %}، واستغرق {{ duration }}{% endif -%}
+        {%- if name %}انتهى تحضير {{ name }}{% else %}انتهى تحضير قهوتك{% endif %}{% if duration %}، واستغرق {{ duration }}{% endif %}{% if tank_line %}. {{ tank_line }}{% endif -%}
       {%- else -%}
-        {%- if name %}Finished preparing {{ name }}{% else %}Your coffee is ready{% endif %}{% if duration %}. It took {{ duration }}{% endif -%}
+        {%- if name %}Finished preparing {{ name }}{% else %}Your coffee is ready{% endif %}{% if duration %}. It took {{ duration }}{% endif %}{% if tank_line %}. {{ tank_line }}{% endif -%}
       {%- endif -%}
     {#- An empty grinder is the machine's own fault: the fault blueprint speaks
         it the moment the machine reports it, so saying it again here as a
@@ -288,19 +305,11 @@ variables:
     {%- elif trigger.id == 'paused' and state_attr(paused_entity_id, 'reason') != 'water'
             and states(machine_status_id) != 'no_water' -%}
       {%- if lang == 'ar' %}التحضير متوقف مؤقتا{% else %}Brew paused{% endif -%}
-    {#- What is left in the tank after a brew that ran it low. -#}
-    {%- elif trigger.id == 'tank' and trigger.event.data.get('tank_low') -%}
-      {%- set left = trigger.event.data.get('water_left_ml') -%}
-      {%- if left is number -%}
-        {%- set n = [((left / 10) | round(0) * 10) | int, 10] | max -%}
-        {%- if lang == 'ar' -%}
-          بقي نحو {{ n }} {{ 'مليلتر' if n % 100 == 0 else ('مليلترات' if n % 100 == 10 else 'مليلترًا') }} من الماء، أضف ماءً قبل الكوب القادم
-        {%- else -%}
-          About {{ n }} millilitres of water left. Add water before your next cup.
-        {%- endif -%}
-      {%- else -%}
-        {%- if lang == 'ar' %}الماء قليل، أضف ماءً قبل الكوب القادم{% else %}The water is low. Add water before your next cup.{% endif -%}
-      {%- endif -%}
+    {#- The plain "Your coffee is ready" comes from the brew status, before
+        the brew's water is known, so with it the water line is said on its
+        own; otherwise it is part of the finish above. -#}
+    {%- elif trigger.id == 'tank' and not (announce_recipe or announce_duration) -%}
+      {{ tank_line }}
     {#- The pause also ends when the brew does; only a brew still running
         was resumed. -#}
     {%- elif trigger.id == 'resumed' and states(status_entity) in ['grinding', 'brewing'] -%}

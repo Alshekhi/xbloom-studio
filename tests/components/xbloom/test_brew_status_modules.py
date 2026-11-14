@@ -151,11 +151,15 @@ async def test_a_recipe_brew_still_announces():
 
 @pytest.mark.asyncio
 async def test_a_brew_home_assistant_starts_announces_from_any_screen():
-    async with _entity() as (ent, on_event, lifecycle):
+    # Such a brew finishes from its completion, which follows its ENJOY.
+    from .test_brew_done_on_presumed import _entity as _entity_with_bus
+
+    async with _entity_with_bus() as (ent, bus, on_event, lifecycle):
         _feed(on_event, _activity(3))
         lifecycle("started")
         _feed(on_event, {"cmd": CMD_GRINDER_START}, {"cmd": CMD_BLOOM, "pour_index": 0},
               {"cmd": CMD_ENJOY})
+        bus["xbloom_brew_completed"](MagicMock(data={"outcome": "confirmed"}))
         assert fired(ent, "brew_done") == ["brew_done"]
 
 

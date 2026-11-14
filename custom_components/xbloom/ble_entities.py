@@ -813,8 +813,10 @@ class XBloomBrewEventBleEntity(EventEntity):
                 )
                 self.async_write_ha_state()
 
-            # Aggregate `brew_done` — RD_ENJOY
-            if cmd == CMD_ENJOY and not self._brew_done_fired:
+            # Aggregate `brew_done` — RD_ENJOY. A brew Home Assistant started
+            # finishes from its completion instead, a moment later, which also
+            # knows the tank: one announcement, in order, rather than two.
+            if cmd == CMD_ENJOY and not self._brew_done_fired and not self._followed:
                 self._brew_done_fired = True
                 duration_s = None
                 if self._first_pour_at is not None:
@@ -850,7 +852,10 @@ class XBloomBrewEventBleEntity(EventEntity):
                 "brew_done",
                 {"recipe_name": event.data.get("recipe_name")
                  or self._last_recipe_name or "",
-                 "duration_s": event.data.get("duration_s")},
+                 "duration_s": event.data.get("duration_s"),
+                 # The tank, when its switch read low at the end.
+                 **{k: event.data[k] for k in ("tank_low", "water_left_ml")
+                    if k in event.data}},
             )
             self._first_pour_at = None
             self._last_recipe_name = None

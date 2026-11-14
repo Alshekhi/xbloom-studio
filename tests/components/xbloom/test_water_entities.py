@@ -113,3 +113,40 @@ async def test_brew_paused_says_it_is_waiting_for_water():
     on_frame({"cmd": 9011})
     assert entity._attr_is_on is False
     assert entity.extra_state_attributes == {"reason": None}
+
+
+@pytest.mark.asyncio
+async def test_a_followed_brew_finishes_once_with_its_tank():
+    """The finish waits for the completion, which knows the tank.
+
+    Fired on the machine's ENJOY, it went out a moment before the completion
+    and the tank had to follow as a second announcement, which could be
+    heard first.
+    """
+    ent = XBloomBrewEventBleEntity(MagicMock(entry_id="test_entry"))
+    ent._trigger_event = MagicMock()
+    ent.hass = MagicMock()
+    bus: dict = {}
+    ent.hass.bus.async_listen = lambda name, handler: (bus.__setitem__(name, handler), lambda: None)[1]
+    ent.async_write_ha_state = MagicMock()
+    ent.async_on_remove = MagicMock()
+    sig: dict = {}
+
+    def _connect(_hass, signal, handler):
+        sig[signal] = handler
+        return lambda: None
+
+    with patch("custom_components.xbloom.ble_entities.async_dispatcher_connect", _connect):
+        await ent.async_added_to_hass()
+
+    sig[signal_brew_lifecycle("test_entry")]("started")
+    for frame in ({"cmd": 40502}, {"cmd": 40510, "pour_index": 0}, {"cmd": 40512}):
+        sig[signal_event("test_entry")](frame)
+    assert "brew_done" not in [name for name, _ in _fired(ent)]
+
+    bus["xbloom_brew_completed"](MagicMock(data={
+        "outcome": "confirmed", "recipe_name": "K", "duration_s": 181.0,
+        "tank_low": True, "water_left_ml": 196}))
+    done = [attrs for name, attrs in _fired(ent) if name == "brew_done"]
+    assert done == [{"recipe_name": "K", "duration_s": 181.0,
+                     "tank_low": True, "water_left_ml": 196}]
