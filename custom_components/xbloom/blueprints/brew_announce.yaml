@@ -300,10 +300,11 @@ variables:
       {%- if lang == 'ar' %}بدأ التحضير{% else %}Brew started{% endif -%}
     {#- A pause for water is announced by the fault announcements, with what
         to do. The water screen that says so can come a moment after the
-        pause itself, so a pause while the tank already reads low is taken
-        as one too. -#}
+        pause itself, so a pause while the water reads low is taken as one
+        too, unless the brew has said it has the water to finish. -#}
     {%- elif trigger.id == 'paused' and state_attr(paused_entity_id, 'reason') != 'water'
-            and states(machine_status_id) != 'no_water' -%}
+            and (states(machine_status_id) != 'no_water'
+                 or state_attr(machine_status_id, 'water_enough_to_finish') == true) -%}
       {%- if lang == 'ar' %}التحضير متوقف مؤقتا{% else %}Brew paused{% endif -%}
     {#- The pause also ends when the brew does; only a brew still running
         was resumed. -#}

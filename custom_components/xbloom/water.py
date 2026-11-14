@@ -24,12 +24,7 @@ from xbloom.ble import (
     NOTIFY_WATER_VOLUME,
 )
 
-from .ble_entities import ACTIVITY_WATER_SHORTAGE
-
-# The switch has no debounce, so water sloshing while pouring can flick it
-# back to "water" for a moment. The firmware itself counts a refill only
-# after the switch has read "water" for over 20 of its 100 ms polls.
-WATER_REFILL_HOLD_S = 2.0
+from .ble_entities import ACTIVITY_WATER_SHORTAGE, WATER_REFILL_HOLD_S
 
 _RESUMED = (NOTIFY_MACHINE_RESUMED, NOTIFY_BREW_RESUMED)   # the knob, or Home Assistant
 

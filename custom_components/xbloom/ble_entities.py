@@ -24,6 +24,7 @@ and no bridge process to toggle.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from homeassistant.components.event import EventEntity
@@ -42,7 +43,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from xbloom import spec
-from xbloom.ble import NOTIFY_MACHINE_INFO
+from xbloom.ble import NOTIFY_BREW_RESUMED, NOTIFY_MACHINE_INFO, NOTIFY_MACHINE_RESUMED
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -268,6 +269,10 @@ ACTIVITY_RECIPE_READY = 31
 # waits here, after 40515, until it is refilled (then 31) and the knob pressed.
 # Seen live 2026-11-13 on V12.0D.500.
 ACTIVITY_WATER_SHORTAGE = 12
+# The low-water switch has no debounce, so water sloshing while pouring can
+# flick it back to "water" for a moment. The firmware itself counts a refill
+# only after the switch has read "water" for over 20 of its 100 ms polls.
+WATER_REFILL_HOLD_S = 2.0
 
 
 def _device_info(entry_id: str) -> DeviceInfo:
@@ -483,6 +488,8 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
         self._entry = entry
         self._attr_native_value = "ok"
         self._attr_extra_state_attributes: dict[str, Any] = {}
+        # Cancels the pending "water is back", while a water reading holds.
+        self._water_back: Callable[[], None] | None = None
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -515,10 +522,15 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
                 self._attr_extra_state_attributes = attrs
                 # Self-clearing water status: only toggles ok <-> no_water so it
                 # never clobbers a distinct active fault (e.g. no_beans).
-                if decoded["water_enough"] == 0 and self._attr_native_value == "ok":
-                    self._attr_native_value = WATER_STATUS
-                elif decoded["water_enough"] == 1 and self._attr_native_value == WATER_STATUS:
-                    self._attr_native_value = "ok"
+                if decoded["water_enough"] == 0:
+                    _cancel_water_back()
+                    if self._attr_native_value == "ok":
+                        self._attr_native_value = WATER_STATUS
+                elif (decoded["water_enough"] == 1 and self._attr_native_value == WATER_STATUS
+                      and self._water_back is None):
+                    # Water is back only once it has held: see WATER_REFILL_HOLD_S.
+                    self._water_back = async_call_later(
+                        self.hass, WATER_REFILL_HOLD_S, _water_is_back)
                 self.async_write_ha_state()
                 return
 
@@ -530,6 +542,21 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
             if status != self._attr_native_value:
                 self._attr_native_value = status
                 self.async_write_ha_state()
+
+        @callback
+        def _cancel_water_back() -> None:
+            if self._water_back is not None:
+                self._water_back()
+                self._water_back = None
+
+        @callback
+        def _water_is_back(_now) -> None:
+            self._water_back = None
+            if self._attr_native_value == WATER_STATUS:
+                self._attr_native_value = MACHINE_OK
+                self.async_write_ha_state()
+
+        self.async_on_remove(_cancel_water_back)
 
         @callback
         def _release_water_reading() -> None:
@@ -744,6 +771,8 @@ class XBloomBrewEventBleEntity(EventEntity):
         # A brew Home Assistant started is under way, so its tank is reported
         # as water events rather than the bare low-water fault.
         self._followed = False
+        # A brew Home Assistant did not start is waiting for water.
+        self._water_paused = False
         # Faults currently asserted. The machine reports a fault for as long as
         # it holds, the way a low-fuel light stays lit, so the frames after the
         # first carry no news — relaying each one made one dry tank announce
@@ -795,7 +824,19 @@ class XBloomBrewEventBleEntity(EventEntity):
             # lifecycle signal — a brew started at the machine runs no such
             # task, so a lifecycle-only reset would let it announce once and
             # then stay silent for every brew after it.
+            # The water pause of a brew Home Assistant did not start: it runs
+            # no water tracker, so the pause is announced here, without the
+            # amounts only a tracker knows.
+            if cmd == CMD_MACHINE_ACTIVITY and decoded.get("activity") == ACTIVITY_WATER_SHORTAGE:
+                if not self._followed and not self._water_paused:
+                    self._water_paused = True
+                    self._trigger_event("water_paused", {})
+                    self.async_write_ha_state()
+            elif cmd in (NOTIFY_MACHINE_RESUMED, NOTIFY_BREW_RESUMED):
+                self._water_paused = False
+
             if cmd in (CMD_GRINDER_START, CMD_BREWER_START):
+                self._water_paused = False
                 self._brew_done_fired = False
                 self._first_pour_at = None
                 self._active_faults.clear()

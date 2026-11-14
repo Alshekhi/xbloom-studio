@@ -36,8 +36,29 @@ def test_the_fault_blueprint_speaks_each_water_event_with_its_amount():
 
 
 def test_the_fault_blueprint_still_speaks_the_bare_fault():
+    """Outside a brew Home Assistant follows, the switch says low, not gone."""
     message = _load("machine_fault_announce.yaml")["variables"]["message"]
-    assert "out of water" in message
+    assert "out of water" not in message and "نفد الماء" not in message
+    assert "water is low" in message and "الماء قليل" in message
+
+
+def test_the_english_names_the_right_knob():
+    message = _load("machine_fault_announce.yaml")["variables"]["message"]
+    assert "press the right knob" in message.lower()
+    assert "press the knob" not in message.lower()
+
+
+def test_a_water_pause_without_amounts_is_still_spoken():
+    """A brew started at the machine has no tracker, so no amount."""
+    message = _load("machine_fault_announce.yaml")["variables"]["message"]
+    paused = message[message.index("ev == 'water_paused'"):]
+    assert "water_needed_ml" in paused
+
+
+def test_a_pause_by_hand_is_spoken_when_the_cup_will_finish():
+    message = _load("brew_announce.yaml")["variables"]["message"]
+    paused = message[message.index("trigger.id == 'paused'"):message.index("trigger.id == 'resumed'")]
+    assert "water_enough_to_finish" in paused
 
 
 def test_the_fault_blueprint_lets_an_empty_message_drop_the_announcement():
@@ -72,7 +93,7 @@ def test_spoken_water_text_has_no_dashes():
 def test_the_knob_is_named_as_elsewhere_in_arabic():
     text = (BLUEPRINTS / "machine_fault_announce.yaml").read_text(encoding="utf-8")
     assert "المقبض" not in text
-    assert text.count("اضغط المفتاح الأيمن") == 2
+    assert text.count("اضغط المفتاح الأيمن") >= 2
 
 
 def test_a_pause_while_the_tank_is_low_is_left_to_the_water_announcement():

@@ -92,11 +92,15 @@ async def test_a_report_of_water_leaves_the_status_ok():
 
 @pytest.mark.asyncio
 async def test_the_status_follows_the_switch():
-    sensor, on_event = await _status_sensor()
-    on_event({"cmd": CMD_LACK_OF_WATER, "water_enough": 0})
-    assert sensor._attr_native_value == WATER_STATUS
-    on_event({"cmd": CMD_LACK_OF_WATER, "water_enough": 1})
-    assert sensor._attr_native_value == "ok"
+    later: list = []
+    with patch("custom_components.xbloom.ble_entities.async_call_later",
+               lambda _h, _d, action: (later.append(action), lambda: None)[1]):
+        sensor, on_event = await _status_sensor()
+        on_event({"cmd": CMD_LACK_OF_WATER, "water_enough": 0})
+        assert sensor._attr_native_value == WATER_STATUS
+        on_event({"cmd": CMD_LACK_OF_WATER, "water_enough": 1})
+        later[0](None)          # the water reading held
+        assert sensor._attr_native_value == "ok"
 
 
 @pytest.mark.asyncio

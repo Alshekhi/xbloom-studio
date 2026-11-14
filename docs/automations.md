@@ -22,7 +22,7 @@ it is; Home Assistant shows a repair notice when a newer one is available.
 |---|---|---|
 | **Brew announcements** | Announces the coffee ready, or a brew that could not start, to the whole home; the brew starting, each step of it, and a cancellation can go to a speaker by the machine, the only one that says the recipe name. | [Import][bp-brew] |
 | **Live-session announcements** | Speaks live feedback while you turn the machine's knobs — weight, grind size, temperature, which module you're on. Needs the **Connect** switch on. | [Import][bp-live] |
-| **Machine fault announcements** | Speaks up when the machine runs out of water or beans, or reports a dose or gear problem. | [Import][bp-fault] |
+| **Machine fault announcements** | Speaks up when the water is too low to finish a brew and by how much, when a brew pauses for water, when the grinder is out of beans, or when the machine reports a dose or gear problem. | [Import][bp-fault] |
 | **Ask how the coffee was** | With Coffee Lab on, asks how each coffee was a quarter of an hour after the last cup: on a phone, with Again / Fine / Not again buttons, or aloud through a voice assistant that keeps the answer and what was said about the taste. | [Import][bp-rating] |
 
 [bp-brew]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Fbrew_announce.yaml
@@ -59,8 +59,10 @@ on the dashboard or to another assistant is not asked about at all.
 The brew blueprint has two sets of speakers:
 
 - **Speakers for the whole home** hear the coffee being ready, a brew that
-  could not start (with the reason, such as the tank needing water), and a
-  brew whose ending never came. With Alexa these play with its announcement
+  could not start (with the reason, such as not enough water for the
+  recipe), and a brew whose ending never came. After a brew that ran the water
+  low, the speaker by the machine also hears how much is left, in the same
+  announcement as the coffee being ready. With Alexa these play with its announcement
   chime.
 - **Speakers by the machine** — optional — hear the brew starting, the
   pouring starting, each pour, a pause and a resume, and a cancelled brew.
@@ -151,8 +153,12 @@ triggers:
   - trigger: state
     entity_id: sensor.xbloom_studio_machine_status
 conditions:
+  # Low water the brew under way will finish on needs nobody.
   - condition: template
-    value_template: "{{ trigger.to_state.state not in ['ok', 'unknown', 'unavailable'] }}"
+    value_template: >-
+      {{ trigger.to_state.state not in ['ok', 'unknown', 'unavailable']
+         and not (trigger.to_state.state == 'no_water'
+                  and trigger.to_state.attributes.get('water_enough_to_finish')) }}
 actions:
   - action: tts.speak
     target:
@@ -161,7 +167,7 @@ actions:
       media_player_entity_id: media_player.kitchen
       message: >-
         {% set s = trigger.to_state.state %}
-        {% if s == 'no_water' %}The xBloom is out of water
+        {% if s == 'no_water' %}The xBloom's water is low
         {% elif s == 'no_beans' %}The xBloom is out of beans
         {% elif s == 'gear_position_error' %}Check the xBloom's dripper position
         {% else %}The xBloom reported a dose or water problem{% endif %}

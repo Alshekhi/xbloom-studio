@@ -39,6 +39,29 @@ Paused** follows the machine itself, so it is right whether the brew was
 paused from Home Assistant or with the machine's knob, and the dashboard shows
 Pause or Resume by it.
 
+## When the water runs low
+
+The machine has no water gauge: one switch says when the water is low, with
+about 270 ml still in it. From then on, during a brew Home Assistant started,
+the integration counts the water poured and compares what is left with what
+the recipe still needs.
+
+- **Enough to finish:** the brew carries on, and the announcement that the
+  coffee is ready says how much water is left.
+- **Not enough:** the announcement says how much is missing, so you can add
+  water before it runs out. If it does run out, the machine pauses mid-pour
+  and waits. Add water, then press the machine's right knob: water alone does
+  not resume it. **Brew Paused** is on meanwhile, with `reason: water`, and the
+  wait does not count towards the brew's ten minutes, for up to an hour.
+- **Already low when you start:** the machine refuses a recipe that needs more
+  water than it has left, before anything is ground, and the brew fails with
+  how much water the recipe needs. A recipe it accepts will finish.
+
+While the water is low during a brew, the dashboard shows the water left and
+how much is missing. With the water source set to tap, none of this applies.
+A brew started from one of the machine's own recipe slots is not counted, but
+its pause for water is still announced.
+
 ## Changing your mind
 
 **Cancel Preparation** takes the recipe back from the machine and unpicks it;
