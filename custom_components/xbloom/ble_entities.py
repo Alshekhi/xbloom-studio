@@ -813,10 +813,14 @@ class XBloomBrewEventBleEntity(EventEntity):
                 )
                 self.async_write_ha_state()
 
-            # Aggregate `brew_done` — RD_ENJOY. A brew Home Assistant started
-            # finishes from its completion instead, a moment later, which also
-            # knows the tank: one announcement, in order, rather than two.
-            if cmd == CMD_ENJOY and not self._brew_done_fired and not self._followed:
+            # Aggregate `brew_done` — RD_ENJOY, or the done screen when ENJOY
+            # goes unheard: whatever turns Brew Status `done` finishes the brew
+            # here too, so announcements have one source for every finish. A
+            # brew Home Assistant started finishes from its completion
+            # instead, a moment later, which also knows the tank.
+            finished = cmd == CMD_ENJOY or (
+                cmd == CMD_MACHINE_ACTIVITY and decoded.get("activity") == ACTIVITY_BREW_DONE)
+            if finished and not self._brew_done_fired and not self._followed:
                 self._brew_done_fired = True
                 duration_s = None
                 if self._first_pour_at is not None:

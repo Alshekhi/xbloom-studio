@@ -172,3 +172,16 @@ async def test_a_new_brew_counts_from_its_own_first_pour():
             on_event({"cmd": CMD_BLOOM})
             on_event({"cmd": CMD_ENJOY})
         assert ent._trigger_event.call_args_list[-1].args[1]["duration_s"] == 180
+
+
+@pytest.mark.asyncio
+async def test_a_brew_started_at_the_machine_finishes_on_its_done_screen():
+    """Brew Status goes `done` on the done screen when ENJOY is not heard;
+    the brew event finishes with it, so every finish has one source."""
+    async with _entity() as (ent, _bus, on_event, _lifecycle):
+        for frame in ({"cmd": 40502}, {"cmd": 40510, "pour_index": 0},
+                      {"cmd": 8023, "activity": 36}):
+            on_event(frame)
+        assert _fired(ent).count("brew_done") == 1
+        on_event({"cmd": CMD_ENJOY})   # heard late: still one finish
+        assert _fired(ent).count("brew_done") == 1

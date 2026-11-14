@@ -46,17 +46,10 @@ def test_the_fault_blueprint_lets_an_empty_message_drop_the_announcement():
 
 
 def test_the_brew_blueprint_says_what_is_left_after_the_coffee():
-    bp = _load("brew_announce.yaml")
-    triggers = {t.get("id"): t for t in bp["trigger"]}
-    assert triggers["tank"]["event_type"] == "xbloom_brew_completed"
-    variables = bp["variables"]
+    variables = _load("brew_announce.yaml")["variables"]
     assert "water_left_ml" in variables["tank_line"] and "tank_low" in variables["tank_line"]
-    # Part of the finish, so the two are one announcement, in order.
     finish = variables["message"][variables["message"].index("trigger.id == 'done_recipe'"):]
-    assert finish.count("{{ tank_line }}") >= 2
-    # On its own only beside the plain finish, which comes before the tank is known.
-    tank = variables["message"][variables["message"].index("trigger.id == 'tank'"):]
-    assert tank.startswith("trigger.id == 'tank' and not (announce_recipe or announce_duration)")
+    assert finish.count("tank_line") >= 2
 
 
 def test_the_brew_blueprint_says_how_much_water_a_refused_recipe_needs():
@@ -88,5 +81,16 @@ def test_a_pause_while_the_tank_is_low_is_left_to_the_water_announcement():
     assert bp["blueprint"]["input"]["entities"]["input"]["machine_status_entity"]["default"] \
         == "sensor.xbloom_studio_machine_status"
     message = bp["variables"]["message"]
-    paused = message[message.index("trigger.id == 'paused'"):message.index("trigger.id == 'tank'")]
+    paused = message[message.index("trigger.id == 'paused'"):message.index("trigger.id == 'resumed'")]
     assert "no_water" in paused
+
+
+def test_every_finish_comes_from_the_brew_event():
+    """One source for the finish, so the water line is part of it whatever
+    the announcement says: Brew Status turns `done` before the tank is known."""
+    bp = _load("brew_announce.yaml")
+    ids = [t.get("id") for t in bp["trigger"]]
+    assert "done_simple" not in ids and "tank" not in ids
+    message = bp["variables"]["message"]
+    finish = message[message.index("trigger.id == 'done_recipe'"):]
+    assert "Your coffee is ready" in finish and "قهوتك جاهزة" in finish
