@@ -14,6 +14,10 @@ can verify it with an off-the-shelf library: HMAC-SHA256 over
 "{id}.{timestamp}.{body}" with the secret's decoded bytes, sent as
 "v1,<base64>". A message keeps its id across retries, so a receiver can drop a
 duplicate. Payloads are facts; the receiver words them.
+
+A receiver that checks a fixed key instead is given one that does not start
+"whsec_": it is sent as "Authorization: Bearer <key>" and nothing is signed.
+The key goes with every message, so such a target must use https.
 """
 from __future__ import annotations
 
@@ -51,6 +55,8 @@ WATER_EVENTS = ("water_low", "water_paused", "water_refilled")
 
 NAME = re.compile(r"^[a-z0-9_]+$")
 SECRET_PREFIX = "whsec_"
+# A bearer key: no whitespace, and long enough not to be a typo.
+KEY = re.compile(r"^\S{16,}$")
 
 # Seconds before each retry. A receiver restarting is the common case; one gone
 # for minutes is not coming back for a brew.
@@ -72,8 +78,12 @@ FINAL = {
 class Target:
     name: str
     url: str
-    # "whsec_" + base64 of the key bytes.
+    # "whsec_" + base64 of the key bytes, or a bearer key.
     secret: str
+
+    @property
+    def signed(self) -> bool:
+        return self.secret.startswith(SECRET_PREFIX)
 
 
 def target_problem(name: str, url: str, secret: str) -> dict[str, str]:
@@ -83,12 +93,17 @@ def target_problem(name: str, url: str, secret: str) -> dict[str, str]:
         errors["name"] = "callback_name_invalid"
     if not url.startswith(("http://", "https://")):
         errors["url"] = "callback_url_invalid"
-    try:
-        key = base64.b64decode(secret.removeprefix(SECRET_PREFIX), validate=True)
-    except (binascii.Error, ValueError):
-        key = b""
-    if not secret.startswith(SECRET_PREFIX) or len(key) < 24:
+    if secret.startswith(SECRET_PREFIX):
+        try:
+            key = base64.b64decode(secret.removeprefix(SECRET_PREFIX), validate=True)
+        except (binascii.Error, ValueError):
+            key = b""
+        if len(key) < 24:
+            errors["secret"] = "callback_secret_invalid"
+    elif not KEY.match(secret):
         errors["secret"] = "callback_secret_invalid"
+    elif url.startswith("http://"):
+        errors["url"] = "callback_url_needs_https"
     return errors
 
 
@@ -106,12 +121,16 @@ def headers_for(target: Target, msg_id: str, body: bytes, now: int | None = None
     # Taken per attempt: receivers reject a signature older than their replay
     # window, and retries can outlast it.
     ts = int(time.time()) if now is None else now
-    return {
+    headers = {
         "content-type": "application/json",
         "webhook-id": msg_id,
         "webhook-timestamp": str(ts),
-        "webhook-signature": signature(target.secret, msg_id, ts, body),
     }
+    if target.signed:
+        headers["webhook-signature"] = signature(target.secret, msg_id, ts, body)
+    else:
+        headers["authorization"] = f"Bearer {target.secret}"
+    return headers
 
 
 @dataclass

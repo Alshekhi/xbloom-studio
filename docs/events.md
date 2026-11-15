@@ -120,14 +120,16 @@ when you want the ones Home Assistant started and everything they carry.
 A service outside Home Assistant can be told how a brew it started went,
 without watching the event stream. Add a callback target in **Settings →
 Devices & services → xBloom Studio → Configure → Add a callback target**: a
-name, the URL to post to, and a [Standard Webhooks](https://www.standardwebhooks.com)
-secret (`whsec_…`). Then start the brew with `notify_target` set to that name.
+name, the URL to post to, and either a [Standard Webhooks](https://www.standardwebhooks.com)
+secret (`whsec_…`), which signs each message, or the receiver's own key, sent
+as `Authorization: Bearer <key>` and only to an `https` URL. Then start the
+brew with `notify_target` set to that name.
 
 The target receives that brew's faults, its water warnings that need someone
 at the tank (`water`, with `water_event` set to `water_low` when the cup will
 not finish, `water_paused` or `water_refilled`, and the amounts), and exactly
 one ending — `completed`, `failed`, `stopped` or `timeout` — and, with
-`notify_progress`, grinding and each pour. Each is a signed POST, retried if the receiver is briefly away, of
+`notify_progress`, grinding and each pour. Each is a POST, retried if the receiver is briefly away, of
 the form `{"type": "xbloom.brew.<event>", "timestamp", "data": {"event",
 "final", "run_id", "recipe", …}, "context"}`, where `data` holds the same facts
 as the event and `context` is what `start_brew` was given. A caller names a

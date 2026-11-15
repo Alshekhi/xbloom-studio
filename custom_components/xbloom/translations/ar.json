@@ -368,7 +368,7 @@
         },
         "data_description": {
           "name": "أحرف لاتينية صغيرة وأرقام و_.",
-          "secret": "مفتاح Standard Webhooks يبدأ بـ whsec_."
+          "secret": "مفتاح يبدأ بـ whsec_ لتوقيع كل رسالة، أو أي مفتاح آخر يرسل بصيغة Bearer."
         }
       },
       "remove_callback_target": {
@@ -411,7 +411,8 @@
       "cloud_login_failed": "تعذّر تسجيل الدخول. تحقّق من بريدك الإلكتروني وكلمة المرور، ثم حاول من جديد.",
       "callback_name_invalid": "استخدم أحرفا لاتينية صغيرة وأرقاما و_.",
       "callback_url_invalid": "أدخل رابطا يبدأ بـ http أو https.",
-      "callback_secret_invalid": "أدخل مفتاح Standard Webhooks: whsec_ متبوعا بـ 24 بايت على الأقل بترميز base64.",
+      "callback_secret_invalid": "أدخل whsec_ متبوعا بـ 24 بايت على الأقل بترميز base64، أو مفتاحا من 16 حرفا على الأقل بلا مسافات.",
+      "callback_url_needs_https": "لا يرسل المفتاح إلا إلى رابط يبدأ بـ https.",
       "notion_auth": "لم يقبل Notion الرمز.",
       "notion_page": "لم يعثر على الصفحة. شاركها مع التكامل ثم حاول مرة أخرى.",
       "notion_unreachable": "تعذر الوصول إلى Notion: {detail}",

@@ -25,12 +25,33 @@ def test_headers_carry_id_timestamp_and_signature():
     assert headers["webhook-signature"] == signature(SECRET, "msg_1", 100, b"{}")
 
 
+KEY = "key_0123456789abcdef"
+
+
+def test_a_key_is_sent_as_a_bearer_token_and_nothing_is_signed():
+    target = Target("receiver", "https://example.invalid/hook", KEY)
+    headers = headers_for(target, "msg_1", b"{}", now=100)
+    assert headers["authorization"] == f"Bearer {KEY}"
+    assert headers["webhook-id"] == "msg_1" and headers["webhook-timestamp"] == "100"
+    assert "webhook-signature" not in headers
+
+
+def test_a_signed_message_carries_no_key():
+    headers = headers_for(Target("receiver", "https://example.invalid/hook", SECRET), "msg_1", b"{}", now=100)
+    assert "authorization" not in headers
+
+
 @pytest.mark.parametrize("name, url, secret, bad", [
     ("receiver", "https://x.invalid", SECRET, set()),
+    ("receiver", "http://x.invalid", SECRET, set()),
     ("Receiver!", "https://x.invalid", SECRET, {"name"}),
     ("receiver", "ftp://x.invalid", SECRET, {"url"}),
     ("receiver", "https://x.invalid", "whsec_c2hvcnQ=", {"secret"}),
     ("receiver", "https://x.invalid", "not-a-secret", {"secret"}),
+    ("receiver", "https://x.invalid", KEY, set()),
+    # A key travels with every message, so never in the clear.
+    ("receiver", "http://x.invalid", KEY, {"url"}),
+    ("receiver", "https://x.invalid", "key 0123456789abcdef", {"secret"}),
 ])
 def test_a_target_is_checked_before_it_is_saved(name, url, secret, bad):
     assert set(target_problem(name, url, secret)) == bad

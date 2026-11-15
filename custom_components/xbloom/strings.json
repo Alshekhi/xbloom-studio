@@ -368,7 +368,7 @@
         },
         "data_description": {
           "name": "Lowercase letters, digits and _.",
-          "secret": "A Standard Webhooks secret, starting whsec_."
+          "secret": "A whsec_ secret signs each message. Any other key is sent as a Bearer token."
         }
       },
       "remove_callback_target": {
@@ -411,7 +411,8 @@
       "cloud_login_failed": "Sign-in failed. Check your xBloom email and password, then try again.",
       "callback_name_invalid": "Use lowercase letters, digits and _.",
       "callback_url_invalid": "Enter an http or https URL.",
-      "callback_secret_invalid": "Enter a Standard Webhooks secret: whsec_ followed by at least 24 bytes in base64.",
+      "callback_secret_invalid": "Enter whsec_ followed by at least 24 bytes in base64, or a key of at least 16 characters with no spaces.",
+      "callback_url_needs_https": "A key is sent only to an https URL.",
       "notion_auth": "Notion did not accept the token.",
       "notion_page": "The page was not found. Share it with the integration, then try again.",
       "notion_unreachable": "Notion could not be reached: {detail}",
