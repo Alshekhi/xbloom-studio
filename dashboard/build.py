@@ -30,6 +30,7 @@ TEXT = {
         "show_advanced": "Show brew adjustments", "show_per_pour": "Show each pour",
         "preparing": "Preparing the recipe.", "need_bag": "Pick a bag to prepare this recipe.",
         "out_of_range": "The machine is out of range.", "need_water": "Add water.",
+        "w_poured": "**Water poured:** {{ n }}{% if total %} of {{ total }}{% endif %} ml",
         "w_water": "**Water:** {% if left > 0 %}{{ left }} ml left{% else %}none left{% endif %}, {% if a.get('water_enough_to_finish') %}enough to finish{% else %}{{ short }} ml short{% endif %}",
         "not_taken": "The machine did not take the recipe. Pick it again.",
         "show_manual": "Show manual brew",
@@ -103,6 +104,7 @@ TEXT = {
         "show_advanced": "إظهار تعديلات التحضير", "show_per_pour": "إظهار كل صبة",
         "preparing": "يجري تجهيز الوصفة.", "need_bag": "اختر كيسا لتجهيز هذه الوصفة.",
         "out_of_range": "الماكينة خارج النطاق.", "need_water": "أضف ماءً.",
+        "w_poured": "{% macro ml(n) %}{{ n }} {{ 'مليلتر' if n % 100 <= 2 else ('مليلترات' if n % 100 <= 10 else 'مليلترًا') }}{% endmacro %}**الماء المصبوب:** {% if total %}{{ n }} من {{ ml(total) }}{% else %}{{ ml(n) }}{% endif %}",
         "w_water": "{% macro ml(n) %}{{ n }} {{ 'مليلتر' if n % 100 <= 2 else ('مليلترات' if n % 100 <= 10 else 'مليلترًا') }}{% endmacro %}**الماء:** {% if left > 0 %}بقي {{ ml(left) }}{% else %}نفد{% endif %}، {% if a.get('water_enough_to_finish') %}يكفي لإكمال الوصفة{% else %}ينقص {{ ml(short) }}{% endif %}",
         "not_taken": "لم تقبل الماكينة الوصفة. اخترها مرة أخرى.",
         "show_manual": "إظهار التحضير اليدوي",
@@ -319,6 +321,12 @@ def brew_view(t: dict) -> dict:
                 f"{{% set s = states('sensor.{E}_brew_time') | int(0) %}}"
                 f"**{t['brew_time']} {{{{ s // 60 }}}}:{{{{ '%02d' % (s % 60) }}}}**"
             ), "visibility": present(f"sensor.{E}_brew_time")},
+            # "Water poured: 310 of 500 ml", as the machine reports it.
+            {"type": "markdown", "text_only": True, "content": (
+                f"{{% set n = states('sensor.{E}_water_poured') | int(0) %}}"
+                f"{{% set total = state_attr('sensor.{E}_water_poured', 'recipe_water_ml') %}}"
+                + t["w_poured"]
+            ), "visibility": present(f"sensor.{E}_water_poured")},
             # The water left and what the recipe still needs, once the
             # low-water switch has tripped; empty, and hidden, otherwise.
             {"type": "markdown", "text_only": True, "show_empty": False, "content": water_card(t),

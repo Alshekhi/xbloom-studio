@@ -84,3 +84,13 @@ def test_the_dashboard_does_not_name_the_tank():
     for lang in ("en", "ar"):
         assert "خزان" not in build.TEXT[lang]["need_water"]
         assert "tank" not in build.TEXT[lang]["need_water"]
+
+
+def test_the_dashboard_shows_the_water_poured_during_a_brew():
+    build = _build()
+    for lang, label in (("en", "Water poured"), ("ar", "الماء المصبوب")):
+        poured = [c for c in _cards(build.dashboard(lang))
+                  if c.get("type") == "markdown" and "xbloom_studio_water_poured" in str(c.get("content"))]
+        assert len(poured) == 1, lang
+        assert label in poured[0]["content"]
+        assert poured[0]["visibility"] == build.present("sensor.xbloom_studio_water_poured")

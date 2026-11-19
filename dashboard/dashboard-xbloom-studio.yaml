@@ -289,6 +289,17 @@ views:
         state_not: unknown
     - type: markdown
       text_only: true
+      content: '{% set n = states(''sensor.xbloom_studio_water_poured'') | int(0) %}{% set total = state_attr(''sensor.xbloom_studio_water_poured'',
+        ''recipe_water_ml'') %}**Water poured:** {{ n }}{% if total %} of {{ total }}{% endif %} ml'
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_water_poured
+        state_not: unavailable
+      - condition: state
+        entity: sensor.xbloom_studio_water_poured
+        state_not: unknown
+    - type: markdown
+      text_only: true
       show_empty: false
       content: '{% set a = states[''sensor.xbloom_studio_machine_status''].attributes if states[''sensor.xbloom_studio_machine_status'']
         else {} %}{% set left = a.get(''water_left_ml'') %}{% if left is number %}{% set short = [a.get(''water_needed_ml'',

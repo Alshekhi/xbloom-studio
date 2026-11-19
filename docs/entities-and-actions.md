@@ -2,7 +2,7 @@
 
 ## Entities
 
-- **Sensors** — Brew Status, Machine Status, Scale Weight, Brew Time, and live readings: Current Recipe, Current Pour, Current Module, Grind Size, Grind Speed, Pour Pattern, Brew Temperature, Brew Ratio, Last Recipe Card, Status Updated.
+- **Sensors** — Brew Status, Machine Status, Scale Weight, Brew Time, Water Poured (the water the brew in progress has poured, in ml, with the recipe's beside it when Home Assistant started or prepared the brew), and live readings: Current Recipe, Current Pour, Current Module, Grind Size, Grind Speed, Pour Pattern, Brew Temperature, Brew Ratio, Last Recipe Card, Status Updated.
 - **Binary sensors** — In Range: on while Home Assistant's Bluetooth can see the machine, off once it drops it. The status sensors keep the last thing the machine reported, so this is the one that says a machine switched off is gone. Recipe Ready: on while the machine holds the picked recipe, ready to start at once. Brew Paused: on while a brew is paused, from Home Assistant or at the machine, or waiting for the tank to be refilled; its `reason` is `water` then. See [Brewing](brewing.md).
 - **Event** — Brew Event, fired on brew lifecycle changes (useful as an automation trigger).
 - **Selects** — Recipe, Recipe to Manage (archive or delete it; picking one never prepares the machine), Archived Recipe, Mode (auto / pro), Water Source (tank / tap), Temperature Unit (°C / °F), Weight Unit (g / oz / ml), Brew Pattern, Taste (balanced / less sour / less bitter: moves Brew Grind Size from the picked recipe's).
