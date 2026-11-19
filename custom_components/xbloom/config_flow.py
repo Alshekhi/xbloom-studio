@@ -95,6 +95,7 @@ class XBloomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Bluetooth-first setup. No MQTT, no account, no serial entry required."""
 
     VERSION = 3  # bumped from v2 when MQTT + status_source were dropped
+    MINOR_VERSION = 2  # 3.2: the workflow entities are hidden (workflow_entities.py)
 
     def __init__(self) -> None:
         self._discovered_ble_name: str | None = None

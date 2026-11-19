@@ -251,6 +251,8 @@ class RatingQuestionSensor(CoffeeLabEntity, SensorEntity):
     due is a matter of time, not of anything changing.
     """
 
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
+
     _attr_icon = "mdi:star-outline"
 
     def __init__(self, lab: CoffeeLab) -> None:
@@ -280,6 +282,8 @@ class RatingQuestionSensor(CoffeeLabEntity, SensorEntity):
 class RateBrewSelect(CoffeeLabEntity, SelectEntity):
     """The verdict on the brew in question; picking one answers it."""
 
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
+
     _attr_icon = "mdi:star"
     _attr_options = list(VERDICTS)
     _attr_current_option = None
@@ -302,6 +306,8 @@ class CupIssueSelect(CoffeeLabEntity, SelectEntity):
     Available only while one waits to be asked; picking an answer sets its
     Next Change (Nothing sets none) and the question goes.
     """
+
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
 
     _attr_icon = "mdi:help-circle-outline"
     _attr_options = list(ISSUES)
@@ -329,6 +335,8 @@ class CupIssueSelect(CoffeeLabEntity, SelectEntity):
 class BagQuestionSensor(CoffeeLabEntity, SensorEntity):
     """A finished bag waiting to be asked about: its name, for a week."""
 
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
+
     _attr_icon = "mdi:sack-outline"
 
     def __init__(self, lab: CoffeeLab) -> None:
@@ -341,6 +349,8 @@ class BagQuestionSensor(CoffeeLabEntity, SensorEntity):
 
 class BuyAgainSelect(CoffeeLabEntity, SelectEntity):
     """Would the finished bag's coffee be bought again; picking one answers it."""
+
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
 
     _attr_icon = "mdi:cart-outline"
     _attr_options = list(BUY_AGAIN)

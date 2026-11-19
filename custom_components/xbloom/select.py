@@ -92,6 +92,8 @@ class XBloomLibraryRecipeSelect(CoordinatorEntity, SelectEntity):
     so a dashboard shows the recipe's actions only then.
     """
 
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
+
     _attr_has_entity_name = True
     _attr_translation_key = "library_recipe"
     _attr_unique_id = "xbloom_library_recipe_select"
@@ -138,6 +140,8 @@ class XBloomArchivedRecipeSelect(CoordinatorEntity, SelectEntity):
     Held by id, like the recipe select. The whole archived recipe is its
     attributes, so a dashboard can show what is being restored.
     """
+
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
 
     _attr_has_entity_name = True
     _attr_translation_key = "archived_recipe"
@@ -467,7 +471,7 @@ class XBloomTempUnitSelect(_XBloomSettingSelect):
     _attr_options = list(spec.TEMP_UNIT_CODES)
     _service = "set_temp_unit"
     _service_arg = "unit"
-    _heartbeat_key = "temp_unit"     # heartbeat "C"/"F"
+    _heartbeat_key = "temp_unit"     # heartbeat "c"/"f"
 
 
 class XBloomWeightUnitSelect(_XBloomSettingSelect):

@@ -236,6 +236,8 @@ def entities_for(entry, platform: str) -> list:
 
 
 class _VersionEntity:
+
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
     _attr_has_entity_name = True
     _attr_should_poll = False
 

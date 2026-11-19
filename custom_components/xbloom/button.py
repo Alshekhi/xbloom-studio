@@ -106,6 +106,8 @@ class XBloomDeleteSelectedRecipeButton(CoordinatorEntity, ButtonEntity):
     confirmation; a deleted recipe cannot be brought back.
     """
 
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
+
     _attr_has_entity_name = True
     _attr_translation_key = "delete_selected_recipe"
     _attr_unique_id = "xbloom_delete_selected_recipe_button"
@@ -143,6 +145,8 @@ class XBloomArchiveRecipeButton(CoordinatorEntity, ButtonEntity):
     The dashboard asks for confirmation first.
     """
 
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
+
     _attr_has_entity_name = True
 
     def __init__(self, coordinator: XBloomCoordinator, *, remove_from_cloud: bool = False) -> None:
@@ -171,6 +175,8 @@ class XBloomArchiveRecipeButton(CoordinatorEntity, ButtonEntity):
 
 class XBloomRestoreArchivedRecipeButton(CoordinatorEntity, ButtonEntity):
     """Bring back the recipe picked in Archived Recipe."""
+
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
 
     _attr_has_entity_name = True
     _attr_translation_key = "restore_archived_recipe"
