@@ -970,6 +970,12 @@
     "notion_failed": {
       "message": "تعذر الوصول إلى Notion أو رفض التغيير: {error}"
     },
+    "cloud_unreachable": {
+      "message": "لم تستجب سحابة xBloom، حاول مرة أخرى بعد قليل."
+    },
+    "cloud_failed": {
+      "message": "رفضت سحابة xBloom التغيير: {reason}"
+    },
     "cloud_sign_in_required": {
       "message": "سجل الدخول إلى سحابة xBloom لحذف الوصفة منها."
     },

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
 import pytest
 
 from custom_components.xbloom.const import (
@@ -347,6 +348,37 @@ async def test_auth_failure_during_a_write_opens_the_reauth_flow() -> None:
         with pytest.raises(XBloomAuthError):
             await coord.async_add_recipe(CLOUD_RECIPE)
     coord.config_entry.async_start_reauth.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [
+    aiohttp.ServerDisconnectedError("Server disconnected"),
+    TimeoutError(),
+])
+async def test_a_cloud_dropout_during_a_write_is_a_clear_error(error) -> None:
+    """The cloud dropping the connection mid-write is said plainly, not as a
+    raw library exception (which a service call reports as a server error)."""
+    from homeassistant.exceptions import HomeAssistantError
+
+    coord = _make(creds=CREDS)
+    with patch.object(type(coord._session()), "create_recipe", AsyncMock(side_effect=error)):
+        with pytest.raises(HomeAssistantError) as raised:
+            await coord.async_add_recipe(CLOUD_RECIPE)
+    assert raised.value.translation_key == "cloud_unreachable"
+    coord.config_entry.async_start_reauth.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_cloud_api_error_during_a_write_carries_its_reason() -> None:
+    from homeassistant.exceptions import HomeAssistantError
+
+    coord = _make(creds=CREDS)
+    with patch.object(type(coord._session()), "create_recipe",
+                      AsyncMock(side_effect=XBloomAPIError("name already used"))):
+        with pytest.raises(HomeAssistantError) as raised:
+            await coord.async_add_recipe(CLOUD_RECIPE)
+    assert raised.value.translation_key == "cloud_failed"
+    assert raised.value.translation_placeholders == {"reason": "name already used"}
 
 
 # --------------------------------------------------------------------------- #

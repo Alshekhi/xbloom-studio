@@ -970,6 +970,12 @@
     "notion_failed": {
       "message": "Notion could not be reached or refused the change: {error}"
     },
+    "cloud_unreachable": {
+      "message": "The xBloom cloud did not answer. Try again in a moment."
+    },
+    "cloud_failed": {
+      "message": "The xBloom cloud refused the change: {reason}"
+    },
     "cloud_sign_in_required": {
       "message": "Sign in to the xBloom cloud to remove a recipe from it."
     },

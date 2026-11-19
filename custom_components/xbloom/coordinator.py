@@ -54,7 +54,7 @@ from .storage import (
     XBloomRecipeArchive,
     XBloomRecipeStore,
 )
-from .tool_common import refuse
+from .tool_common import fail, refuse
 from xbloom.cloud import (
     XBloomAuthError,
     XBloomCloudClient,
@@ -195,12 +195,21 @@ class XBloomCoordinator(DataUpdateCoordinator):
     # Recipe CRUD — routed to cloud when logged in, else local            #
     # ------------------------------------------------------------------ #
     async def _cloud_op(self, coro):
-        """Await a cloud coroutine, opening a reauth prompt on auth failure."""
+        """Await a cloud coroutine, opening a reauth prompt on auth failure.
+
+        Any other failure becomes a translated error: a library exception
+        reaching a service call is reported as a server error, with no word
+        of what went wrong.
+        """
         try:
             return await coro
         except XBloomAuthError:
             self._start_reauth()
             raise
+        except XBloomAPIError as err:
+            raise fail("cloud_failed", reason=str(err)) from err
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise fail("cloud_unreachable") from err
 
     async def _refresh_after_recipe_write(self) -> None:
         """Refresh the recipe list now, not after the debounce.
