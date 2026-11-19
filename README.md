@@ -66,7 +66,7 @@ Recipes are managed after setup from the integration's **Configure** menu: add o
 
 ## Documentation
 
-- [Brewing](docs/brewing.md) — how picking a recipe prepares it, starting at the machine, pause and resume.
+- [Brewing](docs/brewing.md) — how picking a recipe prepares it, starting at the machine, pause and resume, and low water.
 - [Recipes](docs/recipes.md) — cloud sign-in, how recipes sync, archiving, and community recipes.
 - [Entities and actions](docs/entities-and-actions.md) — everything the integration adds to Home Assistant.
 - [Coffee Lab](docs/coffee-lab.md) — bags, how a brew is counted, rating a brew, trying a change, and keeping it in Notion.

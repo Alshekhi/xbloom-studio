@@ -102,8 +102,9 @@ too little to lift the switch: how much was added is unknown, so the completion
 carries `tank_low: true` alone.
 
 **A start refused for water** fires `xbloom_brew_failed` with `reason: no_water`,
-whether it came from Home Assistant or from the machine's button on a recipe
-Home Assistant prepared; for a prepared recipe it carries `water_needed_ml` too.
+whether it came from Home Assistant or from the machine's button. For a recipe
+Home Assistant started or prepared it carries `recipe_name` and
+`water_needed_ml`; for one it did not, `recipe_name` is null.
 A button start answers with no reply, only the water screen, so this one has no
 `run_id` or `step`. The water screen of a refused start is not a water pause, and
 the low-water report that comes with it is not relayed as `error_no_water`.

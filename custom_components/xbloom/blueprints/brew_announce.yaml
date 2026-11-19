@@ -100,7 +100,7 @@ blueprint:
           name: Announce each pour
           description: >
             "Pour 2 of 4", and the final one as the last pour. The first is
-            announced as the pouring starting.
+            announced as the pouring starting, after grinding.
           default: false
           selector:
             boolean: {}
@@ -170,7 +170,7 @@ variables:
     {%- if trigger.id == 'done_recipe' -%}
       {{ trigger.to_state.attributes.get('recipe_name', '') }}
     {%- elif trigger.id in ['started', 'failed', 'stopped'] -%}
-      {{ trigger.event.data.get('recipe_name', '') }}
+      {{ trigger.event.data.get('recipe_name') or '' }}
     {%- else -%}
     {%- endif -%}
   # Why a brew did not run, in one short phrase. The event carries a code and

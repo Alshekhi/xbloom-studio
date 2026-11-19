@@ -57,8 +57,9 @@ the recipe still needs.
   water than it has left, before anything is ground, and the brew fails with
   how much water the recipe needs. A recipe it accepts will finish.
 
-While the water is low during a brew, the dashboard shows the water left and
-how much is missing. With the water source set to tap, none of this applies.
+During a brew the dashboard shows the water poured so far, against the
+recipe's; while the water is low, it also shows the water left and how much is
+missing. With the water source set to tap, none of this applies.
 A brew started from one of the machine's own recipe slots is not counted, but
 its pause for water is still announced.
 

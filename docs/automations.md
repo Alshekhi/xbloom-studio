@@ -60,12 +60,14 @@ The brew blueprint has two sets of speakers:
 
 - **Speakers for the whole home** hear the coffee being ready, a brew that
   could not start (with the reason, such as not enough water for the
-  recipe), and a brew whose ending never came. After a brew that ran the water
-  low, the speaker by the machine also hears how much is left, in the same
-  announcement as the coffee being ready. With Alexa these play with its announcement
-  chime.
+  recipe), and a brew whose ending never came. With Alexa these play with its
+  announcement chime.
 - **Speakers by the machine** — optional — hear the brew starting, the
-  pouring starting, each pour, a pause and a resume, and a cancelled brew.
+  pouring starting once grinding is done, each pour, a pause and a resume (a
+  pause for water is spoken by the fault announcements), and a cancelled brew.
+  After a brew that ran the water low, they also hear how much is left, in the
+  same announcement as the coffee being ready; with none set, every speaker
+  hears it.
   These speakers are the only ones that say the recipe name; the rest of the
   home hears that the coffee is ready, not which one. With Alexa, the pouring,
   the pours and pauses play without the chime. Leave this empty to announce

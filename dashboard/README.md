@@ -43,8 +43,8 @@ repair appears if one has waited more than an hour.
 
 ## The views
 
-- **Brew** — what is happening now, the water left and how much is missing
-  while a brew runs low, the bag in use, a recipe for that bag,
+- **Brew** — what is happening now, the water poured so far, the water left
+  and how much is missing while a brew runs low, the bag in use, a recipe for that bag,
   brewing a recipe, one-off adjustments, saving a new recipe, and manual brews.
   Choosing a bag, or **Suggest a recipe**, fills a picker with your own recipes brewed with this
   bag or coffee like it, then community recipes to try, each marked as from

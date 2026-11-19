@@ -1,7 +1,7 @@
 blueprint:
   name: "xBloom — Machine fault announcements"
   description: >
-    Speaks the machine's faults as they happen, in English or Arabic: the tank
+    Speaks the machine's faults as they happen, in English or Arabic: the water
     too low to finish a brew and by how much, a brew paused for water, the
     grinder empty, the water and coffee amounts not matching, or the grinder
     out of position.

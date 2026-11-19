@@ -134,7 +134,7 @@ async def test_a_recipe_waiting_for_its_start_is_not_paused():
     assert entity._attr_is_on is False
 
 
-# Seen live 2026-11-13: the tank running dry mid-pour sent 40515, then the
+# Seen on firmware V12.0D.500: the tank running dry mid-pour sent 40515, then the
 # water-shortage screen (activity 12); refilling brought the recipe screen (31)
 # and only the knob (9011) resumed the pour.
 @pytest.mark.asyncio

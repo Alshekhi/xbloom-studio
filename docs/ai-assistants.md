@@ -14,6 +14,12 @@ prepared and how it differs from the saved recipe, and `cancel_preparation`
 takes it back. `start_brew` then starts exactly what was prepared, preparing
 first if nothing matching is ready.
 
+During a brew, `brew_status` also reports its `progress`: the `pour` and
+`pours`, whether it is `paused` and its `pause_reason`, `brew_time_s`, and
+`water_poured_ml` against `recipe_water_ml`. `machine_status` carries
+`water_left_ml` and `water_needed_ml` once the low-water switch has tripped,
+and low water the cup will finish on is not a `fault`.
+
 `start_brew` waits for the machine to accept or refuse the brew before it
 answers. With Coffee Lab on, it needs the bag the coffee comes from, or
 `unattributed`. With `notify_target`, the caller is told how the brew ends by
