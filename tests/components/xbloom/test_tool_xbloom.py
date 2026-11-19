@@ -435,6 +435,42 @@ async def test_brew_status_with_no_recipe_chosen():
     assert facts["preparation"] == {"state": "none"}
 
 
+async def test_brew_status_reports_the_progress_of_a_brew():
+    hass = FakeHass(states={
+        "sensor.xbloom_brew_status": "brewing",
+        "sensor.xbloom_current_pour": ("3", {"total_pours": 4}),
+        "binary_sensor.xbloom_brew_paused": ("on", {"reason": "water"}),
+        "sensor.xbloom_brew_time": "95",
+        "sensor.xbloom_water_poured": ("312", {"recipe_water_ml": 500}),
+    })
+    facts = await ACTIONS["brew_status"].run(_machine(hass), {})
+    assert facts["progress"] == {
+        "pour": 3, "pours": 4, "paused": True, "pause_reason": "water",
+        "brew_time_s": 95, "water_poured_ml": 312, "recipe_water_ml": 500,
+    }
+
+
+async def test_brew_status_progress_leaves_out_what_is_not_known():
+    # Grinding: nothing poured yet, no pour, no time; a brew started at the
+    # machine has no recipe water. Nothing is reported as zero.
+    hass = FakeHass(states={
+        "sensor.xbloom_brew_status": "grinding",
+        "sensor.xbloom_current_pour": ("0", {"total_pours": None}),
+        "binary_sensor.xbloom_brew_paused": ("off", {"reason": None}),
+    })
+    facts = await ACTIONS["brew_status"].run(_machine(hass), {})
+    assert facts["progress"] == {"paused": False}
+
+
+async def test_brew_status_has_no_progress_while_idle():
+    hass = FakeHass(states={
+        "sensor.xbloom_brew_status": "idle",
+        "sensor.xbloom_current_pour": ("0", {"total_pours": 4}),
+    })
+    facts = await ACTIONS["brew_status"].run(_machine(hass), {})
+    assert "progress" not in facts
+
+
 async def test_prepare_brew_answers_once_the_machine_is_ready():
     # One call, one definite answer: an assistant cannot be told later, so an
     # early answer only means being asked again.

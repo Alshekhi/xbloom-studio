@@ -817,13 +817,48 @@ def _in_range(machine: Machine) -> bool | None:
     return None if state is None else state == "on"
 
 
+def _whole(value: Any) -> int | None:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _progress(machine: Machine) -> dict[str, Any]:
+    """How far the brew under way has got: what the dashboard shows of it.
+
+    Only what is known goes in; nothing is reported as zero before it starts.
+    """
+    facts: dict[str, Any] = {}
+    pour = _whole(machine.state("sensor", "xbloom_current_pour"))
+    if pour:
+        facts["pour"] = pour
+        if pours := _whole(machine.attributes("sensor", "xbloom_current_pour").get("total_pours")):
+            facts["pours"] = pours
+    facts["paused"] = machine.state("binary_sensor", "xbloom_brew_paused") == "on"
+    if facts["paused"]:
+        facts["pause_reason"] = machine.attributes(
+            "binary_sensor", "xbloom_brew_paused").get("reason") or "paused"
+    if (seconds := _whole(machine.state("sensor", "xbloom_brew_time"))) is not None:
+        facts["brew_time_s"] = seconds
+    if (poured := _whole(machine.state("sensor", "xbloom_water_poured"))) is not None:
+        facts["water_poured_ml"] = poured
+    if water := _whole(machine.attributes("sensor", "xbloom_water_poured").get("recipe_water_ml")):
+        facts["recipe_water_ml"] = water
+    return facts
+
+
 async def brew_status(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "brew_status": machine.state("sensor", "xbloom_brew_status"),
+    status = machine.state("sensor", "xbloom_brew_status")
+    facts = {
+        "brew_status": status,
         "recipe": machine.state("sensor", "xbloom_current_recipe"),
         "in_range": _in_range(machine),
         "preparation": _preparation(machine),
     }
+    if status in ("grinding", "brewing"):
+        facts["progress"] = _progress(machine)
+    return facts
 
 
 async def machine_status(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
@@ -1083,7 +1118,12 @@ ACTIONS: dict[str, Spec] = {
     "pause_brew": Spec(partial(_plain, "brew_pause"), "pause the brew"),
     "resume_brew": Spec(partial(_plain, "brew_resume"), "carry on after a pause"),
     # Machine
-    "brew_status": Spec(brew_status, "what the machine is doing now"),
+    "brew_status": Spec(
+        brew_status,
+        "what the machine is doing now; during a brew, its progress: the pour, "
+        "whether it is paused and why, how long it has poured, and the water "
+        "poured against the recipe's",
+    ),
     "machine_status": Spec(
         machine_status,
         "whether the machine is in range, and any fault. No status is given out "
