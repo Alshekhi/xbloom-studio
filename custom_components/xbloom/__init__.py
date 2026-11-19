@@ -1279,7 +1279,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     # later than this.
                     hass.bus.async_fire(
                         "xbloom_brew_started",
-                        {"recipe_name": recipe_name, "total_pours": total_pours, **meta},
+                        {"recipe_name": recipe_name, "total_pours": total_pours,
+                         "recipe_water_ml": round(recipe_water_ml(recipe)), **meta},
                     )
                     started = True
                     outcome = await _await_brew_outcome(

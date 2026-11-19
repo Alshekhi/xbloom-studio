@@ -27,10 +27,13 @@ from custom_components.xbloom.reading_sensors import (
     XBloomCurrentPourSensor,
     XBloomGrindSizeSensor,
     XBloomLastRecipeCardSensor,
+    XBloomWaterPouredSensor,
 )
 from xbloom import spec
 
 CMD_BLOOM = 40510
+CMD_GRINDER_START = 40502
+CMD_MACHINE_ACTIVITY = 8023
 
 
 def _make(cls):
@@ -416,3 +419,80 @@ async def test_the_next_brew_starts_from_no_pour() -> None:
     handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 3})
     handlers.signals[0]({"cmd": 40502})
     assert entity._attr_native_value == 0
+
+
+# --------------------------------------------------------------------------- #
+# Water poured                                                                #
+# --------------------------------------------------------------------------- #
+# The machine reports the water a brew has poured, in ml (40523), several times
+# a second; the sensor follows it from the first pour to the brew's end.
+
+WATER = 40523
+
+
+def _poured(ml):
+    return {"cmd": WATER, "water_ml": ml}
+
+
+@pytest.mark.asyncio
+async def test_water_poured_counts_from_the_first_pour() -> None:
+    entity = _make(XBloomWaterPouredSensor)
+    handlers = await _wire(entity)
+    handlers.signals[0](_poured(0.0))            # sent at connect, before any pour
+    assert entity._attr_native_value is None
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    handlers.signals[0](_poured(112.4))
+    assert entity._attr_native_value == 112
+
+
+@pytest.mark.asyncio
+async def test_water_poured_writes_every_change_and_no_repeat() -> None:
+    entity = _make(XBloomWaterPouredSensor)
+    handlers = await _wire(entity)
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    for ml, expected in ((1.2, 1), (2.6, 3), (3.4, 3), (4.0, 4)):
+        handlers.signals[0](_poured(ml))
+        assert entity._attr_native_value == expected
+    writes = entity.async_write_ha_state.call_count
+    handlers.signals[0](_poured(4.0))
+    assert entity.async_write_ha_state.call_count == writes
+
+
+@pytest.mark.asyncio
+async def test_water_poured_clears_when_the_brew_ends() -> None:
+    entity = _make(XBloomWaterPouredSensor)
+    handlers = await _wire(entity)
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    handlers.signals[0](_poured(300))
+    handlers.signals[0]({"cmd": CMD_ENJOY})
+    assert entity._attr_native_value is None
+    handlers.signals[0](_poured(500))            # a late report is not a new brew
+    assert entity._attr_native_value is None
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    handlers.signals[0](_poured(20))
+    handlers.signals[1]("ended")
+    assert entity._attr_native_value is None
+
+
+@pytest.mark.asyncio
+async def test_water_poured_ignores_the_standalone_brewer() -> None:
+    entity = _make(XBloomWaterPouredSensor)
+    handlers = await _wire(entity)
+    handlers.signals[0]({"cmd": CMD_MACHINE_ACTIVITY, "activity": 3})   # brewer screen
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    handlers.signals[0](_poured(50))
+    assert entity._attr_native_value is None
+
+
+@pytest.mark.asyncio
+async def test_water_poured_carries_the_recipe_water_of_a_known_brew() -> None:
+    entity = _make(XBloomWaterPouredSensor)
+    handlers = await _wire(entity)
+    assert entity.extra_state_attributes == {}
+    handlers[EV_BREW_STARTED](_event(EV_BREW_STARTED, {"total_pours": 4, "recipe_water_ml": 500}))
+    handlers.signals[0]({"cmd": CMD_GRINDER_START})
+    handlers.signals[0]({"cmd": CMD_BLOOM, "pour_index": 0})
+    handlers.signals[0](_poured(10))
+    assert entity.extra_state_attributes == {"recipe_water_ml": 500}
+    handlers.signals[0]({"cmd": CMD_ENJOY})
+    assert entity.extra_state_attributes == {}

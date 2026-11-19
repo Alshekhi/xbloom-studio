@@ -668,6 +668,9 @@
           "queued": "Waiting to be saved"
         }
       },
+      "water_poured": {
+        "name": "Water Poured"
+      },
       "brew_time": {
         "name": "Brew Time"
       },

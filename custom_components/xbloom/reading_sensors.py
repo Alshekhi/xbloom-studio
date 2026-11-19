@@ -37,7 +37,7 @@ from homeassistant.components.sensor import (
 )
 from datetime import datetime, timedelta
 
-from homeassistant.const import UnitOfTime
+from homeassistant.const import UnitOfTime, UnitOfVolume
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_track_time_interval
@@ -55,7 +55,7 @@ from .ble_entities import (
     signal_event,
 )
 from xbloom import spec
-from xbloom.ble import NOTIFY_BREW_ABANDONED
+from xbloom.ble import NOTIFY_BREW_ABANDONED, NOTIFY_WATER_VOLUME
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -441,10 +441,107 @@ class XBloomBrewTimeSensor(SensorEntity):
         )
 
 
+class XBloomWaterPouredSensor(SensorEntity):
+    """The water the brew in progress has poured, in ml; empty otherwise.
+
+    Follows the machine's own report (RD_WATER_VOLUME), which it sends several
+    times a second while pouring: every change is written, a repeat is not.
+    It counts from the first pour, since the machine also reports 0 on connect,
+    and clears when the brew ends, like Brew Time. A brew Home Assistant knows
+    the recipe of carries that recipe's water beside it.
+    """
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_translation_key = "water_poured"
+    _attr_unique_id = "xbloom_water_poured"
+    _attr_device_class = SensorDeviceClass.VOLUME
+    _attr_native_unit_of_measurement = UnitOfVolume.MILLILITERS
+    _attr_icon = "mdi:water"
+
+    def __init__(self, entry) -> None:
+        self._entry = entry
+        self._attr_native_value: int | None = None
+        self._counting = False
+        self._recipe_water: int | None = None
+        self._on_module_screen = False
+
+    @property
+    def device_info(self):
+        return _device_info(self._entry.entry_id)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {} if self._recipe_water is None else {"recipe_water_ml": self._recipe_water}
+
+    @callback
+    def _set(self, value: int | None) -> None:
+        if value != self._attr_native_value:
+            self._attr_native_value = value
+            self.async_write_ha_state()
+
+    @callback
+    def _end(self) -> None:
+        self._counting = False
+        changed = self._recipe_water is not None
+        self._recipe_water = None
+        if self._attr_native_value is not None:
+            self._set(None)
+        elif changed:
+            self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+
+        @callback
+        def _on_started(event) -> None:
+            # The machine took a brew whose recipe is known here; its pours
+            # are counted once the first one begins.
+            self._on_module_screen = False
+            self._counting = False
+            water = event.data.get("recipe_water_ml")
+            self._recipe_water = round(water) if isinstance(water, (int, float)) else None
+            self._attr_native_value = None
+            self.async_write_ha_state()
+
+        @callback
+        def _on_signal(decoded: dict) -> None:
+            self._on_module_screen = module_screen_after(decoded, self._on_module_screen)
+            if self._on_module_screen:
+                return
+            cmd = decoded.get("cmd")
+            if cmd == CMD_BLOOM:
+                self._counting = True
+            elif cmd == NOTIFY_WATER_VOLUME and self._counting and "water_ml" in decoded:
+                self._set(round(float(decoded["water_ml"])))
+            elif cmd == CMD_GRINDER_START:
+                # The next brew beginning: what it pours is counted afresh.
+                self._counting = False
+                self._set(None)
+            elif cmd == CMD_ENJOY or brew_over(decoded):
+                self._end()
+
+        @callback
+        def _on_lifecycle(phase: str) -> None:
+            if phase == "ended":
+                self._end()
+
+        self.async_on_remove(self.hass.bus.async_listen(EV_BREW_STARTED, _on_started))
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, signal_event(self._entry.entry_id), _on_signal)
+        )
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, signal_brew_lifecycle(self._entry.entry_id), _on_lifecycle
+            )
+        )
+
+
 READING_SENSORS = [
     XBloomCurrentRecipeSensor,
     XBloomCurrentPourSensor,
     XBloomBrewTimeSensor,
+    XBloomWaterPouredSensor,
     XBloomGrindSizeSensor,
     XBloomCurrentModuleSensor,
     XBloomLastRecipeCardSensor,
