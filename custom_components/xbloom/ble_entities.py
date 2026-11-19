@@ -36,7 +36,8 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import UnitOfMass
 from homeassistant.core import callback
-from homeassistant.helpers.event import async_call_later
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.util import dt as dt_util
@@ -240,6 +241,24 @@ WATER_FAULT_EVENT = next(
 #  40502/40507 grinder cmds for the grinding->brewing transition instead.)
 ACTIVITY_HOME_STATES = (1, 65)   # Pro home, Auto/Easy home
 ACTIVITY_MODULE_SCREENS = (2, 3, 4, 5)   # grinder, brewer, scale (4/5)
+
+
+def water_source_entity(hass) -> str | None:
+    """The Water Source select's entity id."""
+    return er.async_get(hass).async_get_entity_id("select", DOMAIN, "xbloom_water_source_select")
+
+
+def on_tap(hass) -> bool:
+    """Whether the machine draws from the tap.
+
+    Read from the Water Source select, which follows both what Home Assistant
+    sets and what the machine reports: setting the tap brings no report from
+    the machine. On the tap, the tank's low-water switch keeps reporting the
+    tank — empty or removed — and means nothing.
+    """
+    entity_id = water_source_entity(hass)
+    state = hass.states.get(entity_id) if entity_id else None
+    return state is not None and state.state == "tap"
 
 
 def module_screen_after(decoded: dict, on_module_screen: bool) -> bool:
@@ -520,6 +539,13 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
                 if "voltage" in decoded:
                     attrs["voltage"] = decoded["voltage"]
                 self._attr_extra_state_attributes = attrs
+                if on_tap(self.hass):
+                    # The tank is not in use: its switch says nothing about water.
+                    _cancel_water_back()
+                    if self._attr_native_value == WATER_STATUS:
+                        self._attr_native_value = MACHINE_OK
+                    self.async_write_ha_state()
+                    return
                 # Self-clearing water status: only toggles ok <-> no_water so it
                 # never clobbers a distinct active fault (e.g. no_beans).
                 if decoded["water_enough"] == 0:
@@ -557,6 +583,19 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
                 self.async_write_ha_state()
 
         self.async_on_remove(_cancel_water_back)
+
+        @callback
+        def _on_source(_event) -> None:
+            # Choosing the tap ends a low-water reading at once: the machine
+            # sends no report when its source changes.
+            if on_tap(self.hass) and self._attr_native_value == WATER_STATUS:
+                _cancel_water_back()
+                self._attr_native_value = MACHINE_OK
+                self.async_write_ha_state()
+
+        if (source := water_source_entity(self.hass)) is not None:
+            self.async_on_remove(
+                async_track_state_change_event(self.hass, [source], _on_source))
 
         @callback
         def _release_water_reading() -> None:
@@ -803,6 +842,7 @@ class XBloomBrewEventBleEntity(EventEntity):
             # button for water: that is announced as a failed start.
             if granular == WATER_FAULT_EVENT and (
                 decoded.get("water_enough") == 1 or self._followed or self._on_recipe_screen
+                or on_tap(self.hass)
             ):
                 granular = None
             if granular:

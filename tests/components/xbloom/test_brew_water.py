@@ -61,7 +61,9 @@ async def _brew(fake, *, water_source="tank"):
          patch("custom_components.xbloom._resolve_ble_device",
                AsyncMock(return_value=MagicMock(address="AA:BB:CC:DD:EE:FF"))), \
          patch("homeassistant.helpers.dispatcher.async_dispatcher_send", _send), \
-         patch("xbloom.ble.XBloomBleClient", fake):
+         patch("xbloom.ble.XBloomBleClient", fake), \
+         patch("custom_components.xbloom.ble_entities.water_source_entity",
+               lambda _hass: "select.xbloom_studio_water_source"):
         handlers = await _setup_and_get_handlers(hass, entry)
         await handlers["start_brew"](MagicMock(data={}))
         await entry.tasks[0]

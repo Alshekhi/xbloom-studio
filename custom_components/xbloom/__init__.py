@@ -1088,11 +1088,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         # The tank, unless the machine draws from the tap. What it decides goes
         # out on signal_water; amounts are re-sent only when one moves by
         # 10 ml or more, not on every volume frame.
-        source = hass.states.get("select.xbloom_studio_water_source")
-        water = (
-            None if source is not None and source.state == "tap"
-            else WaterTracker(recipe_water_ml(recipe))
-        )
+        from .ble_entities import on_tap
+
+        water = None if on_tap(hass) else WaterTracker(recipe_water_ml(recipe))
         water_sent: dict = {"state": None}
 
         def _water_key(state: dict | None) -> tuple | None:

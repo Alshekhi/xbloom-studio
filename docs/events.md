@@ -79,8 +79,10 @@ Bluetooth link — which it releases when a brew ends. So
 `sensor.xbloom_studio_machine_status` drops a water fault at that point, and does
 not restore one across a restart, rather than asserting a level nobody is still
 reading; a low tank reports itself again on the next connection, and
-immediately at the next brew. The other faults are reported once and stay until
-a brew starts.
+immediately at the next brew. With the water source on the tap, the switch
+still reports the tank, empty or not, so Machine Status ignores it and no
+`error_no_water` fires. The other faults are reported once and stay until a
+brew starts.
 
 **A brew Home Assistant started follows its tank.** When the switch trips, the
 integration counts the water poured since and compares what is left with what
