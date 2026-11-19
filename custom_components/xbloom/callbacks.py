@@ -198,6 +198,8 @@ class Callbacks:
         self._running: str | None = None
         self._queue: asyncio.Queue[Message] = asyncio.Queue()
         self._send = send
+        # The switch reads low and the cup is not known to finish.
+        self._water_short = False
         # Who started each brew that completed: the brew's rating, asked
         # later in a message of its own, goes back to the same caller.
         self._completed: dict[str, tuple[str, Any]] = {}
@@ -313,7 +315,25 @@ class Callbacks:
                           {"pour": index + 1, "pours": pending.total_pours})
 
     @callback
-    def on_machine_status(self, before: str | None, after: str | None) -> None:
+    def on_brew_paused(self, before: str | None, after: str | None, reason: str | None) -> None:
+        current = self._current()
+        if current is None or before not in ("on", "off") or after not in ("on", "off"):
+            return
+        run_id, pending = current
+        if not pending.progress or before == after:
+            return
+        if after == "off":
+            self._enqueue(run_id, pending, "resumed", False, {})
+        elif reason != "water" and not self._water_short:
+            # A pause for water is the `water` message, with the amounts.
+            self._enqueue(run_id, pending, "paused", False, {})
+
+    @callback
+    def on_machine_status(
+        self, before: str | None, after: str | None, will_finish: bool = False,
+    ) -> None:
+        # Low water the cup is not known to finish on: a pause now is for water.
+        self._water_short = after == WATER_STATUS and not will_finish
         current = self._current()
         if current is None or after in (None, "unknown", "unavailable") or before == after:
             return
@@ -360,6 +380,7 @@ class Callbacks:
                 ("sensor", "xbloom_brew_status", "status"),
                 ("sensor", "xbloom_machine_status", "machine"),
                 ("event", "xbloom_brew_event", "event"),
+                ("binary_sensor", "xbloom_brew_paused", "paused"),
             )
         }
         watched.pop(None, None)
@@ -374,7 +395,10 @@ class Callbacks:
             if kind == "status":
                 self.on_brew_status(before, new.state)
             elif kind == "machine":
-                self.on_machine_status(before, new.state)
+                self.on_machine_status(
+                    before, new.state, new.attributes.get("water_enough_to_finish") is True)
+            elif kind == "paused":
+                self.on_brew_paused(before, new.state, new.attributes.get("reason"))
             elif before not in (None, "unknown", "unavailable"):
                 # An event entity's state is when it fired; one restored from
                 # unavailable is not a firing.

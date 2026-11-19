@@ -128,6 +128,55 @@ def test_a_pour_is_numbered_from_one_of_the_total():
     assert (message.payload["data"]["pour"], message.payload["data"]["pours"]) == (2, 3)
 
 
+def test_a_pause_and_its_resume_go_to_a_caller_that_asked_for_progress():
+    for progress in (False, True):
+        cb = _callbacks()
+        cb.arm("r1", "receiver", None, progress=progress)
+        cb.on_event(_event("xbloom_brew_started", run_id="r1", recipe_name="K"))
+        cb.on_brew_paused("off", "on", None)
+        cb.on_brew_paused("on", "off", None)
+        events = [m.payload["data"]["event"] for m in _sent(cb)]
+        assert events == (["paused", "resumed"] if progress else [])
+
+
+def test_a_pause_for_water_is_left_to_the_water_message_but_its_resume_is_sent():
+    cb = _callbacks()
+    cb.arm("r1", "receiver", None, progress=True)
+    cb.on_event(_event("xbloom_brew_started", run_id="r1", recipe_name="K"))
+    cb.on_brew_paused("off", "on", "water")
+    cb.on_brew_paused("on", "off", None)
+    assert [m.payload["data"]["event"] for m in _sent(cb)] == ["resumed"]
+
+
+def test_a_pause_that_comes_before_its_water_reason_is_still_a_water_pause():
+    # The pause is reported a moment before the reason: with the switch low
+    # and the cup not known to finish, it is the water pause.
+    cb = _callbacks()
+    cb.arm("r1", "receiver", None, progress=True)
+    cb.on_event(_event("xbloom_brew_started", run_id="r1", recipe_name="K"))
+    cb.on_machine_status("ok", "no_water")
+    cb.on_brew_paused("off", "on", None)
+    assert _sent(cb) == []
+
+
+def test_a_pause_by_hand_with_low_water_the_cup_will_finish_on_is_sent():
+    cb = _callbacks()
+    cb.arm("r1", "receiver", None, progress=True)
+    cb.on_event(_event("xbloom_brew_started", run_id="r1", recipe_name="K"))
+    cb.on_machine_status("ok", "no_water", will_finish=True)
+    cb.on_brew_paused("off", "on", None)
+    assert [m.payload["data"]["event"] for m in _sent(cb)] == ["paused"]
+
+
+def test_a_restored_pause_state_is_not_a_pause():
+    cb = _callbacks()
+    cb.arm("r1", "receiver", None, progress=True)
+    cb.on_event(_event("xbloom_brew_started", run_id="r1", recipe_name="K"))
+    cb.on_brew_paused("unavailable", "on", None)
+    cb.on_brew_paused(None, "off", None)
+    assert _sent(cb) == []
+
+
 async def test_the_service_refuses_an_unknown_target_before_anything_fires():
     from homeassistant.exceptions import HomeAssistantError
 

@@ -140,7 +140,9 @@ The target receives that brew's faults, its water warnings that need someone
 at the tank (`water`, with `water_event` set to `water_low` when the cup will
 not finish, `water_paused` or `water_refilled`, and the amounts), and exactly
 one ending — `completed`, `failed`, `stopped` or `timeout` — and, with
-`notify_progress`, grinding and each pour. Each is a POST, retried if the receiver is briefly away, of
+`notify_progress`, grinding, each pour, and a pause and its resume (`paused`,
+`resumed`; a pause for water is the `water` message instead, and its resume is
+still sent). Each is a POST, retried if the receiver is briefly away, of
 the form `{"type": "xbloom.brew.<event>", "timestamp", "data": {"event",
 "final", "run_id", "recipe", …}, "context"}`, where `data` holds the same facts
 as the event and `context` is what `start_brew` was given. A caller names a
