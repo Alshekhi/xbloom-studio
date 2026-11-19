@@ -14,6 +14,7 @@ import pytest
 from custom_components.xbloom.ble_entities import (
     WATER_STATUS,
     XBloomMachineStatusBleSensor,
+    signal_brew_lifecycle,
     signal_event,
 )
 
@@ -44,9 +45,10 @@ async def _status():
     tracked: list = []
     with patch("custom_components.xbloom.ble_entities.async_track_state_change_event",
                lambda _h, ids, action: tracked.append((ids, action)) or (lambda: None)):
-        on_event = (await _wired(sensor))[signal_event("test_entry")]
+        sig = await _wired(sensor)
     source = _Source(sensor.hass)
-    return sensor, on_event, source, tracked
+    sensor.signals = sig
+    return sensor, sig[signal_event("test_entry")], source, tracked
 
 
 @pytest.mark.asyncio
@@ -103,3 +105,43 @@ async def test_on_the_tap_the_low_water_fault_is_not_fired():
         source.value = "tank"
         on_event(LOW)
     assert [c.args[0] for c in ent._trigger_event.call_args_list] == ["error_no_water"]
+
+
+@pytest.mark.asyncio
+async def test_back_to_the_tank_applies_the_last_reading_at_once():
+    # The machine sends nothing when its source changes and reports the switch
+    # only when it moves: the reading taken on the tap is the tank's now.
+    with _registry():
+        sensor, on_event, source, tracked = await _status()
+        source.value = "tap"
+        on_event(LOW)
+        assert sensor._attr_native_value == "ok"
+        [(_ids, action)] = tracked
+        source.value = "tank"
+        action(None)
+        assert sensor._attr_native_value == WATER_STATUS
+
+
+@pytest.mark.asyncio
+async def test_back_to_the_tank_with_water_stays_ok():
+    with _registry():
+        sensor, on_event, source, tracked = await _status()
+        source.value = "tap"
+        on_event({"cmd": 40522, "water_enough": 1})
+        [(_ids, action)] = tracked
+        source.value = "tank"
+        action(None)
+    assert sensor._attr_native_value == "ok"
+
+
+@pytest.mark.asyncio
+async def test_a_reading_from_a_released_link_is_not_applied_later():
+    with _registry():
+        sensor, on_event, source, tracked = await _status()
+        source.value = "tap"
+        on_event(LOW)
+        sensor.signals[signal_brew_lifecycle("test_entry")]("ended")   # the link let go
+        [(_ids, action)] = tracked
+        source.value = "tank"
+        action(None)
+    assert sensor._attr_native_value == "ok"

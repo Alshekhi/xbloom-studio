@@ -509,6 +509,9 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
         self._attr_extra_state_attributes: dict[str, Any] = {}
         # Cancels the pending "water is back", while a water reading holds.
         self._water_back: Callable[[], None] | None = None
+        # The switch's last reading, kept on the tap too: the machine reports
+        # it only when it moves, and nothing when the source changes.
+        self._tank_low = False
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -533,6 +536,7 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
         def _on_event(decoded: dict) -> None:
             # MachineInfo (40521) heartbeat — continuous water status + extras.
             if "water_enough" in decoded:
+                self._tank_low = decoded["water_enough"] == 0
                 attrs = dict(self._attr_extra_state_attributes or {})
                 if "system_status" in decoded:
                     attrs["system_status"] = decoded["system_status"]
@@ -586,11 +590,16 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
 
         @callback
         def _on_source(_event) -> None:
-            # Choosing the tap ends a low-water reading at once: the machine
-            # sends no report when its source changes.
-            if on_tap(self.hass) and self._attr_native_value == WATER_STATUS:
-                _cancel_water_back()
-                self._attr_native_value = MACHINE_OK
+            # The machine sends no report when its source changes: choosing
+            # the tap ends a low-water reading, and going back to the tank
+            # applies the switch's last one.
+            if on_tap(self.hass):
+                if self._attr_native_value == WATER_STATUS:
+                    _cancel_water_back()
+                    self._attr_native_value = MACHINE_OK
+                    self.async_write_ha_state()
+            elif self._tank_low and self._attr_native_value == MACHINE_OK:
+                self._attr_native_value = WATER_STATUS
                 self.async_write_ha_state()
 
         if (source := water_source_entity(self.hass)) is not None:
@@ -605,6 +614,7 @@ class XBloomMachineStatusBleSensor(RestoreSensor, SensorEntity):
             # for hours after a brew ended. Dropping it claims no
             # more than that we stopped looking: an empty tank says so again on
             # the very next heartbeat, and at the next brew.
+            self._tank_low = False
             if self._attr_native_value == WATER_STATUS:
                 self._attr_native_value = MACHINE_OK
                 self.async_write_ha_state()
