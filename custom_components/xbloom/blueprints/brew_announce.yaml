@@ -381,9 +381,11 @@ trigger:
   # are only unavailable while Home Assistant starts or the integration
   # reloads, and then come back holding their last value, so without this a
   # restart replays the last brew: "Your coffee is ready" with nobody brewing.
+  # Pouring is news only after grinding: a recipe with the grinder off goes
+  # straight to pouring, which "started" has just announced.
   - platform: state
     entity_id: !input xbloom_status_entity
-    not_from: "unavailable"
+    from: "grinding"
     to: "brewing"
     id: pouring
   - platform: state
