@@ -26,3 +26,5 @@ cryptography>=42
 # Reads the bundled blueprints in test_blueprint_restart_guard.py. HA core
 # ships it, so the integration itself needs nothing new.
 PyYAML>=6
+# Renders the blueprints' templates in tests, as Home Assistant does.
+Jinja2>=3.1
