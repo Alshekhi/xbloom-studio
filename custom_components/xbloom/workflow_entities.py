@@ -35,6 +35,21 @@ WORKFLOW_ENTITIES = (
 )
 
 
+# Entities an earlier version provided and this one does not: their registry
+# entries stay behind as "unavailable" until removed.
+RETIRED_ENTITIES = (
+    "xbloom_recipe_action_select",
+    "xbloom_run_recipe_action_button",
+)
+
+
+def remove_retired_entities(registry: Any, entries: Iterable[Any]) -> None:
+    """Remove the registry entries of entities no longer provided."""
+    for entry in entries:
+        if entry.unique_id in RETIRED_ENTITIES:
+            registry.async_remove(entry.entity_id)
+
+
 def hide_workflow_entities(registry: Any, entries: Iterable[Any], hider: Any) -> None:
     """Hide the workflow entities an earlier install registered visible.
 

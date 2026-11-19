@@ -92,13 +92,15 @@ async def test_the_migration_hides_them_once_and_moves_the_entry_on() -> None:
     registry = MagicMock()
     with patch.object(er, "async_get", return_value=registry, create=True), \
             patch.object(er, "async_entries_for_config_entry",
-                         return_value=[_entry("xbloom_coffee_lab_buy_again")], create=True), \
+                         return_value=[_entry("xbloom_coffee_lab_buy_again"),
+                                       _entry("xbloom_run_recipe_action_button")], create=True), \
             patch.object(er, "RegistryEntryHider", SimpleNamespace(INTEGRATION="integration"),
                          create=True):
         assert await async_migrate_entry(hass, entry) is True
         assert entry.minor_version == 2
         registry.async_update_entity.assert_called_once_with(
             "x.xbloom_coffee_lab_buy_again", hidden_by="integration")
+        registry.async_remove.assert_called_once_with("x.xbloom_run_recipe_action_button")
         registry.async_update_entity.reset_mock()
         await async_migrate_entry(hass, entry)          # already done: nothing again
         registry.async_update_entity.assert_not_called()

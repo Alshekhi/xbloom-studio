@@ -2638,20 +2638,20 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                      ble_name, mqtt_host, mqtt_port
     v2 (transition): same minus tokens/device_id, plus optional status_source
     v3 (BLE-only):   product_id + ble_name (mqtt_* / status_source dropped)
-    v3.2:            the workflow entities hidden once (workflow_entities.py)
+    v3.2:            the workflow entities hidden once, retired ones removed
+                     (workflow_entities.py)
     """
     if entry.version < 3:
         _migrate_to_v3(hass, entry)
     if entry.version == 3 and entry.minor_version < 2:
         from homeassistant.helpers import entity_registry as er
 
-        from .workflow_entities import hide_workflow_entities
+        from .workflow_entities import hide_workflow_entities, remove_retired_entities
 
         registry = er.async_get(hass)
-        hide_workflow_entities(
-            registry, er.async_entries_for_config_entry(registry, entry.entry_id),
-            er.RegistryEntryHider.INTEGRATION,
-        )
+        entries = er.async_entries_for_config_entry(registry, entry.entry_id)
+        hide_workflow_entities(registry, entries, er.RegistryEntryHider.INTEGRATION)
+        remove_retired_entities(registry, entries)
         hass.config_entries.async_update_entry(entry, minor_version=2)
     return True
 
