@@ -127,3 +127,19 @@ def test_a_low_blip_during_a_refill_is_not_a_new_trip():
     t = tripped_at(112)
     run(t, [(50, poured(394.9)), (100, screen(12)), (170, HIGH)])
     assert run(t, [(170.5, LOW), (171, HIGH), (172, screen(31))]) == []
+
+
+def test_the_water_screen_before_any_pour_is_not_a_pause():
+    # A start the machine refused for water: it shows its water screen with
+    # nothing poured, so there is no brew to pause.
+    t = WaterTracker(500)
+    assert run(t, [(0, LOW), (1, screen(12))]) == []
+
+
+def test_finish_after_a_top_up_below_the_switch_has_no_amount():
+    # Water added while paused that leaves the tank under the switch sends no
+    # "water" reading, so how much was added, and so how much is left, is
+    # unknown: the finish says the tank is low, without a number.
+    t = tripped_at(183)
+    run(t, [(50, poured(465)), (60, screen(12)), (90, KNOB), (120, poured(500))])
+    assert t.completion_fields() == {"tank_low": True}

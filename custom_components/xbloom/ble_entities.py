@@ -773,6 +773,8 @@ class XBloomBrewEventBleEntity(EventEntity):
         self._followed = False
         # A brew Home Assistant did not start is waiting for water.
         self._water_paused = False
+        # On the recipe screen, where the button starts a prepared recipe.
+        self._on_recipe_screen = False
         # Faults currently asserted. The machine reports a fault for as long as
         # it holds, the way a low-fuel light stays lit, so the frames after the
         # first carry no news — relaying each one made one dry tank announce
@@ -797,8 +799,10 @@ class XBloomBrewEventBleEntity(EventEntity):
             granular = self._CMD_TO_GRANULAR.get(cmd)
             # The low-water report is sent for water coming back too, and a
             # brew Home Assistant started reports the tank as water events.
+            # A low report on the recipe screen is the machine refusing the
+            # button for water: that is announced as a failed start.
             if granular == WATER_FAULT_EVENT and (
-                decoded.get("water_enough") == 1 or self._followed
+                decoded.get("water_enough") == 1 or self._followed or self._on_recipe_screen
             ):
                 granular = None
             if granular:
@@ -827,8 +831,14 @@ class XBloomBrewEventBleEntity(EventEntity):
             # The water pause of a brew Home Assistant did not start: it runs
             # no water tracker, so the pause is announced here, without the
             # amounts only a tracker knows.
+            # Only once pouring has begun: before that the water screen is a
+            # start the machine refused, announced as a failed start.
+            on_recipe_screen = self._on_recipe_screen
+            if cmd == CMD_MACHINE_ACTIVITY:
+                self._on_recipe_screen = decoded.get("activity") == ACTIVITY_RECIPE_READY
             if cmd == CMD_MACHINE_ACTIVITY and decoded.get("activity") == ACTIVITY_WATER_SHORTAGE:
-                if not self._followed and not self._water_paused:
+                if (not self._followed and not self._water_paused
+                        and self._first_pour_at is not None and not on_recipe_screen):
                     self._water_paused = True
                     self._trigger_event("water_paused", {})
                     self.async_write_ha_state()

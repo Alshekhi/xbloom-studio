@@ -97,7 +97,18 @@ whose recipe Home Assistant does not know, still reports `error_no_water`, and
 A brew that starts with the water already low reports no `water_low` and no
 amounts: the machine only accepts a recipe its own estimate of the water
 covers, so the cup will finish, and the completion carries `tank_low: true`
-without `water_left_ml`. Machine Status returns from `no_water` to `ok` only
+without `water_left_ml`. The same holds after a dry-tank pause topped up with
+too little to lift the switch: how much was added is unknown, so the completion
+carries `tank_low: true` alone.
+
+**A start refused for water** fires `xbloom_brew_failed` with `reason: no_water`,
+whether it came from Home Assistant or from the machine's button on a recipe
+Home Assistant prepared; for a prepared recipe it carries `water_needed_ml` too.
+A button start answers with no reply, only the water screen, so this one has no
+`run_id` or `step`. The water screen of a refused start is not a water pause, and
+the low-water report that comes with it is not relayed as `error_no_water`.
+
+Machine Status returns from `no_water` to `ok` only
 once the switch has read water for two seconds, so water sloshing during a pour
 does not flick it.
 

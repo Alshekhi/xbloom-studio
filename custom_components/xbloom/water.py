@@ -47,6 +47,9 @@ class WaterTracker:
         self._paused_since: float | None = None
         self._refilled = False
         self._paused_total = 0.0
+        # Water was added during a pause without the switch reading "water":
+        # how much is unknown, so what is left is too.
+        self._left_unknown = False
 
     def feed(self, decoded: dict, now: float) -> tuple[str, dict] | None:
         """Take one frame; return the decision it led to, if any."""
@@ -60,13 +63,17 @@ class WaterTracker:
         if cmd in (NOTIFY_LACK_OF_WATER, NOTIFY_MACHINE_INFO) and "water_enough" in decoded:
             decision = self._switch(decoded["water_enough"] == 0, now)
         elif cmd == NOTIFY_MACHINE_ACTIVITY and decoded.get("activity") == ACTIVITY_WATER_SHORTAGE:
-            if self._paused_since is None:
+            # Before the first pour the water screen is a start the machine
+            # refused for water, not a brew pausing: there is nothing to resume.
+            if self._paused_since is None and self._pouring:
                 self._paused_since = now
                 self._refilled = False
                 decision = ("water_paused", {"water_needed_ml": round(self._needed())})
         elif cmd in _RESUMED and self._paused_since is not None:
             self._paused_total += now - self._paused_since
             self._paused_since = None
+            if self._switch_low:
+                self._left_unknown = True
 
         # A "water" reading that held is a refill made while still pouring.
         if self._tripped_at is not None and self._water_held(now):
@@ -129,6 +136,6 @@ class WaterTracker:
         """What the finished brew says about the tank."""
         if not self._switch_low:
             return {}
-        if self._tripped_at is None:
+        if self._tripped_at is None or self._left_unknown:
             return {"tank_low": True}
         return {"tank_low": True, "water_left_ml": round(self._left())}

@@ -94,3 +94,15 @@ async def test_machine_status_holds_low_through_a_moment_of_water():
         assert [delay for delay, _ in later] == [WATER_REFILL_HOLD_S]
         later[0][1](None)
         assert sensor._attr_native_value == "ok"
+
+
+@pytest.mark.asyncio
+async def test_a_start_refused_at_the_knob_is_not_a_pause_or_a_bare_fault():
+    # A prepared recipe on the recipe screen, the knob pressed with the tank
+    # low: the machine reports the switch and shows its water screen, with
+    # nothing poured. The refusal is announced as a failed start instead.
+    ent, sig = await _event_entity()
+    on_event = sig[signal_event("test_entry")]
+    for frame in ({"cmd": 8023, "activity": 31}, {"cmd": 40522, "water_enough": 0}, WATER_SCREEN):
+        on_event(frame)
+    assert [c.args[0] for c in ent._trigger_event.call_args_list] == []

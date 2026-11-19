@@ -666,6 +666,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # alone, as the official app does on its second tap.
     brew_session: dict = {
         "task": None, "started_at": 0.0, "client": None, "prepared": None, "prepared_brew": None,
+        # A start from here the machine refused for water, already reported;
+        # the water screen it shows next is that refusal, not another one.
+        "water_refusal_reported": False,
     }
 
     def _prepared_key(session, recipe: dict) -> tuple:
@@ -970,6 +973,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         # already running needs nothing sent, and re-preparing would be refused.
         if adopted is None:
             await preparer.async_settled()
+        brew_session["water_refusal_reported"] = False
 
         # Carried by every event of this brew, so a consumer can tell them
         # apart and route each back to whoever started it. The machine issues
@@ -1371,6 +1375,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 if err.reason == "no_water":
                     # What the recipe needs, so a refusal can say how much.
                     extra["water_needed_ml"] = round(recipe_water_ml(recipe))
+                    brew_session["water_refusal_reported"] = True
                 _fire_failed(err.reason, recipe_name, **extra)
             except Exception as err:  # noqa: BLE001
                 _LOGGER.error(
@@ -1426,6 +1431,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     # Pause and Cancel.
     from .ble_entities import (
         ACTIVITY_RECIPE_READY,
+        ACTIVITY_WATER_SHORTAGE,
         CMD_GRINDER_START,
         CMD_MACHINE_ACTIVITY,
         held_session,
@@ -1439,7 +1445,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         cmd = decoded.get("cmd")
         machine_screen["module"] = module_screen_after(decoded, machine_screen["module"])
         if cmd == CMD_MACHINE_ACTIVITY:
+            before = machine_screen["activity"]
             machine_screen["activity"] = decoded.get("activity")
+            if (decoded.get("activity") == ACTIVITY_WATER_SHORTAGE
+                    and before == ACTIVITY_RECIPE_READY and not _brew_running()):
+                _refused_for_water()
             return
         if cmd != CMD_GRINDER_START or _brew_running() or machine_screen["module"]:
             return
@@ -1464,6 +1474,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         # slots: it cannot be followed, since what it brews is unknown here,
         # but that it started can still be said.
         hass.bus.async_fire("xbloom_machine_brew_started", {})
+
+    @callback
+    def _refused_for_water() -> None:
+        # The recipe screen giving way to the water screen with nothing
+        # poured: the button was refused for water. Home Assistant sent no
+        # start, so no refusal reached it; say it the way a refused start
+        # from here is said, with the recipe's water when Home Assistant
+        # prepared it.
+        if brew_session["water_refusal_reported"]:
+            brew_session["water_refusal_reported"] = False
+            return
+        from .water import recipe_water_ml
+
+        prepared = brew_session["prepared_brew"]
+        data: dict = {"reason": "no_water", "recipe_name": prepared[1] if prepared else None}
+        if prepared is not None:
+            data["water_needed_ml"] = round(recipe_water_ml(prepared[0]))
+        hass.bus.async_fire("xbloom_brew_failed", data)
 
     entry.async_on_unload(
         async_dispatcher_connect(hass, _signal_event(entry.entry_id), _follow_machine_start)

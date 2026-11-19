@@ -10,6 +10,8 @@ nothing sent to the machine.
 import asyncio
 from unittest.mock import MagicMock, patch
 
+from xbloom import ble
+
 from custom_components.xbloom.ble_entities import signal_event
 
 from .test_brew_completion_contract import _Entry, _make_hass, _setup_and_get_handlers
@@ -136,3 +138,58 @@ async def test_a_followed_brew_is_not_also_announced_as_a_slot_brew():
     assert _fired(hass, "xbloom_machine_brew_started") == []
     for task in (*tasks, *entry.tasks):
         task.cancel()
+
+
+LOW = {"cmd": 40522, "water_enough": 0}
+WATER_SCREEN = {"cmd": 8023, "activity": 12}
+
+
+async def test_a_prepared_recipe_refused_at_the_button_is_a_failed_start():
+    # Home Assistant sent nothing for this start, so no refusal reaches it: the
+    # machine answers the button with the low-water switch and its water screen.
+    hass, entry, _handlers, _session, followers, tasks = await _rig()
+    with _machine_in_range():
+        await entry.runtime_data.preparer._prepare({"dose": 15})
+        _hear(followers, RECIPE_SCREEN, LOW, WATER_SCREEN)
+        await _settle()
+    failed = _fired(hass, "xbloom_brew_failed")
+    assert len(failed) == 1
+    assert failed[0]["reason"] == "no_water"
+    assert failed[0]["recipe_name"] == "Test Recipe One"
+    assert failed[0]["water_needed_ml"] > 0
+    assert tasks == []
+
+
+async def test_a_refusal_at_the_button_without_a_prepared_recipe_has_no_name():
+    hass, _entry, _handlers, _session, followers, _tasks = await _rig()
+    _hear(followers, RECIPE_SCREEN, LOW, WATER_SCREEN)
+    await _settle()
+    assert _fired(hass, "xbloom_brew_failed") == [{"reason": "no_water", "recipe_name": None}]
+
+
+async def test_the_water_screen_mid_brew_is_not_a_refused_start():
+    hass, _entry, _handlers, _session, followers, _tasks = await _rig()
+    _hear(followers, {"cmd": 8023, "activity": 35}, LOW, WATER_SCREEN)
+    await _settle()
+    assert _fired(hass, "xbloom_brew_failed") == []
+
+
+class _RefusingStart(_PreparingSession):
+    async def send_start(self):
+        self.sent.append("start")
+        raise ble.CommandRefused("execute", "no_water")
+
+
+async def test_a_start_from_home_assistant_refused_for_water_is_reported_once():
+    # Home Assistant's own start hears the refusal and reports it; the water
+    # screen the machine shows next is that same refusal, not a second one.
+    hass, entry, handlers, _session, followers, _tasks = await _rig()
+    entry.runtime_data.live_session_listener = _RefusingStart()
+    with _machine_in_range():
+        await entry.runtime_data.preparer._prepare({"dose": 15})
+        _hear(followers, RECIPE_SCREEN)
+        await handlers["start_brew"](MagicMock(data={"dose": 15}))
+        await _settle()
+        _hear(followers, LOW, WATER_SCREEN)
+        await _settle()
+    assert [e["reason"] for e in _fired(hass, "xbloom_brew_failed")] == ["no_water"]
