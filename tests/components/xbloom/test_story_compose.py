@@ -93,3 +93,18 @@ async def test_a_bag_running_low_says_goodbye():
     texts = await _texts(bag={**BAG, "remaining_g": 30},
                          history=[{"rating": None, "next_change": ""}] * 5)
     assert texts.stories[Slot("wait", 1, "bag")][1] == "Goodbye Test Kenya."
+
+
+async def test_a_chapter_tied_to_no_country_is_never_still_ahead():
+    content = Content.load("en", FIXTURE)
+    content._data["big_story"]["chapters"][0]["countries"] = []
+    memory = await _memory()
+    plan = _plan()
+    texts = compose(plan_slots(plan, False), plan, None, [], memory, content, TODAY)
+    assert texts.stories[Slot("wait", 1, "big_story")][0] == "Where it began"
+
+
+async def test_a_brew_without_a_bag_counts_no_cups_of_a_bag():
+    texts = await _texts(bag=None)
+    _heading, you = texts.stories[Slot("draining", 0, "you")]
+    assert "of this bag" not in you

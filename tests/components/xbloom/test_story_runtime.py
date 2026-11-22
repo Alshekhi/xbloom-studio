@@ -81,8 +81,10 @@ async def test_a_bag_brew_tells_the_bag_story_at_the_bloom():
 
 
 async def test_draining_shows_the_you_line():
-    runtime, _ = await _runtime()
-    await _started(runtime)
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    runtime, _ = await _runtime(lab)
+    await _started(runtime, bag.id)
     await runtime.async_on_stage("draining", 4)
     assert runtime.current["kind"] == "you" and runtime.current["story"].startswith("Cup 1")
 

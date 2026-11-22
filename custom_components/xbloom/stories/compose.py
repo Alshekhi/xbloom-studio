@@ -54,7 +54,8 @@ def _values(bag: dict | None, history: list[dict], content: Content, today: date
         "altitude": f"{_number(low)}–{_number(high)}" if low is not None and high is not None else _number(low),
         "days_since_roast": _days(content, bag.get("roast_date"), today),
         "days_since_open": _days(content, bag.get("opened_on"), today),
-        "brew_count": str(len(history) + 1),
+        # Cups are counted for a bag; a brew from no bag has none.
+        "brew_count": str(len(history) + 1) if bag else None,
         "last_rating": _number(last.get("rating")),
         "next_change": last.get("next_change") or None,
     }
@@ -144,7 +145,10 @@ class _Writer:
         tasted = {c.casefold() for c in self.memory.big_story()["tasted"]}
         if self.values.get("country"):
             tasted.add(self.values["country"].casefold())
-        ahead = not any(c.casefold() in tasted for c in chapter["countries"])
+        # A chapter about no one country (processing, the cup itself) is
+        # never "still ahead".
+        ahead = bool(chapter["countries"]) and not any(
+            c.casefold() in tasted for c in chapter["countries"])
         self.out.big_story_part_told = True
         heading = self._heading("big_story_ahead" if ahead else "big_story", title=chapter["title"])
         return heading, chapter["parts"][part]

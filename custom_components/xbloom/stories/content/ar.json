@@ -1,0 +1,497 @@
+{
+  "counts": {
+    "day": {
+      "zero": "{n} يوم",
+      "one": "يوم واحد",
+      "two": "يومين",
+      "few": "{n} أيام",
+      "many": "{n} يومًا",
+      "other": "{n} يوم"
+    }
+  },
+  "headings": {
+    "bag": "{name}، الفصل {chapter}",
+    "big_story": "{title}",
+    "big_story_ahead": "{title}، ما زالت أمامك",
+    "science": "في كوبك",
+    "you": "كوبك"
+  },
+  "topics": {
+    "bloom": "التفتّح",
+    "extraction": "الاستخلاص",
+    "origin": "أين تُزرع القهوة",
+    "process": "المعالجة",
+    "roast": "التحميص",
+    "water": "الماء"
+  },
+  "pour_lines": {
+    "centered": "الصبّة {pour}: {volume} مل بحرارة {temperature} °م في المنتصف، تنساب بهدوء في قلب القهوة.",
+    "spiral": "الصبّة {pour}: {volume} مل بحرارة {temperature} °م بشكل حلزوني، تبلّل القهوة بالتساوي من المنتصف إلى الأطراف.",
+    "circular": "الصبّة {pour}: {volume} مل بحرارة {temperature} °م في دوائر، تحرّك القهوة كلها معًا."
+  },
+  "facts": {
+    "bloom.co2": {
+      "topic": "bloom",
+      "level": 1,
+      "text": "تنتفخ القهوة لأن التحميص يحبس ثاني أكسيد الكربون داخل الحبة، والماء الساخن يطلقه. حُمّصت هذه القهوة قبل {days_since_roast}.",
+      "source": "Illy and Viani, Espresso Coffee: The Science of Quality (2005)"
+    },
+    "bloom.fresh": {
+      "topic": "bloom",
+      "level": 1,
+      "text": "القهوة الطازجة تتفتّح أكثر. معظم غازها يخرج في الأسابيع الأولى بعد التحميص.",
+      "source": "Scott Rao, The Coffee Roaster's Companion (2014)"
+    },
+    "bloom.why": {
+      "topic": "bloom",
+      "level": 1,
+      "text": "الصبّة الأولى الصغيرة تسمح للغاز بالخروج. بعدها تصل الصبّات التالية إلى كل حبة بدل أن تدفعها الفقاعات جانبًا.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "bloom.open": {
+      "topic": "bloom",
+      "level": 2,
+      "text": "بعد فتح الكيس يخرج الغاز والعطر أسرع. فُتح هذا الكيس قبل {days_since_open}.",
+      "source": "Illy and Viani, Espresso Coffee: The Science of Quality (2005)"
+    },
+    "bloom.grind": {
+      "topic": "bloom",
+      "level": 2,
+      "text": "الطحن يطلق كثيرًا من الغاز دفعة واحدة. لذلك تكاد القهوة المطحونة منذ وقت طويل لا تتفتّح.",
+      "source": "Illy and Viani, Espresso Coffee: The Science of Quality (2005)"
+    },
+    "bloom.time": {
+      "topic": "bloom",
+      "level": 3,
+      "text": "التفتّح بين ثلاثين وخمس وأربعين ثانية شائع في التقطير اليدوي. عندها يكون معظم الفوران قد هدأ.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "bloom.dark": {
+      "topic": "bloom",
+      "level": 3,
+      "text": "التحميص الأغمق يكوّن ثاني أكسيد كربون أكثر، لكن بنيته الهشة تتركه يخرج أسرع.",
+      "source": "Illy and Viani, Espresso Coffee: The Science of Quality (2005)"
+    },
+    "extraction.order": {
+      "topic": "extraction",
+      "level": 1,
+      "text": "يذيب الماء النكهات بسرعات مختلفة: الأحماض أولًا، ثم السكريات، ثم المركبات المُرّة الأثقل.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "extraction.share": {
+      "topic": "extraction",
+      "level": 1,
+      "text": "يمكن أن يذوب في الماء ما يقارب ثلث الحبة المحمّصة. والكوب الجيد يأخذ عادة نحو خُمس وزن القهوة.",
+      "source": "Specialty Coffee Association, Golden Cup brewing standard"
+    },
+    "extraction.grind": {
+      "topic": "extraction",
+      "level": 2,
+      "text": "الطحن الأنعم يكشف مساحة أكبر، فيستخلص الماء أسرع. وإن زاد النعومة جاءت المركبات المُرّة والجافة.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "extraction.heat": {
+      "topic": "extraction",
+      "level": 2,
+      "text": "الماء الأسخن يستخلص أسرع. لذلك تُحضّر التحميصات الفاتحة، وهي أصعب استخلاصًا، بحرارة أعلى غالبًا.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "extraction.taste": {
+      "topic": "extraction",
+      "level": 2,
+      "text": "الحموضة الحادة والقوام الخفيف تعني غالبًا استخلاصًا قليلًا. والمرارة والجفاف تعنيان غالبًا استخلاصًا زائدًا.",
+      "source": "Specialty Coffee Association, Golden Cup brewing standard"
+    },
+    "extraction.dials": {
+      "topic": "extraction",
+      "level": 3,
+      "text": "نسبة القهوة إلى الماء تحدد القوة، أما الطحن والوقت فيحددان الاستخلاص. هما مفتاحان مختلفان.",
+      "source": "Specialty Coffee Association, Golden Cup brewing standard"
+    },
+    "extraction.stages": {
+      "topic": "extraction",
+      "level": 3,
+      "text": "الصب على مراحل يجلب ماءً جديدًا إلى القهوة مرة بعد مرة، والماء الجديد يذيب أكثر من ماء امتلأ بالقهوة.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "origin.altitude": {
+      "topic": "origin",
+      "level": 1,
+      "text": "نمت هذه القهوة على ارتفاع {altitude} متر. الارتفاع والبرودة يبطئان نضج الثمار، وهذا يبني غالبًا سكرًا وحموضة أكثر.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "origin.country": {
+      "topic": "origin",
+      "level": 1,
+      "text": "تُزرع القهوة في حزام حول خط الاستواء، في أكثر من خمسين بلدًا. وهذه القهوة من {country}.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "origin.tree": {
+      "topic": "origin",
+      "level": 1,
+      "text": "تحتاج شجرة القهوة من ثلاث إلى أربع سنوات لتعطي أول محصول حقيقي.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "origin.region": {
+      "topic": "origin",
+      "level": 2,
+      "text": "زُرعت هذه القهوة في {region}. داخل البلد الواحد قد تختلف المناطق في الطعم كما تختلف البلدان.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "origin.producer": {
+      "topic": "origin",
+      "level": 2,
+      "text": "يذكر هذا الكيس من زرعها: {producer}. ومعرفة المزارع جزء مما يجعل القهوة مختصة.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "origin.species": {
+      "topic": "origin",
+      "level": 2,
+      "text": "الأرابيكا والروبوستا نوعان مختلفان. الأرابيكا أحلى وأكثر حموضة، والروبوستا فيها نحو ضعف الكافيين.",
+      "source": "World Coffee Research, Arabica Coffee Varieties catalogue"
+    },
+    "origin.varietal": {
+      "topic": "origin",
+      "level": 3,
+      "text": "سلالة هذه القهوة {varietal}. وتختلف سلالات القهوة في الطعم كما تختلف أصناف العنب في النبيذ.",
+      "source": "World Coffee Research, Arabica Coffee Varieties catalogue"
+    },
+    "origin.picking": {
+      "topic": "origin",
+      "level": 3,
+      "text": "تُقطف معظم القهوة المختصة باليد، لأن الثمار على الغصن الواحد تنضج في أوقات مختلفة.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.this": {
+      "topic": "process",
+      "level": 1,
+      "text": "معالجة هذا الكيس: {process}. وطريقة إزالة الثمرة عن البذرة تشكّل الطعم بقدر ما يشكّله مكان الزراعة.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.seed": {
+      "topic": "process",
+      "level": 1,
+      "text": "حبة القهوة هي بذرة ثمرة حمراء أو صفراء. والمعالجة هي طريقة إزالة الثمرة من حولها.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.washed": {
+      "topic": "process",
+      "level": 1,
+      "text": "في القهوة المغسولة تُزال الثمرة قبل التجفيف، وهذا يعطي غالبًا كوبًا نظيفًا ومشرقًا.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.natural": {
+      "topic": "process",
+      "level": 2,
+      "text": "القهوة المجففة تجف داخل الثمرة كاملة، وقد يستمر ذلك أسابيع، فتأتي نكهاتها أكثر فاكهية وثقلًا.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.honey": {
+      "topic": "process",
+      "level": 2,
+      "text": "معالجة العسل تترك جزءًا من طبقة الثمرة اللزجة على البذرة وهي تجف. ولا علاقة لها بالنحل.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.anaerobic": {
+      "topic": "process",
+      "level": 3,
+      "text": "التخمير اللاهوائي يحبس الثمار في خزانات بلا أكسجين، وهي طريقة حديثة قد تعطي نكهات قوية وغير مألوفة.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.rest": {
+      "topic": "process",
+      "level": 3,
+      "text": "بعد التجفيف ترتاح القهوة أسابيع قبل تقشيرها وشحنها، لتتوازن رطوبتها.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "roast.days": {
+      "topic": "roast",
+      "level": 1,
+      "text": "حُمّصت هذه القهوة قبل {days_since_roast}. كثير من قهوة التقطير يكون في أفضل حالاته بعد أسبوع أو أسبوعين من الراحة، حين يهدأ الغاز.",
+      "source": "Scott Rao, The Coffee Roaster's Companion (2014)"
+    },
+    "roast.time": {
+      "topic": "roast",
+      "level": 1,
+      "text": "يحوّل التحميص بذرة خضراء صلبة إلى حبة بنية هشة في نحو عشر إلى خمس عشرة دقيقة.",
+      "source": "Scott Rao, The Coffee Roaster's Companion (2014)"
+    },
+    "roast.sugar": {
+      "topic": "roast",
+      "level": 1,
+      "text": "تتكرمل السكريات في الحبة أثناء التحميص، ومنها يأتي كثير من حلاوة القهوة ولونها.",
+      "source": "Scott Rao, The Coffee Roaster's Companion (2014)"
+    },
+    "roast.crack": {
+      "topic": "roast",
+      "level": 2,
+      "text": "صوت يشبه الفشار، يسمى الفرقعة الأولى، هو ماء الحبة يتحول إلى بخار ويشقّها.",
+      "source": "Scott Rao, The Coffee Roaster's Companion (2014)"
+    },
+    "roast.level": {
+      "topic": "roast",
+      "level": 2,
+      "text": "التحميص الفاتح يحفظ أكثر من طابع مكان الزراعة، والغامق يحمل أكثر من نكهات التحميص نفسه.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "roast.aroma": {
+      "topic": "roast",
+      "level": 3,
+      "text": "يصنع التحميص مئات المركبات العطرية التي لم تكن في الحبة الخضراء.",
+      "source": "Illy and Viani, Espresso Coffee: The Science of Quality (2005)"
+    },
+    "roast.keeping": {
+      "topic": "roast",
+      "level": 3,
+      "text": "القهوة الخضراء تحتفظ بجودتها شهورًا، أما المحمّصة فتبدأ بفقد عطرها خلال أسابيع.",
+      "source": "Illy and Viani, Espresso Coffee: The Science of Quality (2005)"
+    },
+    "water.share": {
+      "topic": "water",
+      "level": 1,
+      "text": "كوب قهوة التقطير ماء بأكثر من ثمانية وتسعين في المئة، لذلك يهم طعم الماء نفسه.",
+      "source": "Specialty Coffee Association, Water Quality Handbook (2018)"
+    },
+    "water.minerals": {
+      "topic": "water",
+      "level": 1,
+      "text": "بعض المعادن في الماء تساعد على سحب النكهة من القهوة. والماء الخالي منها تمامًا قد يعطي طعمًا باهتًا.",
+      "source": "Specialty Coffee Association, Water Quality Handbook (2018)"
+    },
+    "water.hard": {
+      "topic": "water",
+      "level": 2,
+      "text": "كثرة المعادن، من النوع الذي يترك ترسبات في الغلاية، قد تُخفت إشراق القهوة.",
+      "source": "Specialty Coffee Association, Water Quality Handbook (2018)"
+    },
+    "water.heat": {
+      "topic": "water",
+      "level": 2,
+      "text": "الماء بين 90 و96 °م هو المدى المعتاد للتقطير اليدوي.",
+      "source": "Specialty Coffee Association, Golden Cup brewing standard"
+    },
+    "water.ions": {
+      "topic": "water",
+      "level": 3,
+      "text": "المغنيسيوم والكالسيوم يساعدان على سحب النكهة، أما البيكربونات فتليّن الحموضة.",
+      "source": "Specialty Coffee Association, Water Quality Handbook (2018)"
+    },
+    "water.target": {
+      "topic": "water",
+      "level": 3,
+      "text": "تنشر جمعية القهوة المختصة هدفًا لماء التحضير: قليل من المعادن ودرجة حموضة متعادلة.",
+      "source": "Specialty Coffee Association, Water Quality Handbook (2018)"
+    }
+  },
+  "bag": {
+    "intro": [
+      "أكوابك الأولى من {name}. جاءت من {country}، ومن هنا تبدأ حكايتها.",
+      "نمت {name} في {region}، {country}.",
+      "زُرعت {name} على ارتفاع {altitude} متر. تذكّر ذلك حين تتذوق حموضتها.",
+      "{name} قهوة معالجتها {process}. لاحظ كيف يظهر ذلك في الكوب خلال التحضيرات القادمة.",
+      "تعرّف على {name}. كل كوب من هذا الكيس يضيف فصلًا."
+    ],
+    "middle": [
+      "حُمّصت {name} قبل {days_since_roast} وبدأت تستقر. الحبوب في هذا العمر تكون غالبًا أكثر استدارة منها في أيامها الأولى.",
+      "فُتح هذا الكيس قبل {days_since_open}. لاحظ هل تغيّر عطره حين تطحنه.",
+      "قلت في المرة الماضية: {next_change}. وهذا الكوب هو الاختبار.",
+      "كان آخر تقييم لك لـ{name} هو {last_rating}.",
+      "كوب آخر من {name}. كلما حضّرت القهوة نفسها أكثر، لاحظت تغيّرات صغيرة أكثر."
+    ],
+    "farewell": [
+      "آخر أكواب {name}. تذوّقها على مهل، فهذه القهوة لن تعود بهذه الصورة تمامًا.",
+      "أوشكت {name} على النفاد. كيف كانت مقارنةً بالأكياس التي سبقتها؟",
+      "وداعًا لـ{name} القادمة من {country}. فصلها في حكايتك يقترب من نهايته.",
+      "اقتربت نهاية {name}. هل ستشتريها مرة أخرى؟ سيسألك مختبر القهوة حين تنتهي."
+    ]
+  },
+  "big_story": {
+    "chapters": [
+      {
+        "key": "ethiopia",
+        "countries": [
+          "Ethiopia"
+        ],
+        "title": "حيث بدأت",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "نمت قهوة الأرابيكا برّية في غابات المرتفعات جنوب غرب إثيوبيا قبل أن يحضّرها أحد بزمن طويل. وما زالت أشكال برّية كثيرة تنمو هناك، وهذا أحد أسباب تنوّع طعم القهوة الإثيوبية.",
+          "القصة الشهيرة عن راعٍ رقصت ماعزه بعد أكل ثمار حمراء كُتبت أول مرة في أوروبا عام 1671. إنها أسطورة، لكن الغابات حقيقية.",
+          "في إثيوبيا مُضغت القهوة وطُبخت بالزبدة ونُقعت أوراقها كالشاي قبل أن تصبح المشروب الذي نعرفه. وما زال التحميص والطحن والصب ثلاث جولات طقسًا يوميًا هناك."
+        ]
+      },
+      {
+        "key": "yemen",
+        "countries": [
+          "Yemen"
+        ],
+        "title": "عبر البحر الأحمر",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "بحلول القرن الخامس عشر كانت القهوة تُزرع في المدرجات الجبلية في اليمن. وكان الصوفيون يشربونها ليبقوا مستيقظين في صلواتهم الليلية.",
+          "على مدى نحو مئتي عام خرج معظم قهوة العالم من ميناء المخا في اليمن. وما زال اسم الميناء حيًا في كلمة موكا.",
+          "حرص اليمن على تجارته، ويُروى أن الحبوب كانت تخرج محمّصة أو مغلية كي لا تنبت. وفي النهاية كسرت البذور المهرّبة هذا الاحتكار."
+        ]
+      },
+      {
+        "key": "ottoman",
+        "countries": [
+          "Turkey"
+        ],
+        "title": "المقاهي",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "انتشرت القهوة من اليمن إلى مكة والقاهرة، وفي خمسينيات القرن السادس عشر فُتحت أول المقاهي في إسطنبول. كان الناس يقصدونها للحديث واللعب وسماع الحكايات.",
+          "لم يرتح الحكام دائمًا لأماكن يتحدث فيها الناس بحرية. فقد مُنعت القهوة في مكة عام 1511 وفي إسطنبول في القرن السابع عشر، وفشل كل منع.",
+          "كانت القهوة العثمانية تُطحن ناعمة جدًا وتُغلى على مهل في إبريق صغير، وهي الطريقة التي ما زالت تسمى القهوة التركية. وبها تذوّق كثير من العالم القهوة أول مرة."
+        ]
+      },
+      {
+        "key": "europe",
+        "countries": [
+          "Italy"
+        ],
+        "title": "أوروبا تستيقظ",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "جلب تجار البندقية القهوة إلى أوروبا في أوائل القرن السابع عشر، وكانت في البندقية مقاهٍ بحلول منتصفه.",
+          "فُتح أول مقهى في إنجلترا في أكسفورد نحو عام 1650. وفي لندن سُمّيت المقاهي جامعات القرش: بثمن فنجان يمكنك أن تشارك في أي حديث.",
+          "مقهى في لندن كان يجتمع فيه أصحاب السفن لتبادل الأخبار صار سوق لويدز للتأمين. ومنذ ذلك الحين والقهوة رفيقة التجارة."
+        ]
+      },
+      {
+        "key": "java",
+        "countries": [
+          "Indonesia"
+        ],
+        "title": "جزر جاوة",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "كان الهولنديون أول من زرع القهوة على نطاق واسع خارج جزيرة العرب. ووصلت الأشجار إلى جاوة، في إندونيسيا اليوم، في أواخر القرن السابع عشر.",
+          "نمت القهوة هناك جيدًا حتى صارت كلمة جافا اسمًا آخر للقهوة. وما زالت إندونيسيا من أكبر منتجي القهوة في العالم.",
+          "كثير من قهوة سومطرة يُقشَّر وهو ما زال رطبًا، في معالجة تُسمى التقشير الرطب، فتعطي كوبًا ترابيًا ثقيلًا لا يكاد يوجد في مكان آخر."
+        ]
+      },
+      {
+        "key": "caribbean",
+        "countries": [
+          "Martinique",
+          "Haiti",
+          "Jamaica",
+          "Cuba",
+          "Dominican Republic",
+          "Puerto Rico"
+        ],
+        "title": "شجرة تعبر المحيط",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "في عام 1714 أهدى الهولنديون ملك فرنسا شجرة قهوة، فحُفظت في دفيئة في باريس.",
+          "بعد سنوات قليلة حمل ضابط بحري فرنسي شتلة من نسلها إلى المارتينيك. وكتب لاحقًا أنه تقاسم معها ماء شربه في الرحلة.",
+          "من الكاريبي انتشرت القهوة في الجزر ثم في البر. وكثير من أرابيكا الأمريكتين ينحدر من تلك الأشجار الأولى."
+        ]
+      },
+      {
+        "key": "brazil",
+        "countries": [
+          "Brazil"
+        ],
+        "title": "البرازيل",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "وصلت القهوة إلى البرازيل عام 1727. وتقول الأسطورة إن الشتلات خُبّئت في باقة ورد أُهديت لضابط زائر.",
+          "منذ أربعينيات القرن التاسع عشر والبرازيل أكبر منتج في العالم، وهي تزرع اليوم نحو ثلث قهوة العالم.",
+          "تنمو كثير من القهوة البرازيلية على تلال لطيفة وتجف داخل ثمرتها، فتعطي حلاوة الشوكولاتة والمكسرات التي تُبنى عليها خلطات كثيرة."
+        ]
+      },
+      {
+        "key": "andes",
+        "countries": [
+          "Colombia",
+          "Costa Rica",
+          "Guatemala",
+          "Honduras",
+          "El Salvador",
+          "Nicaragua",
+          "Mexico",
+          "Peru",
+          "Ecuador",
+          "Bolivia"
+        ],
+        "title": "جبال الأمريكتين",
+        "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)",
+        "parts": [
+          "خلال القرن التاسع عشر انتشرت القهوة في جبال أمريكا الوسطى والجنوبية، وصارت من أهم محاصيل المنطقة.",
+          "في أجزاء من كولومبيا، قرب خط الاستواء، يمكن حصاد القهوة مرتين في السنة، لأن الفصول هناك بالكاد تكون فصولًا.",
+          "معظم القهوة من هذه الجبال مغسولة، فتعطي الأكواب النظيفة المشرقة التي يتخيلها كثيرون حين يفكرون في القهوة الجيدة."
+        ]
+      },
+      {
+        "key": "kenya",
+        "countries": [
+          "Kenya",
+          "Tanzania",
+          "Uganda",
+          "Rwanda",
+          "Burundi"
+        ],
+        "title": "العودة إلى شرق أفريقيا",
+        "source": "World Coffee Research, Arabica Coffee Varieties catalogue",
+        "parts": [
+          "عادت القهوة إلى شرق أفريقيا محصولًا في أواخر القرن التاسع عشر، وزرعها المبشّرون في كينيا.",
+          "في ثلاثينيات القرن العشرين انتقى مختبر في كينيا السلالتين SL28 وSL34. ومنهما يأتي طعم الكشمش الأسود والحموضة المشرقة التي تُعرف بها القهوة الكينية.",
+          "تُخمَّر القهوة الكينية وتُغسل مرتين في الغالب. وتُباع الدفعات في المزاد بعد تذوّق كل منها."
+        ]
+      },
+      {
+        "key": "gesha",
+        "countries": [
+          "Panama"
+        ],
+        "title": "رحلة سلالة",
+        "source": "World Coffee Research, Arabica Coffee Varieties catalogue",
+        "parts": [
+          "في ثلاثينيات القرن العشرين جُمعت بذور من غابات قرب جيشا في إثيوبيا. وسافرت عبر كينيا وتنزانيا إلى محطة أبحاث في كوستاريكا.",
+          "من هناك وصلت السلالة إلى بنما، حيث بقيت عقودًا بين أشجار أخرى دون أن ينتبه إليها أحد.",
+          "في عام 2004 دخلت بها مزرعة في بنما مسابقة، فحقق كوبها الزهري الشبيه بالشاي أسعارًا قياسية. ومنذ ذلك الحين وجيشا من أكثر أنواع القهوة طلبًا."
+        ]
+      },
+      {
+        "key": "processing",
+        "countries": [],
+        "title": "كيف تصير الثمرة حبة",
+        "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)",
+        "parts": [
+          "تبدأ كل حبة قهوة بذرةً في ثمرة. وقبل أن تُحمّص يجب أن تُزال الثمرة من حولها.",
+          "القهوة المغسولة تفقد ثمرتها قبل التجفيف، والمجففة تجف داخلها، ومعالجة العسل تُبقي جزءًا من الطبقة اللزجة. فقد تبدو الحبوب نفسها قهوات مختلفة.",
+          "في السنوات الأخيرة جرّب المنتجون التخمير في خزانات مغلقة وإضافة الخمائر. وصارت المعالجة حرفة قائمة بذاتها."
+        ]
+      },
+      {
+        "key": "specialty",
+        "countries": [],
+        "title": "الكوب على طاولتك",
+        "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)",
+        "parts": [
+          "صيغ مصطلح القهوة المختصة عام 1974 لحبوب من ظروف زراعة مميزة. وهو يعني اليوم قهوة تنال 80 نقطة على الأقل من 100 عند تذوّقها من محكّمين مدرّبين.",
+          "القهوة المختصة يمكن تتبّعها: قد يذكر الكيس البلد والمنطقة، وأحيانًا المزرعة ومن زرعها.",
+          "التحضير باليد، صبّة بعد صبّة، يضع الخطوة الأخيرة بين يديك. وكل ما سبقها، منذ الغابة في إثيوبيا، ينتهي في هذا الكوب."
+        ]
+      }
+    ]
+  },
+  "big_story_ahead": "ما زالت أمامك",
+  "you": {
+    "lines": [
+      "الكوب {brew_count} من هذا الكيس.",
+      "كان هذا الكوب {brew_count} من هذه القهوة.",
+      "كان آخر تقييم لك {last_rating}. لنرَ هل يستحق هذا الكوب أكثر.",
+      "كنت تنوي أن تغيّر: {next_change}.",
+      "خذ الرشفة الأولى بعد أن تبرد قليلًا، فالنكهات تتفتح كلما بردت القهوة.",
+      "شُمّها قبل أن تتذوقها، فمعظم ما نسميه نكهة هو عطر."
+    ],
+    "teaser": {
+      "big_story": "التالي في رحلة القهوة: {title}.",
+      "fact": "في الكوب القادم: شيء عن {topic}."
+    }
+  }
+}

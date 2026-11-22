@@ -1,0 +1,493 @@
+{
+  "counts": {
+    "day": {
+      "one": "{n} day",
+      "other": "{n} days"
+    }
+  },
+  "headings": {
+    "bag": "{name}, chapter {chapter}",
+    "big_story": "{title}",
+    "big_story_ahead": "{title}, still ahead",
+    "science": "In your cup",
+    "you": "Your cup"
+  },
+  "topics": {
+    "bloom": "the bloom",
+    "extraction": "extraction",
+    "origin": "where coffee grows",
+    "process": "processing",
+    "roast": "roasting",
+    "water": "water"
+  },
+  "pour_lines": {
+    "centered": "Pour {pour}: {volume} ml at {temperature} °C into the centre, sinking gently through the middle of the bed.",
+    "spiral": "Pour {pour}: {volume} ml at {temperature} °C in a spiral, wetting the grounds evenly from the middle out.",
+    "circular": "Pour {pour}: {volume} ml at {temperature} °C in circles, keeping the whole bed moving together."
+  },
+  "facts": {
+    "bloom.co2": {
+      "topic": "bloom",
+      "level": 1,
+      "text": "The grounds rise because roasting traps carbon dioxide in the bean, and hot water sets it free. This coffee was roasted {days_since_roast} ago.",
+      "source": "Illy and Viani, Espresso Coffee: The Science of Quality (2005)"
+    },
+    "bloom.fresh": {
+      "topic": "bloom",
+      "level": 1,
+      "text": "Fresh coffee blooms higher. Most of its gas escapes in the first weeks after roasting.",
+      "source": "Scott Rao, The Coffee Roaster's Companion (2014)"
+    },
+    "bloom.why": {
+      "topic": "bloom",
+      "level": 1,
+      "text": "A small first pour lets the gas escape. Later pours can then reach every grain instead of being pushed aside by bubbles.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "bloom.open": {
+      "topic": "bloom",
+      "level": 2,
+      "text": "Once a bag is open, gas and aroma leave faster. This bag was opened {days_since_open} ago.",
+      "source": "Illy and Viani, Espresso Coffee: The Science of Quality (2005)"
+    },
+    "bloom.grind": {
+      "topic": "bloom",
+      "level": 2,
+      "text": "Grinding releases much of the gas at once. Coffee ground long before brewing barely blooms.",
+      "source": "Illy and Viani, Espresso Coffee: The Science of Quality (2005)"
+    },
+    "bloom.time": {
+      "topic": "bloom",
+      "level": 3,
+      "text": "A bloom of thirty to forty-five seconds is common for pour-over. By then most of the bubbling has settled.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "bloom.dark": {
+      "topic": "bloom",
+      "level": 3,
+      "text": "Darker roasts form more carbon dioxide, but their brittle structure also lets it escape sooner.",
+      "source": "Illy and Viani, Espresso Coffee: The Science of Quality (2005)"
+    },
+    "extraction.order": {
+      "topic": "extraction",
+      "level": 1,
+      "text": "Water dissolves flavours at different speeds: acids first, then sugars, then heavier bitter compounds.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "extraction.share": {
+      "topic": "extraction",
+      "level": 1,
+      "text": "About a third of a roasted bean can dissolve in water. A good cup usually takes around a fifth of the grounds' weight.",
+      "source": "Specialty Coffee Association, Golden Cup brewing standard"
+    },
+    "extraction.grind": {
+      "topic": "extraction",
+      "level": 2,
+      "text": "Finer grounds expose more surface, so water extracts faster. Too fine, and the bitter, drying compounds arrive.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "extraction.heat": {
+      "topic": "extraction",
+      "level": 2,
+      "text": "Hotter water extracts faster. That is why light roasts, which are harder to extract, are often brewed hotter.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "extraction.taste": {
+      "topic": "extraction",
+      "level": 2,
+      "text": "Sour and thin usually means too little was extracted. Bitter and dry usually means too much.",
+      "source": "Specialty Coffee Association, Golden Cup brewing standard"
+    },
+    "extraction.dials": {
+      "topic": "extraction",
+      "level": 3,
+      "text": "The ratio of coffee to water sets strength, while grind and time set extraction. They are two different dials.",
+      "source": "Specialty Coffee Association, Golden Cup brewing standard"
+    },
+    "extraction.stages": {
+      "topic": "extraction",
+      "level": 3,
+      "text": "Pouring in stages brings fresh water to the grounds again and again, and fresh water dissolves more than water already full of coffee.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "origin.altitude": {
+      "topic": "origin",
+      "level": 1,
+      "text": "This coffee grew at {altitude} metres. Higher and cooler means cherries ripen more slowly, which tends to build sugar and acidity.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "origin.country": {
+      "topic": "origin",
+      "level": 1,
+      "text": "Coffee grows in a belt around the equator, in more than fifty countries. This one comes from {country}.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "origin.tree": {
+      "topic": "origin",
+      "level": 1,
+      "text": "A coffee tree takes three to four years to give its first real harvest.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "origin.region": {
+      "topic": "origin",
+      "level": 2,
+      "text": "This coffee was grown in {region}. Within one country, regions can taste as different as countries do.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "origin.producer": {
+      "topic": "origin",
+      "level": 2,
+      "text": "This bag names who grew it: {producer}. Knowing the grower is part of what makes a coffee specialty.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "origin.species": {
+      "topic": "origin",
+      "level": 2,
+      "text": "Arabica and robusta are different species. Arabica is sweeter and more acidic, and robusta has about twice the caffeine.",
+      "source": "World Coffee Research, Arabica Coffee Varieties catalogue"
+    },
+    "origin.varietal": {
+      "topic": "origin",
+      "level": 3,
+      "text": "This coffee's variety is {varietal}. Coffee varieties differ in taste much as grape varieties do in wine.",
+      "source": "World Coffee Research, Arabica Coffee Varieties catalogue"
+    },
+    "origin.picking": {
+      "topic": "origin",
+      "level": 3,
+      "text": "Most specialty coffee is picked by hand, because cherries on one branch ripen at different times.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.this": {
+      "topic": "process",
+      "level": 1,
+      "text": "This bag's process is {process}. How the fruit comes off the seed shapes the taste as much as where it grew.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.seed": {
+      "topic": "process",
+      "level": 1,
+      "text": "A coffee bean is the seed of a red or yellow cherry. Processing is how the fruit around it is removed.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.washed": {
+      "topic": "process",
+      "level": 1,
+      "text": "Washed coffees have their fruit removed before drying, which tends to give a clean, bright cup.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.natural": {
+      "topic": "process",
+      "level": 2,
+      "text": "Natural coffees dry inside the whole fruit, often for weeks, which gives fruitier and heavier flavours.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.honey": {
+      "topic": "process",
+      "level": 2,
+      "text": "The honey process leaves some of the sticky fruit layer on the seed while it dries. It has nothing to do with bees.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.anaerobic": {
+      "topic": "process",
+      "level": 3,
+      "text": "Anaerobic fermentation seals cherries in tanks without oxygen, a newer method that can give intense, unusual flavours.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "process.rest": {
+      "topic": "process",
+      "level": 3,
+      "text": "After drying, coffee rests for weeks before it is hulled and shipped, so its moisture can even out.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "roast.days": {
+      "topic": "roast",
+      "level": 1,
+      "text": "This coffee was roasted {days_since_roast} ago. Many filter coffees taste best after a week or two of rest, once the gas has calmed.",
+      "source": "Scott Rao, The Coffee Roaster's Companion (2014)"
+    },
+    "roast.time": {
+      "topic": "roast",
+      "level": 1,
+      "text": "Roasting turns a hard green seed into a brittle brown one in about ten to fifteen minutes.",
+      "source": "Scott Rao, The Coffee Roaster's Companion (2014)"
+    },
+    "roast.sugar": {
+      "topic": "roast",
+      "level": 1,
+      "text": "Sugars in the bean caramelise during roasting, which gives coffee much of its sweetness and colour.",
+      "source": "Scott Rao, The Coffee Roaster's Companion (2014)"
+    },
+    "roast.crack": {
+      "topic": "roast",
+      "level": 2,
+      "text": "A sound like popcorn, called first crack, is the bean's water turning to steam and breaking it open.",
+      "source": "Scott Rao, The Coffee Roaster's Companion (2014)"
+    },
+    "roast.level": {
+      "topic": "roast",
+      "level": 2,
+      "text": "Lighter roasts keep more of where a coffee grew, and darker roasts more of the roast's own flavours.",
+      "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
+    },
+    "roast.aroma": {
+      "topic": "roast",
+      "level": 3,
+      "text": "Roasting creates hundreds of aroma compounds that the green bean did not have.",
+      "source": "Illy and Viani, Espresso Coffee: The Science of Quality (2005)"
+    },
+    "roast.keeping": {
+      "topic": "roast",
+      "level": 3,
+      "text": "Green coffee keeps for months, but roasted coffee starts losing aroma within weeks.",
+      "source": "Illy and Viani, Espresso Coffee: The Science of Quality (2005)"
+    },
+    "water.share": {
+      "topic": "water",
+      "level": 1,
+      "text": "A cup of filter coffee is more than ninety-eight percent water, so the water's own taste matters.",
+      "source": "Specialty Coffee Association, Water Quality Handbook (2018)"
+    },
+    "water.minerals": {
+      "topic": "water",
+      "level": 1,
+      "text": "Some minerals in water help pull flavour out of coffee. Water with none at all can taste flat.",
+      "source": "Specialty Coffee Association, Water Quality Handbook (2018)"
+    },
+    "water.hard": {
+      "topic": "water",
+      "level": 2,
+      "text": "Too many minerals, the kind that leave scale in a kettle, can mute a coffee's brightness.",
+      "source": "Specialty Coffee Association, Water Quality Handbook (2018)"
+    },
+    "water.heat": {
+      "topic": "water",
+      "level": 2,
+      "text": "Water around 90 to 96 °C is the usual range for pour-over.",
+      "source": "Specialty Coffee Association, Golden Cup brewing standard"
+    },
+    "water.ions": {
+      "topic": "water",
+      "level": 3,
+      "text": "Magnesium and calcium help draw flavour out, while bicarbonate softens acidity.",
+      "source": "Specialty Coffee Association, Water Quality Handbook (2018)"
+    },
+    "water.target": {
+      "topic": "water",
+      "level": 3,
+      "text": "The Specialty Coffee Association publishes a target for brewing water: a little mineral content and a neutral pH.",
+      "source": "Specialty Coffee Association, Water Quality Handbook (2018)"
+    }
+  },
+  "bag": {
+    "intro": [
+      "Your first cups of {name}. It comes from {country}, and its story starts here.",
+      "{name} grew in {region}, {country}.",
+      "{name} was grown at {altitude} metres. Keep that in mind when you taste its acidity.",
+      "{name} is a {process} coffee. Watch how that shows in the cup over the next brews.",
+      "Meet {name}. Every cup of this bag adds a chapter."
+    ],
+    "middle": [
+      "{name} was roasted {days_since_roast} ago and is settling. Beans at this age often taste rounder than in their first days.",
+      "This bag was opened {days_since_open} ago. Notice whether its aroma has changed when you grind it.",
+      "Last time you said: {next_change}. This cup is the test.",
+      "Your last rating for {name} was {last_rating}.",
+      "Another cup of {name}. The more you brew one coffee, the more small changes you notice."
+    ],
+    "farewell": [
+      "The last cups of {name}. Taste it slowly; this coffee will not come back in quite this form.",
+      "{name} is almost finished. How did it compare with the bags before it?",
+      "A farewell to {name}, from {country}. Its chapter in your story closes soon.",
+      "Nearly the end of {name}. Would you buy it again? Coffee Lab will ask when it is done."
+    ]
+  },
+  "big_story": {
+    "chapters": [
+      {
+        "key": "ethiopia",
+        "countries": [
+          "Ethiopia"
+        ],
+        "title": "Where it began",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "Arabica coffee grew wild in the highland forests of southwestern Ethiopia long before anyone brewed it. Many wild forms still grow there, which is one reason Ethiopian coffees taste so varied.",
+          "The famous story of a goatherd whose goats danced after eating red cherries was first written down in Europe in 1671. It is a legend, but the forests are real.",
+          "In Ethiopia coffee was chewed, cooked with butter and steeped as a leaf tea before it became the drink we know. Roasting, grinding and pouring three rounds is still a daily ceremony there."
+        ]
+      },
+      {
+        "key": "yemen",
+        "countries": [
+          "Yemen"
+        ],
+        "title": "Across the Red Sea",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "By the fifteenth century coffee was grown on terraced mountains in Yemen. Sufis drank it to stay awake through their night prayers.",
+          "For about two hundred years most of the world's coffee left from the Yemeni port of Mocha. The port's name lives on in the word mocha.",
+          "Yemen guarded its trade, and the story goes that beans left only roasted or boiled so they could not sprout. Smuggled seeds broke that hold in the end."
+        ]
+      },
+      {
+        "key": "ottoman",
+        "countries": [
+          "Turkey"
+        ],
+        "title": "The coffeehouses",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "From Yemen coffee spread to Mecca and Cairo, and in the 1550s the first coffeehouses opened in Istanbul. People went there to talk, play games and hear stories.",
+          "Rulers did not always like places where people talked freely. Coffee was banned in Mecca in 1511 and in Istanbul in the 1600s, and every ban failed.",
+          "Ottoman coffee was ground very fine and simmered in a small pot, the method still called Turkish coffee. It was the first way much of the world tasted coffee."
+        ]
+      },
+      {
+        "key": "europe",
+        "countries": [
+          "Italy"
+        ],
+        "title": "Europe wakes up",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "Venetian merchants brought coffee to Europe in the early 1600s, and Venice had coffeehouses by the middle of that century.",
+          "England's first coffeehouse opened in Oxford around 1650. In London they were called penny universities: for the price of a coffee you could join any conversation.",
+          "A London coffeehouse where ship owners met for news grew into Lloyd's, the insurance market. Coffee and business have kept company ever since."
+        ]
+      },
+      {
+        "key": "java",
+        "countries": [
+          "Indonesia"
+        ],
+        "title": "The islands of Java",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "The Dutch were the first to grow coffee on a large scale outside Arabia. Plants reached Java, in today's Indonesia, at the end of the 1600s.",
+          "Coffee grew so well there that java became another word for coffee. Indonesia is still one of the world's largest producers.",
+          "Many coffees from Sumatra are wet hulled: the seed is hulled while still damp, which gives an earthy, heavy cup found almost nowhere else."
+        ]
+      },
+      {
+        "key": "caribbean",
+        "countries": [
+          "Martinique",
+          "Haiti",
+          "Jamaica",
+          "Cuba",
+          "Dominican Republic",
+          "Puerto Rico"
+        ],
+        "title": "One plant crosses an ocean",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "In 1714 the Dutch gave the King of France a coffee tree, and it was kept in a Paris greenhouse.",
+          "A few years later a French naval officer carried a seedling from that line to Martinique. He later wrote that he shared his own drinking water with it on the voyage.",
+          "From the Caribbean, coffee spread across the islands and onto the mainland. A large share of the arabica in the Americas descends from those first plants."
+        ]
+      },
+      {
+        "key": "brazil",
+        "countries": [
+          "Brazil"
+        ],
+        "title": "Brazil",
+        "source": "Mark Pendergrast, Uncommon Grounds (2010)",
+        "parts": [
+          "Coffee reached Brazil in 1727. The legend says the seedlings were hidden in a bouquet given to a visiting officer.",
+          "Since the 1840s Brazil has been the world's largest producer, today growing around a third of all coffee.",
+          "Much Brazilian coffee grows on gentle hills and is dried in the fruit, which gives the nutty, chocolate sweetness many blends are built on."
+        ]
+      },
+      {
+        "key": "andes",
+        "countries": [
+          "Colombia",
+          "Costa Rica",
+          "Guatemala",
+          "Honduras",
+          "El Salvador",
+          "Nicaragua",
+          "Mexico",
+          "Peru",
+          "Ecuador",
+          "Bolivia"
+        ],
+        "title": "The mountains of the Americas",
+        "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)",
+        "parts": [
+          "Through the 1800s coffee spread over the mountains of Central and South America. It became one of the most important crops of the region.",
+          "In parts of Colombia, close to the equator, coffee can be harvested twice a year, because the seasons there are barely seasons at all.",
+          "Most coffee from these mountains is washed, giving the clean, bright cups many people first think of when they think of good coffee."
+        ]
+      },
+      {
+        "key": "kenya",
+        "countries": [
+          "Kenya",
+          "Tanzania",
+          "Uganda",
+          "Rwanda",
+          "Burundi"
+        ],
+        "title": "Back to East Africa",
+        "source": "World Coffee Research, Arabica Coffee Varieties catalogue",
+        "parts": [
+          "Coffee came back to East Africa as a crop at the end of the 1800s, planted in Kenya by missionaries.",
+          "In the 1930s a laboratory in Kenya selected the varieties SL28 and SL34. They are behind the blackcurrant and bright acidity Kenyan coffee is known for.",
+          "Kenyan coffee is often fermented and washed twice. Lots are sold at auction, judged cup by cup."
+        ]
+      },
+      {
+        "key": "gesha",
+        "countries": [
+          "Panama"
+        ],
+        "title": "A variety's journey",
+        "source": "World Coffee Research, Arabica Coffee Varieties catalogue",
+        "parts": [
+          "In the 1930s seeds were collected from forests near Gesha, in Ethiopia. They travelled through Kenya and Tanzania to a research station in Costa Rica.",
+          "From there the variety reached Panama, where it sat unnoticed among other trees for decades.",
+          "In 2004 a farm in Panama entered it in a competition, and its floral, tea-like cup set record prices. Gesha has been among the most sought-after coffees ever since."
+        ]
+      },
+      {
+        "key": "processing",
+        "countries": [],
+        "title": "How fruit becomes a bean",
+        "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)",
+        "parts": [
+          "Every coffee bean starts as the seed of a cherry. Before it can be roasted, the fruit around it has to come off.",
+          "Washed coffee loses its fruit before drying, natural coffee dries inside it, and honey coffee keeps part of the sticky layer. The same beans can taste like different coffees.",
+          "In recent years producers have experimented with fermentation in sealed tanks and added yeasts. Processing has become a craft of its own."
+        ]
+      },
+      {
+        "key": "specialty",
+        "countries": [],
+        "title": "The cup on your table",
+        "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)",
+        "parts": [
+          "The term specialty coffee was coined in 1974 for beans from special growing conditions. Today it means coffee that scores at least 80 points out of 100 when tasted by trained judges.",
+          "Specialty coffee is traceable: a bag can name the country, the region, sometimes the farm and the person who grew it.",
+          "Brewing by hand, pour by pour, puts the last step in your hands. Everything before it, from the forest in Ethiopia onward, ends in this cup."
+        ]
+      }
+    ]
+  },
+  "big_story_ahead": "still ahead",
+  "you": {
+    "lines": [
+      "Cup {brew_count} of this bag.",
+      "That was cup {brew_count} with this coffee.",
+      "Your last rating was {last_rating}. See whether this cup earns more.",
+      "You planned to change: {next_change}.",
+      "Take the first sip a little cooler; flavours open up as coffee cools.",
+      "Smell it before you taste it; most of what we call flavour is aroma."
+    ],
+    "teaser": {
+      "big_story": "Next in coffee's journey: {title}.",
+      "fact": "Next cup: something about {topic}."
+    }
+  }
+}
