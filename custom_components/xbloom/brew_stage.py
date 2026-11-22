@@ -40,9 +40,10 @@ STAGES = ["idle", "grinding", "pouring", "waiting", "draining", "done"]
 _FOLLOWED = {"idle", "grinding", "done"}
 
 # A pour's agitation runs inside a wait, with no frame for it: "after" in the
-# wait after that pour, "before" in the wait before it. Each measured about
-# 7 s beyond the pause, on brews with one of each (2026-11-22). A first pour's
-# "before" comes ahead of it, after grinding, so it is in no wait.
+# wait after that pour, "before" in the wait before it. The firmware holds each
+# for 5 s then 2 s, and brews measured about 7 s beyond the pause for either.
+# A first pour's "before" comes ahead of it, after grinding, so it is in no
+# wait; it is the only one the machine reports (40527, RD_BeforeVibration).
 AGITATE_S = 7
 _AGITATE_ON = 1
 
