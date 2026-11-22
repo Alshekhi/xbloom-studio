@@ -109,5 +109,14 @@
     "extraction": "الاستخلاص",
     "origin": "المنشأ",
     "process": "المعالجة"
+  },
+  "names": {
+    "country": {
+      "Kenya": "كينيا"
+    },
+    "process": {
+      "Natural": "مجففة",
+      "Other": null
+    }
   }
 }

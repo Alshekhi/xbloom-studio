@@ -172,3 +172,27 @@ async def test_unseen_facts_of_any_topic_come_before_seen_ones():
     texts = compose(plan_slots(plan, True), plan, BAG, [{"rating": None, "next_change": ""}] * 3,
                     memory, content, TODAY)
     assert not {k for k in texts.facts if k.startswith(("origin.", "process."))}
+
+
+def test_country_and_process_are_named_in_the_brews_language():
+    from custom_components.xbloom.stories.compose import _values
+    ar = Content.load("ar", FIXTURE)
+    values = _values({"country": "kenya", "process": "Natural", "region": "Nyeri"}, [], ar, TODAY)
+    assert (values["country"], values["process"], values["region"]) == ("كينيا", "مجففة", "Nyeri")
+
+
+def test_a_name_the_content_does_not_know_stays_as_written():
+    from custom_components.xbloom.stories.compose import _values
+    ar = Content.load("ar", FIXTURE)
+    assert _values({"country": "Atlantis"}, [], ar, TODAY)["country"] == "Atlantis"
+
+
+def test_a_process_of_other_is_not_told():
+    from custom_components.xbloom.stories.compose import _values
+    assert _values({"process": "Other"}, [], CONTENT, TODAY)["process"] is None
+
+
+def test_a_pour_whose_pattern_has_no_line_shows_none():
+    memory_plan = [{**_plan()[0], "pattern": "zigzag"}]
+    texts = compose(plan_slots(memory_plan, True), memory_plan, BAG, [], StoryMemory(_Store()), CONTENT, TODAY)
+    assert 1 not in texts.pour_lines

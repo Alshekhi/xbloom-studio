@@ -53,6 +53,13 @@ class StoryRuntime:
         # still being written when it arrived.
         self._stage: tuple[str, int | None] = ("idle", None)
 
+    def set_mode(self, mode: str) -> None:
+        """Brew Stories on or off; off clears what a brew under way shows."""
+        self.mode = mode
+        if mode == "off":
+            self._texts = None
+            self._publish(dict(NOTHING))
+
     async def async_load(self) -> None:
         await self.memory.async_load()
 

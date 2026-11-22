@@ -145,3 +145,14 @@ async def test_a_finished_brews_texts_do_not_show_in_the_next_brew():
     shown = dict(runtime.current)
     await runtime.async_on_stage("pouring", 1)
     assert runtime.current == shown
+
+
+async def test_turning_stories_off_mid_brew_clears_them():
+    runtime, store = await _runtime()
+    await _started(runtime)
+    await runtime.async_on_stage("pouring", 1)
+    runtime.set_mode("off")
+    assert runtime.current == {"heading": None, "now": None, "story": None, "kind": None}
+    await runtime.async_on_stage("pouring", 2)
+    await runtime.async_on_stage("done", None)
+    assert runtime.current["now"] is None and store.saves == 0

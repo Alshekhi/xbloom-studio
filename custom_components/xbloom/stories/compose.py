@@ -58,7 +58,11 @@ def _values(bag: dict | None, history: list[dict], content: Content, today: date
     low, high = bag.get("altitude_m"), bag.get("altitude_max_m")
     last = history[0] if history else {}
     return {
-        **{k: bag.get(k) for k in ("name", "country", "region", "producer", "process", "varietal", "roast")},
+        **{k: bag.get(k) for k in ("name", "region", "producer", "varietal", "roast")},
+        # Countries and processes in the brew's language; a name the content
+        # does not know stays as written, and one it maps to nothing is untold.
+        "country": _named(content, "country", bag.get("country")),
+        "process": _named(content, "process", bag.get("process")),
         "altitude": _altitude(content, low, high),
         "days_since_roast": _days(content, bag.get("roast_date"), today),
         "days_since_open": _days(content, bag.get("opened_on"), today),
@@ -67,6 +71,13 @@ def _values(bag: dict | None, history: list[dict], content: Content, today: date
         "last_rating": _number(last.get("rating")),
         "next_change": last.get("next_change") or None,
     }
+
+
+def _named(content: Content, kind: str, value: str | None) -> str | None:
+    if not value:
+        return None
+    names = {k.casefold(): v for k, v in content.entry(f"names.{kind}").items()}
+    return names[value.casefold()] if value.casefold() in names else value
 
 
 def _altitude(content: Content, low: Any, high: Any) -> str | None:
@@ -142,7 +153,9 @@ class _Writer:
     def pour_line(self, pour: int) -> str | None:
         step = self.plan[pour - 1]
         template = self.content.entry("pour_lines").get(step.get("pattern") or "")
-        return self.content.fill(template or "", {
+        if not template:
+            return None
+        return self.content.fill(template, {
             "pour": pour, "volume": _number(step.get("volume_ml")),
             "temperature": _number(step.get("temperature_c")),
         })

@@ -88,5 +88,5 @@ class XBloomBrewStoriesSelect(SelectEntity, RestoreEntity):
 
     async def async_select_option(self, option: str) -> None:
         if option in MODES and self._entry.runtime_data.stories is not None:
-            self._entry.runtime_data.stories.mode = option
+            self._entry.runtime_data.stories.set_mode(option)
             self.async_write_ha_state()

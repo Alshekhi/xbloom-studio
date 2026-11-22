@@ -103,5 +103,14 @@
     "extraction": "extraction",
     "origin": "origins",
     "process": "processing"
+  },
+  "names": {
+    "country": {
+      "Kenya": "Kenya"
+    },
+    "process": {
+      "Natural": "Natural",
+      "Other": null
+    }
   }
 }
