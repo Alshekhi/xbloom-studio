@@ -1,0 +1,14 @@
+{
+  "counts": {"day": {"one": "يوم واحد", "two": "يومان", "few": "{n} أيام", "many": "{n} يومًا", "other": "{n} يوم"}},
+  "pour_lines": {"spiral": "الصبة {pour}: {volume} مل بحرارة {temperature} °م بشكل حلزوني."},
+  "facts": {
+    "bloom.co2": {"topic": "bloom", "level": 1, "text": "تنتفخ القهوة: ثاني أكسيد الكربون من التحميص قبل {days_since_roast}.", "source": "fixture"},
+    "bloom.open": {"topic": "bloom", "level": 1, "text": "فُتح الكيس قبل {days_since_open} وما زال ينتفخ.", "source": "fixture"},
+    "bloom.deep": {"topic": "bloom", "level": 2, "text": "معلومة أعمق.", "source": "fixture"},
+    "water.plain": {"topic": "water", "level": 1, "text": "الماء يقوم بالعمل.", "source": "fixture"}
+  },
+  "bag": {"intro": ["تعرّف على {name}."], "middle": ["{name} مرة أخرى."], "farewell": ["وداعًا {name}."]},
+  "big_story": {"chapters": [{"key": "ethiopia", "countries": ["Ethiopia"], "title": "حيث بدأت", "parts": ["واحد.", "اثنان.", "ثلاثة."], "source": "fixture"}]},
+  "big_story_ahead": "ما زالت أمامك",
+  "you": {"lines": ["الكوب {brew_count} من هذا الكيس."], "teaser": {"big_story": "التالي: {title}.", "fact": "التالي: المزيد عن {topic}."}}
+}
