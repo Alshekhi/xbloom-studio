@@ -636,6 +636,20 @@
           "done": "مكتمل"
         }
       },
+      "brew_stage": {
+        "name": "مرحلة التحضير",
+        "state": {
+          "idle": "خامل",
+          "grinding": "قيد الطحن",
+          "pouring": "قيد الصب",
+          "waiting": "انتظار",
+          "draining": "قيد التقطير",
+          "done": "مكتمل"
+        }
+      },
+      "next_pour": {
+        "name": "الصبّة التالية"
+      },
       "machine_status": {
         "name": "حالة الآلة",
         "state": {

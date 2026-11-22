@@ -4,6 +4,7 @@ Two sensors backed by notifications streamed from the machine during a brew
 (see `ble_entities` for the full implementation):
 
   * `sensor.xbloom_studio_brew_status` — `idle | grinding | brewing | done`
+  * `sensor.xbloom_studio_brew_stage` — pouring, waiting or draining within a brew
   * `sensor.xbloom_studio_scale_weight` — live grams during a pour
 """
 from .ble_entities import (
@@ -13,6 +14,7 @@ from .ble_entities import (
     XBloomScaleWeightBleSensor,
 )
 from .reading_sensors import READING_SENSORS
+from .brew_stage import XBloomBrewStageSensor, XBloomNextPourSensor
 from .coffee_lab.entities import entities_for as coffee_lab_entities
 from .community_entities import entities_for as community_entities
 from .versions import entities_for as version_entities
@@ -23,6 +25,8 @@ PARALLEL_UPDATES = 0  # event-driven; no polling
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
     async_add_entities([
         XBloomBrewStatusBleSensor(entry),
+        XBloomBrewStageSensor(entry),
+        XBloomNextPourSensor(entry),
         XBloomMachineStatusBleSensor(entry),
         XBloomScaleWeightBleSensor(entry),
         XBloomLastUpdatedSensor(entry),

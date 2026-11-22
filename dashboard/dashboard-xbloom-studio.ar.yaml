@@ -271,11 +271,26 @@ views:
     - type: markdown
       text_only: true
       content: '{% set p = ''sensor.xbloom_studio_current_pour'' %}{% set total = state_attr(p, ''total_pours'')
-        %}**الصبة {{ states(p) }}{% if total %} من {{ total }}{% endif %}**'
+        %}{% set stage = states(''sensor.xbloom_studio_brew_stage'') %}{% if stage == ''waiting'' %}**انتظار
+        بعد الصبة {{ states(p) }}**{% elif stage == ''draining'' %}**قيد التقطير**{% else %}**الصبة {{
+        states(p) }}{% if total %} من {{ total }}{% endif %}**{% endif %}'
       visibility:
       - condition: numeric_state
         entity: sensor.xbloom_studio_current_pour
         above: 0
+    - type: tile
+      entity: sensor.xbloom_studio_next_pour
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_next_pour
+        state_not: unavailable
+      - condition: state
+        entity: sensor.xbloom_studio_next_pour
+        state_not: unknown
     - type: markdown
       text_only: true
       content: '{% set s = states(''sensor.xbloom_studio_brew_time'') | int(0) %}**زمن التحضير {{ s //

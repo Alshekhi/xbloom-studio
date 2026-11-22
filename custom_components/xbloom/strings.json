@@ -636,6 +636,20 @@
           "done": "Done"
         }
       },
+      "brew_stage": {
+        "name": "Brew Stage",
+        "state": {
+          "idle": "Idle",
+          "grinding": "Grinding",
+          "pouring": "Pouring",
+          "waiting": "Waiting",
+          "draining": "Draining",
+          "done": "Done"
+        }
+      },
+      "next_pour": {
+        "name": "Next Pour"
+      },
       "machine_status": {
         "name": "Machine Status",
         "state": {

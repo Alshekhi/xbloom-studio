@@ -450,6 +450,30 @@ async def test_brew_status_reports_the_progress_of_a_brew():
     }
 
 
+async def test_brew_status_progress_says_the_stage_and_the_seconds_to_the_next_pour():
+    from datetime import datetime, timezone
+    now = datetime(2026, 11, 22, 3, 43, 4, tzinfo=timezone.utc)
+    hass = FakeHass(states={
+        "sensor.xbloom_brew_status": "brewing",
+        "sensor.xbloom_brew_stage": ("waiting", {
+            "pour": 1, "pours": 4, "next_pour_at": "2026-11-22T03:43:19.400000+00:00"}),
+    })
+    with patch.object(tool_xbloom.dt_util, "utcnow", lambda: now):
+        facts = await ACTIONS["brew_status"].run(_machine(hass), {})
+    assert facts["progress"]["stage"] == "waiting"
+    assert facts["progress"]["next_pour_in_s"] == 15
+
+
+async def test_brew_status_progress_has_no_countdown_while_pouring():
+    hass = FakeHass(states={
+        "sensor.xbloom_brew_status": "brewing",
+        "sensor.xbloom_brew_stage": ("pouring", {"pour": 2, "pours": 4, "next_pour_at": None}),
+    })
+    facts = await ACTIONS["brew_status"].run(_machine(hass), {})
+    assert facts["progress"]["stage"] == "pouring"
+    assert "next_pour_in_s" not in facts["progress"]
+
+
 async def test_brew_status_progress_leaves_out_what_is_not_known():
     # Grinding: nothing poured yet, no pour, no time; a brew started at the
     # machine has no recipe water. Nothing is reported as zero.

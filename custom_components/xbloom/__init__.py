@@ -940,6 +940,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             signal_water,
         )
         from .water import WaterTracker, recipe_water_ml
+        from .brew_stage import pour_plan
         from xbloom.ble import (
             NOTIFY_GRINDER_PAUSED,
             NOTIFY_MACHINE_RESUMED,
@@ -1278,7 +1279,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     hass.bus.async_fire(
                         "xbloom_brew_started",
                         {"recipe_name": recipe_name, "total_pours": total_pours,
-                         "recipe_water_ml": round(recipe_water_ml(recipe)), **meta},
+                         "recipe_water_ml": round(recipe_water_ml(recipe)),
+                         "pours": pour_plan(recipe), **meta},
                     )
                     started = True
                     outcome = await _await_brew_outcome(

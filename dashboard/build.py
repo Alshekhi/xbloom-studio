@@ -41,7 +41,7 @@ TEXT = {
         "add_recipes": "Add or edit recipes", "add_bags": "Add or edit bags",
         "h_archive": "Archived recipes",
         "this_brew": "This brew", "coffee": "Coffee", "water": "Water", "ratio": "Ratio",
-        "pour": "Pour", "of": "of", "brew_time": "Brew time", "temp": "Temp", "pick_recipe": "Pick a recipe to see its pours.",
+        "pour": "Pour", "of": "of", "st_waiting": "Waiting after pour", "st_draining": "Draining", "brew_time": "Brew time", "temp": "Temp", "pick_recipe": "Pick a recipe to see its pours.",
         "coffee_used": "Coffee used", "water_brewed": "Water brewed",
         "previous": "Brews in the period before", "other": "Other",
         "h_charts": "Brew history", "brews_daily": "Brews per day", "brews_monthly": "Brews per month",
@@ -115,7 +115,7 @@ TEXT = {
         "add_recipes": "إضافة الوصفات أو تعديلها", "add_bags": "إضافة الأكياس أو تعديلها",
         "h_archive": "الوصفات المؤرشفة",
         "this_brew": "هذا التحضير", "coffee": "القهوة", "water": "الماء", "ratio": "النسبة",
-        "pour": "الصبة", "of": "من", "brew_time": "زمن التحضير", "temp": "الحرارة", "pick_recipe": "اختر وصفة لعرض صباتها.",
+        "pour": "الصبة", "of": "من", "st_waiting": "انتظار بعد الصبة", "st_draining": "قيد التقطير", "brew_time": "زمن التحضير", "temp": "الحرارة", "pick_recipe": "اختر وصفة لعرض صباتها.",
         "coffee_used": "القهوة المستخدمة", "water_brewed": "الماء المستخدم",
         "previous": "التحضيرات في الفترة السابقة", "other": "أخرى",
         "h_charts": "سجل التحضير", "brews_daily": "التحضيرات يوميا", "brews_monthly": "التحضيرات شهريا",
@@ -311,11 +311,17 @@ def brew_view(t: dict) -> dict:
         ], [*present(f"sensor.{E}_version_to_keep"), *not_busy()]),
         section(t["h_in_progress"], [
             tile(f"sensor.{E}_current_recipe", visibility=present(f"sensor.{E}_current_recipe")),
-            # "Pour 2 of 3", once the pours have begun.
+            # "Pour 2 of 3" while it pours, "Waiting after pour 2" between
+            # pours, "Draining" after the last, once the pours have begun.
             {"type": "markdown", "text_only": True, "content": (
                 f"{{% set p = 'sensor.{E}_current_pour' %}}{{% set total = state_attr(p, 'total_pours') %}}"
-                f"**{t['pour']} {{{{ states(p) }}}}{{% if total %}} {t['of']} {{{{ total }}}}{{% endif %}}**"
+                f"{{% set stage = states('sensor.{E}_brew_stage') %}}"
+                f"{{% if stage == 'waiting' %}}**{t['st_waiting']} {{{{ states(p) }}}}**"
+                f"{{% elif stage == 'draining' %}}**{t['st_draining']}**"
+                f"{{% else %}}**{t['pour']} {{{{ states(p) }}}}{{% if total %}} {t['of']} {{{{ total }}}}{{% endif %}}**{{% endif %}}"
             ), "visibility": [{"condition": "numeric_state", "entity": f"sensor.{E}_current_pour", "above": 0}]},
+            # "Next Pour: in 15 seconds", counted down by Home Assistant itself.
+            tile(f"sensor.{E}_next_pour", visibility=present(f"sensor.{E}_next_pour")),
             # Minutes and seconds, "2:28"; it re-renders as the sensor ticks.
             {"type": "markdown", "text_only": True, "content": (
                 f"{{% set s = states('sensor.{E}_brew_time') | int(0) %}}"

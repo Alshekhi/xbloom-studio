@@ -193,3 +193,22 @@ async def test_a_start_from_home_assistant_refused_for_water_is_reported_once():
         _hear(followers, LOW, WATER_SCREEN)
         await _settle()
     assert [e["reason"] for e in _fired(hass, "xbloom_brew_failed")] == ["no_water"]
+
+
+async def test_the_started_brew_carries_its_pour_plan():
+    # Brew Stage tells a pour's end from it, so a prepared brew the button
+    # started gets its waits and countdown like one Home Assistant started.
+    hass, entry, _handlers, session, followers, tasks = await _rig()
+    frames, capture = _frames_through_the_session()
+    with capture, _machine_in_range():
+        await entry.runtime_data.preparer._prepare({"dose": 15})
+        _hear(followers, RECIPE_SCREEN, BUTTON)
+        await _settle()
+        started = _fired(hass, "xbloom_brew_started")
+        for frame in frames:
+            await frame({"cmd": 40512})
+        await asyncio.gather(*tasks)
+        await entry.tasks[0]
+
+    # The plan is the recipe as sent, after the prepare step scaled it.
+    assert started[0]["pours"] == [{"water_ml": started[0]["recipe_water_ml"], "wait_s": 0}]

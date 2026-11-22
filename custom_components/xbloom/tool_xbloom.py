@@ -835,6 +835,12 @@ def _progress(machine: Machine) -> dict[str, Any]:
         facts["pour"] = pour
         if pours := _whole(machine.attributes("sensor", "xbloom_current_pour").get("total_pours")):
             facts["pours"] = pours
+    if stage := machine.state("sensor", "xbloom_brew_stage"):
+        facts["stage"] = stage
+        next_at = dt_util.parse_datetime(
+            machine.attributes("sensor", "xbloom_brew_stage").get("next_pour_at") or "")
+        if next_at is not None:
+            facts["next_pour_in_s"] = max(0, round((next_at - dt_util.utcnow()).total_seconds()))
     facts["paused"] = machine.state("binary_sensor", "xbloom_brew_paused") == "on"
     if facts["paused"]:
         facts["pause_reason"] = machine.attributes(
