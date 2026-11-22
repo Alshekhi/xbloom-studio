@@ -43,7 +43,7 @@ def test_facts_above_the_level_are_not_chosen():
 
 
 def test_a_topic_with_nothing_to_say_gives_nothing():
-    assert CONTENT.pick_fact("roast", VALUES, set(), 3) is None
+    assert CONTENT.pick_fact("no_such_topic", VALUES, set(), 3) is None
 
 
 def test_arabic_counts_take_the_right_form():
