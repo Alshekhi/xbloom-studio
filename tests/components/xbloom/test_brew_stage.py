@@ -68,7 +68,13 @@ def test_plan_of_a_recipe_without_pours_is_empty() -> None:
 
 
 def test_plan_treats_a_missing_pause_as_no_wait() -> None:
-    assert pour_plan({"pours": [{"volume_ml": 100}]}) == [{"water_ml": 100.0, "wait_s": 0}]
+    assert pour_plan({"pours": [{"volume_ml": 100}]}) == [
+        {"water_ml": 100.0, "wait_s": 0, "volume_ml": 100.0, "temperature_c": None, "pattern": None}]
+
+
+def test_plan_carries_each_pours_volume_temperature_and_pattern():
+    [pour] = pour_plan({"pours": [{"volume_ml": 45, "temperature_c": 92, "pattern": 2}]})
+    assert (pour["volume_ml"], pour["temperature_c"], pour["pattern"]) == (45.0, 92.0, "spiral")
 
 
 # --------------------------------------------------------------------------- #

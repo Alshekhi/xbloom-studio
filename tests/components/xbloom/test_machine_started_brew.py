@@ -211,4 +211,5 @@ async def test_the_started_brew_carries_its_pour_plan():
         await entry.tasks[0]
 
     # The plan is the recipe as sent, after the prepare step scaled it.
-    assert started[0]["pours"] == [{"water_ml": started[0]["recipe_water_ml"], "wait_s": 0}]
+    [pour] = started[0]["pours"]
+    assert (pour["water_ml"], pour["wait_s"]) == (started[0]["recipe_water_ml"], 0)

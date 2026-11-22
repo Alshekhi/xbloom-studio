@@ -31,6 +31,7 @@ from homeassistant.util import dt as dt_util
 
 from .ble_entities import CMD_BLOOM, CMD_BREW_END, _device_info, signal_event
 from .const import DOMAIN
+from xbloom import spec
 from xbloom.ble import NOTIFY_WATER_VOLUME
 
 EV_BREW_STARTED = "xbloom_brew_started"
@@ -53,7 +54,7 @@ _WATER_SLACK_ML = 1.0
 
 
 def pour_plan(recipe: dict) -> list[dict[str, float]]:
-    """Each pour's running water total and the wait after it, from a recipe."""
+    """Each pour's running water total, the wait after it, and what it pours."""
     pours = recipe.get("pours") or []
     plan: list[dict[str, float]] = []
     total = 0.0
@@ -65,8 +66,24 @@ def pour_plan(recipe: dict) -> list[dict[str, float]]:
         following = pours[index + 1] if index + 1 < len(pours) else {}
         if following.get("agitate_before") == _AGITATE_ON:
             wait += AGITATE_S
-        plan.append({"water_ml": total, "wait_s": wait})
+        plan.append({
+            "water_ml": total, "wait_s": wait,
+            # What the pour is, for anything that describes it (Brew Stories).
+            "volume_ml": float(pour.get("volume_ml") or 0),
+            "temperature_c": (
+                float(pour["temperature_c"]) if pour.get("temperature_c") is not None else None),
+            "pattern": _pattern_name(pour.get("pattern")),
+        })
     return plan
+
+
+def _pattern_name(value) -> str | None:
+    if isinstance(value, str):
+        return value
+    try:
+        return spec.PATTERN_API_TO_NAME.get(int(value))
+    except (TypeError, ValueError):
+        return None
 
 
 def _entity_id(hass, domain: str, unique_id: str) -> str | None:
