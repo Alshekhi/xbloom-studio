@@ -72,3 +72,19 @@ async def test_a_field_emptied_in_the_form_is_cleared():
     await flow.async_step_edit_bag_details({"name": "Kenya", "status": "open"})
     after = await lab.store.async_get_bean(bag.id)
     assert (after.roaster, after.bag_size_g) == ("", None)
+
+
+async def test_editing_a_bag_sets_and_clears_where_and_when_it_was_made():
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    flow = _flow(lab)
+    await flow.async_step_edit_bag({"bag": bag.id})
+    await flow.async_step_edit_bag_details({
+        "name": "Kenya", "status": "open", "roast_date": "2026-09-12",
+        "farm": "Gatomboya", "altitude_m": 1800.0})
+    after = await lab.store.async_get_bean(bag.id)
+    assert (after.roast_date, after.farm, after.altitude_m) == ("2026-09-12", "Gatomboya", 1800.0)
+    await flow.async_step_edit_bag({"bag": bag.id})
+    await flow.async_step_edit_bag_details({"name": "Kenya", "status": "open"})
+    after = await lab.store.async_get_bean(bag.id)
+    assert (after.roast_date, after.farm, after.altitude_m) == ("", "", None)

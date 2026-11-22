@@ -321,6 +321,9 @@
           "roaster": "Roaster",
           "country": "Country",
           "region": "Region",
+          "farm": "Farm",
+          "altitude_m": "Altitude",
+          "roast_date": "Roast date",
           "process": "Process",
           "varietal": "Variety",
           "roast": "Roast",
@@ -349,6 +352,9 @@
           "roaster": "Roaster",
           "country": "Country",
           "region": "Region",
+          "farm": "Farm",
+          "altitude_m": "Altitude",
+          "roast_date": "Roast date",
           "process": "Process",
           "varietal": "Variety",
           "roast": "Roast",
@@ -1156,6 +1162,18 @@
           "name": "Region",
           "description": "The region within the country."
         },
+        "farm": {
+          "name": "Farm",
+          "description": "The farm or washing station it came from."
+        },
+        "altitude_m": {
+          "name": "Altitude",
+          "description": "How high it was grown, in metres."
+        },
+        "roast_date": {
+          "name": "Roast date",
+          "description": "When it was roasted."
+        },
         "process": {
           "name": "Process",
           "description": "How it was processed, such as washed or natural."
@@ -1217,6 +1235,18 @@
         "region": {
           "name": "Region",
           "description": "The region within the country."
+        },
+        "farm": {
+          "name": "Farm",
+          "description": "The farm or washing station it came from."
+        },
+        "altitude_m": {
+          "name": "Altitude",
+          "description": "How high it was grown, in metres."
+        },
+        "roast_date": {
+          "name": "Roast date",
+          "description": "When it was roasted."
         },
         "process": {
           "name": "Process",

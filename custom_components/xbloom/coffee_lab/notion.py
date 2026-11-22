@@ -79,6 +79,8 @@ KIND = {"coffee": "Coffee", "xpod": "xPod", "tea": "Tea"}
 # A bag's varieties (a multi-select, one option each) and roast, added the
 # same way the first time one is written.
 VARIETAL_COLUMN, ROAST_COLUMN = "Variety", "Roast"
+# Where and when a bag's coffee was made, added the same way.
+ROAST_DATE_COLUMN, FARM_COLUMN, ALTITUDE_COLUMN = "Roast Date", "Farm", "Altitude m"
 # A Notion page id: 32 hex digits, with or without its dashes.
 _PAGE_ID = re.compile(r"[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}")
 NEXT_CHANGE = "Next Change"
@@ -214,6 +216,9 @@ def bean_from_page(page: dict) -> Bean:
         ),
         roast=_select(props.get(ROAST_COLUMN)) or "",
         roaster_notes=_plain(props.get("Roaster Notes")),
+        roast_date=_date(props.get(ROAST_DATE_COLUMN)),
+        farm=_plain(props.get(FARM_COLUMN)),
+        altitude_m=_number(props.get(ALTITUDE_COLUMN)),
         opened_on=_date(props.get("Opened Date")),
         finished_on=_date(props.get("Finished Date")),
         buy_again=(_select(props.get(BUY_AGAIN_COLUMN)) or "").lower(),
@@ -256,12 +261,15 @@ def bean_properties(values: dict[str, Any]) -> dict[str, Any]:
             out[PODS_COLUMN] = {"number": value}
         elif key == "pod_id":
             out[POD_ID_COLUMN] = _text(value or "")
-        elif key in ("opened_on", "finished_on"):
-            label = "Opened Date" if key == "opened_on" else "Finished Date"
+        elif key in ("opened_on", "finished_on", "roast_date"):
+            label = {"opened_on": "Opened Date", "finished_on": "Finished Date",
+                     "roast_date": ROAST_DATE_COLUMN}[key]
             out[label] = {"date": {"start": value} if value else None}
+        elif key == "altitude_m":
+            out[ALTITUDE_COLUMN] = {"number": value}
         else:
             label = {"roaster": "Roaster", "country": "Country", "region": "Region",
-                     "roaster_notes": "Roaster Notes"}[key]
+                     "roaster_notes": "Roaster Notes", "farm": FARM_COLUMN}[key]
             out[label] = _text(value or "")
     return out
 
@@ -506,13 +514,13 @@ class NotionStore(CoffeeLabStore):
             raise fail("notion_failed", error=str(err)) from err
 
     async def _ensure_columns(self, database_id: str, props: dict[str, Any]) -> None:
-        """Add the number and text columns `props` writes that the database lacks.
+        """Add the number, text and date columns `props` writes that the database lacks.
 
         Select columns are added by `_ensure_options` with their option.
         """
         kinds = {
             name: kind for name, value in props.items()
-            for kind in ("number", "rich_text") if kind in value
+            for kind in ("number", "rich_text", "date") if kind in value
         }
         async with self._schema_lock:
             if self._columns.get(database_id) is None:

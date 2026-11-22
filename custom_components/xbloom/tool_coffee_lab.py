@@ -15,6 +15,7 @@ import voluptuous as vol
 from .coffee_lab import actions
 from .community import hub_text
 from .coffee_lab.lab import CoffeeLab
+from .coffee_lab.services import ISO_DATE
 from .coffee_lab.models import BUY_AGAIN, ISSUES, KINDS, STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS, Bean
 from .coffee_lab.stats import PERIODS
 from .tool_common import Spec, check_arguments as _check, describe as _describe
@@ -85,7 +86,8 @@ ACTIONS: dict[str, Spec] = {
         actions.add_bean,
         "a new bag (kind: coffee, xpod — a box of xPods, counted in pods — or tea; "
         "bag_size_g, remaining_g to count it down, pods for an xPod box, status, roaster, "
-        "country, region, process, varietal, roast, roaster_notes). An xPod brew takes "
+        "country, region, farm, altitude_m, process, varietal, roast, roast_date, roaster_notes). "
+        "An xPod brew takes "
         "one pod from the xPod box in use, a tea brew its grams from the tea in use, "
         "never from a bag of coffee. The country, process, varietal and roast are kept "
         "in the community hub's English names; one the hub does not list is kept as "
@@ -96,7 +98,8 @@ ACTIONS: dict[str, Spec] = {
     "update_bean": Spec(
         actions.update_bean,
         "correct a bag's details (new_name, kind, bag_size_g, status, roaster, country, "
-        "region, process, varietal, roast, roaster_notes), the hub's names as for add_bean",
+        "region, farm, altitude_m, process, varietal, roast, roast_date, roaster_notes), "
+        "the hub's names as for add_bean",
         one_of=BAG,
     ),
 }
@@ -117,6 +120,7 @@ INTRO = (
 # cleaned like any text. A note may run longer than a name.
 _OURS = {
     "id", "brew_id", "bean_id", "run_id", "status", "brewed_at", "opened_on", "finished_on",
+    "roast_date",
     "period", "verdict", "matched", "result", "setting",
 }
 _NOTES = {"roaster_notes", "next_change", *TASTE_NOTES}
@@ -154,6 +158,12 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
     "roaster": (str, "Who roasted it."),
     "country": (str, "Where it was grown, as a country name."),
     "region": (str, "The region within the country."),
+    "farm": (str, "The farm or washing station it came from."),
+    "altitude_m": (
+        vol.All(vol.Coerce(float), vol.Range(min=0, max=3500)),
+        "How high it was grown, in metres.",
+    ),
+    "roast_date": (ISO_DATE, "When it was roasted, as YYYY-MM-DD."),
     "process": (str, "How it was processed, such as washed or natural."),
     "varietal": (str, "The coffee variety, such as Bourbon; several comma-separated."),
     "roast": (str, "How dark it was roasted, such as light or medium."),

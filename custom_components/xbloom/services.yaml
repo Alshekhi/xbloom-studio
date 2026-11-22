@@ -596,6 +596,20 @@ add_bean:
     region:
       selector:
         text:
+    farm:
+      selector:
+        text:
+    altitude_m:
+      selector:
+        number:
+          min: 0
+          max: 3500
+          step: 1
+          unit_of_measurement: m
+          mode: box
+    roast_date:
+      selector:
+        date:
     process:
       selector:
         text:
@@ -658,6 +672,20 @@ update_bean:
     region:
       selector:
         text:
+    farm:
+      selector:
+        text:
+    altitude_m:
+      selector:
+        number:
+          min: 0
+          max: 3500
+          step: 1
+          unit_of_measurement: m
+          mode: box
+    roast_date:
+      selector:
+        date:
     process:
       selector:
         text:

@@ -35,6 +35,9 @@ DEFAULT_STATS_PERIOD = "this_month"
 
 # A bag's descriptive fields, which add_bean and update_bean both take.
 DESCRIPTIVE = ("roaster", "country", "region", "process", "varietal", "roast", "roaster_notes")
+# Where and when its coffee was made, which both take too. Not text alone:
+# a date and a height.
+ORIGIN = ("roast_date", "farm", "altitude_m")
 # Those the community hub names, so a bag's are kept in its words.
 HUB_FIELDS = ("country", "process", "varietal", "roast")
 
@@ -57,7 +60,7 @@ def bean_facts(bean: Bean) -> dict[str, Any]:
         # A box is counted in pods; its grams were never weighed.
         facts["pods_left"] = bean.pods_left if bean.tracked else None
         facts["remaining_g"] = None
-    facts.update({key: getattr(bean, key) for key in DESCRIPTIVE if getattr(bean, key)})
+    facts.update({key: getattr(bean, key) for key in (*DESCRIPTIVE, *ORIGIN) if getattr(bean, key)})
     return facts
 
 
@@ -292,7 +295,7 @@ async def finish_bag(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _bag_values(args: dict[str, Any]) -> dict[str, Any]:
-    values = {key: args[key] for key in DESCRIPTIVE if args.get(key) is not None}
+    values = {key: args[key] for key in (*DESCRIPTIVE, *ORIGIN) if args.get(key) is not None}
     for key in ("bag_size_g", "status", "kind"):
         if args.get(key) is not None:
             values[key] = args[key]

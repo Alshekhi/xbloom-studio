@@ -7,6 +7,7 @@ response returns the same facts the tool does.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date
 from typing import Any
 
 import voluptuous as vol
@@ -22,11 +23,25 @@ from .models import ISSUES, KINDS, STATUSES, TASTE_NOTES, TASTE_SCALES, VERDICTS
 _BAG = {vol.Exclusive("bean", "bag"): str, vol.Exclusive("bean_id", "bag"): str}
 _GRAMS = vol.All(vol.Coerce(float), vol.Range(min=0))
 _PODS = vol.All(vol.Coerce(int), vol.Range(min=0, max=500))
+
+
+def _iso_date(value: Any) -> str:
+    """A calendar date as YYYY-MM-DD, or a refusal."""
+    try:
+        return date.fromisoformat(str(value).strip()).isoformat()
+    except ValueError:
+        raise vol.Invalid("not a date in YYYY-MM-DD form") from None
+
+
+ISO_DATE = _iso_date
 _DETAILS = {
     vol.Optional("bag_size_g"): _GRAMS,
     vol.Optional("status"): vol.In(list(STATUSES)),
     vol.Optional("kind"): vol.In(list(KINDS)),
     **{vol.Optional(key): str for key in actions.DESCRIPTIVE},
+    vol.Optional("roast_date"): ISO_DATE,
+    vol.Optional("farm"): str,
+    vol.Optional("altitude_m"): vol.All(vol.Coerce(float), vol.Range(min=0, max=3500)),
 }
 
 # name: (action, schema)

@@ -72,6 +72,10 @@ class Bean:
     varietal: str = ""
     roast: str = ""
     roaster_notes: str = ""
+    # Where and when it was made, as far as the bag says.
+    roast_date: str = ""   # YYYY-MM-DD
+    farm: str = ""
+    altitude_m: float | None = None
     opened_on: str = ""   # YYYY-MM-DD
     finished_on: str = ""   # YYYY-MM-DD
     # Asked once, when the bag is finished: would it be bought again.

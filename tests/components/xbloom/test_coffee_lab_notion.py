@@ -134,7 +134,8 @@ def test_a_bag_round_trips():
     values = {"name": "Kenya", "status": "open", "tracked": True, "remaining_g": 180.0,
               "bag_size_g": 250.0, "roaster": "R", "country": "Kenya", "region": "Nyeri",
               "process": "Washed", "varietal": "SL28, SL34", "roast": "Light Roast",
-              "roaster_notes": "berry", "opened_on": "2026-09-20"}
+              "roaster_notes": "berry", "opened_on": "2026-09-20",
+              "roast_date": "2026-09-12", "farm": "Gatomboya", "altitude_m": 1800.0}
     bean = bean_from_page(_page_from(bean_properties(values)))
     assert {k: getattr(bean, k) for k in values} == values
 
@@ -174,6 +175,26 @@ async def test_a_select_option_the_database_lacks_is_added_before_writing():
     assert {"name": "Carbonic"} in options and {"name": "Washed"} in options
     methods = [c[0] for c in notion.calls]
     assert methods.index("PATCH") < methods.index("POST"), "the option exists before the page"
+
+
+async def test_the_origin_columns_a_database_lacks_are_added_before_writing():
+    notion = FakeNotion({
+        ("GET", "/databases/b"): {"properties": {
+            "Status": {"type": "select", "select": {"options": [{"name": "Unopened"}]}},
+            "Inventory Tracking": {"type": "select", "select": {"options": [{"name": "Untracked"}]}},
+        }},
+        ("POST", "/pages"): lambda body: {"id": "new", "properties": body["properties"]},
+    })
+    store = NotionStore(notion, Databases("b", "r"))
+    await store.async_add_bean(name="Kenya", status="unopened", roast_date="2026-09-12",
+                               farm="Gatomboya", altitude_m=1800.0)
+    added = {}
+    for call in notion.calls:
+        if call[0] == "PATCH":
+            added.update(call[2]["properties"])
+    assert added["Roast Date"] == {"date": {}}
+    assert added["Farm"] == {"rich_text": {}}
+    assert added["Altitude m"] == {"number": {}}
 
 
 async def test_each_variety_is_an_option_of_the_variety_column_added_before_writing():

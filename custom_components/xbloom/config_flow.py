@@ -466,8 +466,12 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             ),
             **{
                 vol.Optional(key, description=suggested(key)): selector.TextSelector()
-                for key in ("roaster", "country", "region", "process", "varietal", "roast")
+                for key in ("roaster", "country", "region", "farm", "process", "varietal", "roast")
             },
+            vol.Optional("altitude_m", description=suggested("altitude_m")): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=3500, step=1, mode="box", unit_of_measurement="m")
+            ),
+            vol.Optional("roast_date", description=suggested("roast_date")): selector.DateSelector(),
             vol.Optional("roaster_notes", description=suggested("roaster_notes")):
                 selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
         })
@@ -524,6 +528,9 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                 # A field emptied in the form is not sent at all, so every
                 # field is set: absent means cleared.
                 details = {k: user_input.get(k, "") for k in coffee_lab_actions.DESCRIPTIVE}
+                details.update(farm=user_input.get("farm", ""),
+                               roast_date=user_input.get("roast_date", ""),
+                               altitude_m=user_input.get("altitude_m"))
                 # The hub names coffee's countries and processes; a tea's are its own.
                 if user_input.get("kind", bean.kind) != "tea":
                     await coffee_lab_actions.in_hub_words(lab, details)
