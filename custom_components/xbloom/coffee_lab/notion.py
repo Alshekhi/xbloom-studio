@@ -80,7 +80,7 @@ KIND = {"coffee": "Coffee", "xpod": "xPod", "tea": "Tea"}
 # same way the first time one is written.
 VARIETAL_COLUMN, ROAST_COLUMN = "Variety", "Roast"
 # Where and when a bag's coffee was made, added the same way.
-ROAST_DATE_COLUMN, FARM_COLUMN, ALTITUDE_COLUMN = "Roast Date", "Farm", "Altitude m"
+ROAST_DATE_COLUMN, PRODUCER_COLUMN, ALTITUDE_COLUMN = "Roast Date", "Producer", "Altitude m"
 # A Notion page id: 32 hex digits, with or without its dashes.
 _PAGE_ID = re.compile(r"[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}")
 NEXT_CHANGE = "Next Change"
@@ -217,7 +217,7 @@ def bean_from_page(page: dict) -> Bean:
         roast=_select(props.get(ROAST_COLUMN)) or "",
         roaster_notes=_plain(props.get("Roaster Notes")),
         roast_date=_date(props.get(ROAST_DATE_COLUMN)),
-        farm=_plain(props.get(FARM_COLUMN)),
+        producer=_plain(props.get(PRODUCER_COLUMN)),
         altitude_m=_number(props.get(ALTITUDE_COLUMN)),
         opened_on=_date(props.get("Opened Date")),
         finished_on=_date(props.get("Finished Date")),
@@ -269,7 +269,7 @@ def bean_properties(values: dict[str, Any]) -> dict[str, Any]:
             out[ALTITUDE_COLUMN] = {"number": value}
         else:
             label = {"roaster": "Roaster", "country": "Country", "region": "Region",
-                     "roaster_notes": "Roaster Notes", "farm": FARM_COLUMN}[key]
+                     "roaster_notes": "Roaster Notes", "producer": PRODUCER_COLUMN}[key]
             out[label] = _text(value or "")
     return out
 

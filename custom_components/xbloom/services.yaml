@@ -596,7 +596,7 @@ add_bean:
     region:
       selector:
         text:
-    farm:
+    producer:
       selector:
         text:
     altitude_m:
@@ -672,7 +672,7 @@ update_bean:
     region:
       selector:
         text:
-    farm:
+    producer:
       selector:
         text:
     altitude_m:

@@ -321,7 +321,7 @@
           "roaster": "Roaster",
           "country": "Country",
           "region": "Region",
-          "farm": "Farm",
+          "producer": "Producer",
           "altitude_m": "Altitude",
           "roast_date": "Roast date",
           "process": "Process",
@@ -352,7 +352,7 @@
           "roaster": "Roaster",
           "country": "Country",
           "region": "Region",
-          "farm": "Farm",
+          "producer": "Producer",
           "altitude_m": "Altitude",
           "roast_date": "Roast date",
           "process": "Process",
@@ -1162,9 +1162,9 @@
           "name": "Region",
           "description": "The region within the country."
         },
-        "farm": {
-          "name": "Farm",
-          "description": "The farm or washing station it came from."
+        "producer": {
+          "name": "Producer",
+          "description": "Who grew it: a farmer, farm, cooperative or washing station."
         },
         "altitude_m": {
           "name": "Altitude",
@@ -1236,9 +1236,9 @@
           "name": "Region",
           "description": "The region within the country."
         },
-        "farm": {
-          "name": "Farm",
-          "description": "The farm or washing station it came from."
+        "producer": {
+          "name": "Producer",
+          "description": "Who grew it: a farmer, farm, cooperative or washing station."
         },
         "altitude_m": {
           "name": "Altitude",

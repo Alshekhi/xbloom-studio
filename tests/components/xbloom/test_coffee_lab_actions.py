@@ -66,12 +66,12 @@ async def test_a_bag_added_without_an_amount_is_not_counted():
     assert not facts["added"]["tracked"] and facts["added"]["remaining_g"] is None
 
 
-async def test_a_bag_keeps_its_roast_date_farm_and_altitude():
+async def test_a_bag_keeps_its_roast_date_producer_and_altitude():
     lab = await _lab()
     facts = await actions.add_bean(lab, {
-        "name": "Kenya", "roast_date": "2026-09-12", "farm": "Gatomboya", "altitude_m": 1800.0})
-    assert (facts["added"]["roast_date"], facts["added"]["farm"], facts["added"]["altitude_m"]) == (
-        "2026-09-12", "Gatomboya", 1800.0)
+        "name": "Kenya", "roast_date": "2026-09-12", "producer": "Gatomboya Cooperative", "altitude_m": 1800.0})
+    assert (facts["added"]["roast_date"], facts["added"]["producer"], facts["added"]["altitude_m"]) == (
+        "2026-09-12", "Gatomboya Cooperative", 1800.0)
     facts = await actions.update_bean(lab, {"bean": "Kenya", "altitude_m": 1900.0})
     assert facts["updated"]["altitude_m"] == 1900.0
     assert facts["updated"]["roast_date"] == "2026-09-12"
@@ -80,7 +80,7 @@ async def test_a_bag_keeps_its_roast_date_farm_and_altitude():
 async def test_a_bag_without_origin_details_lists_none():
     lab = await _lab()
     facts = await actions.add_bean(lab, {"name": "Kenya"})
-    assert not {"roast_date", "farm", "altitude_m"} & set(facts["added"])
+    assert not {"roast_date", "producer", "altitude_m"} & set(facts["added"])
 
 
 def test_the_services_refuse_a_roast_date_that_is_not_a_date():

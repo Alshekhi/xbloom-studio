@@ -40,7 +40,7 @@ _DETAILS = {
     vol.Optional("kind"): vol.In(list(KINDS)),
     **{vol.Optional(key): str for key in actions.DESCRIPTIVE},
     vol.Optional("roast_date"): ISO_DATE,
-    vol.Optional("farm"): str,
+    vol.Optional("producer"): str,
     vol.Optional("altitude_m"): vol.All(vol.Coerce(float), vol.Range(min=0, max=3500)),
 }
 

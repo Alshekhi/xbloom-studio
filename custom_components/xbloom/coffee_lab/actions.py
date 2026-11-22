@@ -37,7 +37,7 @@ DEFAULT_STATS_PERIOD = "this_month"
 DESCRIPTIVE = ("roaster", "country", "region", "process", "varietal", "roast", "roaster_notes")
 # Where and when its coffee was made, which both take too. Not text alone:
 # a date and a height.
-ORIGIN = ("roast_date", "farm", "altitude_m")
+ORIGIN = ("roast_date", "producer", "altitude_m")
 # Those the community hub names, so a bag's are kept in its words.
 HUB_FIELDS = ("country", "process", "varietal", "roast")
 

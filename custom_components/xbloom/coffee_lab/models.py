@@ -74,7 +74,8 @@ class Bean:
     roaster_notes: str = ""
     # Where and when it was made, as far as the bag says.
     roast_date: str = ""   # YYYY-MM-DD
-    farm: str = ""
+    # Who grew it: a farmer, a farm or estate, a cooperative, a washing station.
+    producer: str = ""
     altitude_m: float | None = None
     opened_on: str = ""   # YYYY-MM-DD
     finished_on: str = ""   # YYYY-MM-DD
