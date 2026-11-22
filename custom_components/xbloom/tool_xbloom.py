@@ -841,6 +841,13 @@ def _progress(machine: Machine) -> dict[str, Any]:
             machine.attributes("sensor", "xbloom_brew_stage").get("next_pour_at") or "")
         if next_at is not None:
             facts["next_pour_in_s"] = max(0, round((next_at - dt_util.utcnow()).total_seconds()))
+    story_attrs = machine.attributes("sensor", "xbloom_brew_story")
+    if story_attrs.get("now") or story_attrs.get("story"):
+        heading = machine.state("sensor", "xbloom_brew_story")
+        facts["story"] = {
+            "heading": heading if heading not in (None, "unknown", "unavailable") else None,
+            **{key: story_attrs.get(key) for key in ("now", "story", "kind")},
+        }
     facts["paused"] = machine.state("binary_sensor", "xbloom_brew_paused") == "on"
     if facts["paused"]:
         facts["pause_reason"] = machine.attributes(

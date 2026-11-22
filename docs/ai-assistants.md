@@ -17,7 +17,8 @@ first if nothing matching is ready.
 During a brew, `brew_status` also reports its `progress`: the `pour` and
 `pours`, its `stage` (`pouring`, `waiting` between pours, `draining` after the
 last) and while waiting `next_pour_in_s`, whether it is `paused` and its
-`pause_reason`, `brew_time_s`, and `water_poured_ml` against `recipe_water_ml`. `machine_status` carries
+`pause_reason`, `brew_time_s`, `water_poured_ml` against `recipe_water_ml`, and
+the `story` on screen (`heading`, `now`, `story`, `kind`) when Brew Stories is on. `machine_status` carries
 `water_left_ml` and `water_needed_ml` once the low-water switch has tripped,
 and low water the cup will finish on is not a `fault`.
 

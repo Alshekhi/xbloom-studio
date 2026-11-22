@@ -474,6 +474,27 @@ async def test_brew_status_progress_has_no_countdown_while_pouring():
     assert "next_pour_in_s" not in facts["progress"]
 
 
+async def test_brew_status_progress_carries_the_story():
+    hass = FakeHass(states={
+        "sensor.xbloom_brew_status": "brewing",
+        "sensor.xbloom_brew_story": ("Where it began", {
+            "now": "Pour 2: 85 ml at 92 °C in a spiral.", "story": "One.", "kind": "big_story"}),
+    })
+    facts = await ACTIONS["brew_status"].run(_machine(hass), {})
+    assert facts["progress"]["story"] == {
+        "heading": "Where it began", "now": "Pour 2: 85 ml at 92 °C in a spiral.",
+        "story": "One.", "kind": "big_story"}
+
+
+async def test_brew_status_progress_has_no_story_when_none_is_shown():
+    hass = FakeHass(states={
+        "sensor.xbloom_brew_status": "brewing",
+        "sensor.xbloom_brew_story": ("unknown", {"now": None, "story": None, "kind": None}),
+    })
+    facts = await ACTIONS["brew_status"].run(_machine(hass), {})
+    assert "story" not in facts["progress"]
+
+
 async def test_brew_status_progress_leaves_out_what_is_not_known():
     # Grinding: nothing poured yet, no pour, no time; a brew started at the
     # machine has no recipe water. Nothing is reported as zero.

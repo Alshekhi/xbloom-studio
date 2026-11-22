@@ -293,6 +293,25 @@ views:
         state_not: unknown
     - type: markdown
       text_only: true
+      show_empty: false
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set s = ''sensor.xbloom_studio_brew_story'' %}{% if state_attr(s,
+        ''now'') %}{{ e(state_attr(s, ''now'')) }}{% endif %}{% if state_attr(s, ''story'') %}
+
+
+        **{{ e(states(s)) }}**
+
+
+        {{ e(state_attr(s, ''story'')) }}{% endif %}'
+      visibility:
+      - condition: state
+        entity: sensor.xbloom_studio_brew_stage
+        state:
+        - pouring
+        - waiting
+        - draining
+    - type: markdown
+      text_only: true
       content: '{% set s = states(''sensor.xbloom_studio_brew_time'') | int(0) %}**زمن التحضير {{ s //
         60 }}:{{ ''%02d'' % (s % 60) }}**'
       visibility:

@@ -322,6 +322,14 @@ def brew_view(t: dict) -> dict:
             ), "visibility": [{"condition": "numeric_state", "entity": f"sensor.{E}_current_pour", "above": 0}]},
             # "Next Pour: in 15 seconds", counted down by Home Assistant itself.
             tile(f"sensor.{E}_next_pour", visibility=present(f"sensor.{E}_next_pour")),
+            # The brew story: what this pour does, and the story part on screen.
+            {"type": "markdown", "text_only": True, "show_empty": False, "content": ESCAPE + (
+                f"{{% set s = 'sensor.{E}_brew_story' %}}"
+                f"{{% if state_attr(s, 'now') %}}{{{{ e(state_attr(s, 'now')) }}}}{{% endif %}}"
+                f"{{% if state_attr(s, 'story') %}}\n\n**{{{{ e(states(s)) }}}}**\n\n"
+                f"{{{{ e(state_attr(s, 'story')) }}}}{{% endif %}}"
+            ), "visibility": [{"condition": "state", "entity": f"sensor.{E}_brew_stage",
+                               "state": ["pouring", "waiting", "draining"]}]},
             # Minutes and seconds, "2:28"; it re-renders as the sensor ticks.
             {"type": "markdown", "text_only": True, "content": (
                 f"{{% set s = states('sensor.{E}_brew_time') | int(0) %}}"
