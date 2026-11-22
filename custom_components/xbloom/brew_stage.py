@@ -39,10 +39,11 @@ STAGES = ["idle", "grinding", "pouring", "waiting", "draining", "done"]
 # Brew Status values Brew Stage shows as they are.
 _FOLLOWED = {"idle", "grinding", "done"}
 
-# The agitation step a pour may end with runs inside the wait after it. On the
-# measured brew the one pour with it waited 42 s against a 35 s pause; the
-# pours without it waited exactly their pause.
-AGITATE_AFTER_S = 7
+# A pour's agitation runs inside a wait, with no frame for it: "after" in the
+# wait after that pour, "before" in the wait before it. Each measured about
+# 7 s beyond the pause, on brews with one of each (2026-11-22). A first pour's
+# "before" comes ahead of it, after grinding, so it is in no wait.
+AGITATE_S = 7
 _AGITATE_ON = 1
 
 # The water reading is whole millilitres; a pour's total in the recipe need not
@@ -52,13 +53,17 @@ _WATER_SLACK_ML = 1.0
 
 def pour_plan(recipe: dict) -> list[dict[str, float]]:
     """Each pour's running water total and the wait after it, from a recipe."""
+    pours = recipe.get("pours") or []
     plan: list[dict[str, float]] = []
     total = 0.0
-    for pour in recipe.get("pours") or []:
+    for index, pour in enumerate(pours):
         total += float(pour.get("volume_ml") or 0)
         wait = int(pour.get("pause_s") or 0)
         if pour.get("agitate_after") == _AGITATE_ON:
-            wait += AGITATE_AFTER_S
+            wait += AGITATE_S
+        following = pours[index + 1] if index + 1 < len(pours) else {}
+        if following.get("agitate_before") == _AGITATE_ON:
+            wait += AGITATE_S
         plan.append({"water_ml": total, "wait_s": wait})
     return plan
 

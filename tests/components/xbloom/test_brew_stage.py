@@ -16,7 +16,7 @@ import pytest
 
 from custom_components.xbloom import brew_stage
 from custom_components.xbloom.brew_stage import (
-    AGITATE_AFTER_S,
+    AGITATE_S,
     XBloomBrewStageSensor,
     pour_plan,
 )
@@ -45,7 +45,21 @@ def test_plan_gives_each_pours_running_water_total() -> None:
 
 
 def test_plan_wait_is_the_pause_plus_agitation_when_it_follows_the_pour() -> None:
-    assert [p["wait_s"] for p in pour_plan(RECIPE)] == [35 + AGITATE_AFTER_S, 20, 20, 10]
+    assert [p["wait_s"] for p in pour_plan(RECIPE)] == [35 + AGITATE_S, 20, 20, 10]
+
+
+def test_plan_wait_includes_the_agitation_before_the_next_pour() -> None:
+    # Measured: the wait before a pour that agitates first ran its pause plus
+    # the agitation, with no frame for it.
+    recipe = {"pours": [
+        {"volume_ml": 45, "pause_s": 15, "agitate_before": 1},
+        {"volume_ml": 55, "pause_s": 15, "agitate_after": 1},
+        {"volume_ml": 55, "pause_s": 10},
+        {"volume_ml": 100, "pause_s": 10, "agitate_before": 1},
+    ]}
+    # Pour 1's own agitation comes before it, ahead of any wait.
+    assert [p["wait_s"] for p in pour_plan(recipe)] == [
+        15, 15 + AGITATE_S, 10 + AGITATE_S, 10]
 
 
 def test_plan_of_a_recipe_without_pours_is_empty() -> None:
@@ -192,7 +206,7 @@ async def test_the_pour_reaching_its_water_is_waiting_with_the_next_pours_time(s
     stage.water(43)
     assert stage.state == "waiting"
     assert stage.attrs["pour"] == 1
-    assert stage.attrs["next_pour_at"] == (NOW + timedelta(seconds=35 + AGITATE_AFTER_S)).isoformat()
+    assert stage.attrs["next_pour_at"] == (NOW + timedelta(seconds=35 + AGITATE_S)).isoformat()
 
 
 async def test_a_reading_just_short_of_the_total_ends_the_pour(stage) -> None:
