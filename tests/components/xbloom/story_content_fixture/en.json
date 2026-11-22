@@ -1,14 +1,103 @@
 {
-  "counts": {"day": {"one": "{n} day", "other": "{n} days"}},
-  "pour_lines": {"spiral": "Pour {pour}: {volume} ml at {temperature} °C in a spiral."},
-  "facts": {
-    "bloom.co2": {"topic": "bloom", "level": 1, "text": "The grounds rise: carbon dioxide from roasting, {days_since_roast} ago.", "source": "fixture"},
-    "bloom.open": {"topic": "bloom", "level": 1, "text": "Opened {days_since_open} ago, the bag still rises.", "source": "fixture"},
-    "bloom.deep": {"topic": "bloom", "level": 2, "text": "A deeper fact.", "source": "fixture"},
-    "water.plain": {"topic": "water", "level": 1, "text": "Water does the work.", "source": "fixture"}
+  "counts": {
+    "day": {
+      "one": "{n} day",
+      "other": "{n} days"
+    }
   },
-  "bag": {"intro": ["Meet {name}."], "middle": ["{name} again."], "farewell": ["Goodbye {name}."]},
-  "big_story": {"chapters": [{"key": "ethiopia", "countries": ["Ethiopia"], "title": "Where it began", "parts": ["One.", "Two.", "Three."], "source": "fixture"}]},
+  "pour_lines": {
+    "spiral": "Pour {pour}: {volume} ml at {temperature} °C in a spiral."
+  },
+  "facts": {
+    "bloom.co2": {
+      "topic": "bloom",
+      "level": 1,
+      "text": "The grounds rise: carbon dioxide from roasting, {days_since_roast} ago.",
+      "source": "fixture"
+    },
+    "bloom.open": {
+      "topic": "bloom",
+      "level": 1,
+      "text": "Opened {days_since_open} ago, the bag still rises.",
+      "source": "fixture"
+    },
+    "bloom.deep": {
+      "topic": "bloom",
+      "level": 2,
+      "text": "A deeper fact.",
+      "source": "fixture"
+    },
+    "water.plain": {
+      "topic": "water",
+      "level": 1,
+      "text": "Water does the work.",
+      "source": "fixture"
+    },
+    "roast.dark": {
+      "topic": "roast",
+      "level": 1,
+      "text": "Darker roasts dissolve faster.",
+      "source": "fixture"
+    },
+    "origin.alt": {
+      "topic": "origin",
+      "level": 1,
+      "text": "At {altitude} m cherries ripen slowly.",
+      "source": "fixture"
+    }
+  },
+  "bag": {
+    "intro": [
+      "Meet {name}."
+    ],
+    "middle": [
+      "{name} again."
+    ],
+    "farewell": [
+      "Goodbye {name}."
+    ]
+  },
+  "big_story": {
+    "chapters": [
+      {
+        "key": "ethiopia",
+        "countries": [
+          "Ethiopia"
+        ],
+        "title": "Where it began",
+        "parts": [
+          "One.",
+          "Two.",
+          "Three."
+        ],
+        "source": "fixture"
+      }
+    ]
+  },
   "big_story_ahead": "still ahead",
-  "you": {"lines": ["Cup {brew_count} of this bag."], "teaser": {"big_story": "Next: {title}.", "fact": "Next: more about {topic}."}}
+  "you": {
+    "lines": [
+      "Cup {brew_count} of this bag.",
+      "You rated the last cup {last_rating}."
+    ],
+    "teaser": {
+      "big_story": "Next: {title}.",
+      "fact": "Next: more about {topic}."
+    }
+  },
+  "headings": {
+    "bag": "{name}, chapter {chapter}",
+    "big_story": "{title}",
+    "big_story_ahead": "{title}, still ahead",
+    "science": "In your cup",
+    "you": "Your cup"
+  },
+  "topics": {
+    "bloom": "the bloom",
+    "water": "water",
+    "roast": "roasting",
+    "extraction": "extraction",
+    "origin": "origins",
+    "process": "processing"
+  }
 }
