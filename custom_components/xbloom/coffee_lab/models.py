@@ -76,7 +76,10 @@ class Bean:
     roast_date: str = ""   # YYYY-MM-DD
     # Who grew it: a farmer, a farm or estate, a cooperative, a washing station.
     producer: str = ""
+    # How high it was grown, in metres: one height, or the bottom of a range
+    # whose top is altitude_max_m.
     altitude_m: float | None = None
+    altitude_max_m: float | None = None
     opened_on: str = ""   # YYYY-MM-DD
     finished_on: str = ""   # YYYY-MM-DD
     # Asked once, when the bag is finished: would it be bought again.

@@ -81,6 +81,7 @@ KIND = {"coffee": "Coffee", "xpod": "xPod", "tea": "Tea"}
 VARIETAL_COLUMN, ROAST_COLUMN = "Variety", "Roast"
 # Where and when a bag's coffee was made, added the same way.
 ROAST_DATE_COLUMN, PRODUCER_COLUMN, ALTITUDE_COLUMN = "Roast Date", "Producer", "Altitude m"
+ALTITUDE_MAX_COLUMN = "Altitude Max m"
 # A Notion page id: 32 hex digits, with or without its dashes.
 _PAGE_ID = re.compile(r"[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}")
 NEXT_CHANGE = "Next Change"
@@ -219,6 +220,7 @@ def bean_from_page(page: dict) -> Bean:
         roast_date=_date(props.get(ROAST_DATE_COLUMN)),
         producer=_plain(props.get(PRODUCER_COLUMN)),
         altitude_m=_number(props.get(ALTITUDE_COLUMN)),
+        altitude_max_m=_number(props.get(ALTITUDE_MAX_COLUMN)),
         opened_on=_date(props.get("Opened Date")),
         finished_on=_date(props.get("Finished Date")),
         buy_again=(_select(props.get(BUY_AGAIN_COLUMN)) or "").lower(),
@@ -265,8 +267,8 @@ def bean_properties(values: dict[str, Any]) -> dict[str, Any]:
             label = {"opened_on": "Opened Date", "finished_on": "Finished Date",
                      "roast_date": ROAST_DATE_COLUMN}[key]
             out[label] = {"date": {"start": value} if value else None}
-        elif key == "altitude_m":
-            out[ALTITUDE_COLUMN] = {"number": value}
+        elif key in ("altitude_m", "altitude_max_m"):
+            out[ALTITUDE_COLUMN if key == "altitude_m" else ALTITUDE_MAX_COLUMN] = {"number": value}
         else:
             label = {"roaster": "Roaster", "country": "Country", "region": "Region",
                      "roaster_notes": "Roaster Notes", "producer": PRODUCER_COLUMN}[key]

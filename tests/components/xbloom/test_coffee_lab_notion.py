@@ -135,7 +135,8 @@ def test_a_bag_round_trips():
               "bag_size_g": 250.0, "roaster": "R", "country": "Kenya", "region": "Nyeri",
               "process": "Washed", "varietal": "SL28, SL34", "roast": "Light Roast",
               "roaster_notes": "berry", "opened_on": "2026-09-20",
-              "roast_date": "2026-09-12", "producer": "Gatomboya Cooperative", "altitude_m": 1800.0}
+              "roast_date": "2026-09-12", "producer": "Gatomboya Cooperative", "altitude_m": 1800.0,
+              "altitude_max_m": 2000.0}
     bean = bean_from_page(_page_from(bean_properties(values)))
     assert {k: getattr(bean, k) for k in values} == values
 
@@ -187,7 +188,8 @@ async def test_the_origin_columns_a_database_lacks_are_added_before_writing():
     })
     store = NotionStore(notion, Databases("b", "r"))
     await store.async_add_bean(name="Kenya", status="unopened", roast_date="2026-09-12",
-                               producer="Gatomboya Cooperative", altitude_m=1800.0)
+                               producer="Gatomboya Cooperative", altitude_m=1800.0,
+                               altitude_max_m=2000.0)
     added = {}
     for call in notion.calls:
         if call[0] == "PATCH":
@@ -195,6 +197,7 @@ async def test_the_origin_columns_a_database_lacks_are_added_before_writing():
     assert added["Roast Date"] == {"date": {}}
     assert added["Producer"] == {"rich_text": {}}
     assert added["Altitude m"] == {"number": {}}
+    assert added["Altitude Max m"] == {"number": {}}
 
 
 async def test_each_variety_is_an_option_of_the_variety_column_added_before_writing():

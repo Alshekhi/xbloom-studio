@@ -471,6 +471,9 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             vol.Optional("altitude_m", description=suggested("altitude_m")): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=0, max=3500, step=1, mode="box", unit_of_measurement="m")
             ),
+            vol.Optional("altitude_max_m", description=suggested("altitude_max_m")): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=3500, step=1, mode="box", unit_of_measurement="m")
+            ),
             vol.Optional("roast_date", description=suggested("roast_date")): selector.DateSelector(),
             vol.Optional("roaster_notes", description=suggested("roaster_notes")):
                 selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
@@ -486,6 +489,9 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             values = {k: v for k, v in user_input.items() if v not in (None, "")}
             if not str(values.get("name", "")).strip():
                 errors["name"] = "required"
+            elif coffee_lab_actions.altitude_range_wrong(
+                    values.get("altitude_m"), values.get("altitude_max_m")):
+                errors["altitude_max_m"] = "altitude_range"
             else:
                 facts = await coffee_lab_actions.add_bean(lab, values)
                 return self.async_create_entry(
@@ -524,13 +530,17 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             name = str(user_input.get("name", "")).strip()
             if not name:
                 errors["name"] = "required"
+            elif coffee_lab_actions.altitude_range_wrong(
+                    user_input.get("altitude_m"), user_input.get("altitude_max_m")):
+                errors["altitude_max_m"] = "altitude_range"
             else:
                 # A field emptied in the form is not sent at all, so every
                 # field is set: absent means cleared.
                 details = {k: user_input.get(k, "") for k in coffee_lab_actions.DESCRIPTIVE}
                 details.update(producer=user_input.get("producer", ""),
                                roast_date=user_input.get("roast_date", ""),
-                               altitude_m=user_input.get("altitude_m"))
+                               altitude_m=user_input.get("altitude_m"),
+                               altitude_max_m=user_input.get("altitude_max_m"))
                 # The hub names coffee's countries and processes; a tea's are its own.
                 if user_input.get("kind", bean.kind) != "tea":
                     await coffee_lab_actions.in_hub_words(lab, details)

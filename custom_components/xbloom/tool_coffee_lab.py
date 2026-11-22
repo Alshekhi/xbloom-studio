@@ -86,7 +86,7 @@ ACTIONS: dict[str, Spec] = {
         actions.add_bean,
         "a new bag (kind: coffee, xpod — a box of xPods, counted in pods — or tea; "
         "bag_size_g, remaining_g to count it down, pods for an xPod box, status, roaster, "
-        "country, region, producer, altitude_m, process, varietal, roast, roast_date, roaster_notes). "
+        "country, region, producer, altitude_m, altitude_max_m, process, varietal, roast, roast_date, roaster_notes). "
         "An xPod brew takes "
         "one pod from the xPod box in use, a tea brew its grams from the tea in use, "
         "never from a bag of coffee. The country, process, varietal and roast are kept "
@@ -98,7 +98,7 @@ ACTIONS: dict[str, Spec] = {
     "update_bean": Spec(
         actions.update_bean,
         "correct a bag's details (new_name, kind, bag_size_g, status, roaster, country, "
-        "region, producer, altitude_m, process, varietal, roast, roast_date, roaster_notes), "
+        "region, producer, altitude_m, altitude_max_m, process, varietal, roast, roast_date, roaster_notes), "
         "the hub's names as for add_bean",
         one_of=BAG,
     ),
@@ -161,7 +161,11 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
     "producer": (str, "Who grew it: a farmer, farm, cooperative or washing station."),
     "altitude_m": (
         vol.All(vol.Coerce(float), vol.Range(min=0, max=3500)),
-        "How high it was grown, in metres.",
+        "How high it was grown, in metres; the bottom of the range when there is one.",
+    ),
+    "altitude_max_m": (
+        vol.All(vol.Coerce(float), vol.Range(min=0, max=3500)),
+        "The top of the altitude range, in metres, when the bag gives a range.",
     ),
     "roast_date": (ISO_DATE, "When it was roasted, as YYYY-MM-DD."),
     "process": (str, "How it was processed, such as washed or natural."),

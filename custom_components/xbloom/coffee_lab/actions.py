@@ -37,7 +37,7 @@ DEFAULT_STATS_PERIOD = "this_month"
 DESCRIPTIVE = ("roaster", "country", "region", "process", "varietal", "roast", "roaster_notes")
 # Where and when its coffee was made, which both take too. Not text alone:
 # a date and a height.
-ORIGIN = ("roast_date", "producer", "altitude_m")
+ORIGIN = ("roast_date", "producer", "altitude_m", "altitude_max_m")
 # Those the community hub names, so a bag's are kept in its words.
 HUB_FIELDS = ("country", "process", "varietal", "roast")
 
@@ -341,10 +341,21 @@ async def add_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     elif args.get("remaining_g") is not None:
         values.update(tracked=True, remaining_g=float(args["remaining_g"]))
     # The hub names coffee's countries and processes; a tea's are its own.
+    check_altitude(values.get("altitude_m"), values.get("altitude_max_m"))
     checked = await in_hub_words(lab, values) if values.get("kind") != "tea" else {}
     bean = await lab.store.async_add_bean(name=str(args["name"]).strip(), **values)
     lab.on_change()
     return {"added": bean_facts(bean), **checked}
+
+
+def altitude_range_wrong(low: float | None, high: float | None) -> bool:
+    """Whether a range's top is below its bottom."""
+    return low is not None and high is not None and float(high) < float(low)
+
+
+def check_altitude(low: float | None, high: float | None) -> None:
+    if altitude_range_wrong(low, high):
+        raise refuse("altitude_range", low=f"{float(low):g}", high=f"{float(high):g}")
 
 
 def kind_changes(bean: Bean, kind: str | None) -> dict[str, Any]:
@@ -366,6 +377,8 @@ async def update_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     if args.get("new_name"):
         changes["name"] = str(args["new_name"]).strip()
     changes.update(kind_changes(bean, changes.get("kind")))
+    check_altitude(changes.get("altitude_m", bean.altitude_m),
+                   changes.get("altitude_max_m", bean.altitude_max_m))
     # The hub names coffee's countries and processes; a tea's are its own.
     checked = await in_hub_words(lab, changes) if changes.get("kind", bean.kind) != "tea" else {}
     updated = await lab.store.async_update_bean(bean.id, **changes)

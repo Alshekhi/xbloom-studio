@@ -323,6 +323,7 @@
           "region": "Region",
           "producer": "Producer",
           "altitude_m": "Altitude",
+          "altitude_max_m": "Altitude, top of range",
           "roast_date": "Roast date",
           "process": "Process",
           "varietal": "Variety",
@@ -354,6 +355,7 @@
           "region": "Region",
           "producer": "Producer",
           "altitude_m": "Altitude",
+          "altitude_max_m": "Altitude, top of range",
           "roast_date": "Roast date",
           "process": "Process",
           "varietal": "Variety",
@@ -424,7 +426,8 @@
       "notion_unreachable": "Notion could not be reached: {detail}",
       "notion_duplicate": "The page has more than one database called {detail}. Keep one.",
       "notion_half": "The page is missing {detail}. Add it, or use a page with neither.",
-      "notion_fields": "These fields are missing or of the wrong type — {detail}."
+      "notion_fields": "These fields are missing or of the wrong type — {detail}.",
+      "altitude_range": "The top of the altitude range is below its bottom."
     },
     "abort": {
       "no_recipes": "No recipes saved yet.",
@@ -1055,6 +1058,9 @@
     },
     "notion_column_type": {
       "message": "The {column} column in Notion is a {type} column, which Coffee Lab can't write to. Rename it in Notion, and Coffee Lab adds its own."
+    },
+    "altitude_range": {
+      "message": "The top of the altitude range, {high} m, is below its bottom, {low} m."
     }
   },
   "services": {
@@ -1168,7 +1174,11 @@
         },
         "altitude_m": {
           "name": "Altitude",
-          "description": "How high it was grown, in metres."
+          "description": "How high it was grown, in metres; the bottom of the range when there is one."
+        },
+        "altitude_max_m": {
+          "name": "Altitude, top of range",
+          "description": "The top of the altitude range, in metres, when the bag gives a range."
         },
         "roast_date": {
           "name": "Roast date",
@@ -1242,7 +1252,11 @@
         },
         "altitude_m": {
           "name": "Altitude",
-          "description": "How high it was grown, in metres."
+          "description": "How high it was grown, in metres; the bottom of the range when there is one."
+        },
+        "altitude_max_m": {
+          "name": "Altitude, top of range",
+          "description": "The top of the altitude range, in metres, when the bag gives a range."
         },
         "roast_date": {
           "name": "Roast date",

@@ -88,3 +88,17 @@ async def test_editing_a_bag_sets_and_clears_where_and_when_it_was_made():
     await flow.async_step_edit_bag_details({"name": "Kenya", "status": "open"})
     after = await lab.store.async_get_bean(bag.id)
     assert (after.roast_date, after.producer, after.altitude_m) == ("", "", None)
+
+
+async def test_the_bag_form_keeps_an_altitude_range_and_refuses_one_upside_down():
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    flow = _flow(lab)
+    await flow.async_step_edit_bag({"bag": bag.id})
+    result = await flow.async_step_edit_bag_details(
+        {"name": "Kenya", "status": "open", "altitude_m": 1650.0, "altitude_max_m": 1300.0})
+    assert result["errors"] == {"altitude_max_m": "altitude_range"}
+    await flow.async_step_edit_bag_details(
+        {"name": "Kenya", "status": "open", "altitude_m": 1300.0, "altitude_max_m": 1650.0})
+    after = await lab.store.async_get_bean(bag.id)
+    assert (after.altitude_m, after.altitude_max_m) == (1300.0, 1650.0)

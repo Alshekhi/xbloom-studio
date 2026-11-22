@@ -77,10 +77,26 @@ async def test_a_bag_keeps_its_roast_date_producer_and_altitude():
     assert facts["updated"]["roast_date"] == "2026-09-12"
 
 
+async def test_a_bag_keeps_an_altitude_range():
+    lab = await _lab()
+    facts = await actions.add_bean(lab, {"name": "Kenya", "altitude_m": 1300.0, "altitude_max_m": 1650.0})
+    assert (facts["added"]["altitude_m"], facts["added"]["altitude_max_m"]) == (1300.0, 1650.0)
+
+
+async def test_an_altitude_range_whose_top_is_below_its_bottom_is_refused():
+    lab = await _lab()
+    assert await _refused(actions.add_bean(
+        lab, {"name": "Kenya", "altitude_m": 1650.0, "altitude_max_m": 1300.0})) == "altitude_range"
+    await actions.add_bean(lab, {"name": "Kenya", "altitude_m": 1800.0})
+    # Checked against the bag's own bottom when only the top is given.
+    assert await _refused(actions.update_bean(
+        lab, {"bean": "Kenya", "altitude_max_m": 1500.0})) == "altitude_range"
+
+
 async def test_a_bag_without_origin_details_lists_none():
     lab = await _lab()
     facts = await actions.add_bean(lab, {"name": "Kenya"})
-    assert not {"roast_date", "producer", "altitude_m"} & set(facts["added"])
+    assert not {"roast_date", "producer", "altitude_m", "altitude_max_m"} & set(facts["added"])
 
 
 def test_the_services_refuse_a_roast_date_that_is_not_a_date():

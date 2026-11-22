@@ -35,7 +35,7 @@ as typed, and the action's response names it under `not_on_hub`. The
 **roaster notes** stay as written; the hub's flavor names found in them are
 what community suggestions match. A bag can also say where and when its
 coffee was made: its **producer** (the farmer, farm, cooperative or washing
-station), the **altitude** it was grown at, in metres,
+station), the **altitude** it was grown at, in metres, one height or a range,
 and the **roast date**.
 
 ## Coffee, xPod boxes and tea
@@ -220,7 +220,7 @@ A field missing or of the wrong type is named when you set it up, and nothing
 is saved until it is fixed. The fields for ratings — Rating, Body, Acidity,
 Sweetness, Clarity, Hot, Warm, Cool and Overall Notes, Finish and Next Change
 in Brews, and Buy Again in Coffee Beans — are added the first time one is
-kept, as are Kind, Pods Left, Pod ID, Variety, Roast, Producer, Altitude m and
+kept, as are Kind, Pods Left, Pod ID, Variety, Roast, Producer, Altitude m, Altitude Max m and
 Roast Date in Coffee Beans.
 A select option the database lacks — a new brewer,
 say — is added before it is used. A bag added or changed in Notion itself

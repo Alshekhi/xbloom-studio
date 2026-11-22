@@ -607,6 +607,14 @@ add_bean:
           step: 1
           unit_of_measurement: m
           mode: box
+    altitude_max_m:
+      selector:
+        number:
+          min: 0
+          max: 3500
+          step: 1
+          unit_of_measurement: m
+          mode: box
     roast_date:
       selector:
         date:
@@ -676,6 +684,14 @@ update_bean:
       selector:
         text:
     altitude_m:
+      selector:
+        number:
+          min: 0
+          max: 3500
+          step: 1
+          unit_of_measurement: m
+          mode: box
+    altitude_max_m:
       selector:
         number:
           min: 0
