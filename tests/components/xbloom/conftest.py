@@ -164,6 +164,7 @@ def _inject_global_stubs() -> None:
 
     const = _stub_mod("homeassistant.const")
     const.UnitOfMass = MagicMock(name="UnitOfMass")
+    const.EVENT_STATE_CHANGED = "state_changed"
 
     exc_mod = _stub_mod("homeassistant.exceptions")
     exc_mod.ConfigEntryAuthFailed = type("ConfigEntryAuthFailed", (Exception,), {})

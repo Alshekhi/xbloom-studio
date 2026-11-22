@@ -23,10 +23,10 @@ from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
 from .ble_entities import CMD_BLOOM, CMD_BREW_END, _device_info, signal_event
@@ -65,6 +65,24 @@ def pour_plan(recipe: dict) -> list[dict[str, float]]:
 
 def _entity_id(hass, domain: str, unique_id: str) -> str | None:
     return er.async_get(hass).async_get_entity_id(domain, DOMAIN, unique_id)
+
+
+def _follow(hass, domain: str, unique_id: str, handler):
+    """Call `handler` on each state change of one of this integration's entities.
+
+    The entity is found when its changes arrive, not now: a platform set up
+    after this one (the binary sensors) has registered nothing yet on a new
+    install, and a lookup made now would follow nothing until a restart.
+    """
+    found: list[str] = []
+
+    @callback
+    def _is_it(event_data) -> bool:
+        if not found and (entity_id := _entity_id(hass, domain, unique_id)) is not None:
+            found.append(entity_id)
+        return bool(found) and event_data.get("entity_id") == found[0]
+
+    return hass.bus.async_listen(EVENT_STATE_CHANGED, handler, event_filter=_is_it)
 
 
 class XBloomBrewStageSensor(SensorEntity):
@@ -166,13 +184,9 @@ class XBloomBrewStageSensor(SensorEntity):
         self.async_on_remove(self.hass.bus.async_listen(EV_BREW_STARTED, _on_started))
         self.async_on_remove(
             async_dispatcher_connect(self.hass, signal_event(self._entry.entry_id), _on_frame))
-        for domain, unique_id, handler in (
-            ("sensor", "xbloom_brew_status", _on_status),
-            ("binary_sensor", "xbloom_brew_paused", _on_paused),
-        ):
-            if (entity_id := _entity_id(self.hass, domain, unique_id)) is not None:
-                self.async_on_remove(
-                    async_track_state_change_event(self.hass, [entity_id], handler))
+        self.async_on_remove(_follow(self.hass, "sensor", "xbloom_brew_status", _on_status))
+        self.async_on_remove(
+            _follow(self.hass, "binary_sensor", "xbloom_brew_paused", _on_paused))
 
 
 class XBloomNextPourSensor(SensorEntity):
@@ -209,6 +223,4 @@ class XBloomNextPourSensor(SensorEntity):
                 self._attr_native_value = value
                 self.async_write_ha_state()
 
-        if (entity_id := _entity_id(self.hass, "sensor", "xbloom_brew_stage")) is not None:
-            self.async_on_remove(
-                async_track_state_change_event(self.hass, [entity_id], _on_stage))
+        self.async_on_remove(_follow(self.hass, "sensor", "xbloom_brew_stage", _on_stage))

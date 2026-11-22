@@ -75,26 +75,28 @@ class _Stage:
 
     async def wire(self) -> "_Stage":
         signals: list = []
-        tracked: dict = {}
 
         def _connect(_hass, _signal, handler):
             signals.append(handler)
             return lambda: None
 
-        def _track(_hass, entity_ids, handler):
-            for entity_id in entity_ids:
-                tracked[entity_id] = handler
-            return lambda: None
-
-        ids = {"xbloom_brew_status": "sensor.brew_status", "xbloom_brew_paused": "binary_sensor.paused"}
         with patch.object(brew_stage, "async_dispatcher_connect", _connect), \
-             patch.object(brew_stage, "async_track_state_change_event", _track), \
-             patch.object(brew_stage, "_entity_id", lambda _hass, domain, uid: ids[uid]):
+             patch.object(brew_stage, "_entity_id", self._lookup):
             await self.entity.async_added_to_hass()
         self.signal = signals[0]
-        self.bus = {c.args[0]: c.args[1] for c in self.entity.hass.bus.async_listen.call_args_list}
-        self.tracked = tracked
+        calls = self.entity.hass.bus.async_listen.call_args_list
+        self.bus = {c.args[0]: c.args[1] for c in calls if c.args[0] != "state_changed"}
+        self.followers = [(c.kwargs["event_filter"], c.args[1])
+                          for c in calls if c.args[0] == "state_changed"]
         return self
+
+    # Entities are found when their changes arrive, not when Brew Stage is
+    # added: on a new install the binary sensors are not registered yet then.
+    registered = {"xbloom_brew_status": "sensor.brew_status",
+                  "xbloom_brew_paused": "binary_sensor.paused"}
+
+    def _lookup(self, _hass, _domain, unique_id):
+        return self.registered.get(unique_id)
 
     def brew_started(self, recipe=RECIPE) -> None:
         ev = MagicMock()
@@ -110,8 +112,11 @@ class _Stage:
 
     def _state(self, entity_id: str, value: str) -> None:
         ev = MagicMock()
-        ev.data = {"new_state": MagicMock(state=value)}
-        self.tracked[entity_id](ev)
+        ev.data = {"entity_id": entity_id, "new_state": MagicMock(state=value)}
+        with patch.object(brew_stage, "_entity_id", self._lookup):
+            for accepts, handler in self.followers:
+                if accepts(ev.data):
+                    handler(ev)
 
     def frame(self, cmd: int, **data) -> None:
         with patch.object(brew_stage.dt_util, "utcnow", lambda: self.now):
@@ -144,6 +149,20 @@ def test_stage_starts_idle() -> None:
 def test_stage_offers_the_states_it_can_take() -> None:
     assert XBloomBrewStageSensor._attr_options == [
         "idle", "grinding", "pouring", "waiting", "draining", "done"]
+
+
+async def test_an_entity_registered_after_brew_stage_is_still_followed() -> None:
+    stage = _Stage()
+    stage.registered = {}
+    await stage.wire()
+    stage.registered = {"xbloom_brew_status": "sensor.brew_status"}
+    stage.status("grinding")
+    assert stage.state == "grinding"
+
+
+async def test_changes_of_other_entities_are_ignored(stage) -> None:
+    stage._state("sensor.something_else", "grinding")
+    assert stage.state == "idle"
 
 
 async def test_grinding_and_done_follow_brew_status(stage) -> None:
@@ -306,20 +325,18 @@ async def _next_pour():
     entity.hass = MagicMock()
     entity.async_write_ha_state = MagicMock()
     entity.async_on_remove = MagicMock()
-    tracked: dict = {}
-
-    def _track(_hass, entity_ids, handler):
-        tracked.update({e: handler for e in entity_ids})
-        return lambda: None
-
-    with patch.object(brew_stage, "async_track_state_change_event", _track), \
-         patch.object(brew_stage, "_entity_id", lambda _hass, domain, uid: "sensor.brew_stage"):
+    lookup = lambda _hass, domain, uid: "sensor.brew_stage"
+    with patch.object(brew_stage, "_entity_id", lookup):
         await entity.async_added_to_hass()
+    call = entity.hass.bus.async_listen.call_args
 
     def stage(value: str, next_pour_at: str | None) -> None:
         ev = MagicMock()
-        ev.data = {"new_state": MagicMock(state=value, attributes={"next_pour_at": next_pour_at})}
-        tracked["sensor.brew_stage"](ev)
+        ev.data = {"entity_id": "sensor.brew_stage",
+                   "new_state": MagicMock(state=value, attributes={"next_pour_at": next_pour_at})}
+        with patch.object(brew_stage, "_entity_id", lookup):
+            assert call.kwargs["event_filter"](ev.data)
+        call.args[1](ev)
 
     return entity, stage
 
