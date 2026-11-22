@@ -108,3 +108,67 @@ async def test_a_brew_without_a_bag_counts_no_cups_of_a_bag():
     texts = await _texts(bag=None)
     _heading, you = texts.stories[Slot("draining", 0, "you")]
     assert "of this bag" not in you
+
+
+def test_altitude_is_counted_in_the_languages_forms():
+    from custom_components.xbloom.stories.compose import _values
+    ar = Content.load("ar", FIXTURE)
+    assert _values({"altitude_m": 1650}, [], ar, TODAY)["altitude"] == "1650 مترًا"
+    assert _values({"altitude_m": 1300, "altitude_max_m": 1650}, [], ar, TODAY)["altitude"] == "1300–1650 مترًا"
+    assert _values({"altitude_m": 2000}, [], ar, TODAY)["altitude"] == "2000 متر"
+    assert _values({"altitude_m": 1800}, [], CONTENT, TODAY)["altitude"] == "1800 metres"
+
+
+def test_a_day_that_has_not_passed_is_not_told():
+    from custom_components.xbloom.stories.compose import _values
+    values = _values({"roast_date": TODAY.isoformat(), "opened_on": TODAY.isoformat()}, [], CONTENT, TODAY)
+    assert values["days_since_roast"] is None and values["days_since_open"] is None
+
+
+async def test_a_kept_promise_is_not_promised_again():
+    memory = await _memory()
+    short = _plan()[:2]
+    for _ in range(3):
+        texts = compose(plan_slots(short, True), short, BAG, [], memory, CONTENT, TODAY)
+        if memory.teaser:
+            assert texts.teaser is None or texts.teaser["key"] != memory.teaser["key"]
+        await memory.async_record_brew("bag-1", told=texts.told, facts=texts.facts,
+                                       big_story_part_told=texts.big_story_part_told,
+                                       country="Kenya", teaser=texts.teaser)
+
+
+async def test_a_promise_nothing_could_show_is_not_marked_seen():
+    memory = await _memory()
+    await memory.async_record_brew("bag-1", told=[], facts=[], big_story_part_told=False,
+                                   country=None, teaser={"kind": "fact", "key": "water.plain", "text": "x"})
+    texts = compose(plan_slots(None, True), None, BAG, [], memory, CONTENT, TODAY)
+    assert "water.plain" not in texts.facts
+
+
+async def test_no_brew_tells_the_same_figure_twice():
+    from custom_components.xbloom.stories.compose import _values
+    content = Content.load("en")
+    bag = {**BAG, "remaining_g": 200}
+    history = [{"rating": None, "next_change": ""}] * 3
+    for brews in range(6):
+        memory = await _memory()
+        memory._data["brews"] = brews
+        # Origin and process told already, so the roast facts come up.
+        memory._data["facts_seen"] = [k for k in content.entry("facts")
+                                      if k.startswith(("origin.", "process."))]
+        plan = _plan()
+        texts = compose(plan_slots(plan, True), plan, bag, history, memory, content, TODAY)
+        every = " ".join(list(texts.pour_lines.values()) + [t for _h, t in texts.stories.values()])
+        values = _values(bag, history, content, TODAY)
+        for key in ("days_since_roast", "days_since_open", "altitude"):
+            assert every.count(values[key]) <= 1, (brews, key)
+
+
+async def test_unseen_facts_of_any_topic_come_before_seen_ones():
+    content = Content.load("en")
+    memory = await _memory()
+    memory._data["facts_seen"] = [k for k in content.entry("facts") if k.startswith(("origin.", "process."))]
+    plan = _plan()
+    texts = compose(plan_slots(plan, True), plan, BAG, [{"rating": None, "next_change": ""}] * 3,
+                    memory, content, TODAY)
+    assert not {k for k in texts.facts if k.startswith(("origin.", "process."))}

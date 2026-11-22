@@ -3,6 +3,10 @@
     "day": {
       "one": "{n} day",
       "other": "{n} days"
+    },
+    "metre": {
+      "one": "{n} metre",
+      "other": "{n} metres"
     }
   },
   "pour_lines": {
@@ -42,7 +46,7 @@
     "origin.alt": {
       "topic": "origin",
       "level": 1,
-      "text": "At {altitude} m cherries ripen slowly.",
+      "text": "At {altitude}, cherries ripen slowly.",
       "source": "fixture"
     }
   },

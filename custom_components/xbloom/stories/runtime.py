@@ -28,6 +28,10 @@ _LOGGER = logging.getLogger(__name__)
 EV_BREW_STARTED = "xbloom_brew_started"
 EV_MACHINE_BREW_STARTED = "xbloom_machine_brew_started"
 NOTHING = {"heading": None, "now": None, "story": None, "kind": None}
+# The brews read for a bag's history: newest first, far more than one bag holds.
+HISTORY_BREWS = 100
+# Stages a late-written brew catches up with.
+_UNDER_WAY = ("pouring", "waiting", "draining")
 
 
 def signal_story(entry_id: str) -> str:
@@ -45,6 +49,9 @@ class StoryRuntime:
         self._texts: BrewTexts | None = None
         self._bag: dict | None = None
         self._recorded = False
+        # The last stage Brew Stage reported, for a brew whose texts were
+        # still being written when it arrived.
+        self._stage: tuple[str, int | None] = ("idle", None)
 
     async def async_load(self) -> None:
         await self.memory.async_load()
@@ -90,7 +97,7 @@ class StoryRuntime:
         from ..coffee_lab.store import UnknownBean
         try:
             bean = await lab.store.async_get_bean(bean_id)
-            brews = await lab.store.async_list_brews()
+            brews = await lab.store.async_list_brews(limit=HISTORY_BREWS)
         except (UnknownBean, *STORE_UNREACHABLE) as err:
             _LOGGER.info("Brew Stories: bag %s not read (%s); telling no bag story", bean_id, err)
             return None, []
@@ -108,6 +115,14 @@ class StoryRuntime:
         slots = plan_slots(plan, self._bag is not None)
         self._texts = compose(slots, plan, self._bag, history, self.memory, content,
                               dt_util.now().date())
+        # A brew already under way when its texts were ready (adopted from
+        # the machine's button, or a slow Coffee Lab) shows what its stage
+        # calls for now, not from the next change on.
+        stage, pour = self._stage
+        if stage in _UNDER_WAY:
+            if stage != "pouring":
+                await self.async_on_stage("pouring", pour)
+            await self.async_on_stage(stage, pour)
 
     async def async_brew_started(self, data: dict[str, Any]) -> None:
         await self._begin(data.get("pours") or None, data.get("bean_id"))
@@ -123,6 +138,7 @@ class StoryRuntime:
         return None
 
     async def async_on_stage(self, stage: str, pour: int | None) -> None:
+        self._stage = (stage, pour)
         if stage == "idle":
             self._texts = None
             self._publish(dict(NOTHING))
@@ -139,6 +155,8 @@ class StoryRuntime:
             found = self._story("draining", 0)
         elif stage == "done":
             await self._record()
+            # What is on screen stays; the next brew writes its own texts.
+            self._texts = None
             return
         else:
             return

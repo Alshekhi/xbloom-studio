@@ -3,6 +3,10 @@
     "day": {
       "one": "{n} day",
       "other": "{n} days"
+    },
+    "metre": {
+      "one": "{n} metre",
+      "other": "{n} metres"
     }
   },
   "headings": {
@@ -113,7 +117,7 @@
     "origin.altitude": {
       "topic": "origin",
       "level": 1,
-      "text": "This coffee grew at {altitude} metres. Higher and cooler means cherries ripen more slowly, which tends to build sugar and acidity.",
+      "text": "This coffee grew at {altitude}. Higher and cooler means cherries ripen more slowly, which tends to build sugar and acidity.",
       "source": "James Hoffmann, The World Atlas of Coffee, 2nd ed. (2018)"
     },
     "origin.country": {
@@ -283,12 +287,12 @@
     "intro": [
       "Your first cups of {name}. It comes from {country}, and its story starts here.",
       "{name} grew in {region}, {country}.",
-      "{name} was grown at {altitude} metres. Keep that in mind when you taste its acidity.",
+      "{name} was grown at {altitude}. Keep that in mind when you taste its acidity.",
       "{name} is a {process} coffee. Watch how that shows in the cup over the next brews.",
       "Meet {name}. Every cup of this bag adds a chapter."
     ],
     "middle": [
-      "{name} was roasted {days_since_roast} ago and is settling. Beans at this age often taste rounder than in their first days.",
+      "{name} was roasted {days_since_roast} ago. Coffee often tastes rounder once its first days have passed.",
       "This bag was opened {days_since_open} ago. Notice whether its aroma has changed when you grind it.",
       "Last time you said: {next_change}. This cup is the test.",
       "Your last rating for {name} was {last_rating}.",
@@ -430,10 +434,10 @@
           "Rwanda",
           "Burundi"
         ],
-        "title": "Back to East Africa",
+        "title": "East Africa's highlands",
         "source": "World Coffee Research, Arabica Coffee Varieties catalogue",
         "parts": [
-          "Coffee came back to East Africa as a crop at the end of the 1800s, planted in Kenya by missionaries.",
+          "Kenya began growing coffee as a crop at the end of the 1800s, when missionaries planted it.",
           "In the 1930s a laboratory in Kenya selected the varieties SL28 and SL34. They are behind the blackcurrant and bright acidity Kenyan coffee is known for.",
           "Kenyan coffee is often fermented and washed twice. Lots are sold at auction, judged cup by cup."
         ]

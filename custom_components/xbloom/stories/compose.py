@@ -7,6 +7,7 @@ fields, its brews, and general knowledge in the content.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -21,6 +22,12 @@ SCIENCE_TOPICS = ("origin", "process", "roast", "water", "extraction", "bloom")
 LAST_CUPS_G = 40
 # Brews with stories before deeper facts unlock.
 LEVELS = ((15, 1), (40, 2))
+# Figures a brew states once: a second text naming one says it again.
+FIGURES = frozenset({"days_since_roast", "days_since_open", "altitude"})
+
+
+def _figures(template: str) -> set[str]:
+    return set(re.findall(r"{(\w+)}", template)) & FIGURES
 
 
 @dataclass
@@ -42,7 +49,8 @@ def _days(content: Content, since: str | None, today: date) -> str | None:
         days = (today - date.fromisoformat(since)).days if since else None
     except ValueError:
         return None
-    return content.count(days, "day") if days is not None and days >= 0 else None
+    # The day itself is not "0 days ago": nothing is said.
+    return content.count(days, "day") if days is not None and days > 0 else None
 
 
 def _values(bag: dict | None, history: list[dict], content: Content, today: date) -> dict[str, Any]:
@@ -51,7 +59,7 @@ def _values(bag: dict | None, history: list[dict], content: Content, today: date
     last = history[0] if history else {}
     return {
         **{k: bag.get(k) for k in ("name", "country", "region", "producer", "process", "varietal", "roast")},
-        "altitude": f"{_number(low)}–{_number(high)}" if low is not None and high is not None else _number(low),
+        "altitude": _altitude(content, low, high),
         "days_since_roast": _days(content, bag.get("roast_date"), today),
         "days_since_open": _days(content, bag.get("opened_on"), today),
         # Cups are counted for a bag; a brew from no bag has none.
@@ -59,6 +67,15 @@ def _values(bag: dict | None, history: list[dict], content: Content, today: date
         "last_rating": _number(last.get("rating")),
         "next_change": last.get("next_change") or None,
     }
+
+
+def _altitude(content: Content, low: Any, high: Any) -> str | None:
+    """The height with its counted word; a range takes the form of its top."""
+    if low is None:
+        return None
+    if high is None:
+        return content.count(int(float(low)), "metre", _number(low))
+    return content.count(int(float(high)), "metre", f"{_number(low)}–{_number(high)}")
 
 
 def _level(brews: int) -> int:
@@ -85,6 +102,7 @@ class _Writer:
         self.out = BrewTexts()
         teaser = memory.teaser
         self.promised = teaser["key"] if teaser and teaser.get("kind") == "fact" else None
+        self.said: set[str] = set()
 
     @property
     def _seen(self) -> set[str]:
@@ -94,19 +112,31 @@ class _Writer:
         return self.content.fill(self.content.entry(f"headings.{key}"), values) or ""
 
     def _fact(self, topics: tuple[str, ...]) -> tuple[str, str] | None:
+        """An unseen fact from any of `topics` before a seen one from the first."""
+        found = []
         for topic in topics:
-            picked = self.content.pick_fact(topic, self.values, self._seen, self.level)
+            picked = self.content.pick_fact(
+                topic, self.values, self._seen, self.level, frozenset(self.said))
             if picked and picked[0] not in self.out.facts:
-                return picked
-        return None
+                if picked[0] not in self._seen:
+                    return self._said(picked)
+                found.append(picked)
+        return self._said(found[0]) if found else None
+
+    def _said(self, picked: tuple[str, str]) -> tuple[str, str]:
+        self.said |= _figures(self.content.entry("facts")[picked[0]]["text"])
+        return picked
 
     def _keep_promise(self) -> str | None:
         if not self.promised or self.promised in self.out.facts:
             return None
         fact = self.content.entry("facts").get(self.promised)
-        text = self.content.fill(fact["text"], self.values) if fact else None
+        if not fact or _figures(fact["text"]) & self.said:
+            return None
+        text = self.content.fill(fact["text"], self.values)
         if text:
             self.out.facts.append(self.promised)
+            self.said |= _figures(fact["text"])
         return text
 
     def pour_line(self, pour: int) -> str | None:
@@ -125,9 +155,12 @@ class _Writer:
                                 chapter=self.memory.bag(bean_id)["chapter"] + 1)
         for index, template in enumerate(self.content.entry(f"bag.{phase}")):
             key = f"bag.{phase}.{index}"
-            text = None if key in told else self.content.fill(template, self.values)
+            if key in told or _figures(template) & self.said:
+                continue
+            text = self.content.fill(template, self.values)
             if text:
                 self.out.told.append(key)
+                self.said |= _figures(template)
                 return heading, text
         picked = self._fact(("origin", "process"))
         if picked:
@@ -193,6 +226,8 @@ def compose(
 ) -> BrewTexts:
     writer = _Writer(plan or [], bag, history, memory, content, today)
     for slot in slots:
+        if slot.kind == "you":
+            continue
         if slot.kind == "pour_line":
             if (text := writer.pour_line(slot.pour)) is not None:
                 writer.out.pour_lines[slot.pour] = text
@@ -205,7 +240,11 @@ def compose(
         }[slot.kind]()
         if story is not None:
             writer.out.stories[slot] = story
-    # A promise the brew had no science slot for is kept on its first pour.
-    if writer.promised and (kept := writer._keep_promise()) and 1 in writer.out.pour_lines:
+    # A promise the brew had no science slot for is kept on its first pour,
+    # before the closing line chooses the next promise.
+    if writer.promised and 1 in writer.out.pour_lines and (kept := writer._keep_promise()):
         writer.out.pour_lines[1] = f"{writer.out.pour_lines[1]} {kept}"
+    for slot in slots:
+        if slot.kind == "you" and (story := writer.you()) is not None:
+            writer.out.stories[slot] = story
     return writer.out

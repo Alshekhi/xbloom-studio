@@ -71,19 +71,26 @@ class Content:
         except _Missing:
             return None
 
-    def count(self, n: int, key: str) -> str:
+    def count(self, n: int, key: str, shown: str | None = None) -> str:
+        """`n` with its counted word; `shown` stands in for the number (a range)."""
         forms = self._data["counts"][key]
         form = _arabic_form(n) if self.lang == "ar" else ("one" if n == 1 else "other")
-        return (forms.get(form) or forms["other"]).replace("{n}", str(n))
+        return (forms.get(form) or forms["other"]).replace("{n}", shown or str(n))
 
     def pick_fact(
-        self, topic: str, values: dict[str, Any], seen: set[str], level: int
+        self, topic: str, values: dict[str, Any], seen: set[str], level: int,
+        avoid: frozenset[str] = frozenset(),
     ) -> tuple[str, str] | None:
-        """An unseen fact on `topic` that can be told; a seen one once all are."""
+        """An unseen fact on `topic` that can be told; a seen one once all are.
+
+        A fact naming any value in `avoid` is passed over.
+        """
         told: list[tuple[str, str]] = []
         for key in sorted(self._data.get("facts", {})):
             fact = self._data["facts"][key]
             if fact["topic"] != topic or fact["level"] > level:
+                continue
+            if any("{" + name + "}" in fact["text"] for name in avoid):
                 continue
             text = self.fill(fact["text"], values)
             if text is None:

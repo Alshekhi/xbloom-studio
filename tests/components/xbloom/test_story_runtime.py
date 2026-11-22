@@ -127,3 +127,21 @@ def test_story_sensor_is_not_restored():
 
 def test_the_select_offers_off_and_built_in():
     assert XBloomBrewStoriesSelect._attr_options == ["off", "built_in"]
+
+
+async def test_a_story_written_after_its_wait_began_shows_at_once():
+    runtime, _ = await _runtime()
+    await runtime.async_on_stage("pouring", 1)
+    await runtime.async_on_stage("waiting", 1)
+    await _started(runtime)
+    assert runtime.current["story"] == "One."
+
+
+async def test_a_finished_brews_texts_do_not_show_in_the_next_brew():
+    runtime, _ = await _runtime()
+    await _started(runtime)
+    await runtime.async_on_stage("draining", 4)
+    await runtime.async_on_stage("done", None)
+    shown = dict(runtime.current)
+    await runtime.async_on_stage("pouring", 1)
+    assert runtime.current == shown

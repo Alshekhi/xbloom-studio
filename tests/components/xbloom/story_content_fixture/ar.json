@@ -6,6 +6,13 @@
       "few": "{n} أيام",
       "many": "{n} يومًا",
       "other": "{n} يوم"
+    },
+    "metre": {
+      "one": "متر واحد",
+      "two": "متران",
+      "few": "{n} أمتار",
+      "many": "{n} مترًا",
+      "other": "{n} متر"
     }
   },
   "pour_lines": {
@@ -45,7 +52,7 @@
     "origin.alt": {
       "topic": "origin",
       "level": 1,
-      "text": "على ارتفاع {altitude} م تنضج الثمار ببطء.",
+      "text": "على ارتفاع {altitude} تنضج الثمار ببطء.",
       "source": "fixture"
     }
   },
