@@ -355,6 +355,8 @@ class XBloomRuntimeData:
     # The Brew tab's Taste (const.TASTE_GRIND), kept until a brew has used
     # its coffee or another bag is chosen (prepare.reset_taste).
     taste: str = "balanced"
+    # Brew Stories (stories/runtime.py).
+    stories: object = None
 
 
 type XBloomConfigEntry = ConfigEntry[XBloomRuntimeData]
@@ -2577,6 +2579,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
     # The AI tools call the services above, so they come and go with them.
     entry.async_on_unload(llm_api.async_register(hass, entry))
+
+    # Brew Stories follow brews from here on; their entities read it.
+    from .stories.runtime import StoryRuntime
+    entry.runtime_data.stories = StoryRuntime(hass, entry)
+    await entry.runtime_data.stories.async_setup()
 
     _LOGGER.debug("xbloom: loading platforms %s", PLATFORMS)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

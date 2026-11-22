@@ -15,6 +15,7 @@ from .ble_entities import (
 )
 from .reading_sensors import READING_SENSORS
 from .brew_stage import XBloomBrewStageSensor, XBloomNextPourSensor
+from .stories.entities import XBloomBrewStorySensor
 from .coffee_lab.entities import entities_for as coffee_lab_entities
 from .community_entities import entities_for as community_entities
 from .versions import entities_for as version_entities
@@ -27,6 +28,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         XBloomBrewStatusBleSensor(entry),
         XBloomBrewStageSensor(entry),
         XBloomNextPourSensor(entry),
+        XBloomBrewStorySensor(entry),
         XBloomMachineStatusBleSensor(entry),
         XBloomScaleWeightBleSensor(entry),
         XBloomLastUpdatedSensor(entry),

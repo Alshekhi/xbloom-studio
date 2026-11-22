@@ -40,6 +40,7 @@ EV_MODULE_ENTERED = "xbloom_module_entered"
 # blueprint can speak it — a commanded 11511 emits no machine screen-event.
 EV_MODE_CHANGED = "xbloom_mode_changed"
 
+from .stories.entities import XBloomBrewStoriesSelect
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
     """Set up the xBloom select entities from a config entry."""
@@ -56,6 +57,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         XBloomWeightUnitSelect(entry),
         XBloomBrewPatternSelect(entry),
         XBloomTasteSelect(entry),
+        XBloomBrewStoriesSelect(entry),
     ])
     # Coffee Lab's, only while it is switched on.
     async_add_entities(coffee_lab_entities(entry.runtime_data.coffee_lab, "select"))

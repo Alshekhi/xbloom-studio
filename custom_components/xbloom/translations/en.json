@@ -608,6 +608,13 @@
           "tea": "Tea",
           "search": "Search the community"
         }
+      },
+      "brew_stories": {
+        "name": "Brew Stories",
+        "state": {
+          "off": "Off",
+          "built_in": "Built-in"
+        }
       }
     },
     "sensor": {
@@ -728,6 +735,9 @@
           "xpod": "xPod",
           "tea": "Tea"
         }
+      },
+      "brew_story": {
+        "name": "Brew Story"
       }
     },
     "switch": {

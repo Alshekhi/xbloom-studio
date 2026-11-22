@@ -119,6 +119,12 @@ async def test_sensor_platform_registers_brew_stage() -> None:
 
 
 @pytest.mark.asyncio
+async def test_brew_stories_register_their_sensor_and_select() -> None:
+    assert "xbloom_brew_story" in _ids(await _added(sensor_platform))
+    assert "xbloom_brew_stories" in _ids(await _added(select_platform))
+
+
+@pytest.mark.asyncio
 async def test_update_platform_registers_the_firmware_entity() -> None:
     assert _ids(await _added(update_platform)) == {"xbloom_firmware"}
 
