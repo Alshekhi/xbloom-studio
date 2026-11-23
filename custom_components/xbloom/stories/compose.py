@@ -220,7 +220,12 @@ class _Writer:
         return (self._heading("you"), text) if text else None
 
     def _teaser(self) -> dict[str, Any] | None:
+        # A topic this cup told already would read as a repeat when promised.
+        facts = self.content.entry("facts")
+        told_now = {facts[key]["topic"] for key in self.out.facts}
         for topic in SCIENCE_TOPICS:
+            if topic in told_now:
+                continue
             picked = self.content.pick_fact(topic, self.values, self._seen, self.level)
             if picked and picked[0] not in self._seen:
                 text = self.content.fill(self.content.entry("you.teaser.fact"),

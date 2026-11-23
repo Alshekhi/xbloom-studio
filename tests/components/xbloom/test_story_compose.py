@@ -196,3 +196,17 @@ def test_a_pour_whose_pattern_has_no_line_shows_none():
     memory_plan = [{**_plan()[0], "pattern": "zigzag"}]
     texts = compose(plan_slots(memory_plan, True), memory_plan, BAG, [], StoryMemory(_Store()), CONTENT, TODAY)
     assert 1 not in texts.pour_lines
+
+
+async def test_the_teaser_promises_a_topic_this_cup_has_not_told():
+    # The built-in content: its first topic holds facts enough to fill a cup
+    # and still promise one more.
+    content = Content.load("en")
+    memory = await _memory()
+    plan = _plan() + [{"water_ml": 330.0, "wait_s": 5, "volume_ml": 57.0,
+                       "temperature_c": 85.0, "pattern": "centre"}]
+    texts = compose(plan_slots(plan, True), plan, BAG, [], memory, content, TODAY)
+    facts = content.entry("facts")
+    told = {facts[key]["topic"] for key in texts.facts}
+    assert told and texts.teaser and texts.teaser["kind"] == "fact"
+    assert facts[texts.teaser["key"]]["topic"] not in told
