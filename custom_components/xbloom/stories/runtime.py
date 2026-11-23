@@ -313,9 +313,15 @@ class StoryRuntime:
         await self.memory.async_record_brew(
             self._bag["id"] if self._bag else None, told=texts.told, facts=texts.facts,
             big_story_part_told=texts.big_story_part_told,
-            country=(self._bag or {}).get("country"), teaser=texts.teaser,
+            country=(self._bag or {}).get("country"), teaser=self._teaser_shown(texts),
             agent_texts=self._agent_texts, advance_bag=self._built is None,
         )
+
+    def _teaser_shown(self, texts: BrewTexts) -> dict | None:
+        """The teaser, unless an agent brew's closing line never showed it."""
+        if self._built is None or any(s.at == "draining" for s in texts.stories):
+            return texts.teaser
+        return None
 
     def _publish(self, shown: dict[str, Any]) -> None:
         if shown != self.current:
@@ -329,5 +335,7 @@ def _brew_facts(brew) -> dict[str, Any]:
     return {
         "rating": brew.rating, "verdict": VERDICT_OF.get(brew.rating),
         "next_change": brew.next_change, "recipe": brew.recipe,
-        "settings": dict(brew.settings or {}), "tasting": dict(brew.tasting or {}),
+        # The record keeps the dose and water beside the settings, not in them.
+        "settings": {**(brew.settings or {}), "dose_g": brew.dose_g, "water_ml": brew.water_ml},
+        "tasting": dict(brew.tasting or {}),
     }

@@ -22,18 +22,22 @@ TASK_NAME = "xbloom brew story"
 AGENT_KINDS = ("bag", "you")
 # What of a bag is sent: what it is and where it comes from, nothing of stock.
 BAG_FIELDS = ("name", *DESCRIPTIVE, *ORIGIN)
+# This bag's latest brews sent; enough to see what was tried, no more.
+BAG_BREWS = 20
 
 _LANGUAGE_NAMES = {"en": "English", "ar": "Modern Standard Arabic"}
 
-_KINDS = {
-    "bag": ("This cup: what this recipe does for this coffee (its temperatures, pours "
-            "and ratio against the coffee's origin, process and the roaster's notes) "
-            "and what to smell or taste for now and as it cools."),
-    "you": ("The coach: what changed since the last brew of this recipe with this bag "
-            "and what to check in the cup because of it, given that brew's verdict, "
-            "tasting and planned change; then one pattern from the rated history, "
-            "only if a real one exists."),
-}
+_THIS_CUP = ("What this recipe does for this coffee (its temperatures, pours and ratio "
+             "against the coffee's origin, process and the roaster's notes) and what to "
+             "smell or taste for now and as it cools.")
+_COACH = ("What changed since the last brew of this recipe with this bag and what to check "
+          "in the cup because of it, given that brew's verdict, tasting and planned change; "
+          "then one pattern from the rated history, only if a real one exists.")
+_COACH_FIRST = ("There is no earlier brew of this recipe with this bag: say what to check in "
+                "this cup, given the coffee and the recipe; then one pattern from the rated "
+                "history, only if a real one exists.")
+_COACH_NO_BAG = ("No bag, so no comparison: one pattern from the rated history, only if a real "
+                 "one exists; otherwise one thing to notice in this cup.")
 
 _RULES = """\
 You write short texts shown on a phone while a coffee machine brews one cup,
@@ -50,11 +54,23 @@ def slot_key(slot: Slot) -> str:
     return "draining" if slot.at == "draining" else f"{slot.at}_{slot.pour}"
 
 
+def _value(value: Any) -> Any:
+    # The record may keep a number as text ("50.0"): compared as numbers.
+    try:
+        return round(float(value), 2)
+    except (TypeError, ValueError):
+        return value
+
+
+def _known_on_both(before: dict[str, Any], now: dict[str, Any]) -> list[str]:
+    return [k for k in now if before.get(k) is not None and now.get(k) is not None]
+
+
 def changes_since(before: dict[str, Any], now: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
-    """The settings known on both sides whose values differ."""
+    """The settings known on both sides whose values differ, as numbers where they are."""
     return {
-        key: (before[key], now[key]) for key in now
-        if before.get(key) is not None and now.get(key) is not None and before[key] != now[key]
+        key: (_value(before[key]), _value(now[key])) for key in _known_on_both(before, now)
+        if _value(before[key]) != _value(now[key])
     }
 
 
@@ -77,21 +93,30 @@ def build_request(
     if bag:
         fields = {k: bag[k] for k in BAG_FIELDS if bag.get(k) not in (None, "")}
         parts.append("The coffee: " + json.dumps(fields, ensure_ascii=False))
-        parts.append(f"This bag's earlier brews, newest first ({len(bag_brews)}): "
-                     + _brews(bag_brews, ("recipe", "settings", "verdict", "tasting", "next_change")))
-        last = next((b for b in bag_brews if b.get("recipe") == recipe), None)
+        latest = bag_brews[:BAG_BREWS]
+        parts.append(f"This bag's latest brews, newest first ({len(latest)}): "
+                     + _brews(latest, ("recipe", "settings", "verdict", "tasting", "next_change")))
+        last = next((b for b in bag_brews if b.get("recipe") == recipe), None) if recipe else None
         if last is None:
+            coach = _COACH_FIRST
             parts.append("This is the first brew of this recipe with this bag.")
         else:
-            changed = changes_since(last.get("settings") or {}, settings)
-            parts.append("Changed since the last brew of this recipe with this bag "
-                         "(setting: before, now): "
-                         + (json.dumps(changed) if changed else "nothing"))
+            coach = _COACH
+            before = last.get("settings") or {}
+            if not _known_on_both(before, settings):
+                parts.append("What changed since the last brew of this recipe with this bag "
+                             "is not known.")
+            else:
+                changed = changes_since(before, settings)
+                parts.append("Changed since the last brew of this recipe with this bag "
+                             "(setting: before, now): "
+                             + (json.dumps(changed) if changed else "no setting changed"))
         told = memory.agent_told(bag.get("id"))
         if told:
             parts.append("Already told about this bag; do not repeat any of it:\n"
                          + "\n".join(f"- {t}" for t in told))
     else:
+        coach = _COACH_NO_BAG
         parts.append("There is no bag for this brew: say nothing about a particular coffee.")
     if rated:
         parts.append("Rated history, newest first, for patterns (a verdict is again, fine "
@@ -103,7 +128,8 @@ def build_request(
     for slot in texts.stories:
         if slot.kind in AGENT_KINDS:
             structure[slot_key(slot)] = {
-                "description": _KINDS[slot.kind], "required": True, "selector": {"text": {}}}
+                "description": _THIS_CUP if slot.kind == "bag" else coach,
+                "required": True, "selector": {"text": {}}}
     return "\n\n".join(parts), structure
 
 

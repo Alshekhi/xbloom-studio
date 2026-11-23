@@ -399,3 +399,21 @@ async def test_a_new_brew_cancels_the_last_brews_request():
     await asyncio.sleep(0)
     assert first.cancelled()
     runtime._agent_task.cancel()
+
+
+def test_a_stored_brews_dose_and_water_are_among_its_settings():
+    from custom_components.xbloom.coffee_lab.models import Brew
+    facts = runtime_module._brew_facts(Brew(id="x", brewed_at="", recorded_at="", dose_g=17.0,
+                                            water_ml=255.0, settings={"grind": "50"}))
+    assert facts["settings"] == {"grind": "50", "dose_g": 17.0, "water_ml": 255.0}
+
+
+async def test_a_failed_agent_brew_records_no_teaser():
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    runtime, _ = await _agent_runtime(lab, reply=HomeAssistantError("down"))
+    await _started(runtime, bag.id)
+    await runtime._agent_task
+    await runtime.async_on_stage("draining", 4)
+    await runtime.async_on_stage("done", None)
+    assert runtime.memory.teaser is None

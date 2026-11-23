@@ -100,3 +100,43 @@ async def test_a_reply_text_goes_under_the_built_in_heading():
     bag_slot = next(s for s in texts.stories if s.kind == "bag")
     heading = texts.stories[bag_slot][0]
     assert parse_reply(texts, {"wait_1": " Smell it. "})[bag_slot] == (heading, "Smell it.")
+
+
+def test_a_grind_kept_as_text_is_the_same_grind_as_a_number():
+    assert changes_since({"grind": "50.0", "ratio": "15"}, {"grind": 50, "ratio": 15.0}) == {}
+    assert changes_since({"grind": "50"}, {"grind": 48.0}) == {"grind": (50.0, 48.0)}
+
+
+async def test_when_nothing_could_be_compared_the_change_is_not_known():
+    _t, (instructions, _) = await _request(bag_brews=[_brew(recipe="R")])
+    assert "not known" in instructions and ": nothing" not in instructions
+
+
+async def test_a_first_brew_tells_the_coach_there_is_no_last_time():
+    _t, (_i, structure) = await _request(bag_brews=[_brew(recipe="Other", grind=40)])
+    assert "no earlier brew of this recipe" in structure["draining"]["description"]
+
+
+async def test_a_brew_with_no_recipe_known_is_compared_with_nothing():
+    texts, plan, memory = await _texts()
+    instructions, structure = build_request(texts, plan, None, {}, STOCKED,
+                                            [_brew(recipe=None, grind=50)], [], memory, "en")
+    assert "Changed since" not in instructions
+    assert "no earlier brew of this recipe" in structure["draining"]["description"]
+
+
+async def test_without_a_bag_the_coach_is_asked_for_a_pattern_only():
+    _t, (_i, structure) = await _request(bag=None)
+    assert "no comparison" in structure["draining"]["description"]
+
+
+async def test_slot_descriptions_carry_no_label_to_echo():
+    _t, (_i, structure) = await _request(bag_brews=[_brew(recipe="R", grind=50)])
+    for field in structure.values():
+        assert not field["description"].startswith(("This cup:", "The coach:"))
+
+
+async def test_only_the_latest_bag_brews_are_sent():
+    many = [_brew(recipe=f"R{n}", grind=n) for n in range(60)]
+    _t, (instructions, _) = await _request(bag_brews=many)
+    assert '"R19"' in instructions and '"R20"' not in instructions
