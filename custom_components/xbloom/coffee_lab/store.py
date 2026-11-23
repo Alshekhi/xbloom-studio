@@ -81,9 +81,10 @@ class CoffeeLabStore(ABC):
 
     @abstractmethod
     async def async_list_brews(
-        self, *, since: datetime | None = None, limit: int | None = None
+        self, *, since: datetime | None = None, limit: int | None = None,
+        bean_id: str | None = None,
     ) -> list[Brew]:
-        """Brews, newest first, optionally from `since` on."""
+        """Brews, newest first, optionally from `since` on, optionally of one bag."""
 
     @abstractmethod
     async def async_create_brew(self, brew: Brew) -> Brew:
@@ -183,13 +184,15 @@ class LocalStore(CoffeeLabStore):
         return bean
 
     async def async_list_brews(
-        self, *, since: datetime | None = None, limit: int | None = None
+        self, *, since: datetime | None = None, limit: int | None = None,
+        bean_id: str | None = None,
     ) -> list[Brew]:
         # Compared as instants: as text, "…Z" and "…+03:00" do not sort in time.
         zone = since.tzinfo if since is not None else timezone.utc
         dated = [
             (m, b) for b in self._brews
             if (m := moment(b.brewed_at or b.recorded_at, zone)) is not None
+            and (bean_id is None or b.bean_id == bean_id)
         ]
         dated.sort(key=lambda pair: pair[0], reverse=True)
         brews = [b for m, b in dated if since is None or m >= since]

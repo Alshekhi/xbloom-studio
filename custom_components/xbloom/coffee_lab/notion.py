@@ -620,20 +620,26 @@ class NotionStore(CoffeeLabStore):
         return bean_from_page(page)
 
     async def async_list_brews(
-        self, *, since: datetime | None = None, limit: int | None = None
+        self, *, since: datetime | None = None, limit: int | None = None,
+        bean_id: str | None = None,
     ) -> list[Brew]:
         body: dict[str, Any] = {"sorts": [{"property": "Brewed At", "direction": "descending"}]}
+        filters: list[dict[str, Any]] = []
+        if bean_id is not None:
+            filters.append({"property": "Bean", "relation": {"contains": bean_id}})
         if since is not None:
             # A day early: a brew near midnight in UTC can be the next local
             # day. A row with no Brewed At is found by when it was recorded.
             day = (since - timedelta(days=1)).date().isoformat()
-            body["filter"] = {"or": [
+            filters.append({"or": [
                 {"property": "Brewed At", "date": {"on_or_after": day}},
                 {"and": [
                     {"property": "Brewed At", "date": {"is_empty": True}},
                     {"timestamp": "created_time", "created_time": {"on_or_after": day}},
                 ]},
-            ]}
+            ]})
+        if filters:
+            body["filter"] = filters[0] if len(filters) == 1 else {"and": filters}
         try:
             pages = await self._client.query(self._db.brews, body, limit)
         except NotionError as err:

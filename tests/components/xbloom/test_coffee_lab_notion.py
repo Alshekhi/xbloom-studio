@@ -245,6 +245,16 @@ async def test_brews_since_a_moment_are_exact_though_the_query_reaches_back_a_da
     assert body["filter"]["or"][0]["date"]["on_or_after"] == "2026-09-23"
 
 
+async def test_brews_of_one_bag_are_asked_of_notion_by_their_bag():
+    notion = FakeNotion({("POST", "/databases/r/query"): {"results": []}})
+    store = NotionStore(notion, Databases("b", "r"))
+    await store.async_list_brews(bean_id="bag-1")
+    assert notion.calls[0][2]["filter"] == {"property": "Bean", "relation": {"contains": "bag-1"}}
+    await store.async_list_brews(bean_id="bag-1", since=datetime(2026, 9, 24, tzinfo=timezone.utc))
+    bag, when = notion.calls[1][2]["filter"]["and"]
+    assert bag["relation"] == {"contains": "bag-1"} and when["or"][0]["date"]["on_or_after"] == "2026-09-23"
+
+
 def test_why_a_brew_needs_review_and_its_run_id_reach_notion():
     brew = Brew(id="", brewed_at="2026-09-26T07:00:00Z", recorded_at="", dose_g=18.0,
                 run_id="run-9", review=Review("more_than_left", {"grams": 18.0}))

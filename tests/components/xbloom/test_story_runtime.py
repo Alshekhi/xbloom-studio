@@ -3,14 +3,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.components.sensor import RestoreSensor
 
 from custom_components.xbloom.brew_stage import pour_plan
 from custom_components.xbloom.stories.content import Content
 from custom_components.xbloom.stories.entities import XBloomBrewStoriesSelect, XBloomBrewStorySensor
-from custom_components.xbloom.stories.runtime import StoryRuntime
+from custom_components.xbloom.stories.runtime import HISTORY_BREWS, StoryRuntime
 
 from .test_coffee_lab_lab import _bag, _lab
 
@@ -156,3 +156,26 @@ async def test_turning_stories_off_mid_brew_clears_them():
     await runtime.async_on_stage("pouring", 2)
     await runtime.async_on_stage("done", None)
     assert runtime.current["now"] is None and store.saves == 0
+
+
+async def test_the_cup_count_holds_every_brew_of_the_bag_however_many_others_came_after():
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    other = await _bag(lab, name="Other", status="open", remaining_g=5000.0)
+    # One by hand from this bag, then more brews of another bag than one page holds.
+    await lab.async_consume(bean_id=bag.id, grams=15, run_id="by-hand", brewer="V60")
+    for n in range(HISTORY_BREWS + 1):
+        await lab.async_consume(bean_id=other.id, grams=15, run_id=f"other-{n}")
+    runtime, _ = await _runtime(lab)
+    await _started(runtime, bag.id)
+    await runtime.async_on_stage("draining", 4)
+    assert runtime.current["story"].startswith("Cup 2")
+
+
+async def test_a_brew_still_waiting_to_be_saved_is_saved_before_the_story_reads_the_bag():
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    lab.async_retry_pending = AsyncMock(return_value=0)
+    runtime, _ = await _runtime(lab)
+    await _started(runtime, bag.id)
+    lab.async_retry_pending.assert_awaited_once()

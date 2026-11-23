@@ -132,3 +132,11 @@ async def test_only_the_latest_runs_are_kept():
         await runs.async_add(f"run-{i}")
     assert len(storage.data["run_ids"]) == KEEP_RUN_IDS
     assert not runs.contains("run-0") and runs.contains(f"run-{KEEP_RUN_IDS + 4}")
+
+
+async def test_brews_of_one_bag():
+    store = await _store()
+    for bean_id in ("bag-a", "bag-b", "bag-a"):
+        await store.async_create_brew(Brew(id="", brewed_at="2026-09-25T10:00:00Z", recorded_at="",
+                                           dose_g=15.0, bean_id=bean_id))
+    assert [b.bean_id for b in await store.async_list_brews(bean_id="bag-a")] == ["bag-a", "bag-a"]

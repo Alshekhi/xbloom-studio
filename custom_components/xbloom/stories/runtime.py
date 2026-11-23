@@ -103,13 +103,15 @@ class StoryRuntime:
         from ..coffee_lab.lab import STORE_UNREACHABLE
         from ..coffee_lab.store import UnknownBean
         try:
+            # A brew of this bag still waiting to be saved (one by hand, say)
+            # is one of its cups: saved first, it is in what is read next.
+            await lab.async_retry_pending()
             bean = await lab.store.async_get_bean(bean_id)
-            brews = await lab.store.async_list_brews(limit=HISTORY_BREWS)
+            brews = await lab.store.async_list_brews(bean_id=bean_id, limit=HISTORY_BREWS)
         except (UnknownBean, *STORE_UNREACHABLE) as err:
             _LOGGER.info("Brew Stories: bag %s not read (%s); telling no bag story", bean_id, err)
             return None, []
-        history = [{"rating": b.rating, "next_change": b.next_change}
-                   for b in brews if b.bean_id == bean_id]
+        history = [{"rating": b.rating, "next_change": b.next_change} for b in brews]
         return bean_facts(bean), history
 
     async def _begin(self, plan: list[dict] | None, bean_id: str | None) -> None:
