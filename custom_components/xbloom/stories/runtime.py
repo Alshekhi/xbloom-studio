@@ -8,6 +8,7 @@ coffee drains. The brew is remembered once, when it is done.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -17,7 +18,9 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from ..brew_stage import _follow
+from ..const import CONF_STORY_AGENT
 from . import LANGUAGES, MODES
+from .agent import TASK_NAME, build_request, parse_reply
 from .compose import BrewTexts, compose
 from .content import Content
 from .memory import STORAGE_KEY, STORAGE_VERSION, StoryMemory
@@ -30,6 +33,8 @@ EV_MACHINE_BREW_STARTED = "xbloom_machine_brew_started"
 NOTHING = {"heading": None, "now": None, "story": None, "kind": None}
 # The brews read for a bag's history: newest first, far more than one bag holds.
 HISTORY_BREWS = 100
+# A story agent's reply later than this would miss nearly every slot of a brew.
+AGENT_TIMEOUT_S = 120
 # Stages a late-written brew catches up with.
 _UNDER_WAY = ("pouring", "waiting", "draining")
 
@@ -52,6 +57,11 @@ class StoryRuntime:
         # The last stage Brew Stage reported, for a brew whose texts were
         # still being written when it arrived.
         self._stage: tuple[str, int | None] = ("idle", None)
+        self.agent_entity: str | None = (entry.data or {}).get(CONF_STORY_AGENT) or None
+        # Which brew a story agent's reply belongs to, and the texts it told.
+        self._brew_id = 0
+        self._agent_task: asyncio.Future | None = None
+        self._agent_texts: list[str] = []
 
     def set_mode(self, mode: str) -> None:
         """Brew Stories on or off; off clears what a brew under way shows."""
@@ -59,6 +69,12 @@ class StoryRuntime:
         if mode == "off":
             self._texts = None
             self._publish(dict(NOTHING))
+
+    def set_agent(self, entity_id: str | None) -> None:
+        """The AI Task entity that writes stories; none leaves the agent mode."""
+        self.agent_entity = entity_id or None
+        if self.agent_entity is None and self.mode == "agent":
+            self.set_mode("built_in")
 
     async def async_load(self) -> None:
         await self.memory.async_load()
@@ -129,8 +145,17 @@ class StoryRuntime:
         content = await self._content_now()
         self._bag, history = await self._bag_and_history(bean_id)
         slots = plan_slots(plan, self._bag is not None)
-        self._texts = compose(slots, plan, self._bag, history, self.memory, content,
-                              dt_util.now().date())
+        built = compose(slots, plan, self._bag, history, self.memory, content,
+                        dt_util.now().date())
+        self._brew_id += 1
+        self._agent_texts = []
+        if self.mode == "agent":
+            # Pour lines are always built-in; the stories are the agent's or none.
+            self._texts = BrewTexts(pour_lines=built.pour_lines)
+            self._agent_task = self.hass.async_create_task(self._ask_agent(
+                self._brew_id, built, plan, history, content.lang))
+        else:
+            self._texts = built
         # A brew already under way when its texts were ready (adopted from
         # the machine's button, or a slow Coffee Lab) shows what its stage
         # calls for now, not from the next change on.
@@ -139,6 +164,60 @@ class StoryRuntime:
             if stage != "pouring":
                 await self.async_on_stage("pouring", pour)
             await self.async_on_stage(stage, pour)
+
+    async def _ask_agent(
+        self, brew_id: int, built: BrewTexts, plan: list[dict] | None,
+        history: list[dict], language: str,
+    ) -> None:
+        """One request for this brew's stories; a failure leaves pour lines only."""
+        if self.agent_entity is None:
+            _LOGGER.warning("Brew Stories: no story agent is set; pour lines only")
+            return
+        instructions, structure = build_request(
+            built, plan, self._bag, history, self.memory, language)
+        try:
+            async with asyncio.timeout(AGENT_TIMEOUT_S):
+                response = await self.hass.services.async_call(
+                    "ai_task", "generate_data",
+                    {"task_name": TASK_NAME, "entity_id": self.agent_entity,
+                     "instructions": instructions, "structure": structure},
+                    blocking=True, return_response=True)
+            data = response.get("data") if isinstance(response, dict) else None
+            if not isinstance(data, dict):
+                raise ValueError(f"no structured data in the reply: {response!r}"[:200])
+        except Exception as err:  # noqa: BLE001 — any failure is that brew without stories
+            _LOGGER.warning("Brew Stories: %s did not write this brew's stories (%s: %s); "
+                            "pour lines only", self.agent_entity, type(err).__name__, err)
+            return
+        if brew_id != self._brew_id or self._texts is None or self._recorded:
+            _LOGGER.debug("Brew Stories: a story agent reply for an earlier brew was dropped")
+            return
+        stories, teaser = parse_reply(built, data)
+        self._texts.stories = stories
+        self._texts.teaser = teaser
+        self._texts.big_story_part_told = any(s.kind == "big_story" for s in stories)
+        self._agent_texts = [text for _heading, text in stories.values()]
+        if (slot := self._running_story_slot()) is not None:
+            heading, text = stories[slot]
+            self._publish({**self.current, "heading": heading, "story": text, "kind": slot.kind})
+
+    def _running_story_slot(self) -> Slot | None:
+        """The story slot that began last and is still on, from the stage now."""
+        stage, pour = self._stage
+        if stage == "draining":
+            now = (float("inf"), 0)
+        elif stage in ("pouring", "waiting") and pour:
+            now = (pour, 0 if stage == "pouring" else 1)
+        else:
+            return None
+
+        def position(slot: Slot) -> tuple[float, int]:
+            if slot.at == "draining":
+                return (float("inf"), 0)
+            return (slot.pour, 0 if slot.at == "pour" else 1)
+
+        begun = [s for s in self._texts.stories if position(s) <= now] if self._texts else []
+        return max(begun, key=position, default=None)
 
     async def async_brew_started(self, data: dict[str, Any]) -> None:
         await self._begin(data.get("pours") or None, data.get("bean_id"))
@@ -190,6 +269,7 @@ class StoryRuntime:
             self._bag["id"] if self._bag else None, told=texts.told, facts=texts.facts,
             big_story_part_told=texts.big_story_part_told,
             country=(self._bag or {}).get("country"), teaser=texts.teaser,
+            agent_texts=self._agent_texts,
         )
 
     def _publish(self, shown: dict[str, Any]) -> None:

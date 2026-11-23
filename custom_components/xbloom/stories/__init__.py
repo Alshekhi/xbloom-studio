@@ -7,7 +7,7 @@ moves on (`runtime`, `entities`).
 """
 from __future__ import annotations
 
-MODES = ["off", "built_in"]
+MODES = ["off", "built_in", "agent"]
 # The languages the stories are written in (content/<lang>.json). Until one is
 # picked, Home Assistant's own if it is one of these, otherwise English.
 LANGUAGES = ["en", "ar"]

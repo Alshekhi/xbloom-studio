@@ -76,4 +76,6 @@ DRINKS = ("any", "hot", "iced")
 # lives on the always-on host), so this is a deployment choice. The library gives
 # the default (mode_listener.IDLE_TIMEOUT_SEC); this overrides it. entry.data.
 CONF_IDLE_TIMEOUT = "idle_timeout_s"
+# The AI Task entity that writes brew stories in the agent mode.
+CONF_STORY_AGENT = "story_agent"
 

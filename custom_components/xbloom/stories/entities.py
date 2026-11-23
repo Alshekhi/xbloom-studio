@@ -59,13 +59,12 @@ class XBloomBrewStorySensor(SensorEntity):
 
 
 class XBloomBrewStoriesSelect(SelectEntity, RestoreEntity):
-    """Off, or the built-in stories."""
+    """Off, the built-in stories, or the agent's while one is set."""
 
     _attr_has_entity_name = True
     _attr_translation_key = "brew_stories"
     _attr_unique_id = "xbloom_brew_stories"
     _attr_icon = "mdi:book-open-page-variant"
-    _attr_options = MODES
 
     def __init__(self, entry) -> None:
         self._entry = entry
@@ -73,6 +72,13 @@ class XBloomBrewStoriesSelect(SelectEntity, RestoreEntity):
     @property
     def device_info(self):
         return _device_info(self._entry.entry_id)
+
+    @property
+    def options(self) -> list[str]:
+        runtime = self._entry.runtime_data.stories
+        if runtime is not None and runtime.agent_entity:
+            return list(MODES)
+        return [mode for mode in MODES if mode != "agent"]
 
     @property
     def current_option(self) -> str | None:
@@ -83,11 +89,11 @@ class XBloomBrewStoriesSelect(SelectEntity, RestoreEntity):
         await super().async_added_to_hass()
         last = await self.async_get_last_state()
         runtime = self._entry.runtime_data.stories
-        if last is not None and last.state in MODES and runtime is not None:
+        if last is not None and last.state in self.options and runtime is not None:
             runtime.mode = last.state
 
     async def async_select_option(self, option: str) -> None:
-        if option in MODES and self._entry.runtime_data.stories is not None:
+        if option in self.options and self._entry.runtime_data.stories is not None:
             self._entry.runtime_data.stories.set_mode(option)
             self.async_write_ha_state()
 
