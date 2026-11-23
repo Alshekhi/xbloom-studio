@@ -53,8 +53,9 @@ Use brewing knowledge to reason: how temperature, grind, ratio, pour structure
 and process shape extraction and taste. Do not tell coffee history or trivia,
 and claim nothing about this coffee beyond its fields below. The screen
 already shows each pour's volume, temperature and pattern: do not repeat those
-numbers, say what they do. When the data does not support something, leave it
-out."""
+numbers, say what they do.
+Give the roaster's notes no order, timing or strength they do not state.
+When the data does not support something, leave it out."""
 
 
 def slot_key(slot: Slot) -> str:

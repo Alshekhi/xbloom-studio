@@ -163,3 +163,8 @@ async def test_an_unrated_pair_is_coached_toward_what_to_notice():
     assert "no verdict yet" in structure["draining"]["description"]
     _t, (_i, structure) = await _request(bag_brews=[_brew(recipe="R", verdict="fine", grind=48)])
     assert "no verdict yet" not in structure["draining"]["description"]
+
+
+async def test_the_agent_is_told_not_to_order_or_rank_the_roasters_notes():
+    _t, (instructions, _) = await _request()
+    assert "order, timing or strength" in instructions
