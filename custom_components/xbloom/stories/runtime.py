@@ -20,7 +20,7 @@ from homeassistant.util import dt as dt_util
 from ..brew_stage import _follow
 from ..const import CONF_STORY_AGENT
 from . import LANGUAGES, MODES
-from .agent import TASK_NAME, build_request, parse_reply
+from .agent import AGENT_KINDS, TASK_NAME, build_request, parse_reply, slot_key
 from .compose import BrewTexts, compose
 from .content import Content
 from .memory import STORAGE_KEY, STORAGE_VERSION, StoryMemory
@@ -33,6 +33,8 @@ EV_MACHINE_BREW_STARTED = "xbloom_machine_brew_started"
 NOTHING = {"heading": None, "now": None, "story": None, "kind": None}
 # The brews read for a bag's history: newest first, far more than one bag holds.
 HISTORY_BREWS = 100
+# Rated brews of any bag a story agent is given to find patterns in.
+RATED_BREWS = 30
 # A story agent's reply later than this would miss nearly every slot of a brew.
 AGENT_TIMEOUT_S = 120
 # Stages a late-written brew catches up with.
@@ -62,6 +64,8 @@ class StoryRuntime:
         self._brew_id = 0
         self._agent_task: asyncio.Future | None = None
         self._agent_texts: list[str] = []
+        # The built-in texts of an agent brew: its facts, teaser and big story.
+        self._built: BrewTexts | None = None
 
     def set_mode(self, mode: str) -> None:
         """Brew Stories on or off; off clears what a brew under way shows."""
@@ -134,11 +138,33 @@ class StoryRuntime:
         except (UnknownBean, *STORE_UNREACHABLE) as err:
             _LOGGER.info("Brew Stories: bag %s not read (%s); telling no bag story", bean_id, err)
             return None, []
-        history = [{"rating": b.rating, "next_change": b.next_change} for b in brews]
-        return bean_facts(bean), history
+        return bean_facts(bean), [_brew_facts(b) for b in brews]
 
-    async def _begin(self, plan: list[dict] | None, bean_id: str | None) -> None:
-        self._texts, self._bag, self._recorded = None, None, False
+    async def _rated(self) -> list[dict]:
+        """The latest rated brews of any bag, with the bag each came from."""
+        lab = getattr(self.entry.runtime_data, "coffee_lab", None)
+        if lab is None:
+            return []
+        from ..coffee_lab.lab import STORE_UNREACHABLE
+        try:
+            brews = await lab.store.async_list_brews(limit=HISTORY_BREWS)
+            beans = {b.id: b for b in await lab.store.async_list_beans(selectable_only=False)}
+        except STORE_UNREACHABLE as err:
+            _LOGGER.info("Brew Stories: rated history not read (%s)", err)
+            return []
+        rated = []
+        for brew in (b for b in brews if b.rating is not None):
+            bean = beans.get(brew.bean_id)
+            rated.append({**_brew_facts(brew), "bag": bean.name if bean else None,
+                          "country": bean.country if bean else None,
+                          "process": bean.process if bean else None})
+        return rated[:RATED_BREWS]
+
+    async def _begin(
+        self, plan: list[dict] | None, bean_id: str | None,
+        recipe: str | None = None, settings: dict | None = None,
+    ) -> None:
+        self._texts, self._bag, self._built, self._recorded = None, None, None, False
         self._publish(dict(NOTHING))
         if self.mode not in MODES or self.mode == "off":
             return
@@ -153,11 +179,21 @@ class StoryRuntime:
             # The last brew's request would only be dropped when it came back.
             self._agent_task.cancel()
         if self.mode == "agent":
-            # Pour lines are always built-in; the stories are the agent's or none.
-            self._texts = BrewTexts(pour_lines=built.pour_lines)
+            # The agent writes only this cup's parts; everything else stays
+            # built-in, and its slots stay empty until the reply arrives.
+            self._built = built
+            this_cup = content.entry("headings.this_cup")
+            asked = BrewTexts(teaser=built.teaser, stories={
+                slot: ((this_cup if slot.kind == "bag" else heading), text)
+                for slot, (heading, text) in built.stories.items()})
+            self._texts = BrewTexts(
+                pour_lines=built.pour_lines, facts=list(built.facts), teaser=built.teaser,
+                big_story_part_told=built.big_story_part_told,
+                stories={s: v for s, v in built.stories.items() if s.kind not in AGENT_KINDS})
             # Tied to the entry: cancelled on unload, never awaited at shutdown.
             self._agent_task = self.entry.async_create_background_task(
-                self.hass, self._ask_agent(self._brew_id, built, plan, history, content.lang),
+                self.hass, self._ask_agent(self._brew_id, asked, plan, recipe, settings or {},
+                                           self._bag, history, content.lang),
                 "xbloom brew story agent")
         else:
             self._texts = built
@@ -171,15 +207,16 @@ class StoryRuntime:
             await self.async_on_stage(stage, pour)
 
     async def _ask_agent(
-        self, brew_id: int, built: BrewTexts, plan: list[dict] | None,
-        history: list[dict], language: str,
+        self, brew_id: int, asked: BrewTexts, plan: list[dict] | None, recipe: str | None,
+        settings: dict, bag: dict | None, history: list[dict], language: str,
     ) -> None:
-        """One request for this brew's stories; a failure leaves pour lines only."""
+        """One request for this cup's parts; a failure leaves them empty."""
         if self.agent_entity is None:
-            _LOGGER.warning("Brew Stories: no story agent is set; pour lines only")
+            _LOGGER.warning("Brew Stories: no story agent is set; this cup's parts are left empty")
             return
         instructions, structure = build_request(
-            built, plan, self._bag, history, self.memory, language)
+            asked, plan, recipe, settings, bag, history, await self._rated(), self.memory,
+            language)
         try:
             async with asyncio.timeout(AGENT_TIMEOUT_S):
                 response = await self.hass.services.async_call(
@@ -191,20 +228,20 @@ class StoryRuntime:
             if not isinstance(data, dict):
                 raise ValueError(f"no structured data in the reply: {response!r}"[:200])
         except Exception as err:  # noqa: BLE001 — any failure is that brew without stories
-            _LOGGER.warning("Brew Stories: %s did not write this brew's stories (%s: %s); "
-                            "pour lines only", self.agent_entity, type(err).__name__, err)
+            _LOGGER.warning("Brew Stories: %s did not write this cup's parts (%s: %s); "
+                            "they are left empty", self.agent_entity, type(err).__name__, err)
             return
         if brew_id != self._brew_id or self._texts is None or self._recorded:
             _LOGGER.debug("Brew Stories: a story agent reply for an earlier brew was dropped")
             return
-        stories, teaser = parse_reply(built, data)
-        self._texts.stories = stories
-        self._texts.teaser = teaser
-        self._texts.big_story_part_told = any(s.kind == "big_story" for s in stories)
-        self._agent_texts = [text for _heading, text in stories.values()]
-        # Among the slots asked for: one the agent left empty shows nothing,
-        # rather than letting a slot that has passed show late.
-        if (slot := self._running_story_slot(built.stories)) is not None and slot in stories:
+        stories = parse_reply(asked, data)
+        self._texts.stories.update(stories)
+        self._agent_texts = [
+            (data.get(slot_key(slot)) or "").strip() for slot in stories
+            if isinstance(data.get(slot_key(slot)), str) and data.get(slot_key(slot)).strip()]
+        # The part running now, among every story slot: shown only if it is
+        # one the agent wrote, so a slot that has passed never shows late.
+        if (slot := self._running_story_slot(asked.stories)) is not None and slot in stories:
             heading, text = stories[slot]
             self._publish({**self.current, "heading": heading, "story": text, "kind": slot.kind})
 
@@ -227,7 +264,8 @@ class StoryRuntime:
         return max(begun, key=position, default=None)
 
     async def async_brew_started(self, data: dict[str, Any]) -> None:
-        await self._begin(data.get("pours") or None, data.get("bean_id"))
+        await self._begin(data.get("pours") or None, data.get("bean_id"),
+                          data.get("recipe_name"), data.get("settings"))
 
     async def async_machine_brew_started(self) -> None:
         lab = getattr(self.entry.runtime_data, "coffee_lab", None)
@@ -276,10 +314,20 @@ class StoryRuntime:
             self._bag["id"] if self._bag else None, told=texts.told, facts=texts.facts,
             big_story_part_told=texts.big_story_part_told,
             country=(self._bag or {}).get("country"), teaser=texts.teaser,
-            agent_texts=self._agent_texts,
+            agent_texts=self._agent_texts, advance_bag=self._built is None,
         )
 
     def _publish(self, shown: dict[str, Any]) -> None:
         if shown != self.current:
             self.current = shown
             async_dispatcher_send(self.hass, signal_story(self.entry.entry_id))
+
+
+def _brew_facts(brew) -> dict[str, Any]:
+    """A past brew as the stories read it; the verdict as its word."""
+    from ..coffee_lab.models import VERDICT_OF
+    return {
+        "rating": brew.rating, "verdict": VERDICT_OF.get(brew.rating),
+        "next_change": brew.next_change, "recipe": brew.recipe,
+        "settings": dict(brew.settings or {}), "tasting": dict(brew.tasting or {}),
+    }

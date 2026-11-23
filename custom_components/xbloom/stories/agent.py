@@ -1,113 +1,126 @@
-"""A brew's stories written by a story agent: the request and the reply.
+"""The parts of a brew a story agent writes: the request and the reply.
 
-Pure. The built-in writer has already planned the brew — which slots carry a
-story, their headings, the big-story part due — so the request asks the agent
-for the texts of those slots and the next teaser, grounded in what is known.
-The reply's texts go under the built-in headings; a slot the agent left empty
-shows nothing.
+Pure. The agent writes only what no file can — texts about this cup, reasoned
+from the brew history the integration keeps: what this recipe does for this
+coffee and what to taste for (the bloom), and what changed since last time,
+what to check because of it and a pattern in the history (the closing line).
+Facts and the big story stay built-in and are never sent. The closing line
+ends on the built-in teaser.
 """
 from __future__ import annotations
 
 import json
 from typing import Any
 
+from ..coffee_lab.actions import DESCRIPTIVE, ORIGIN
 from .compose import BrewTexts
 from .memory import StoryMemory
 from .plan import Slot
 
 TASK_NAME = "xbloom brew story"
+# The slot kinds the agent writes; every other slot keeps its built-in text.
+AGENT_KINDS = ("bag", "you")
+# What of a bag is sent: what it is and where it comes from, nothing of stock.
+BAG_FIELDS = ("name", *DESCRIPTIVE, *ORIGIN)
 
 _LANGUAGE_NAMES = {"en": "English", "ar": "Modern Standard Arabic"}
 
 _KINDS = {
-    "bag": "about this bag of coffee, from its own fields only",
-    "big_story": "the next part of a story following coffee's history; retell the source text given",
-    "science": "one fact about coffee that bears on this brew or this bag",
-    "you": "a short closing line to the person drinking it, about this cup",
+    "bag": ("This cup: what this recipe does for this coffee (its temperatures, pours "
+            "and ratio against the coffee's origin, process and the roaster's notes) "
+            "and what to smell or taste for now and as it cools."),
+    "you": ("The coach: what changed since the last brew of this recipe with this bag "
+            "and what to check in the cup because of it, given that brew's verdict, "
+            "tasting and planned change; then one pattern from the rated history, "
+            "only if a real one exists."),
 }
 
 _RULES = """\
-You write the short texts shown on a phone while a coffee machine brews one cup.
-Each text fills one slot of the brew and is read in the seconds that slot lasts.
-Write in {language}. Plain sentences, at most about 60 words per text, no lists,
-no headings, no emoji.
+You write short texts shown on a phone while a coffee machine brews one cup,
+for the person who will drink it. Each text fills one moment of the brew and is
+read in the seconds it lasts. Write in {language}. Plain sentences, at most
+about 60 words per text, no lists, no headings, no emoji.
 
-Never invent. A specific claim about this coffee (its farm, producer, altitude,
-variety, process, taste, roast) comes only from the bag's fields below. General
-knowledge is allowed only at the level of a region, a variety, a process or
-coffee's history. When unsure, say less rather than guess."""
+Reason only from the data below. Do not state facts about coffee's history or
+science, and no figure that is not in the data. When the data does not support
+something, leave it out."""
 
 
 def slot_key(slot: Slot) -> str:
     return "draining" if slot.at == "draining" else f"{slot.at}_{slot.pour}"
 
 
-def _when(slot: Slot) -> str:
-    if slot.at == "draining":
-        return "while the coffee drains at the end"
-    if slot.at == "wait":
-        return f"in the wait after pour {slot.pour}"
-    return f"while pour {slot.pour} runs"
+def changes_since(before: dict[str, Any], now: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
+    """The settings known on both sides whose values differ."""
+    return {
+        key: (before[key], now[key]) for key in now
+        if before.get(key) is not None and now.get(key) is not None and before[key] != now[key]
+    }
+
+
+def _brews(brews: list[dict[str, Any]], keys: tuple[str, ...]) -> str:
+    rows = [{k: b.get(k) for k in keys if b.get(k) not in (None, "", {})} for b in brews]
+    return json.dumps(rows, ensure_ascii=False)
 
 
 def build_request(
-    texts: BrewTexts, plan: list[dict] | None, bag: dict | None, history: list[dict],
-    memory: StoryMemory, language: str,
+    texts: BrewTexts, plan: list[dict] | None, recipe: str | None, settings: dict[str, Any],
+    bag: dict | None, bag_brews: list[dict], rated: list[dict], memory: StoryMemory,
+    language: str,
 ) -> tuple[str, dict[str, Any]]:
     """The instructions and the structure of one brew's request."""
     parts = [_RULES.format(language=_LANGUAGE_NAMES.get(language, "English"))]
     pours = [{k: p.get(k) for k in ("volume_ml", "temperature_c", "pattern", "wait_s")}
              for p in plan or []]
-    parts.append("The brew, pour by pour: " + (json.dumps(pours) if pours else "not known"))
+    parts.append(f"This brew: recipe {json.dumps(recipe, ensure_ascii=False)}, settings "
+                 f"{json.dumps(settings)}, pours {json.dumps(pours) if pours else 'not known'}.")
     if bag:
-        fields = {k: v for k, v in bag.items() if k not in ("id",) and v not in (None, "")}
-        parts.append("The bag: " + json.dumps(fields, ensure_ascii=False))
-        last = history[0] if history else {}
-        said = [f"This is cup {len(history) + 1} from this bag."]
-        if last.get("rating"):
-            said.append(f"The last cup was rated {last['rating']} of 5.")
-        if last.get("next_change"):
-            said.append(f"After it, the plan was to change: {last['next_change']}.")
-        parts.append(" ".join(said))
+        fields = {k: bag[k] for k in BAG_FIELDS if bag.get(k) not in (None, "")}
+        parts.append("The coffee: " + json.dumps(fields, ensure_ascii=False))
+        parts.append(f"This bag's earlier brews, newest first ({len(bag_brews)}): "
+                     + _brews(bag_brews, ("recipe", "settings", "verdict", "tasting", "next_change")))
+        last = next((b for b in bag_brews if b.get("recipe") == recipe), None)
+        if last is None:
+            parts.append("This is the first brew of this recipe with this bag.")
+        else:
+            changed = changes_since(last.get("settings") or {}, settings)
+            parts.append("Changed since the last brew of this recipe with this bag "
+                         "(setting: before, now): "
+                         + (json.dumps(changed) if changed else "nothing"))
         told = memory.agent_told(bag.get("id"))
         if told:
             parts.append("Already told about this bag; do not repeat any of it:\n"
                          + "\n".join(f"- {t}" for t in told))
     else:
-        parts.append("There is no bag for this brew: write nothing about a particular coffee.")
-    teaser = memory.teaser
-    if teaser and teaser.get("text"):
-        parts.append(f"The last brew ended by promising: \"{teaser['text']}\" "
-                     "The first story text keeps that promise.")
+        parts.append("There is no bag for this brew: say nothing about a particular coffee.")
+    if rated:
+        parts.append("Rated history, newest first, for patterns (a verdict is again, fine "
+                     "or not again): " + _brews(rated, ("bag", "country", "process", "recipe",
+                                                        "settings", "verdict")))
+    else:
+        parts.append("There is no rated history: say nothing about patterns.")
     structure: dict[str, Any] = {}
-    for slot, (heading, text) in texts.stories.items():
-        description = f"{_KINDS.get(slot.kind, slot.kind)}; shown {_when(slot)}."
-        if slot.kind == "big_story":
-            parts.append(f"Source text for the story part titled \"{heading}\": {text}")
-            description += f" Retell the source text for \"{heading}\"."
-        structure[slot_key(slot)] = {
-            "description": description, "required": True, "selector": {"text": {}}}
-    structure["teaser"] = {
-        "description": "One sentence promising the next cup's topic, one not told in this brew.",
-        "required": True, "selector": {"text": {}}}
+    for slot in texts.stories:
+        if slot.kind in AGENT_KINDS:
+            structure[slot_key(slot)] = {
+                "description": _KINDS[slot.kind], "required": True, "selector": {"text": {}}}
     return "\n\n".join(parts), structure
 
 
-def parse_reply(
-    texts: BrewTexts, data: dict[str, Any],
-) -> tuple[dict[Slot, tuple[str, str]], dict[str, Any] | None]:
-    """The agent's texts under the built-in headings, and its teaser."""
-    raw = data.get("teaser")
-    teaser = raw.strip() if isinstance(raw, str) else ""
+def parse_reply(texts: BrewTexts, data: dict[str, Any]) -> dict[Slot, tuple[str, str]]:
+    """The agent's text per slot it writes, under the built-in heading.
+
+    The closing line ends on the built-in teaser, as in built-in mode.
+    """
+    teaser = (texts.teaser or {}).get("text") or ""
     stories: dict[Slot, tuple[str, str]] = {}
     for slot, (heading, _text) in texts.stories.items():
+        if slot.kind not in AGENT_KINDS:
+            continue
         value = data.get(slot_key(slot))
         text = value.strip() if isinstance(value, str) else ""
-        # The closing line ends on the teaser, as the built-in one does.
         if slot.at == "draining" and teaser:
             text = f"{text} {teaser}".strip()
         if text:
             stories[slot] = (heading, text)
-    if teaser:
-        return stories, {"kind": "agent", "key": None, "text": teaser}
-    return stories, None
+    return stories

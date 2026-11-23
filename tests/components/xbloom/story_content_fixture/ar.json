@@ -100,7 +100,8 @@
     "big_story": "{title}",
     "big_story_ahead": "{title}، ما زالت أمامك",
     "science": "في كوبك",
-    "you": "كوبك"
+    "you": "كوبك",
+    "this_cup": "هذا الكوب"
   },
   "topics": {
     "bloom": "التفتح",

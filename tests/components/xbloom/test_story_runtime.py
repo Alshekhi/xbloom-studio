@@ -228,8 +228,7 @@ async def test_a_brew_still_waiting_to_be_saved_is_saved_before_the_story_reads_
     lab.async_retry_pending.assert_awaited_once()
 
 
-REPLY = {"wait_1": "Agent bag.", "wait_2": "Agent history.", "wait_3": "Agent fact.",
-         "draining": "Agent closing.", "teaser": "Next: the rain."}
+REPLY = {"wait_1": "Agent cup.", "draining": "Agent coach."}
 
 
 def _agent(reply=REPLY, gate=None):
@@ -248,17 +247,39 @@ async def _agent_runtime(lab=None, **kw):
     return runtime, store
 
 
-async def test_agent_mode_shows_pour_lines_before_the_reply_and_the_agents_story_after():
+async def _bag_runtime(**kw):
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    runtime, store = await _agent_runtime(lab, **kw)
+    return runtime, bag
+
+
+async def test_agent_mode_keeps_the_built_in_big_story_and_science_parts():
+    runtime, _ = await _agent_runtime()
+    await _started(runtime)
+    await runtime._agent_task
+    await runtime.async_on_stage("waiting", 1)
+    assert (runtime.current["kind"], runtime.current["story"]) == ("big_story", "One.")
+    await runtime.async_on_stage("draining", 4)
+    assert runtime.current["kind"] == "you" and runtime.current["story"].startswith("Agent coach.")
+
+
+async def test_agent_mode_shows_pour_lines_before_the_reply():
     gate = asyncio.Event()
     runtime, _ = await _agent_runtime(gate=gate)
     await _started(runtime)
     await runtime.async_on_stage("pouring", 1)
-    assert runtime.current["now"].startswith("Pour 1:") and runtime.current["story"] is None
+    assert runtime.current["now"].startswith("Pour 1:")
     gate.set()
     await runtime._agent_task
+
+
+async def test_the_bloom_heading_is_this_cup_in_agent_mode():
+    runtime, _ = await _bag_runtime()
+    await _started(runtime, (await runtime.entry.runtime_data.coffee_lab.store.async_list_beans())[0].id)
+    await runtime._agent_task
     await runtime.async_on_stage("waiting", 1)
-    # No bag: the first story is the big story's.
-    assert runtime.current["story"] == "Agent bag." and runtime.current["kind"] == "big_story"
+    assert runtime.current == {**runtime.current, "heading": "This cup", "story": "Agent cup.", "kind": "bag"}
 
 
 async def test_the_request_is_sent_once_per_brew_and_names_the_agent():
@@ -272,29 +293,42 @@ async def test_the_request_is_sent_once_per_brew_and_names_the_agent():
     assert kwargs.get("return_response") is True and kwargs.get("blocking") is True
 
 
-async def test_a_late_reply_shows_only_the_part_whose_slot_is_running():
-    gate = asyncio.Event()
-    runtime, _ = await _agent_runtime(gate=gate)
-    await _started(runtime)
-    await runtime.async_on_stage("pouring", 1)
-    await runtime.async_on_stage("waiting", 1)
-    await runtime.async_on_stage("pouring", 2)
-    await runtime.async_on_stage("waiting", 2)
-    gate.set()
+async def test_the_request_carries_this_bags_brews_and_the_rated_history():
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    other = await _bag(lab, name="Gedeb", status="open", country="Ethiopia")
+    await lab.async_consume(bean_id=bag.id, grams=15, run_id="a", recipe="Morning")
+    await lab.async_consume(bean_id=other.id, grams=15, run_id="b", recipe="Iced")
+    for brew in await lab.store.async_list_brews():
+        await lab.store.async_rate_brew(brew.id, rating=3)
+    runtime, _ = await _agent_runtime(lab)
+    await _started(runtime, bag.id)
     await runtime._agent_task
-    assert runtime.current["story"] == "Agent history."
+    instructions = runtime.hass.services.async_call.await_args.args[2]["instructions"]
+    assert "Morning" in instructions and "Gedeb" in instructions and '"again"' in instructions
 
 
-async def test_a_reply_arriving_during_a_pour_shows_the_part_of_the_wait_before_it():
+async def test_a_late_reply_shows_its_part_only_while_that_slot_runs():
     gate = asyncio.Event()
-    runtime, _ = await _agent_runtime(gate=gate)
-    await _started(runtime)
+    runtime, bag = await _bag_runtime(gate=gate)
+    await _started(runtime, bag.id)
     await runtime.async_on_stage("pouring", 1)
     await runtime.async_on_stage("waiting", 1)
-    await runtime.async_on_stage("pouring", 2)
     gate.set()
     await runtime._agent_task
-    assert runtime.current["story"] == "Agent bag."
+    assert runtime.current["story"] == "Agent cup."
+
+
+async def test_a_late_reply_after_its_slot_passed_is_not_shown():
+    gate = asyncio.Event()
+    runtime, bag = await _bag_runtime(gate=gate)
+    await _started(runtime, bag.id)
+    for stage, pour in (("pouring", 1), ("waiting", 1), ("pouring", 2), ("waiting", 2)):
+        await runtime.async_on_stage(stage, pour)
+    built = runtime.current["story"]
+    gate.set()
+    await runtime._agent_task
+    assert runtime.current["story"] == built and runtime.current["kind"] == "big_story"
 
 
 async def test_a_reply_for_an_earlier_brew_is_dropped():
@@ -303,21 +337,22 @@ async def test_a_reply_for_an_earlier_brew_is_dropped():
     await _started(runtime)
     first = runtime._agent_task
     await _started(runtime)
-    await runtime.async_on_stage("pouring", 1)
-    await runtime.async_on_stage("waiting", 1)
+    await runtime.async_on_stage("draining", 4)
     runtime._agent_task.cancel()
     gate.set()
     await asyncio.gather(first, return_exceptions=True)
-    assert runtime.current["story"] is None
+    assert runtime.current["kind"] != "you"
 
 
-async def test_an_agent_failure_leaves_pour_lines_and_no_story():
+async def test_an_agent_failure_keeps_the_built_in_parts_and_leaves_its_own_empty():
     runtime, _ = await _agent_runtime(reply=HomeAssistantError("down"))
     await _started(runtime)
     await runtime._agent_task
     await runtime.async_on_stage("pouring", 1)
     await runtime.async_on_stage("waiting", 1)
-    assert runtime.current["now"].startswith("Pour 1:") and runtime.current["story"] is None
+    assert runtime.current["now"].startswith("Pour 1:") and runtime.current["story"] == "One."
+    await runtime.async_on_stage("draining", 4)
+    assert runtime.current["kind"] != "you"
 
 
 async def test_a_timeout_is_a_failure(monkeypatch):
@@ -325,47 +360,35 @@ async def test_a_timeout_is_a_failure(monkeypatch):
     runtime, _ = await _agent_runtime(gate=asyncio.Event())
     await _started(runtime)
     await runtime._agent_task
-    await runtime.async_on_stage("waiting", 1)
-    assert runtime.current["story"] is None
+    await runtime.async_on_stage("draining", 4)
+    assert runtime.current["kind"] != "you"
 
 
-async def test_an_agent_brew_records_its_texts_and_teaser_not_built_in_facts():
-    lab = await _lab()
-    bag = await _bag(lab, status="open")
-    runtime, _ = await _agent_runtime(lab)
+async def test_an_agent_brew_records_built_in_facts_and_teaser_and_does_not_advance_the_bag_chapter():
+    runtime, bag = await _bag_runtime()
     await _started(runtime, bag.id)
     await runtime._agent_task
+    built_facts = list(runtime._built.facts)
+    built_teaser = runtime._built.teaser
     await runtime.async_on_stage("draining", 4)
     await runtime.async_on_stage("done", None)
     memory = runtime.memory
-    assert memory.agent_told(bag.id) == [
-        "Agent bag.", "Agent history.", "Agent fact.", "Agent closing. Next: the rain."]
-    assert memory.teaser == {"kind": "agent", "key": None, "text": "Next: the rain."}
-    assert memory.facts_seen == set()
+    assert memory.agent_told(bag.id) == ["Agent cup.", "Agent coach."]
+    assert memory.facts_order[-len(built_facts):] == built_facts if built_facts else True
+    assert memory.teaser == built_teaser
+    assert memory.bag(bag.id)["chapter"] == 0
 
 
-async def test_without_an_agent_set_agent_mode_shows_pour_lines_only():
+async def test_without_an_agent_set_agent_mode_shows_no_agent_parts():
     runtime, _ = await _runtime()
     runtime.mode = "agent"
     await _started(runtime)
     await runtime._agent_task
-    await runtime.async_on_stage("pouring", 1)
     await runtime.async_on_stage("waiting", 1)
-    assert runtime.current["now"].startswith("Pour 1:") and runtime.current["story"] is None
+    assert runtime.current["story"] == "One."
+    await runtime.async_on_stage("draining", 4)
+    assert runtime.current["kind"] != "you"
     runtime.hass.services.async_call.assert_not_called()
-
-
-async def test_a_late_reply_that_left_the_running_slot_empty_shows_nothing():
-    gate = asyncio.Event()
-    runtime, _ = await _agent_runtime(reply={**REPLY, "wait_2": ""}, gate=gate)
-    await _started(runtime)
-    await runtime.async_on_stage("pouring", 1)
-    await runtime.async_on_stage("waiting", 1)
-    await runtime.async_on_stage("pouring", 2)
-    await runtime.async_on_stage("waiting", 2)
-    gate.set()
-    await runtime._agent_task
-    assert runtime.current["story"] is None
 
 
 async def test_a_new_brew_cancels_the_last_brews_request():

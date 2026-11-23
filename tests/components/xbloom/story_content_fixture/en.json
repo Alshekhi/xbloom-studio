@@ -94,7 +94,8 @@
     "big_story": "{title}",
     "big_story_ahead": "{title}, still ahead",
     "science": "In your cup",
-    "you": "Your cup"
+    "you": "Your cup",
+    "this_cup": "This cup"
   },
   "topics": {
     "bloom": "the bloom",

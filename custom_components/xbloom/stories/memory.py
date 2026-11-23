@@ -90,7 +90,7 @@ class StoryMemory:
     async def async_record_brew(
         self, bean_id: str | None, *, told: list[str], facts: list[str],
         big_story_part_told: bool, country: str | None, teaser: dict[str, Any] | None,
-        agent_texts: list[str] | None = None,
+        agent_texts: list[str] | None = None, advance_bag: bool = True,
     ) -> None:
         story = self._data["big_story"]
         chapter, part = self.big_story_position(bean_id)
@@ -101,7 +101,9 @@ class StoryMemory:
             story["tasted"].append(country)
         if bean_id:
             bag = self._data["bags"].setdefault(bean_id, {"chapter": 0, "told": []})
-            bag["chapter"] += 1
+            # A brew whose bag part a story agent wrote told no chapter.
+            if advance_bag:
+                bag["chapter"] += 1
             bag["told"].extend(t for t in told if t not in bag["told"])
             if agent_texts:
                 kept = self._data["agent_told"].setdefault(bean_id, [])
