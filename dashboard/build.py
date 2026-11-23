@@ -684,6 +684,9 @@ def xbloom_view(t: dict) -> dict:
         section(t["h_stories"], [
             select(f"select.{E}_brew_stories"),
             select(f"select.{E}_story_language", visibility=[is_not(f"select.{E}_brew_stories", "off")]),
+            # Read by the story announcement blueprint.
+            select(f"select.{E}_spoken_story_parts", visibility=[
+                is_not(f"select.{E}_brew_stories", "off"), *present(f"select.{E}_spoken_story_parts")]),
         ], present(f"select.{E}_brew_stories")),
         section(t["h_voice"], [
             toggle(entity, name=name, visibility=[

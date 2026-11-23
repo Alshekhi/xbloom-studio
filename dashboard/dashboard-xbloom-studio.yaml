@@ -2362,6 +2362,27 @@ views:
       hide_state: true
       tap_action:
         action: none
+    - type: tile
+      entity: select.xbloom_studio_spoken_story_parts
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+      visibility:
+      - condition: state
+        entity: select.xbloom_studio_brew_stories
+        state_not: 'off'
+      - condition: state
+        entity: select.xbloom_studio_spoken_story_parts
+        state_not: unavailable
+      - condition: state
+        entity: select.xbloom_studio_spoken_story_parts
+        state_not: unknown
+      hide_state: true
+      tap_action:
+        action: none
     visibility:
     - condition: state
       entity: select.xbloom_studio_brew_stories
