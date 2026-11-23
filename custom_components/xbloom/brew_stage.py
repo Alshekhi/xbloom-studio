@@ -126,6 +126,8 @@ class XBloomBrewStageSensor(SensorEntity):
         self._plan: list[dict[str, float]] | None = None
         self._pour: int | None = None
         self._next_pour_at = None
+        # The water reading the current wait began at, or last rose to.
+        self._water: float | None = None
         # The last pour the machine started. Brew Status turns brewing on the
         # first pour's own frame, so that frame reaches here before brewing.
         self._heard_pour: int | None = None
@@ -143,6 +145,11 @@ class XBloomBrewStageSensor(SensorEntity):
         }
 
     @callback
+    def _countdown(self, step: dict) -> object:
+        if self._pour < len(self._plan):
+            return dt_util.utcnow() + timedelta(seconds=step["wait_s"])
+        return None
+
     def _set(self, stage: str, pour: int | None, next_pour_at=None) -> None:
         if (stage, pour, next_pour_at) == (
                 self._attr_native_value, self._pour, self._next_pour_at):
@@ -194,15 +201,20 @@ class XBloomBrewStageSensor(SensorEntity):
                 self._set("pouring", self._heard_pour)
             elif cmd == CMD_BREW_END:
                 self._set("draining", self._pour)
-            elif (cmd == NOTIFY_WATER_VOLUME and self._attr_native_value == "pouring"
-                    and self._plan and self._pour and self._pour <= len(self._plan)
-                    and "water_ml" in decoded):
+            elif (cmd == NOTIFY_WATER_VOLUME and self._plan and self._pour
+                    and self._pour <= len(self._plan) and "water_ml" in decoded):
                 step = self._plan[self._pour - 1]
-                if float(decoded["water_ml"]) >= step["water_ml"] - _WATER_SLACK_ML:
-                    next_at = None
-                    if self._pour < len(self._plan):
-                        next_at = dt_util.utcnow() + timedelta(seconds=step["wait_s"])
-                    self._set("waiting", self._pour, next_at)
+                water = float(decoded["water_ml"])
+                if self._attr_native_value == "pouring" and water >= step["water_ml"] - _WATER_SLACK_ML:
+                    self._water = water
+                    self._set("waiting", self._pour, self._countdown(step))
+                elif (self._attr_native_value == "waiting" and self._next_pour_at is not None
+                        and self._water is not None and water > self._water):
+                    # Still the last millilitres: the machine's pause starts when
+                    # the water stops, seen once as 1.7 s after the reading came
+                    # within a millilitre of the total.
+                    self._water = water
+                    self._set("waiting", self._pour, self._countdown(step))
 
         self.async_on_remove(self.hass.bus.async_listen(EV_BREW_STARTED, _on_started))
         self.async_on_remove(

@@ -375,3 +375,27 @@ async def test_next_pour_follows_the_stages_countdown() -> None:
     assert entity._attr_native_value == NOW + timedelta(seconds=15)
     stage("pouring", None)
     assert entity._attr_native_value is None
+
+
+async def test_the_countdown_starts_again_while_the_last_millilitres_trickle_in(stage) -> None:
+    # Seen on a brew: the reading reached the total less 1 ml, then rose for
+    # 1.7 s more; the machine's pause starts when the water stops.
+    stage.brew_started()
+    stage.status("brewing")
+    stage.pour(0)
+    stage.water(42)
+    assert stage.state == "waiting"
+    stage.now = NOW + timedelta(seconds=1.7)
+    stage.water(43)
+    assert stage.attrs["next_pour_at"] == (NOW + timedelta(seconds=1.7 + 35 + AGITATE_S)).isoformat()
+
+
+async def test_a_reading_that_does_not_rise_leaves_the_countdown(stage) -> None:
+    stage.brew_started()
+    stage.status("brewing")
+    stage.pour(0)
+    stage.water(43)
+    before = stage.attrs["next_pour_at"]
+    stage.now = NOW + timedelta(seconds=3)
+    stage.water(43)
+    assert stage.attrs["next_pour_at"] == before
