@@ -50,6 +50,7 @@
           "cloud_logout": "Sign out of xBloom cloud",
           "connection": "Connection (live-session timeout)",
           "coffee_lab": "Coffee Lab",
+          "brew_stories": "Brew stories",
           "add_callback_target": "Add a callback target",
           "remove_callback_target": "Remove a callback target",
           "firmware_flashing": "Firmware flashing (advanced)",
@@ -307,6 +308,13 @@
         },
         "data_description": {
           "brewers": "Offered when recording a brew made without the xBloom."
+        }
+      },
+      "brew_stories": {
+        "title": "Brew stories",
+        "description": "The AI task that writes each brew's stories when Brew Stories is set to Agent.",
+        "data": {
+          "story_agent": "AI task"
         }
       },
       "add_bag": {
@@ -613,7 +621,8 @@
         "name": "Brew Stories",
         "state": {
           "off": "Off",
-          "built_in": "Built-in"
+          "built_in": "Built-in",
+          "agent": "Agent"
         }
       },
       "story_language": {

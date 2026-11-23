@@ -52,6 +52,7 @@ from .const import (
     CONF_CLOUD_REMEMBER,
     CONF_CLOUD_TOKEN,
     CONF_IDLE_TIMEOUT,
+    CONF_STORY_AGENT,
     CONF_PRODUCT_ID,
     DEFAULT_BREWERS,
     DOMAIN,
@@ -346,6 +347,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                 cloud_option,
                 "connection",
                 "coffee_lab",
+                "brew_stories",
                 *callback_options,
                 "firmware_flashing",
                 "done",
@@ -388,6 +390,31 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                         unit_of_measurement="s",
                     )
                 ),
+            }),
+        )
+
+    async def async_step_brew_stories(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """The AI task that writes brew stories when Brew Stories is set to agent."""
+        entry = self.config_entry
+        current = entry.data.get(CONF_STORY_AGENT)
+        if user_input is not None:
+            data = {k: v for k, v in entry.data.items() if k != CONF_STORY_AGENT}
+            if agent := user_input.get(CONF_STORY_AGENT):
+                data[CONF_STORY_AGENT] = agent
+            self.hass.config_entries.async_update_entry(entry, data=data)
+            # Rebuilt so the Brew Stories select offers the agent, or no longer does.
+            self.hass.async_create_task(
+                self.hass.config_entries.async_reload(entry.entry_id)
+            )
+            return self.async_create_entry(title="", data={})
+        return self.async_show_form(
+            step_id="brew_stories",
+            data_schema=vol.Schema({
+                vol.Optional(
+                    CONF_STORY_AGENT, description={"suggested_value": current},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="ai_task")),
             }),
         )
 
