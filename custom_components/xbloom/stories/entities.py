@@ -10,7 +10,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from ..ble_entities import _device_info
-from . import LANGUAGES, MODES
+from . import LANGUAGES, MODES, SPOKEN_PARTS
 from .runtime import signal_story
 
 # A state is at most 255 characters; the full text is in the attributes.
@@ -127,4 +127,37 @@ class XBloomStoryLanguageSelect(SelectEntity):
     async def async_select_option(self, option: str) -> None:
         if option in LANGUAGES and self._entry.runtime_data.stories is not None:
             await self._entry.runtime_data.stories.async_set_language(option)
+            self.async_write_ha_state()
+
+
+class XBloomSpokenStoryPartsSelect(SelectEntity, RestoreEntity):
+    """Which story parts the story announcement blueprint speaks; read by it."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "spoken_story_parts"
+    _attr_unique_id = "xbloom_spoken_story_parts"
+    _attr_icon = "mdi:account-voice"
+    _attr_options = SPOKEN_PARTS
+
+    def __init__(self, entry) -> None:
+        self._entry = entry
+        self._picked = SPOKEN_PARTS[0]
+
+    @property
+    def current_option(self) -> str:
+        return self._picked
+
+    @property
+    def device_info(self):
+        return _device_info(self._entry.entry_id)
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        if last is not None and last.state in SPOKEN_PARTS:
+            self._picked = last.state
+
+    async def async_select_option(self, option: str) -> None:
+        if option in SPOKEN_PARTS:
+            self._picked = option
             self.async_write_ha_state()

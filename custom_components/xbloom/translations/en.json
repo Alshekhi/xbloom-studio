@@ -631,6 +631,13 @@
           "en": "English",
           "ar": "Arabic"
         }
+      },
+      "spoken_story_parts": {
+        "name": "Spoken story parts",
+        "state": {
+          "bag_and_teaser": "Bag story and teaser",
+          "every_part": "Every part"
+        }
       }
     },
     "sensor": {

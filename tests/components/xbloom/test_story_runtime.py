@@ -442,3 +442,15 @@ def test_the_story_sensor_shows_the_teaser_attribute():
     entry = MagicMock()
     entry.runtime_data.stories.current = {"heading": "h", "now": None, "story": "s. T.", "kind": "you", "teaser": "T."}
     assert XBloomBrewStorySensor(entry).extra_state_attributes["teaser"] == "T."
+
+
+async def test_spoken_story_parts_starts_on_bag_and_teaser_and_keeps_a_pick():
+    from custom_components.xbloom.stories.entities import XBloomSpokenStoryPartsSelect
+    entry = MagicMock()
+    select = XBloomSpokenStoryPartsSelect(entry)
+    select.async_write_ha_state = MagicMock()
+    assert select._attr_options == ["bag_and_teaser", "every_part"]
+    assert select.current_option == "bag_and_teaser"
+    await select.async_select_option("every_part")
+    assert select.current_option == "every_part"
+    select.async_write_ha_state.assert_called_once()
