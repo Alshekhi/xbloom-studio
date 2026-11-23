@@ -107,3 +107,10 @@ async def test_forgetting_a_bag_forgets_what_the_agent_told_it():
     await _brew(memory, "bag-1", agent_texts=["a"])
     await memory.async_forget_bag("bag-1")
     assert memory.agent_told("bag-1") == []
+
+
+async def test_a_fact_told_again_moves_to_the_end():
+    memory = await _memory()
+    await _brew(memory, facts=["a", "b"])
+    await _brew(memory, facts=["a"])
+    assert memory.facts_order == ["b", "a"] and memory.facts_seen == {"a", "b"}

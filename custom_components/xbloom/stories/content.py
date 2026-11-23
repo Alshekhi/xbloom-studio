@@ -79,11 +79,12 @@ class Content:
 
     def pick_fact(
         self, topic: str, values: dict[str, Any], seen: set[str], level: int,
-        avoid: frozenset[str] = frozenset(),
+        avoid: frozenset[str] = frozenset(), order: list[str] | None = None,
     ) -> tuple[str, str] | None:
         """An unseen fact on `topic` that can be told; a seen one once all are.
 
-        A fact naming any value in `avoid` is passed over.
+        A fact naming any value in `avoid` is passed over. Once all are told,
+        the one earliest in `order` (told longest ago) comes next.
         """
         told: list[tuple[str, str]] = []
         for key in sorted(self._data.get("facts", {})):
@@ -98,4 +99,7 @@ class Content:
             if key not in seen:
                 return key, text
             told.append((key, text))
+        if order is not None:
+            rank = {key: index for index, key in enumerate(order)}
+            told.sort(key=lambda pair: rank.get(pair[0], -1))
         return told[0] if told else None

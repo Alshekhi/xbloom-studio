@@ -64,6 +64,11 @@ class StoryMemory:
         return set(self._data["facts_seen"])
 
     @property
+    def facts_order(self) -> list[str]:
+        """The facts told, least recently told first."""
+        return list(self._data["facts_seen"])
+
+    @property
     def teaser(self) -> dict[str, Any] | None:
         return self._data["teaser"]
 
@@ -102,8 +107,12 @@ class StoryMemory:
                 kept = self._data["agent_told"].setdefault(bean_id, [])
                 kept.extend(agent_texts)
                 del kept[:-AGENT_TOLD_KEEP]
+        # Least recently told first: a fact told again moves to the end.
         seen = self._data["facts_seen"]
-        seen.extend(f for f in facts if f not in seen)
+        for fact in facts:
+            if fact in seen:
+                seen.remove(fact)
+            seen.append(fact)
         self._data["teaser"] = teaser
         self._data["brews"] += 1
         await self._store.async_save(self._data)

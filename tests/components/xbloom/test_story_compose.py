@@ -210,3 +210,15 @@ async def test_the_teaser_promises_a_topic_this_cup_has_not_told():
     told = {facts[key]["topic"] for key in texts.facts}
     assert told and texts.teaser and texts.teaser["kind"] == "fact"
     assert facts[texts.teaser["key"]]["topic"] not in told
+
+
+async def test_once_every_fact_is_told_two_brews_in_a_row_do_not_repeat_one():
+    memory = await _memory()
+    facts = CONTENT.entry("facts")
+    await memory.async_record_brew("bag-x", told=[], facts=sorted(facts), big_story_part_told=False,
+                                   country=None, teaser=None)
+    first = await _texts(memory=memory)
+    await memory.async_record_brew("bag-1", told=first.told, facts=first.facts, big_story_part_told=False,
+                                   country=None, teaser=None)
+    second = await _texts(memory=memory)
+    assert first.facts and second.facts and not set(first.facts) & set(second.facts)

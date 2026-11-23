@@ -123,15 +123,18 @@ class _Writer:
         return self.content.fill(self.content.entry(f"headings.{key}"), values) or ""
 
     def _fact(self, topics: tuple[str, ...]) -> tuple[str, str] | None:
-        """An unseen fact from any of `topics` before a seen one from the first."""
+        """An unseen fact from any of `topics`; once all are told, the one told longest ago."""
+        order = self.memory.facts_order
         found = []
         for topic in topics:
             picked = self.content.pick_fact(
-                topic, self.values, self._seen, self.level, frozenset(self.said))
+                topic, self.values, self._seen, self.level, frozenset(self.said), order=order)
             if picked and picked[0] not in self.out.facts:
                 if picked[0] not in self._seen:
                     return self._said(picked)
                 found.append(picked)
+        rank = {key: index for index, key in enumerate(order)}
+        found.sort(key=lambda pair: rank.get(pair[0], -1))
         return self._said(found[0]) if found else None
 
     def _said(self, picked: tuple[str, str]) -> tuple[str, str]:

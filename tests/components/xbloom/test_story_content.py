@@ -63,3 +63,9 @@ def test_a_language_without_a_file_falls_back_to_english():
 def test_entries_are_reached_by_path():
     assert CONTENT.entry("big_story.chapters")[0]["key"] == "ethiopia"
     assert CONTENT.entry("bag.intro") == ["Meet {name}."]
+
+
+def test_once_all_are_told_the_one_told_longest_ago_comes_next():
+    seen = {"bloom.co2", "bloom.open"}
+    assert CONTENT.pick_fact("bloom", VALUES, seen, 1, order=["bloom.open", "bloom.co2"])[0] == "bloom.open"
+    assert CONTENT.pick_fact("bloom", VALUES, seen, 1, order=["bloom.co2", "bloom.open"])[0] == "bloom.co2"
