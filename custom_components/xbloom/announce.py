@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections import deque
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -31,6 +32,34 @@ GAP_S = 1.5
 # it belongs to.
 STORY_STALE_S = 30.0
 STORY = "story"
+
+# What the action accepts: a message reaches only a notify service, a TTS
+# engine or media players, never another action under the integration's name.
+_NOTIFY = re.compile(r"^notify\.[a-z0-9_]+$")
+_TTS = re.compile(r"^tts\.[a-z0-9_]+$")
+_MEDIA_PLAYER = re.compile(r"^media_player\.[a-z0-9_]+$")
+
+
+def notify_service(value: Any) -> str:
+    value = str(value or "").strip()
+    if value and not _NOTIFY.match(value):
+        raise ValueError(f"not a notify service: {value}")
+    return value
+
+
+def tts_engine(value: Any) -> str:
+    value = str(value or "").strip()
+    if value and not _TTS.match(value):
+        raise ValueError(f"not a TTS engine: {value}")
+    return value
+
+
+def media_players(value: Any) -> list[str]:
+    values = [value] if isinstance(value, str) else list(value or [])
+    for entity_id in values:
+        if not _MEDIA_PLAYER.match(str(entity_id)):
+            raise ValueError(f"not a media player: {entity_id}")
+    return [str(v) for v in values]
 
 
 def speak_seconds(message: str) -> float:
@@ -99,17 +128,19 @@ class AnnouncementQueue:
         message, method = item["message"], item.get("method")
         targets = item.get("targets") or []
         try:
+            # The caller's context: permissions and the logbook name who asked.
+            context = item.get("context")
             if method == "alexa" and targets:
                 await self._call("notify", "alexa_media", {
                     "target": targets, "data": {"type": item.get("alexa_type") or "tts"},
-                    "message": message}, blocking=True)
-            elif method == "tts" and targets and item.get("tts_engine"):
+                    "message": message}, blocking=True, context=context)
+            elif method == "tts" and targets and _TTS.match(item.get("tts_engine") or ""):
                 await self._call("tts", "speak", {
                     "entity_id": item["tts_engine"], "media_player_entity_id": targets,
-                    "message": message}, blocking=True)
-            elif method == "notify" and "." in (item.get("notify_service") or ""):
-                domain, service = item["notify_service"].split(".", 1)
-                await self._call(domain, service, {"message": message}, blocking=True)
+                    "message": message}, blocking=True, context=context)
+            elif method == "notify" and _NOTIFY.match(item.get("notify_service") or ""):
+                await self._call("notify", item["notify_service"].split(".", 1)[1],
+                                 {"message": message}, blocking=True, context=context)
             else:
                 return False
         except Exception as err:  # noqa: BLE001 — one speaker failing must not stop the rest

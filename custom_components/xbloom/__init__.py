@@ -2576,6 +2576,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
     # One announcement at a time for every xBloom blueprint (announce.py).
     from .announce import AnnouncementQueue
+    from .announce import media_players as announce_media_players
+    from .announce import notify_service as announce_notify_service
+    from .announce import tts_engine as announce_tts_engine
     entry.runtime_data.announcements = AnnouncementQueue(
         hass.services.async_call,
         create_task=lambda coro: entry.async_create_background_task(
@@ -2584,14 +2587,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     entry.async_on_unload(lambda: entry.runtime_data.announcements.stop())
 
     async def handle_announce(call) -> None:
-        targets = call.data.get("targets") or []
         entry.runtime_data.announcements.add({
             "message": call.data["message"], "method": call.data.get("method", "alexa"),
-            "targets": [targets] if isinstance(targets, str) else list(targets),
-            "tts_engine": call.data.get("tts_engine") or "",
-            "notify_service": call.data.get("notify_service") or "",
+            "targets": announce_media_players(call.data.get("targets")),
+            "tts_engine": announce_tts_engine(call.data.get("tts_engine")),
+            "notify_service": announce_notify_service(call.data.get("notify_service")),
             "alexa_type": call.data.get("alexa_type") or "tts",
             "kind": call.data.get("kind") or "announcement",
+            "context": call.context,
         })
 
     async def handle_wait_for_announcements(call) -> None:
@@ -2603,9 +2606,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         schema=vol.Schema({
             vol.Required("message"): str,
             vol.Optional("method", default="alexa"): vol.In(["alexa", "tts", "notify"]),
-            vol.Optional("targets"): vol.Any(str, [str]),
-            vol.Optional("tts_engine"): vol.Any(None, str),
-            vol.Optional("notify_service"): vol.Any(None, str),
+            vol.Optional("targets"): announce_media_players,
+            vol.Optional("tts_engine"): announce_tts_engine,
+            vol.Optional("notify_service"): announce_notify_service,
             vol.Optional("alexa_type", default="tts"): vol.In(["tts", "announce"]),
             vol.Optional("kind", default="announcement"): vol.In(["announcement", "story"]),
         }),

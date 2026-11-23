@@ -142,3 +142,26 @@ async def test_waiting_for_quiet_ends_once_everything_has_been_spoken():
 def test_speaking_time_grows_with_the_text_and_has_a_floor():
     assert speak_seconds("Hi") == speak_seconds("Hello")
     assert speak_seconds("word " * 60) > speak_seconds("word " * 10) > speak_seconds("Hi")
+
+
+async def test_only_a_notify_service_is_ever_called_for_a_notification():
+    queue, spoken, gates, _ = _queue()
+    queue.add({**_say("x", method="notify"), "notify_service": "lock.unlock"})
+    queue.add({**_say("y", method="notify"), "notify_service": "notify.phone"})
+    await _settle()
+    assert [s[:2] for s in spoken] == [("notify", "phone")]
+    queue.stop()
+
+
+async def test_the_callers_context_goes_with_the_message():
+    calls = []
+
+    async def call(domain, service, data, **kw):
+        calls.append(kw.get("context"))
+
+    queue = AnnouncementQueue(AsyncMock(side_effect=call), sleep=AsyncMock(), clock=lambda: 0.0)
+    marker = object()
+    queue.add({**_say("x"), "context": marker})
+    await _settle()
+    assert calls == [marker]
+    queue.stop()
