@@ -38,7 +38,7 @@ def test_an_edited_blueprint_is_never_overwritten():
 def test_the_bundled_blueprints():
     assert bundled_names() == [
         "brew_announce.yaml", "live_control_announce.yaml", "machine_fault_announce.yaml",
-        "rating_ask.yaml",
+        "rating_ask.yaml", "story_announce.yaml",
     ]
 
 

@@ -1,0 +1,139 @@
+blueprint:
+  name: "xBloom — Brew story announcements"
+  description: >
+    Speaks the brew story as it appears, through Alexa, a speaker with a TTS
+    engine, or a notification, in the language the story is told in.
+    **Which parts** follows the Spoken story parts select on the device: the
+    bag's story and the teaser for the next cup, or every story part. The line
+    about each pour is never spoken. Needs Brew Stories on.
+  domain: automation
+  author: xbloom-studio-controler
+  source_url: https://github.com/Alshekhi/xbloom-studio/blob/main/custom_components/xbloom/blueprints/story_announce.yaml
+  homeassistant:
+    min_version: 2024.6.0
+  input:
+    delivery:
+      name: How to announce
+      icon: mdi:bullhorn
+      input:
+        delivery_method:
+          name: Announce with
+          description: >
+            Alexa uses the Alexa Media Player integration. Speaker (TTS) speaks
+            through a TTS engine. Notification sends the text to a notify
+            service, such as a phone. Fill in only the fields for the one you
+            choose.
+          default: alexa
+          selector:
+            select:
+              options:
+                - { value: alexa, label: Alexa }
+                - { value: tts, label: Speaker (TTS) }
+                - { value: notify, label: Notification }
+        speakers:
+          name: Speakers
+          description: Where the story parts are spoken, for Alexa or Speaker (TTS).
+          default: []
+          selector:
+            entity:
+              domain: media_player
+              multiple: true
+        tts_engine:
+          name: TTS engine
+          description: For Speaker (TTS) only, for example tts.piper.
+          default: ""
+          selector:
+            entity:
+              domain: tts
+        notify_service:
+          name: Notify service
+          description: >
+            For Notification only, for example notify.mobile_app_my_phone.
+          default: ""
+          selector:
+            text:
+    entities:
+      name: xBloom entities
+      icon: mdi:coffee-maker-outline
+      description: The integration creates these; the defaults are right.
+      collapsed: true
+      input:
+        story_entity:
+          name: Brew story
+          default: sensor.xbloom_studio_brew_story
+          selector:
+            entity:
+              domain: sensor
+        spoken_parts_entity:
+          name: Spoken story parts
+          default: select.xbloom_studio_spoken_story_parts
+          selector:
+            entity:
+              domain: select
+
+variables:
+  method: !input delivery_method
+  notify_service: !input notify_service
+  # A template, not `!input` in `target:`: an unused engine's empty default
+  # would fail the validation Home Assistant runs on every `choose` branch.
+  tts_engine: !input tts_engine
+  speakers: !input speakers
+  parts_entity: !input spoken_parts_entity
+  kind: "{{ trigger.to_state.attributes.get('kind') or '' }}"
+  story: "{{ trigger.to_state.attributes.get('story') or '' }}"
+  teaser: "{{ trigger.to_state.attributes.get('teaser') or '' }}"
+  # The bag's part and the teaser alone, or every story part whole.
+  part: >-
+    {%- if states(parts_entity) == 'every_part' -%}
+      {{ story if kind in ['bag', 'big_story', 'science', 'you'] else '' }}
+    {%- elif kind == 'bag' -%}
+      {{ story }}
+    {%- elif kind == 'you' -%}
+      {{ teaser }}
+    {%- endif -%}
+  # A speaker reads a symbol or a dash aloud: said in words, or as a pause.
+  message: >-
+    {{ part | replace(' °C', ' degrees') | replace('°C', ' degrees')
+            | replace(' °م', ' درجة') | replace('°م', ' درجة')
+            | replace(' — ', ', ') | replace('—', ', ')
+            | replace(' – ', ', ') | replace('–', ', ') | trim }}
+
+trigger:
+  # A new story part, not a new pour line: only the part's text is watched.
+  - platform: state
+    entity_id: !input story_entity
+    attribute: story
+    not_from: unavailable
+
+condition:
+  - condition: template
+    value_template: >-
+      {{ message != '' and (method == 'notify' or speakers | length > 0) }}
+
+action:
+  - choose:
+      - conditions: "{{ method == 'alexa' }}"
+        sequence:
+          - action: notify.alexa_media
+            data:
+              target: "{{ speakers }}"
+              data:
+                type: tts
+              message: "{{ message }}"
+      - conditions: "{{ method == 'tts' }}"
+        sequence:
+          - action: tts.speak
+            target:
+              entity_id: "{{ tts_engine }}"
+            data:
+              media_player_entity_id: "{{ speakers }}"
+              message: "{{ message }}"
+      - conditions: "{{ method == 'notify' }}"
+        sequence:
+          - action: "{{ notify_service }}"
+            data:
+              message: "{{ message }}"
+
+# Parts follow each other closely: each is spoken in turn, none cut off.
+mode: queued
+max: 5
