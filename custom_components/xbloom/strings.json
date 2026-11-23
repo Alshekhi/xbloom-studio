@@ -1853,6 +1853,50 @@
           "description": "An xBloom share link."
         }
       }
+    },
+    "announce": {
+      "name": "Announce",
+      "description": "Speak a message after any xBloom announcement already being spoken, so one never cuts another off. Brew, fault and live-session messages go before a brew story part; only the newest story part waits, and one that waited past its moment is dropped.",
+      "fields": {
+        "message": {
+          "name": "Message",
+          "description": "What to say."
+        },
+        "method": {
+          "name": "Announce with",
+          "description": "Alexa (Alexa Media Player), a speaker through a TTS engine, or a notify service."
+        },
+        "targets": {
+          "name": "Speakers",
+          "description": "The speakers to say it on, for Alexa or a TTS engine."
+        },
+        "tts_engine": {
+          "name": "TTS engine",
+          "description": "For a TTS engine only, for example tts.piper."
+        },
+        "notify_service": {
+          "name": "Notify service",
+          "description": "For a notify service only, for example notify.mobile_app_my_phone."
+        },
+        "alexa_type": {
+          "name": "Alexa type",
+          "description": "tts speaks it; announce plays the announcement chime first."
+        },
+        "kind": {
+          "name": "Kind",
+          "description": "announcement for brew, fault and live-session messages; story for a brew story part."
+        }
+      }
+    },
+    "wait_for_announcements": {
+      "name": "Wait for announcements",
+      "description": "Wait until no xBloom announcement is being spoken or waiting, or until the timeout.",
+      "fields": {
+        "timeout_s": {
+          "name": "Timeout",
+          "description": "The longest to wait, in seconds."
+        }
+      }
     }
   },
   "selector": {

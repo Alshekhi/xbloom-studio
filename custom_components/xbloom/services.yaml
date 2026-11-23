@@ -796,3 +796,61 @@ restore_recipe:
         text:
 
 list_archived_recipes:
+
+announce:
+  fields:
+    message:
+      required: true
+      selector:
+        text:
+    method:
+      required: false
+      default: alexa
+      selector:
+        select:
+          options:
+            - alexa
+            - tts
+            - notify
+    targets:
+      required: false
+      selector:
+        entity:
+          domain: media_player
+          multiple: true
+    tts_engine:
+      required: false
+      selector:
+        entity:
+          domain: tts
+    notify_service:
+      required: false
+      selector:
+        text:
+    alexa_type:
+      required: false
+      default: tts
+      selector:
+        select:
+          options:
+            - tts
+            - announce
+    kind:
+      required: false
+      default: announcement
+      selector:
+        select:
+          options:
+            - announcement
+            - story
+
+wait_for_announcements:
+  fields:
+    timeout_s:
+      required: false
+      default: 60
+      selector:
+        number:
+          min: 1
+          max: 600
+          unit_of_measurement: s
