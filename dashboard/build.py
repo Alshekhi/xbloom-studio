@@ -24,7 +24,7 @@ TEXT = {
         "h_save": "Save as a new recipe", "h_manual": "Manual brew", "h_stats": "Coffee stats",
         "h_by_brewer": "By brewer", "h_bags": "Bags on hand", "h_connection": "Connection & status",
         "h_modules": "Modules", "h_grinder": "Grinder", "h_brewer": "Brewer", "h_scale": "Scale",
-        "h_library": "Recipe library", "h_settings": "Settings",
+        "h_library": "Recipe library", "h_settings": "Settings", "h_stories": "Brew stories",
         "h_voice": "Voice announcements", "h_updates": "Updates", "h_events": "Recent machine events",
         "go_home": "Return the machine to its home screen to brew a recipe.",
         "show_advanced": "Show brew adjustments", "show_per_pour": "Show each pour",
@@ -98,7 +98,7 @@ TEXT = {
         "h_save": "حفظ كوصفة جديدة", "h_manual": "تحضير يدوي", "h_stats": "إحصاءات القهوة",
         "h_by_brewer": "حسب أداة التحضير", "h_bags": "الأكياس المتوفرة", "h_connection": "الاتصال والحالة",
         "h_modules": "الوحدات", "h_grinder": "المطحنة", "h_brewer": "وحدة الصب", "h_scale": "الميزان",
-        "h_library": "مكتبة الوصفات", "h_settings": "الإعدادات",
+        "h_library": "مكتبة الوصفات", "h_settings": "الإعدادات", "h_stories": "حكايات التحضير",
         "h_voice": "الإعلانات الصوتية", "h_updates": "التحديثات", "h_events": "أحدث أحداث الماكينة",
         "go_home": "أعد الماكينة إلى شاشتها الرئيسية لتحضير وصفة.",
         "show_advanced": "إظهار تعديلات التحضير", "show_per_pour": "إظهار كل صبة",
@@ -680,6 +680,11 @@ def xbloom_view(t: dict) -> dict:
             select(f"select.{E}_temperature_unit"),
             select(f"select.{E}_weight_unit"),
         ], [live]),
+        # Kept in Home Assistant, not the machine: shown whether connected or not.
+        section(t["h_stories"], [
+            select(f"select.{E}_brew_stories"),
+            select(f"select.{E}_story_language", visibility=[is_not(f"select.{E}_brew_stories", "off")]),
+        ], present(f"select.{E}_brew_stories")),
         section(t["h_voice"], [
             toggle(entity, name=name, visibility=[
                 {"condition": "state", "entity": entity, "state_not": "unavailable"}]) for entity, name in voice

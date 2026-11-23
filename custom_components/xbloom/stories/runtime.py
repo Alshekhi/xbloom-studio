@@ -17,7 +17,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from ..brew_stage import _follow
-from . import MODES
+from . import LANGUAGES, MODES
 from .compose import BrewTexts, compose
 from .content import Content
 from .memory import STORAGE_KEY, STORAGE_VERSION, StoryMemory
@@ -92,8 +92,15 @@ class StoryRuntime:
             self._content = await self.hass.async_add_executor_job(Content.load, self._language())
         return self._content
 
+    async def async_set_language(self, language: str) -> None:
+        """The language the next brew's stories are told in, kept from now on."""
+        await self.memory.async_set_language(language)
+
     def _language(self) -> str:
-        return (getattr(self.hass.config, "language", None) or "en").split("-")[0]
+        if self.memory.language in LANGUAGES:
+            return self.memory.language
+        own = (getattr(self.hass.config, "language", None) or "").split("-")[0]
+        return own if own in LANGUAGES else LANGUAGES[0]
 
     async def _bag_and_history(self, bean_id: str | None) -> tuple[dict | None, list[dict]]:
         lab = getattr(self.entry.runtime_data, "coffee_lab", None)

@@ -9,7 +9,8 @@ from homeassistant.components.sensor import RestoreSensor
 
 from custom_components.xbloom.brew_stage import pour_plan
 from custom_components.xbloom.stories.content import Content
-from custom_components.xbloom.stories.entities import XBloomBrewStoriesSelect, XBloomBrewStorySensor
+from custom_components.xbloom.stories.entities import (
+    XBloomBrewStoriesSelect, XBloomBrewStorySensor, XBloomStoryLanguageSelect)
 from custom_components.xbloom.stories.runtime import HISTORY_BREWS, StoryRuntime
 
 from .test_coffee_lab_lab import _bag, _lab
@@ -156,6 +157,33 @@ async def test_turning_stories_off_mid_brew_clears_them():
     await runtime.async_on_stage("pouring", 2)
     await runtime.async_on_stage("done", None)
     assert runtime.current["now"] is None and store.saves == 0
+
+
+def test_the_language_select_offers_each_language_the_stories_are_written_in():
+    written = sorted(p.stem for p in (Path(__file__).parents[3] / "custom_components/xbloom/stories/content").glob("*.json"))
+    assert sorted(XBloomStoryLanguageSelect._attr_options) == written == ["ar", "en"]
+
+
+async def test_stories_start_in_home_assistants_language_if_written_in_it_else_english():
+    runtime, _ = await _runtime()
+    runtime.hass.config.language = "ar-SA"
+    assert runtime._language() == "ar"
+    runtime.hass.config.language = "fr"
+    assert runtime._language() == "en"
+
+
+async def test_a_picked_language_is_kept_across_a_restart_and_an_unpicked_one_is_not():
+    runtime, store = await _runtime()
+    runtime.hass.config.language = "en"
+    # Restarted without a pick: Home Assistant's language is still followed.
+    again = StoryRuntime(runtime.hass, runtime.entry, store=store)
+    await again.async_load()
+    runtime.hass.config.language = "ar"
+    assert again._language() == "ar"
+    await again.async_set_language("en")
+    after = StoryRuntime(runtime.hass, runtime.entry, store=store)
+    await after.async_load()
+    assert after._language() == "en"
 
 
 async def test_the_cup_count_holds_every_brew_of_the_bag_however_many_others_came_after():

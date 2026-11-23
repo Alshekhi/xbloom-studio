@@ -10,7 +10,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from ..ble_entities import _device_info
-from . import MODES
+from . import LANGUAGES, MODES
 from .runtime import signal_story
 
 # A state is at most 255 characters; the full text is in the attributes.
@@ -89,4 +89,36 @@ class XBloomBrewStoriesSelect(SelectEntity, RestoreEntity):
     async def async_select_option(self, option: str) -> None:
         if option in MODES and self._entry.runtime_data.stories is not None:
             self._entry.runtime_data.stories.set_mode(option)
+            self.async_write_ha_state()
+
+
+class XBloomStoryLanguageSelect(SelectEntity):
+    """The language the stories are told in, whatever Home Assistant's is.
+
+    Not restored from its state: that shows Home Assistant's language before
+    anything is picked, and restoring it would make that a pick. The pick is
+    kept in the stories' own storage instead.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "story_language"
+    _attr_unique_id = "xbloom_story_language"
+    _attr_icon = "mdi:translate"
+    _attr_options = LANGUAGES
+
+    def __init__(self, entry) -> None:
+        self._entry = entry
+
+    @property
+    def device_info(self):
+        return _device_info(self._entry.entry_id)
+
+    @property
+    def current_option(self) -> str | None:
+        runtime = self._entry.runtime_data.stories
+        return runtime._language() if runtime else None
+
+    async def async_select_option(self, option: str) -> None:
+        if option in LANGUAGES and self._entry.runtime_data.stories is not None:
+            await self._entry.runtime_data.stories.async_set_language(option)
             self.async_write_ha_state()

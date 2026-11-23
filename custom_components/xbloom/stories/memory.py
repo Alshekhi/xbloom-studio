@@ -26,6 +26,9 @@ def _empty() -> dict[str, Any]:
         "facts_seen": [],
         "teaser": None,
         "brews": 0,
+        # The Story language picked; None until one is, so Home Assistant's
+        # own is followed.
+        "language": None,
     }
 
 
@@ -63,6 +66,14 @@ class StoryMemory:
     @property
     def brews(self) -> int:
         return self._data["brews"]
+
+    @property
+    def language(self) -> str | None:
+        return self._data["language"]
+
+    async def async_set_language(self, language: str) -> None:
+        self._data["language"] = language
+        await self._store.async_save(self._data)
 
     async def async_record_brew(
         self, bean_id: str | None, *, told: list[str], facts: list[str],

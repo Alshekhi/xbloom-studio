@@ -615,6 +615,13 @@
           "off": "Off",
           "built_in": "Built-in"
         }
+      },
+      "story_language": {
+        "name": "Story language",
+        "state": {
+          "en": "English",
+          "ar": "Arabic"
+        }
       }
     },
     "sensor": {
