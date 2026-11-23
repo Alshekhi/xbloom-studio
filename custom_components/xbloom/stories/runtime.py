@@ -334,6 +334,7 @@ def _brew_facts(brew) -> dict[str, Any]:
     from ..coffee_lab.models import VERDICT_OF
     return {
         "rating": brew.rating, "verdict": VERDICT_OF.get(brew.rating),
+        "brewed_at": brew.brewed_at or brew.recorded_at or None,
         "next_change": brew.next_change, "recipe": brew.recipe,
         # The record keeps the dose and water beside the settings, not in them.
         "settings": {**(brew.settings or {}), "dose_g": brew.dose_g, "water_ml": brew.water_ml},

@@ -33,6 +33,10 @@ _THIS_CUP = ("What this recipe does for this coffee (its temperatures, pours and
 _COACH = ("What changed since the last brew of this recipe with this bag and what to check "
           "in the cup because of it, given that brew's verdict, tasting and planned change; "
           "then one pattern from the rated history, only if a real one exists.")
+_COACH_UNRATED = ("This recipe with this bag has no verdict yet: say what changed since the "
+                  "last brew of it, if anything, and what to notice in this cup so the verdict "
+                  "means something; then one pattern from the rated history, only if a real "
+                  "one exists.")
 _COACH_FIRST = ("There is no earlier brew of this recipe with this bag: say what to check in "
                 "this cup, given the coffee and the recipe; then one pattern from the rated "
                 "history, only if a real one exists.")
@@ -45,9 +49,12 @@ for the person who will drink it. Each text fills one moment of the brew and is
 read in the seconds it lasts. Write in {language}. Plain sentences, at most
 about 60 words per text, no lists, no headings, no emoji.
 
-Reason only from the data below. Do not state facts about coffee's history or
-science, and no figure that is not in the data. When the data does not support
-something, leave it out."""
+Use brewing knowledge to reason: how temperature, grind, ratio, pour structure
+and process shape extraction and taste. Do not tell coffee history or trivia,
+and claim nothing about this coffee beyond its fields below. The screen
+already shows each pour's volume, temperature and pattern: do not repeat those
+numbers, say what they do. When the data does not support something, leave it
+out."""
 
 
 def slot_key(slot: Slot) -> str:
@@ -101,7 +108,14 @@ def build_request(
             coach = _COACH_FIRST
             parts.append("This is the first brew of this recipe with this bag.")
         else:
-            coach = _COACH
+            same = [b for b in bag_brews if b.get("recipe") == recipe]
+            coach = _COACH if any(b.get("verdict") for b in same) else _COACH_UNRATED
+            parts.append(
+                "The last brew of this recipe with this bag: "
+                + (f"on {last['brewed_at'][:10]}, " if last.get("brewed_at") else "")
+                + f"verdict: {last.get('verdict') or 'none'}, "
+                + f"tasting: {json.dumps(last['tasting'], ensure_ascii=False) if last.get('tasting') else 'none'}, "
+                + f"planned change: {last.get('next_change') or 'none'}.")
             before = last.get("settings") or {}
             if not _known_on_both(before, settings):
                 parts.append("What changed since the last brew of this recipe with this bag "

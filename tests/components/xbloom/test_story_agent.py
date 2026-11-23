@@ -140,3 +140,26 @@ async def test_only_the_latest_bag_brews_are_sent():
     many = [_brew(recipe=f"R{n}", grind=n) for n in range(60)]
     _t, (instructions, _) = await _request(bag_brews=many)
     assert '"R19"' in instructions and '"R20"' not in instructions
+
+
+async def test_brewing_knowledge_is_allowed_and_history_is_not():
+    _t, (instructions, _) = await _request()
+    assert "brewing knowledge" in instructions and "history" in instructions
+
+
+async def test_numbers_already_on_screen_are_not_to_be_repeated():
+    _t, (instructions, _) = await _request()
+    assert "already shows" in instructions
+
+
+async def test_the_last_brew_of_the_pair_is_described_even_with_no_verdict_or_tasting():
+    _t, (instructions, _) = await _request(bag_brews=[_brew(recipe="R", grind=48)])
+    last = instructions.split("The last brew of this recipe with this bag", 1)[1].split("\n\n", 1)[0]
+    assert "verdict: none" in last and "tasting: none" in last and "planned change: none" in last
+
+
+async def test_an_unrated_pair_is_coached_toward_what_to_notice():
+    _t, (_i, structure) = await _request(bag_brews=[_brew(recipe="R", grind=48)])
+    assert "no verdict yet" in structure["draining"]["description"]
+    _t, (_i, structure) = await _request(bag_brews=[_brew(recipe="R", verdict="fine", grind=48)])
+    assert "no verdict yet" not in structure["draining"]["description"]
