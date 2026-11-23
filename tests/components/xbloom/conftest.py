@@ -211,7 +211,28 @@ def _inject_global_stubs() -> None:
     restore.RestoreEntity = _base_class("RestoreEntity")
 
     storage = _stub_mod("homeassistant.helpers.storage")
-    storage.Store = _base_class("Store")
+
+    class _Store:
+        """Home Assistant's Store with nothing behind it: loads nothing,
+        saves nowhere. Without these methods a test passed only if another
+        module had swapped in its own Store first."""
+
+        def __init__(self, hass=None, version=None, key=None, *args, **kwargs):
+            self.hass, self.version, self.key = hass, version, key
+
+        async def async_load(self):
+            return None
+
+        async def async_save(self, data):
+            return None
+
+        def async_delay_save(self, data_func, delay=0):
+            return None
+
+        async def async_remove(self):
+            return None
+
+    storage.Store = _Store
 
     issues = _stub_mod("homeassistant.helpers.issue_registry")
     issues.async_create_issue = MagicMock()
@@ -262,7 +283,14 @@ def _inject_global_stubs() -> None:
 
     uc = _stub_mod("homeassistant.helpers.update_coordinator")
     uc.DataUpdateCoordinator = _base_class("DataUpdateCoordinator")
-    uc.CoordinatorEntity = _base_class("CoordinatorEntity")
+    coordinator_entity = _base_class("CoordinatorEntity")
+
+    def _coordinator_init(self, coordinator=None, *args, **kwargs):
+        # Real CoordinatorEntity keeps its coordinator; entities read it.
+        self.coordinator = coordinator
+
+    coordinator_entity.__init__ = _coordinator_init
+    uc.CoordinatorEntity = coordinator_entity
     uc.UpdateFailed = type("UpdateFailed", (Exception,), {})
 
     # -- components -----------------------------------------------------------
