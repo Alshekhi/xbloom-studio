@@ -154,28 +154,17 @@ condition:
     value_template: "{{ message | trim != '' }}"
 
 action:
-  - choose:
-      - conditions: "{{ method == 'alexa' }}"
-        sequence:
-          - action: notify.alexa_media
-            data:
-              target: !input speakers
-              data:
-                type: announce
-              message: "{{ message }}"
-      - conditions: "{{ method == 'tts' }}"
-        sequence:
-          - action: tts.speak
-            target:
-              entity_id: "{{ tts_engine }}"
-            data:
-              media_player_entity_id: !input speakers
-              message: "{{ message }}"
-      - conditions: "{{ method == 'notify' }}"
-        sequence:
-          - action: "{{ notify_service }}"
-            data:
-              message: "{{ message }}"
+  # Through the integration's one queue: a message waits until the one before
+  # it, from any xBloom blueprint, has been said.
+  - action: xbloom.announce
+    data:
+      message: "{{ message }}"
+      method: "{{ method }}"
+      targets: !input speakers
+      tts_engine: "{{ tts_engine }}"
+      notify_service: "{{ notify_service }}"
+      alexa_type: announce
+      kind: announcement
 
 mode: queued
 max: 5

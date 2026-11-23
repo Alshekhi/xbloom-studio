@@ -447,28 +447,17 @@ action:
                      (method == 'notify' and repeat.item == 'first')
                      or (method != 'notify' and to | length > 0)) }}
           then:
-            - choose:
-                - conditions: "{{ method == 'alexa' }}"
-                  sequence:
-                    - action: notify.alexa_media
-                      data:
-                        target: "{{ to }}"
-                        data:
-                          type: "{{ alexa_type }}"
-                        message: "{{ text }}"
-                - conditions: "{{ method == 'tts' }}"
-                  sequence:
-                    - action: tts.speak
-                      target:
-                        entity_id: "{{ tts_engine }}"
-                      data:
-                        media_player_entity_id: "{{ to }}"
-                        message: "{{ text }}"
-                - conditions: "{{ method == 'notify' }}"
-                  sequence:
-                    - action: "{{ notify_service }}"
-                      data:
-                        message: "{{ text }}"
+            # Through the integration's one queue: a message waits until the
+            # one before it, from any xBloom blueprint, has been said.
+            - action: xbloom.announce
+              data:
+                message: "{{ text }}"
+                method: "{{ method }}"
+                targets: "{{ to }}"
+                tts_engine: "{{ tts_engine }}"
+                notify_service: "{{ notify_service }}"
+                alexa_type: "{{ alexa_type }}"
+                kind: announcement
 
 mode: queued
 max: 5

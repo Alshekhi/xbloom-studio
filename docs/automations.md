@@ -23,12 +23,14 @@ it is; Home Assistant shows a repair notice when a newer one is available.
 | **Brew announcements** | Announces the coffee ready, or a brew that could not start, to the whole home; the brew starting, each step of it, and a cancellation can go to a speaker by the machine, the only one that says the recipe name. | [Import][bp-brew] |
 | **Live-session announcements** | Speaks live feedback while you turn the machine's knobs — weight, grind size, temperature, which module you're on. Needs the **Connect** switch on. | [Import][bp-live] |
 | **Machine fault announcements** | Speaks up when the water is too low to finish a brew and by how much, when a brew pauses for water, when the grinder is out of beans, or when the machine reports a dose or gear problem. | [Import][bp-fault] |
+| **Brew story announcements** | Speaks the brew story as it appears, in the story's own language: the bag's part and the teaser for the next cup, or every story part, as the **Spoken story parts** select says. Never the line about each pour. Needs **Brew Stories** on. | [Import][bp-story] |
 | **Ask how the coffee was** | With Coffee Lab on, asks how each coffee was a quarter of an hour after the last cup: on a phone, with Again / Fine / Not again buttons, or aloud through a voice assistant that keeps the answer and what was said about the taste. | [Import][bp-rating] |
 
 [bp-brew]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Fbrew_announce.yaml
 [bp-live]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Flive_control_announce.yaml
 [bp-fault]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Fmachine_fault_announce.yaml
 [bp-rating]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Frating_ask.yaml
+[bp-story]: https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FAlshekhi%2Fxbloom-studio%2Fmain%2Fcustom_components%2Fxbloom%2Fblueprints%2Fstory_announce.yaml
 
 The **Import** links are only needed without the integration installed, for
 example to try a blueprint elsewhere. The files are in
@@ -41,7 +43,15 @@ announce**, **Announce with** offers three choices:
 - **Speaker (TTS)** — any TTS engine (Piper, Google Translate, Cloud) on any media player.
 - **Notification** — any `notify.*` service, so the text arrives as a phone notification instead of speech.
 
-All of them are **bilingual, English or Arabic**, chosen per automation. You can
+**They never talk over each other.** Every one of them speaks through
+`xbloom.announce`, one message at a time: each waits until the one before it,
+from any of them, has been said. Brew, fault and live-session messages go
+before a story part; a story part that waited past its moment is dropped
+rather than said late, and a spoken rating question starts once the
+announcements are quiet. Your own automations can join the same line by
+calling `xbloom.announce` instead of speaking directly.
+
+All of them but the story announcements are **bilingual, English or Arabic**, chosen per automation; the story is spoken in the language it is told in (**Story language**). You can
 create more than one automation from a blueprint — for example, English on one
 speaker and Arabic on another. Each blueprint's entities are filled in for you
 under **xBloom entities**, collapsed.

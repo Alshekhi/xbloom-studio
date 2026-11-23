@@ -153,6 +153,11 @@ action:
                         {{ ns.out }}
       - conditions: "{{ method == 'voice' }}"
         sequence:
+          # Not over an announcement still being said: the question starts
+          # once the xBloom announcements are quiet.
+          - action: xbloom.wait_for_announcements
+            data:
+              timeout_s: 90
           - action: assist_satellite.start_conversation
             target:
               entity_id: "{{ satellite }}"

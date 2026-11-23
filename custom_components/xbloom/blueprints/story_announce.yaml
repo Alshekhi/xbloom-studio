@@ -111,29 +111,18 @@ condition:
       {{ message != '' and (method == 'notify' or speakers | length > 0) }}
 
 action:
-  - choose:
-      - conditions: "{{ method == 'alexa' }}"
-        sequence:
-          - action: notify.alexa_media
-            data:
-              target: "{{ speakers }}"
-              data:
-                type: tts
-              message: "{{ message }}"
-      - conditions: "{{ method == 'tts' }}"
-        sequence:
-          - action: tts.speak
-            target:
-              entity_id: "{{ tts_engine }}"
-            data:
-              media_player_entity_id: "{{ speakers }}"
-              message: "{{ message }}"
-      - conditions: "{{ method == 'notify' }}"
-        sequence:
-          - action: "{{ notify_service }}"
-            data:
-              message: "{{ message }}"
+  # Through the integration's one queue: behind any brew, fault or
+  # live-session announcement, and dropped if its moment passes first.
+  - action: xbloom.announce
+    data:
+      message: "{{ message }}"
+      method: "{{ method }}"
+      targets: "{{ speakers }}"
+      tts_engine: "{{ tts_engine }}"
+      notify_service: "{{ notify_service }}"
+      alexa_type: tts
+      kind: story
 
-# Parts follow each other closely: each is spoken in turn, none cut off.
+# The queue keeps the order; the automation only hands each part over.
 mode: queued
 max: 5
