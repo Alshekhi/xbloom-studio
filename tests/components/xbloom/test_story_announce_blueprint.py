@@ -61,3 +61,9 @@ def test_its_input_keys_match_the_other_blueprints_delivery():
     assert {"delivery_method", "speakers", "tts_engine", "notify_service"} <= set(story)
     for key in ("delivery_method", "tts_engine", "notify_service"):
         assert story[key]["selector"] == brew[key]["selector"]
+
+
+def test_a_removed_story_sensor_says_nothing_and_raises_nothing():
+    gone = {"platform": "state", "to_state": None,
+            "from_state": {"state": "Heading", "attributes": {"kind": "bag", "story": "x"}}}
+    assert render(STORY, gone, states={PARTS: "every_part"})["message"] == ""

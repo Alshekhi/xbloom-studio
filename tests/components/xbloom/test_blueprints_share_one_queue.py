@@ -54,3 +54,16 @@ def test_story_parts_are_the_story_kind_and_the_rest_are_announcements():
 def test_a_spoken_rating_question_waits_for_the_announcements_first():
     actions = [a["action"] for a in _actions(_load("rating_ask.yaml")["action"])]
     assert actions.index("xbloom.wait_for_announcements") < actions.index("assist_satellite.start_conversation")
+
+
+@pytest.mark.parametrize("name", SPEAKING)
+def test_a_delivery_field_for_another_method_is_sent_empty(name):
+    import jinja2
+    env = jinja2.Environment()
+    for a in (a for a in _actions(_load(name)["action"]) if a["action"] == "xbloom.announce"):
+        for field, own in (("notify_service", "notify"), ("tts_engine", "tts")):
+            template = a["data"][field]
+            for method in ("alexa", "tts", "notify"):
+                rendered = env.from_string(template).render(
+                    method=method, notify_service="mobile_app_typed_without_prefix", tts_engine="tts.piper")
+                assert (rendered != "") == (method == own), (name, field, method, rendered)

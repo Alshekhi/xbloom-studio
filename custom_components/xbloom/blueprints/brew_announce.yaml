@@ -454,8 +454,10 @@ action:
                 message: "{{ text }}"
                 method: "{{ method }}"
                 targets: "{{ to }}"
-                tts_engine: "{{ tts_engine }}"
-                notify_service: "{{ notify_service }}"
+                # Only the field the chosen method uses: one left filled in from
+                # another method is not checked, and cannot stop the message.
+                tts_engine: "{{ tts_engine if method == 'tts' else '' }}"
+                notify_service: "{{ notify_service if method == 'notify' else '' }}"
                 alexa_type: "{{ alexa_type }}"
                 kind: announcement
 

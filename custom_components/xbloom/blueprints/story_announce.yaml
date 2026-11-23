@@ -79,9 +79,9 @@ variables:
   tts_engine: !input tts_engine
   speakers: !input speakers
   parts_entity: !input spoken_parts_entity
-  kind: "{{ trigger.to_state.attributes.get('kind') or '' }}"
-  story: "{{ trigger.to_state.attributes.get('story') or '' }}"
-  teaser: "{{ trigger.to_state.attributes.get('teaser') or '' }}"
+  kind: "{{ (trigger.to_state.attributes if trigger.to_state else {}).get('kind') or '' }}"
+  story: "{{ (trigger.to_state.attributes if trigger.to_state else {}).get('story') or '' }}"
+  teaser: "{{ (trigger.to_state.attributes if trigger.to_state else {}).get('teaser') or '' }}"
   # The bag's part and the teaser alone, or every story part whole.
   part: >-
     {%- if states(parts_entity) == 'every_part' -%}
@@ -100,9 +100,13 @@ variables:
 
 trigger:
   # A new story part, not a new pour line: only the part's text is watched.
+  # The sensor removed on a reload has no state: nothing to say.
   - platform: state
     entity_id: !input story_entity
     attribute: story
+    # With `attribute`, this compares the story text, not the entity's state;
+    # it is here for the shared restart check. The sensor itself starts empty
+    # and is never restored, so a restart replays nothing.
     not_from: unavailable
 
 condition:
@@ -118,8 +122,10 @@ action:
       message: "{{ message }}"
       method: "{{ method }}"
       targets: "{{ speakers }}"
-      tts_engine: "{{ tts_engine }}"
-      notify_service: "{{ notify_service }}"
+      # Only the field the chosen method uses: one left filled in from
+      # another method is not checked, and cannot stop the message.
+      tts_engine: "{{ tts_engine if method == 'tts' else '' }}"
+      notify_service: "{{ notify_service if method == 'notify' else '' }}"
       alexa_type: tts
       kind: story
 

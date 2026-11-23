@@ -142,6 +142,8 @@ class AnnouncementQueue:
                 await self._call("notify", item["notify_service"].split(".", 1)[1],
                                  {"message": message}, blocking=True, context=context)
             else:
+                _LOGGER.debug("xbloom: an announcement by %s had nowhere to go "
+                              "(no speakers, TTS engine or notify service)", method)
                 return False
         except Exception as err:  # noqa: BLE001 — one speaker failing must not stop the rest
             _LOGGER.warning("xbloom: an announcement was not delivered (%s: %s)",

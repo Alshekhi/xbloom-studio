@@ -2588,7 +2588,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
 
     async def handle_announce(call) -> None:
         entry.runtime_data.announcements.add({
-            "message": call.data["message"], "method": call.data.get("method", "alexa"),
+            "message": str(call.data["message"]), "method": call.data.get("method", "alexa"),
             "targets": announce_media_players(call.data.get("targets")),
             "tts_engine": announce_tts_engine(call.data.get("tts_engine")),
             "notify_service": announce_notify_service(call.data.get("notify_service")),
@@ -2604,7 +2604,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     hass.services.async_register(
         DOMAIN, "announce", handle_announce,
         schema=vol.Schema({
-            vol.Required("message"): str,
+            # A message rendered from a template may arrive as a number.
+            vol.Required("message"): vol.Coerce(str),
             vol.Optional("method", default="alexa"): vol.In(["alexa", "tts", "notify"]),
             vol.Optional("targets"): announce_media_players,
             vol.Optional("tts_engine"): announce_tts_engine,
