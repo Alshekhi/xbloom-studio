@@ -11,6 +11,8 @@ from typing import Any, Protocol
 
 STORAGE_VERSION = 1
 STORAGE_KEY = "xbloom.stories.{entry_id}"
+# The texts a story agent told a bag that the next request lists, newest kept.
+AGENT_TOLD_KEEP = 20
 
 
 class Storage(Protocol):
@@ -29,6 +31,8 @@ def _empty() -> dict[str, Any]:
         # The Story language picked; None until one is, so Home Assistant's
         # own is followed.
         "language": None,
+        # Per bag, what a story agent told it, oldest first.
+        "agent_told": {},
     }
 
 
@@ -67,6 +71,9 @@ class StoryMemory:
     def brews(self) -> int:
         return self._data["brews"]
 
+    def agent_told(self, bean_id: str | None) -> list[str]:
+        return list(self._data["agent_told"].get(bean_id or "", []))
+
     @property
     def language(self) -> str | None:
         return self._data["language"]
@@ -78,6 +85,7 @@ class StoryMemory:
     async def async_record_brew(
         self, bean_id: str | None, *, told: list[str], facts: list[str],
         big_story_part_told: bool, country: str | None, teaser: dict[str, Any] | None,
+        agent_texts: list[str] | None = None,
     ) -> None:
         story = self._data["big_story"]
         chapter, part = self.big_story_position(bean_id)
@@ -90,6 +98,10 @@ class StoryMemory:
             bag = self._data["bags"].setdefault(bean_id, {"chapter": 0, "told": []})
             bag["chapter"] += 1
             bag["told"].extend(t for t in told if t not in bag["told"])
+            if agent_texts:
+                kept = self._data["agent_told"].setdefault(bean_id, [])
+                kept.extend(agent_texts)
+                del kept[:-AGENT_TOLD_KEEP]
         seen = self._data["facts_seen"]
         seen.extend(f for f in facts if f not in seen)
         self._data["teaser"] = teaser
@@ -97,5 +109,6 @@ class StoryMemory:
         await self._store.async_save(self._data)
 
     async def async_forget_bag(self, bean_id: str) -> None:
-        if self._data["bags"].pop(bean_id, None) is not None:
+        told = self._data["agent_told"].pop(bean_id, None)
+        if self._data["bags"].pop(bean_id, None) is not None or told is not None:
             await self._store.async_save(self._data)

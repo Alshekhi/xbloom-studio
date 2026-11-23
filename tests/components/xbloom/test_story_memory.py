@@ -82,3 +82,28 @@ async def test_a_forgotten_bag_starts_its_story_again():
     await _brew(memory, "bag-1", told=["bag.intro.0"])
     await memory.async_forget_bag("bag-1")
     assert memory.bag("bag-1") == {"chapter": 0, "told": []}
+
+
+async def test_agent_texts_are_kept_per_bag_newest_twenty():
+    memory = await _memory()
+    for n in range(3):
+        await _brew(memory, "bag-1", agent_texts=[f"t{n}a", f"t{n}b"])
+    await _brew(memory, "bag-2", agent_texts=["other"])
+    assert memory.agent_told("bag-1")[-2:] == ["t2a", "t2b"]
+    assert "t0a" not in memory.agent_told("bag-2")
+    for n in range(3, 14):
+        await _brew(memory, "bag-1", agent_texts=[f"t{n}a", f"t{n}b"])
+    told = memory.agent_told("bag-1")
+    assert len(told) == 20 and told[-1] == "t13b"
+
+
+async def test_a_file_from_before_agent_mode_loads():
+    memory = await _memory({"bags": {}, "facts_seen": [], "brews": 3})
+    assert memory.agent_told("x") == [] and memory.agent_told(None) == []
+
+
+async def test_forgetting_a_bag_forgets_what_the_agent_told_it():
+    memory = await _memory()
+    await _brew(memory, "bag-1", agent_texts=["a"])
+    await memory.async_forget_bag("bag-1")
+    assert memory.agent_told("bag-1") == []
