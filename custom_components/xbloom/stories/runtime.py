@@ -30,7 +30,7 @@ _LOGGER = logging.getLogger(__name__)
 
 EV_BREW_STARTED = "xbloom_brew_started"
 EV_MACHINE_BREW_STARTED = "xbloom_machine_brew_started"
-NOTHING = {"heading": None, "now": None, "story": None, "kind": None}
+NOTHING = {"heading": None, "now": None, "story": None, "kind": None, "teaser": None}
 # The brews read for a bag's history: newest first, far more than one bag holds.
 HISTORY_BREWS = 100
 # Rated brews of any bag a story agent is given to find patterns in.
@@ -243,7 +243,7 @@ class StoryRuntime:
         # one the agent wrote, so a slot that has passed never shows late.
         if (slot := self._running_story_slot(asked.stories)) is not None and slot in stories:
             heading, text = stories[slot]
-            self._publish({**self.current, "heading": heading, "story": text, "kind": slot.kind})
+            self._publish({**self.current, **self._part(slot, heading, text)})
 
     def _running_story_slot(self, slots) -> Slot | None:
         """Of `slots`, the one that began last and is still on, from the stage now."""
@@ -302,7 +302,7 @@ class StoryRuntime:
             return
         if found:
             slot, (heading, text) = found
-            shown.update(heading=heading, story=text, kind=slot.kind)
+            shown.update(self._part(slot, heading, text))
         self._publish(shown)
 
     async def _record(self) -> None:
@@ -316,6 +316,13 @@ class StoryRuntime:
             country=(self._bag or {}).get("country"), teaser=self._teaser_shown(texts),
             agent_texts=self._agent_texts, advance_bag=self._built is None,
         )
+
+    def _part(self, slot: Slot, heading: str, text: str) -> dict[str, Any]:
+        """A story part as shown, with the teaser it ends on given on its own."""
+        teaser = ((self._texts.teaser if self._texts else None) or {}).get("text")
+        ends_on = slot.at == "draining" and teaser and text.endswith(teaser)
+        return {"heading": heading, "story": text, "kind": slot.kind,
+                "teaser": teaser if ends_on else None}
 
     def _teaser_shown(self, texts: BrewTexts) -> dict | None:
         """The teaser, unless an agent brew's closing line never showed it."""

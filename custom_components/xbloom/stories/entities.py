@@ -45,7 +45,7 @@ class XBloomBrewStorySensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         current = self._runtime.current if self._runtime else {}
-        return {key: current.get(key) for key in ("now", "story", "kind")}
+        return {key: current.get(key) for key in ("now", "story", "kind", "teaser")}
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()

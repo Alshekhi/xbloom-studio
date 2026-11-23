@@ -110,7 +110,7 @@ async def test_idle_clears_what_is_shown():
     await _started(runtime)
     await runtime.async_on_stage("pouring", 1)
     await runtime.async_on_stage("idle", None)
-    assert runtime.current == {"heading": None, "now": None, "story": None, "kind": None}
+    assert runtime.current == {"heading": None, "now": None, "story": None, "kind": None, "teaser": None}
 
 
 async def test_off_shows_nothing():
@@ -172,7 +172,7 @@ async def test_turning_stories_off_mid_brew_clears_them():
     await _started(runtime)
     await runtime.async_on_stage("pouring", 1)
     runtime.set_mode("off")
-    assert runtime.current == {"heading": None, "now": None, "story": None, "kind": None}
+    assert runtime.current == {"heading": None, "now": None, "story": None, "kind": None, "teaser": None}
     await runtime.async_on_stage("pouring", 2)
     await runtime.async_on_stage("done", None)
     assert runtime.current["now"] is None and store.saves == 0
@@ -417,3 +417,28 @@ async def test_a_failed_agent_brew_records_no_teaser():
     await runtime.async_on_stage("draining", 4)
     await runtime.async_on_stage("done", None)
     assert runtime.memory.teaser is None
+
+
+async def test_draining_carries_the_teaser_on_its_own_and_other_stages_do_not():
+    runtime, _ = await _runtime()
+    await _started(runtime)
+    await runtime.async_on_stage("waiting", 1)
+    assert runtime.current.get("teaser") is None
+    await runtime.async_on_stage("draining", 4)
+    teaser = runtime._texts.teaser
+    assert teaser and runtime.current["teaser"] == teaser["text"]
+    assert runtime.current["story"].endswith(teaser["text"])
+
+
+async def test_an_agent_closing_line_carries_the_teaser_too():
+    runtime, _ = await _agent_runtime()
+    await _started(runtime)
+    await runtime._agent_task
+    await runtime.async_on_stage("draining", 4)
+    assert runtime.current["teaser"] and runtime.current["story"].endswith(runtime.current["teaser"])
+
+
+def test_the_story_sensor_shows_the_teaser_attribute():
+    entry = MagicMock()
+    entry.runtime_data.stories.current = {"heading": "h", "now": None, "story": "s. T.", "kind": "you", "teaser": "T."}
+    assert XBloomBrewStorySensor(entry).extra_state_attributes["teaser"] == "T."
