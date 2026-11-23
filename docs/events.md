@@ -6,7 +6,7 @@ can your own automations or a service outside Home Assistant.
 
 | Event | When | Payload |
 |---|---|---|
-| `xbloom_brew_started` | the machine has accepted the brew — every step, including execute | `recipe_name`, `total_pours`, `recipe_water_ml`, `pours` (each pour's running water total `water_ml` and the wait after it `wait_s`) |
+| `xbloom_brew_started` | the machine has accepted the brew — every step, including execute | `recipe_name`, `total_pours`, `recipe_water_ml`, `pours` (each pour's running water total `water_ml` and the wait after it `wait_s`), `settings` (`grind`, `water_ml`, `ratio`, `temperature_c` and `flow_rate` when every pour shares them, `dose_g`) |
 | `xbloom_brew_completed` | **The brew finished.** Key on this one. | `recipe_id`, `recipe_name`, `dose_g`, `cup_type`, `outcome`, `started_at`, `first_pour_at`, `ended_at`, `duration_s` (first pour to the machine's end signal; empty when either went unheard), and what it was made with: `grind`, `water_ml`, `ratio`, `temperature_c`, `flow_rate` (a value the pours disagree on is omitted rather than guessed). When the tank's low-water switch read low at the end, also `tank_low: true`, and `water_left_ml` when the switch tripped during this brew |
 | `xbloom_brew_failed` | The brew could not start, or the machine gave up on it | `reason`, `recipe_name`, sometimes `step` / `error`; with `reason: no_water`, `water_needed_ml`, the recipe's water |
 | `xbloom_brew_stopped` | Someone stopped the brew | `by`, `recipe_name`, `ground` (whether the grinder had run), `dose_g` |
@@ -197,7 +197,7 @@ change and test `trigger.to_state.attributes.event_type`:
 
 | Event | Fired when | Data |
 |---|---|---|
-| `xbloom_brew_started` | the machine accepts the brew (also fires with Connect off); a refused brew fires `xbloom_brew_failed` instead | `recipe_name`, `total_pours`, `recipe_water_ml`, `pours` (each pour's running water total `water_ml` and the wait after it `wait_s`) |
+| `xbloom_brew_started` | the machine accepts the brew (also fires with Connect off); a refused brew fires `xbloom_brew_failed` instead | `recipe_name`, `total_pours`, `recipe_water_ml`, `pours` (each pour's running water total `water_ml` and the wait after it `wait_s`), `settings` (`grind`, `water_ml`, `ratio`, `temperature_c` and `flow_rate` when every pour shares them, `dose_g`) |
 | `xbloom_connect_ready` / `_connecting` / `_failed` / `_stopped` / `_auto_stopped` | the live session changes state | `reason` on failures and stops; `for_recipe: true` on connecting and ready when the session was opened only to send a picked recipe |
 | `xbloom_scale_weight_stable` | the weight settles while you're on the scale | `weight_g`, `unit` |
 | `xbloom_grinder_knob_changed` | a grinder knob is turned | `parameter`, `value` |

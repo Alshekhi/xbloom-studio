@@ -394,6 +394,22 @@ def _brew_settings(recipe: dict) -> dict:
     }
 
 
+def brew_started_payload(recipe_name, total_pours: int, recipe: dict, meta: dict) -> dict:
+    """What `xbloom_brew_started` carries. A public contract: add keys, never rename one."""
+    from .brew_stage import pour_plan
+    from .water import recipe_water_ml
+
+    return {
+        "recipe_name": recipe_name, "total_pours": total_pours,
+        "recipe_water_ml": round(recipe_water_ml(recipe)),
+        "pours": pour_plan(recipe),
+        # What this brew is made with, so a change since the last brew of the
+        # same recipe can be told from the record rather than guessed.
+        "settings": {**_brew_settings(recipe), "dose_g": recipe.get("dose_g")},
+        **meta,
+    }
+
+
 def _resolve_ble_name(entry: ConfigEntry) -> str | None:
     """Pick a BLE advertiser name from entry data — explicit or derived."""
     name = entry.data.get(CONF_BLE_NAME)
@@ -1280,9 +1296,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                     # later than this.
                     hass.bus.async_fire(
                         "xbloom_brew_started",
-                        {"recipe_name": recipe_name, "total_pours": total_pours,
-                         "recipe_water_ml": round(recipe_water_ml(recipe)),
-                         "pours": pour_plan(recipe), **meta},
+                        brew_started_payload(recipe_name, total_pours, recipe, meta),
                     )
                     started = True
                     outcome = await _await_brew_outcome(
