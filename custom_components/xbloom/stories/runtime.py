@@ -149,11 +149,16 @@ class StoryRuntime:
                         dt_util.now().date())
         self._brew_id += 1
         self._agent_texts = []
+        if self._agent_task is not None and not self._agent_task.done():
+            # The last brew's request would only be dropped when it came back.
+            self._agent_task.cancel()
         if self.mode == "agent":
             # Pour lines are always built-in; the stories are the agent's or none.
             self._texts = BrewTexts(pour_lines=built.pour_lines)
-            self._agent_task = self.hass.async_create_task(self._ask_agent(
-                self._brew_id, built, plan, history, content.lang))
+            # Tied to the entry: cancelled on unload, never awaited at shutdown.
+            self._agent_task = self.entry.async_create_background_task(
+                self.hass, self._ask_agent(self._brew_id, built, plan, history, content.lang),
+                "xbloom brew story agent")
         else:
             self._texts = built
         # A brew already under way when its texts were ready (adopted from
@@ -197,12 +202,14 @@ class StoryRuntime:
         self._texts.teaser = teaser
         self._texts.big_story_part_told = any(s.kind == "big_story" for s in stories)
         self._agent_texts = [text for _heading, text in stories.values()]
-        if (slot := self._running_story_slot()) is not None:
+        # Among the slots asked for: one the agent left empty shows nothing,
+        # rather than letting a slot that has passed show late.
+        if (slot := self._running_story_slot(built.stories)) is not None and slot in stories:
             heading, text = stories[slot]
             self._publish({**self.current, "heading": heading, "story": text, "kind": slot.kind})
 
-    def _running_story_slot(self) -> Slot | None:
-        """The story slot that began last and is still on, from the stage now."""
+    def _running_story_slot(self, slots) -> Slot | None:
+        """Of `slots`, the one that began last and is still on, from the stage now."""
         stage, pour = self._stage
         if stage == "draining":
             now = (float("inf"), 0)
@@ -216,7 +223,7 @@ class StoryRuntime:
                 return (float("inf"), 0)
             return (slot.pour, 0 if slot.at == "pour" else 1)
 
-        begun = [s for s in self._texts.stories if position(s) <= now] if self._texts else []
+        begun = [s for s in slots if position(s) <= now]
         return max(begun, key=position, default=None)
 
     async def async_brew_started(self, data: dict[str, Any]) -> None:

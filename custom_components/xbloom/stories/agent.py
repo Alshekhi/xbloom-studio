@@ -97,12 +97,17 @@ def parse_reply(
     texts: BrewTexts, data: dict[str, Any],
 ) -> tuple[dict[Slot, tuple[str, str]], dict[str, Any] | None]:
     """The agent's texts under the built-in headings, and its teaser."""
+    raw = data.get("teaser")
+    teaser = raw.strip() if isinstance(raw, str) else ""
     stories: dict[Slot, tuple[str, str]] = {}
     for slot, (heading, _text) in texts.stories.items():
         value = data.get(slot_key(slot))
-        if isinstance(value, str) and value.strip():
-            stories[slot] = (heading, value.strip())
-    teaser = data.get("teaser")
-    if isinstance(teaser, str) and teaser.strip():
-        return stories, {"kind": "agent", "key": None, "text": teaser.strip()}
+        text = value.strip() if isinstance(value, str) else ""
+        # The closing line ends on the teaser, as the built-in one does.
+        if slot.at == "draining" and teaser:
+            text = f"{text} {teaser}".strip()
+        if text:
+            stories[slot] = (heading, text)
+    if teaser:
+        return stories, {"kind": "agent", "key": None, "text": teaser}
     return stories, None

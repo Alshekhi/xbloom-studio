@@ -46,7 +46,7 @@ async def _runtime(lab=None, agent=None):
     store = _Store()
     hass = MagicMock()
     hass.config.language = "en"
-    hass.async_create_task = asyncio.ensure_future
+    entry.async_create_background_task = lambda _hass, coro, _name: asyncio.ensure_future(coro)
     if agent is not None:
         hass.services.async_call = agent
     runtime = StoryRuntime(hass, entry, store=store, content=Content.load("en", FIXTURE))
@@ -307,7 +307,7 @@ async def test_a_reply_for_an_earlier_brew_is_dropped():
     await runtime.async_on_stage("waiting", 1)
     runtime._agent_task.cancel()
     gate.set()
-    await first
+    await asyncio.gather(first, return_exceptions=True)
     assert runtime.current["story"] is None
 
 
@@ -338,7 +338,8 @@ async def test_an_agent_brew_records_its_texts_and_teaser_not_built_in_facts():
     await runtime.async_on_stage("draining", 4)
     await runtime.async_on_stage("done", None)
     memory = runtime.memory
-    assert memory.agent_told(bag.id) == ["Agent bag.", "Agent history.", "Agent fact.", "Agent closing."]
+    assert memory.agent_told(bag.id) == [
+        "Agent bag.", "Agent history.", "Agent fact.", "Agent closing. Next: the rain."]
     assert memory.teaser == {"kind": "agent", "key": None, "text": "Next: the rain."}
     assert memory.facts_seen == set()
 
@@ -352,3 +353,26 @@ async def test_without_an_agent_set_agent_mode_shows_pour_lines_only():
     await runtime.async_on_stage("waiting", 1)
     assert runtime.current["now"].startswith("Pour 1:") and runtime.current["story"] is None
     runtime.hass.services.async_call.assert_not_called()
+
+
+async def test_a_late_reply_that_left_the_running_slot_empty_shows_nothing():
+    gate = asyncio.Event()
+    runtime, _ = await _agent_runtime(reply={**REPLY, "wait_2": ""}, gate=gate)
+    await _started(runtime)
+    await runtime.async_on_stage("pouring", 1)
+    await runtime.async_on_stage("waiting", 1)
+    await runtime.async_on_stage("pouring", 2)
+    await runtime.async_on_stage("waiting", 2)
+    gate.set()
+    await runtime._agent_task
+    assert runtime.current["story"] is None
+
+
+async def test_a_new_brew_cancels_the_last_brews_request():
+    runtime, _ = await _agent_runtime(gate=asyncio.Event())
+    await _started(runtime)
+    first = runtime._agent_task
+    await _started(runtime)
+    await asyncio.sleep(0)
+    assert first.cancelled()
+    runtime._agent_task.cancel()

@@ -45,7 +45,7 @@ async def test_the_reply_keeps_the_built_in_heading_and_takes_the_agents_text():
     texts, _plan_, _ = await _texts()
     slot, (heading, _text) = next(iter(texts.stories.items()))
     stories, teaser = parse_reply(texts, {slot_key(slot): " Hello. ", "teaser": "Next: water."})
-    assert stories == {slot: (heading, "Hello.")}
+    assert stories[slot] == (heading, "Hello.")
     assert teaser == {"kind": "agent", "key": None, "text": "Next: water."}
 
 
@@ -54,3 +54,12 @@ async def test_an_empty_or_missing_field_gives_no_part_for_that_slot():
     first, second = list(texts.stories)[:2]
     stories, teaser = parse_reply(texts, {slot_key(first): "  ", "teaser": ""})
     assert first not in stories and second not in stories and teaser is None
+
+
+async def test_the_teaser_ends_the_draining_text_and_stands_alone_if_the_line_is_empty():
+    texts, _plan_, _ = await _texts()
+    draining = next(s for s in texts.stories if s.at == "draining")
+    stories, _ = parse_reply(texts, {"draining": "Enjoy it.", "teaser": "Next: water."})
+    assert stories[draining][1] == "Enjoy it. Next: water."
+    stories, _ = parse_reply(texts, {"draining": "", "teaser": "Next: water."})
+    assert stories[draining][1] == "Next: water."
