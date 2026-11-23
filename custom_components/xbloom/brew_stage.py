@@ -209,7 +209,9 @@ class XBloomBrewStageSensor(SensorEntity):
                     self._water = water
                     self._set("waiting", self._pour, self._countdown(step))
                 elif (self._attr_native_value == "waiting" and self._next_pour_at is not None
-                        and self._water is not None and water > self._water):
+                        and self._water is not None and water > self._water
+                        # This pour's own last millilitres, never the next pour's.
+                        and water <= step["water_ml"] + _WATER_SLACK_ML):
                     # Still the last millilitres: the machine's pause starts when
                     # the water stops, seen once as 1.7 s after the reading came
                     # within a millilitre of the total.

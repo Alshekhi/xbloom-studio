@@ -399,3 +399,15 @@ async def test_a_reading_that_does_not_rise_leaves_the_countdown(stage) -> None:
     stage.now = NOW + timedelta(seconds=3)
     stage.water(43)
     assert stage.attrs["next_pour_at"] == before
+
+
+async def test_the_next_pours_water_never_restarts_the_last_wait(stage) -> None:
+    # The next pour's readings can arrive before the frame that starts it.
+    stage.brew_started()
+    stage.status("brewing")
+    stage.pour(0)
+    stage.water(43)
+    before = stage.attrs["next_pour_at"]
+    stage.now = NOW + timedelta(seconds=40)
+    stage.water(48)
+    assert stage.attrs["next_pour_at"] == before
