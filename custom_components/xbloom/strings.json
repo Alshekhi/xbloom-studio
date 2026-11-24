@@ -819,6 +819,9 @@
       },
       "coffee_lab_xpod_stock": {
         "name": "xPod stock"
+      },
+      "coffee_lab_todays_cup": {
+        "name": "Today's cup"
       }
     },
     "switch": {
@@ -995,6 +998,12 @@
       },
       "leave_recipe_unchanged": {
         "name": "Leave Recipe Unchanged"
+      },
+      "coffee_lab_use_todays_cup": {
+        "name": "Use today's cup"
+      },
+      "coffee_lab_another_cup": {
+        "name": "Another cup"
       }
     },
     "text": {

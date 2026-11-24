@@ -35,7 +35,11 @@ from homeassistant.core import HomeAssistant, ServiceResponse, SupportsResponse,
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_change,
+    async_track_time_interval,
+)
 
 from .const import (
     CONF_BLE_ADDRESS, CONF_BLE_NAME, CONF_BREWERS, CONF_CALLBACK_TARGETS, CONF_COFFEE_LAB,
@@ -558,6 +562,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             async_dispatcher_connect(hass, SIGNAL_COFFEE_LAB_UPDATED, watch.schedule))
         entry.async_on_unload(watch.stop)
         watch.schedule()
+        # Today's cup: kept current on every change, a change of drink, at
+        # midnight and when a brew ends (coffee_lab/todays_cup_runtime.py).
+        from .coffee_lab.todays_cup_runtime import BREW_STATUS, BUSY, TodaysCup
+        cup = TodaysCup(hass, lab, browser, lambda: coordinator.data or [])
+        lab.todays_cup = cup
+        last_drink = [browser.drink]
+
+        @callback
+        def _drink_maybe_changed() -> None:
+            if browser.drink != last_drink[0]:
+                last_drink[0] = browser.drink
+                cup.schedule()
+
+        @callback
+        def _brew_status(event) -> None:
+            old, new = event.data.get("old_state"), event.data.get("new_state")
+            if old is not None and old.state in BUSY and (new is None or new.state not in BUSY):
+                cup.schedule()
+
+        entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_COFFEE_LAB_UPDATED, cup.schedule))
+        entry.async_on_unload(async_dispatcher_connect(hass, browser.signal, _drink_maybe_changed))
+        entry.async_on_unload(async_track_state_change_event(hass, [BREW_STATUS], _brew_status))
+        entry.async_on_unload(async_track_time_change(hass, cup.schedule, hour=0, minute=0, second=5))
+        entry.async_on_unload(cup.stop)
+        cup.schedule()
         entry.async_on_unload(async_count_completed_brews(hass, lab))
         # Brews that could not reach the store wait in Home Assistant and are
         # retried here, at startup and every few minutes (coffee_lab/pending.py).

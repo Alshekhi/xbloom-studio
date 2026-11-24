@@ -611,6 +611,24 @@ class CommunityBrowser:
     async def async_add_and_use(self) -> None:
         await self.async_use(await self.async_add_picked())
 
+    async def async_community_for(self, bag: Any, drink: str) -> dict[str, Any] | None:
+        """The best community recipe for a bag and drink, or None.
+
+        For today's cup: asks the hub as a suggestion does, and leaves the
+        picker and the Community tab as they were. Hub errors are raised.
+        """
+        found = await suggest(
+            self._client, self._coordinator.data or [],
+            getattr(bag, "country", None), getattr(bag, "process", None),
+            bag_remaining_g(bag), self.names, **bag_coffee(bag), drink=drink,
+        )
+        return found["recipes"][0] if found["recipes"] else None
+
+    async def async_add_and_use_recipe(self, recipe: dict[str, Any]) -> None:
+        """Read a hub recipe in full, add it to the library and pick it."""
+        await self._async_pick_recipe(recipe)
+        await self.async_add_and_use()
+
     def own_facts(self) -> list[dict[str, Any]]:
         return [
             {"name": o.name, "brews": o.brews, "matched": o.matched,

@@ -33,6 +33,7 @@ from .inventory import kind_of_cup
 from .models import BUY_AGAIN, ISSUES, KINDS, VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
 from .opening import USUAL_DAYS, fading, open_next, usual_dose
+from .todays_cup_runtime import SIGNAL_TODAYS_CUP
 from .stock import MEASURES, figure, floor
 
 _LOGGER = logging.getLogger(__name__)
@@ -629,6 +630,61 @@ class StockLevelNumber(StockEntity, NumberEntity):
         await self.lab.async_set_stock_level(self.kind, value)
 
 
+class TodaysCupSensor(CoffeeLabEntity, SensorEntity):
+    """Today's cup: the bag as state; the recipe, dose and reasons as attributes."""
+
+    _attr_icon = "mdi:coffee-outline"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "todays_cup")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_TODAYS_CUP, self._changed))
+
+    async def async_read(self) -> None:
+        cup = getattr(self.lab, "todays_cup", None)
+        pick = cup.pick if cup is not None else None
+        self._attr_native_value = pick.bag if pick else None
+        self._attr_extra_state_attributes = {
+            "bag_id": pick.bag_id, "bag": pick.bag, "recipe": pick.recipe,
+            "source": pick.recipe_source, "hub_id": pick.hub_id, "drink": pick.drink,
+            "dose_g": pick.dose_g, "reasons": list(pick.reasons),
+        } if pick else {}
+
+
+class _TodaysCupButton(CoffeeLabEntity, ButtonEntity):
+    def _cup(self):
+        cup = getattr(self.lab, "todays_cup", None)
+        if cup is None:
+            raise refuse("suggestion_none")
+        return cup
+
+
+class UseTodaysCupButton(_TodaysCupButton):
+    """Pick today's cup on the Brew tab: bag, recipe and dose. Nothing is started."""
+
+    _attr_icon = "mdi:check"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "use_todays_cup")
+
+    async def async_press(self) -> None:
+        await self._cup().async_use()
+
+
+class AnotherCupButton(_TodaysCupButton):
+    """The next cup on offer."""
+
+    _attr_icon = "mdi:swap-horizontal"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "another_cup")
+
+    async def async_press(self) -> None:
+        await self._cup().async_another()
+
+
 class _OpeningNumber(CoffeeLabEntity, NumberEntity):
     """One of the opening rules: a setting kept in Coffee Lab's state."""
 
@@ -676,10 +732,10 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
         ],
         "sensor": [
             RemainingSensor, BagsSensor, StatsSensor, RecentBrewsSensor, LastCountSensor, WaitingBrewsSensor,
-            RatingQuestionSensor, BagQuestionSensor, RecipeKindSensor,
+            RatingQuestionSensor, BagQuestionSensor, RecipeKindSensor, TodaysCupSensor,
         ],
         "number": [ManualDoseNumber, OpenLimitNumber, RestDaysNumber, FadeDaysNumber],
-        "button": [RecordManualBrewButton],
+        "button": [RecordManualBrewButton, UseTodaysCupButton, AnotherCupButton],
     }
     # Only a store edited elsewhere — Notion — can be out of date here.
     if lab.store.remote:
