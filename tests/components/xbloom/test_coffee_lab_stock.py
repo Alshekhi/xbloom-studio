@@ -68,3 +68,42 @@ def test_a_kind_never_kept_never_turns_low():
 ])
 def test_a_crossing_changes_only_on_a_known_figure(stored, value, level, expected):
     assert crossing(stored, value, level) == expected
+
+
+# ── Levels and state kept by Coffee Lab ──────────────────────────────────────
+
+from .test_coffee_lab_lab import _bag, _lab  # noqa: E402
+
+
+async def test_a_level_is_kept_per_measure():
+    lab = await _lab()
+    assert (lab.stock_measure("coffee"), lab.stock_level("coffee")) == ("days", 7)
+    await lab.async_set_stock_level("coffee", 4)
+    await lab.async_set_stock_measure("coffee", "grams")
+    assert lab.stock_level("coffee") == 250
+    await lab.async_set_stock_measure("coffee", "days")
+    assert lab.stock_level("coffee") == 4
+
+
+async def test_a_measure_the_kind_does_not_have_is_refused():
+    lab = await _lab()
+    with pytest.raises(ValueError):
+        await lab.async_set_stock_measure("xpod", "grams")
+
+
+async def test_the_low_state_and_the_added_item_are_kept():
+    lab = await _lab()
+    assert lab.stock_low_state("coffee") is None and lab.stock_item("coffee") is None
+    await lab.async_set_stock_low_state("coffee", True)
+    await lab.async_set_stock_item("coffee", "uid-1")
+    assert (lab.stock_low_state("coffee"), lab.stock_item("coffee")) == (True, "uid-1")
+
+
+async def test_buy_again_yes_tells_the_watch_and_maybe_does_not():
+    lab = await _lab()
+    told = []
+    lab.on_buy_again = told.append
+    bag = await _bag(lab, status="finished")
+    await lab.async_rate_bag("maybe", bag.id)
+    await lab.async_rate_bag("yes", bag.id)
+    assert [b.id for b in told] == [bag.id]
