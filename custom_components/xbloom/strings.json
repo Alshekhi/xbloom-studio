@@ -1987,6 +1987,25 @@
         "weak": "Too weak",
         "strong": "Too strong"
       }
+    },
+    "stock_text": {
+      "options": {
+        "item_coffee": "Coffee beans",
+        "item_tea": "Tea",
+        "item_xpod": "xPods",
+        "kind_coffee": "Coffee",
+        "kind_tea": "Tea",
+        "kind_xpod": "xPods",
+        "running_low": "{kind}: running low.",
+        "left_days": "Days left: about {n}.",
+        "left_grams": "Grams left: {n}.",
+        "left_cups": "Cups left: about {n}.",
+        "left_bags": "Bags left: {n}.",
+        "left_pods": "Pods left: {n}.",
+        "left_boxes": "Boxes left: {n}.",
+        "added": "Added to {list}.",
+        "buy_again": "Time to buy {name} again."
+      }
     }
   },
   "issues": {

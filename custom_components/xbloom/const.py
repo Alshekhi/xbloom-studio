@@ -33,6 +33,9 @@ CONF_COFFEE_LAB = "coffee_lab"
 # person edits the list. Seeded with brand names only, which read the same in
 # any language. entry.data.
 CONF_BREWERS = "coffee_lab_brewers"
+# Where Coffee Lab reminds to buy: a todo list and a notify service, both optional.
+CONF_STOCK_LIST = "coffee_lab_stock_list"
+CONF_STOCK_NOTIFY = "coffee_lab_stock_notify"
 
 # Where Coffee Lab keeps its bags and brews: "local" (Home Assistant's own
 # storage) or "notion". With Notion, the token, the page shared with it, and

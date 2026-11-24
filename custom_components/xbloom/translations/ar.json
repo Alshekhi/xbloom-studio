@@ -1987,6 +1987,25 @@
         "weak": "خفيفة جدًا",
         "strong": "قوية جدًا"
       }
+    },
+    "stock_text": {
+      "options": {
+        "item_coffee": "بن",
+        "item_tea": "شاي",
+        "item_xpod": "كبسولات xPod",
+        "kind_coffee": "البن",
+        "kind_tea": "الشاي",
+        "kind_xpod": "كبسولات xPod",
+        "running_low": "{kind}: الكمية منخفضة.",
+        "left_days": "الأيام المتبقية: نحو {n}.",
+        "left_grams": "الغرامات المتبقية: {n}.",
+        "left_cups": "الأكواب المتبقية: نحو {n}.",
+        "left_bags": "الأكياس المتبقية: {n}.",
+        "left_pods": "الكبسولات المتبقية: {n}.",
+        "left_boxes": "العلب المتبقية: {n}.",
+        "added": "أُضيف إلى {list}.",
+        "buy_again": "حان وقت شراء {name} مجددًا."
+      }
     }
   },
   "issues": {
