@@ -268,3 +268,30 @@ async def test_a_saved_phone_that_has_gone_does_not_block_the_other_settings():
     result = await flow.async_step_coffee_lab({"enable": False, "brewers": ["V60"],
                                                "stock_notify": "notify.mobile_app_old"})
     assert not result.get("errors")
+
+
+_NOTION = {"coffee_lab": True, "coffee_lab_store": "notion", "notion_token": "secret_x",
+           "notion_page": "p", "notion_beans_db": "b", "notion_brews_db": "r"}
+
+
+async def test_a_setting_changed_with_notion_already_connected_asks_nothing_of_notion():
+    from custom_components.xbloom.const import CONF_STOCK_NOTIFY
+    flow, entry = _options_flow(dict(_NOTION))
+    result = await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"], "store": "notion",
+                                               "stock_notify": "notify.mobile_app_test"})
+    assert result["type"] != "form"
+    data = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
+    assert data[CONF_STOCK_NOTIFY] == "notify.mobile_app_test" and data["notion_token"] == "secret_x"
+
+
+async def test_reconnect_notion_asks_for_it_again():
+    flow, entry = _options_flow(dict(_NOTION))
+    result = await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"], "store": "notion",
+                                               "notion_reconnect": True})
+    assert result["step_id"] == "coffee_lab_notion"
+
+
+async def test_switching_to_notion_asks_for_it():
+    flow, entry = _options_flow({"coffee_lab": True, "coffee_lab_store": "local"})
+    result = await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"], "store": "notion"})
+    assert result["step_id"] == "coffee_lab_notion"

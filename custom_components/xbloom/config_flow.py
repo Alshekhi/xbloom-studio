@@ -458,11 +458,18 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             # Both optional; one left empty is dropped rather than kept as "".
             self._stock_choices = {
                 k: v for k, v in ((CONF_STOCK_LIST, stock_list), (CONF_STOCK_NOTIFY, stock_notify)) if v}
-            if enabled and user_input.get("store", store) == "notion":
+            # Notion already connected, and not asked to connect again: the
+            # rest is saved as it is, without asking for the token and page.
+            connected = store == "notion" and all(
+                entry.data.get(k) for k in (CONF_NOTION_TOKEN, CONF_NOTION_PAGE,
+                                            CONF_NOTION_BEANS, CONF_NOTION_BREWS))
+            if enabled and user_input.get("store", store) == "notion" and (
+                    not connected or user_input.get("notion_reconnect")):
                 return await self.async_step_coffee_lab_notion()
+            kept = "notion" if enabled and user_input.get("store", store) == "notion" else "local"
             self.hass.config_entries.async_update_entry(
                 entry, data={**self._without_stock(entry.data), **self._coffee_lab,
-                             **self._stock_choices, CONF_COFFEE_LAB_STORE: "local"}
+                             **self._stock_choices, CONF_COFFEE_LAB_STORE: kept}
             )
             # Reload so the entities and the tool follow the switch.
             self.hass.async_create_task(
@@ -486,6 +493,9 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                     selector.EntitySelector(selector.EntitySelectorConfig(domain="todo")),
                 vol.Optional("stock_notify", description={"suggested_value": stock_notify}):
                     selector.TextSelector(),
+                # Offered only once Notion is in use: the way back to its token and page.
+                **({vol.Optional("notion_reconnect", default=False): selector.BooleanSelector()}
+                   if store == "notion" else {}),
             }),
             errors=errors,
         )

@@ -306,12 +306,14 @@
           "brewers": "Brewers",
           "store": "Where to keep it",
           "stock_list": "Shopping list",
-          "stock_notify": "Phone"
+          "stock_notify": "Phone",
+          "notion_reconnect": "Reconnect Notion"
         },
         "data_description": {
           "brewers": "Offered when recording a brew made without the xBloom.",
           "stock_list": "Where Coffee Lab adds what is running low, and a coffee to buy again.",
-          "stock_notify": "A notify service, for example notify.mobile_app_my_phone, told when something goes on the list."
+          "stock_notify": "A notify service, for example notify.mobile_app_my_phone, told when something goes on the list.",
+          "notion_reconnect": "Enter the Notion token and page again. Leave off to keep the connection as it is."
         }
       },
       "brew_stories": {

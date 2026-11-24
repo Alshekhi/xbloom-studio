@@ -306,12 +306,14 @@
           "brewers": "أدوات التحضير",
           "store": "مكان الحفظ",
           "stock_list": "قائمة التسوق",
-          "stock_notify": "الهاتف"
+          "stock_notify": "الهاتف",
+          "notion_reconnect": "إعادة ربط Notion"
         },
         "data_description": {
           "brewers": "تعرض عند تسجيل تحضير دون آلة xBloom.",
           "stock_list": "حيث يضيف Coffee Lab ما أوشك على النفاد، والبن الذي تريد شراءه مجددًا.",
-          "stock_notify": "خدمة إشعارات، مثل notify.mobile_app_my_phone، تُبلَّغ عند إضافة شيء إلى القائمة."
+          "stock_notify": "خدمة إشعارات، مثل notify.mobile_app_my_phone، تُبلَّغ عند إضافة شيء إلى القائمة.",
+          "notion_reconnect": "أدخل رمز Notion والصفحة من جديد. اتركه مطفأ لإبقاء الربط كما هو."
         }
       },
       "brew_stories": {
