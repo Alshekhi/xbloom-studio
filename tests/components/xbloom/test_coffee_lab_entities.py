@@ -237,3 +237,30 @@ async def test_a_kind_never_kept_has_no_stock_entities_available():
         entity = make(lab, "tea")
         await entity.async_read()
         assert entity._attr_available is False, make
+
+
+async def test_recent_brews_show_the_newest_brew_and_each_in_full():
+    from custom_components.xbloom.coffee_lab.entities import RecentBrewsSensor
+
+    lab = await _lab()
+    bag = await _bag(lab)
+    await lab.async_consume(bean_id=bag.id, grams=17, run_id="r1", recipe="Daily",
+                            brewed_at="2026-09-25T09:00:00+03:00")
+    await lab.async_consume(bean_id=bag.id, grams=20, run_id="r2", recipe="Iced",
+                            brewed_at="2026-09-26T09:00:00+03:00")
+    sensor = RecentBrewsSensor(lab)
+    await sensor.async_read()
+    assert sensor._attr_native_value.isoformat().startswith("2026-09-26T09:00")
+    brews = sensor._attr_extra_state_attributes["brews"]
+    assert [b["recipe"] for b in brews] == ["Iced", "Daily"]
+    assert brews[0]["bag"] == bag.name and brews[0]["dose_g"] == 20
+    assert "brews" in RecentBrewsSensor._unrecorded_attributes
+
+
+async def test_recent_brews_with_nothing_brewed():
+    from custom_components.xbloom.coffee_lab.entities import RecentBrewsSensor
+
+    sensor = RecentBrewsSensor(await _lab())
+    await sensor.async_read()
+    assert sensor._attr_native_value is None
+    assert sensor._attr_extra_state_attributes == {"brews": []}

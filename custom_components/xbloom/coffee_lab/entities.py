@@ -23,6 +23,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
+from homeassistant.util import dt as dt_util
 
 from ..tool_common import refuse
 from ..const import DOMAIN, SIGNAL_COFFEE_LAB_STOCK, SIGNAL_COFFEE_LAB_UPDATED
@@ -41,6 +42,8 @@ RECIPE_SELECT = "select.xbloom_studio_recipe"
 COUNT_RESULTS = ["counted", "recorded", "skipped", "flagged", "queued"]
 # How often the question's sensor looks at the clock.
 QUESTION_TICK = timedelta(minutes=1)
+# How many of the latest brews Recent brews holds.
+RECENT_BREWS = 10
 
 
 def bag_labels(beans: list[Bean]) -> dict[str, str]:
@@ -254,6 +257,30 @@ class StatsSensor(CoffeeLabEntity, SensorEntity):
         facts = await actions.stats(self.lab, {"period": self.lab.stats_period})
         self._attr_native_value = facts.pop("brews")
         self._attr_extra_state_attributes = facts
+
+
+class RecentBrewsSensor(CoffeeLabEntity, SensorEntity):
+    """When the newest brew was made; the latest brews, in full, as attributes.
+
+    Each brew as brew_history gives it — recipe, bag, dose, how it was brewed,
+    the verdict and tasting — so a dashboard can open one without an agent.
+    """
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_icon = "mdi:history"
+    # The list is re-read from the record whenever it is needed; keeping every
+    # copy of it in the recorder's history would only fill the database.
+    _unrecorded_attributes = frozenset({"brews"})
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "recent_brews")
+
+    async def async_read(self) -> None:
+        brews = (await actions.brew_history(self.lab, {"limit": RECENT_BREWS}))["brews"]
+        # A brew typed in without a time has none to show; the newest with one.
+        newest = next((b["brewed_at"] for b in brews if b.get("brewed_at")), None)
+        self._attr_native_value = dt_util.parse_datetime(newest) if newest else None
+        self._attr_extra_state_attributes = {"brews": brews}
 
 
 class RatingQuestionSensor(CoffeeLabEntity, SensorEntity):
@@ -602,7 +629,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
             ManualBrewerSelect, RateBrewSelect, CupIssueSelect, BuyAgainSelect,
         ],
         "sensor": [
-            RemainingSensor, BagsSensor, StatsSensor, LastCountSensor, WaitingBrewsSensor,
+            RemainingSensor, BagsSensor, StatsSensor, RecentBrewsSensor, LastCountSensor, WaitingBrewsSensor,
             RatingQuestionSensor, BagQuestionSensor, RecipeKindSensor,
         ],
         "number": [ManualDoseNumber],

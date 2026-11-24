@@ -10,7 +10,7 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -26,7 +26,8 @@ from ..const import DOMAIN
 from .inventory import Deduct, Flag, Skip, decide_consumption, kind_of_cup
 from .models import SELECTABLE, VERDICTS, Bean, Brew, Review
 from .pending import PendingBrews
-from .stats import DEFAULT_PERIOD, PERIODS, Report, earliest_needed, period_report
+from .habits import habits
+from .stats import DEFAULT_PERIOD, PERIODS, Report, earliest_needed, period_report, window
 from .store import (
     STORAGE_VERSION, CoffeeLabStore, ProcessedRuns, Storage, StoreRefused, UnknownBean,
     UnknownBrew,
@@ -34,6 +35,8 @@ from .store import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+# The rolling stats periods, by how many days the habits count.
+ROLLING_DAYS = {"last_7_days": 7, "last_30_days": 30}
 
 STATE_KEY = f"{DOMAIN}.coffee_lab_state"
 PENDING_KEY = f"{DOMAIN}.coffee_lab_pending"
@@ -1104,7 +1107,23 @@ class CoffeeLab:
         # A day earlier than the window needs: a brew stored in UTC can already
         # be the next day locally.
         since = earliest_needed(period, now) - timedelta(days=1)
-        return period_report(await self.store.async_list_brews(since=since), period, now)
+        records = await self.store.async_list_brews(since=since)
+        w = window(period, now)
+        report = period_report(records, period, now)
+        try:
+            beans = await self.store.async_list_beans(selectable_only=False)
+        except STORE_UNREACHABLE as err:
+            # The totals stand on the brews alone; the habits wait for the
+            # next read rather than stop them.
+            _LOGGER.warning("Coffee Lab: could not read the bags for the habits: %s", err)
+            return report
+        start = w.start
+        if period in ROLLING_DAYS:
+            # A rolling week from 10:00 seven days ago touches eight dates;
+            # the habits count whole days, so theirs are the last seven.
+            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            start = midnight - timedelta(days=ROLLING_DAYS[period] - 1)
+        return replace(report, habits=habits(records, beans, start, w.end))
 
 
 class _MemoryStorage:

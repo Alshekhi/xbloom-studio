@@ -58,8 +58,12 @@ repair appears if one has waited more than an hour.
   offered to keep, as the recipe or as a new one; a change asked for last time
   is offered as **Use that change** under the recipe picker; a finished bag
   asks whether it would be bought again.
-- **Stats** — brews and coffee over a chosen period, brews per brewer, and
-  charts of the brew history: brews per day and per month, coffee used and
+- **Stats** — brews and coffee over a chosen period; a summary of how they
+  were brewed: days brewed, most days in a row, cups on a brewing day, the
+  usual hot and iced cup, the coffee and recipe brewed most, the verdicts, the
+  usual time of day when there is one, and bags opened; the latest brews, each
+  opening to its recipe, coffee, settings, verdict and tasting; brews per
+  brewer; and charts of the brew history: brews per day and per month, coffee used and
   water brewed per week. The charts read statistics the integration keeps
   from the brew record, so they cover every brew in it.
 - **Bags** — every open or unopened bag, choosing the one in use, and a link

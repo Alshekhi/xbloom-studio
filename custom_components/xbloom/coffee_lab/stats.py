@@ -11,7 +11,8 @@ UTC. A record with no brew time is placed by when it was recorded.
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 from datetime import datetime, timedelta, tzinfo
 
 from .models import Brew
@@ -56,6 +57,9 @@ class Report:
     period: str
     now: Totals
     before: Totals
+    # How the period's brews were made (habits.habits), when the bags were
+    # at hand to read them with.
+    habits: dict[str, Any] = field(default_factory=dict)
 
     @property
     def change_in_brews(self) -> int:

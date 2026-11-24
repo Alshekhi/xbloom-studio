@@ -754,6 +754,9 @@
       "coffee_lab_stats": {
         "name": "Brews"
       },
+      "coffee_lab_recent_brews": {
+        "name": "Recent brews"
+      },
       "coffee_lab_last_count": {
         "name": "Last brew counted",
         "state": {

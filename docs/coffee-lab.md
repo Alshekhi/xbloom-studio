@@ -212,10 +212,35 @@ The Brew tab shows what is left of what the picked recipe draws from, and the
 AI tools see it too, mentioning a low stock once while already talking about
 coffee.
 
+## How you brew
+
+For the period chosen in **Stats period**, **Brews** also says how its cups
+were made, under `habits`:
+
+| Habit | What it is |
+|---|---|
+| `days_brewed`, `days_in_period` | Days with a brew, out of the days in the period so far |
+| `longest_streak_days` | The most days in a row with a brew |
+| `cups_per_brewing_day` | Cups on a day with a brew |
+| `usual` | For `hot` and `iced`: the dose and ratio brewed most, from three brews of that drink or more |
+| `top_coffee`, `top_recipe` | The coffee and the recipe brewed most, with how many times; bags of a coffee bought again count as one coffee |
+| `verdicts` | How many cups got each verdict |
+| `time_of_day` | `morning`, `afternoon`, `evening` or `night`, only when at least five cups were brewed and most of them at that time |
+| `bags_opened` | Bags of coffee opened in the period |
+
+A cup is hot or iced by its ratio, as for suggestions. Tea and brews without
+a ratio, such as most manual brews, set no usual dose, and a brew stopped
+after grinding is not a cup. The AI tools' stats return the same.
+
+**Recent brews** is the time of the newest brew, with the latest brews as its
+`brews` attribute — recipe, bag, dose, how it was brewed, the verdict, tasting
+and next change, as `brew_history` gives them — for a dashboard to show each
+one.
+
 ## Entities and actions
 
 **Coffee bag** (the bag in use), **Coffee left**, **Coffee bags** (with every
-bag as an attribute), **Brews** and **Stats period**, **Last brew counted**,
+bag as an attribute), **Brews** and **Stats period**, **Recent brews**, **Last brew counted**,
 **Waiting brews**, the manual-brew controls, and those described above for
 rating, versions and suggestions. The actions are `xbloom.add_bean`,
 `xbloom.update_bean`, `xbloom.set_active_bean`, `xbloom.consume`,

@@ -1287,6 +1287,138 @@ views:
     cards:
     - type: markdown
       text_only: true
+      show_empty: false
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set h = state_attr(''sensor.xbloom_studio_brews'', ''habits'')
+        or {} %}{% if h %}{% set u = h.get(''usual'') or {} %}{% set v = h.get(''verdicts'') or {} %}##
+        Summary
+
+
+        - **Days brewed:** {{ h.get(''days_brewed'', 0) }} of {{ h.get(''days_in_period'', 0) }}
+
+        {% if h.get(''longest_streak_days'', 0) > 1 %}- **Most days in a row:** {{ h.longest_streak_days
+        }}
+
+        {% endif %}{% if h.get(''cups_per_brewing_day'') %}- **Cups on a brewing day:** {{ ((h.cups_per_brewing_day
+        | float) | round(1) | string | replace(''.0'', '''')) }}
+
+        {% endif %}{% if u.get(''hot'') %}- **Usual hot cup:** {{ ((u[''hot''].dose_g | float) | round(1)
+        | string | replace(''.0'', '''')) }} g at 1:{{ ((u[''hot''].ratio | float) | round(1) | string
+        | replace(''.0'', '''')) }}
+
+        {% endif %}{% if u.get(''iced'') %}- **Usual iced cup:** {{ ((u[''iced''].dose_g | float) | round(1)
+        | string | replace(''.0'', '''')) }} g at 1:{{ ((u[''iced''].ratio | float) | round(1) | string
+        | replace(''.0'', '''')) }}
+
+        {% endif %}{% if h.get(''top_coffee'') %}- **Most brewed coffee:** {{ e(h.top_coffee.name) }}
+        ({{ h.top_coffee.brews }})
+
+        {% endif %}{% if h.get(''top_recipe'') %}- **Most brewed recipe:** {{ e(h.top_recipe.name) }}
+        ({{ h.top_recipe.brews }})
+
+        {% endif %}{% if h.get(''time_of_day'') %}- **Usually brewed:** {% if h.time_of_day == ''morning''
+        %}in the morning{% elif h.time_of_day == ''afternoon'' %}in the afternoon{% elif h.time_of_day
+        == ''evening'' %}in the evening{% elif h.time_of_day == ''night'' %}at night{% endif %}
+
+        {% endif %}{% if v %}- **Verdicts:** {{ [("Keep it like this" ~ '' ('' ~ v.get(''again'') ~ '')'')
+        if v.get(''again'') else '''', ("Close, needs a tweak" ~ '' ('' ~ v.get(''fine'') ~ '')'') if
+        v.get(''fine'') else '''', ("Doesn''t suit this coffee" ~ '' ('' ~ v.get(''not_again'') ~ '')'')
+        if v.get(''not_again'') else ''''] | select | join('', '') }}
+
+        {% endif %}{% if h.get(''bags_opened'') %}- **Bags opened:** {% for b in h.bags_opened %}{{ e(b)
+        }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% endif %}'
+    visibility:
+    - condition: numeric_state
+      entity: sensor.xbloom_studio_brews
+      above: 0
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## Recent brews'
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% for b in state_attr(''sensor.xbloom_studio_recent_brews'', ''brews'')
+        or [] %}<details><summary>{% set when = as_datetime(b.get(''brewed_at'') or '''', none) %}{% set
+        verdict %}{% if b.verdict == ''again'' %}Keep it like this{% elif b.verdict == ''fine'' %}Close,
+        needs a tweak{% elif b.verdict == ''not_again'' %}Doesn''t suit this coffee{% endif %}{% endset
+        %}{{ [when.strftime(''%d/%m %H:%M'') if when else '''', b.get(''recipe'') or '''', b.get(''bag'')
+        or '''', verdict] | select | join('', '') | escape }}</summary>
+
+
+        {% if b.get(''dose_g'') %}- **Dose:** {{ ((b.dose_g | float) | round(1) | string | replace(''.0'',
+        '''')) }} g{% if b.get(''ratio'') %}, 1:{{ ((b.ratio | float) | round(1) | string | replace(''.0'',
+        '''')) }}{% endif %}
+
+        {% endif %}{% if b.get(''water_ml'') %}- **Water:** {{ b.water_ml | round(0) | int }} ml
+
+        {% endif %}{% if b.get(''grind'') %}- **Grind:** {{ e(b.grind | string | regex_replace(''[.]0$'',
+        '''')) }}
+
+        {% endif %}{% if b.get(''temperature_c'') %}- **Temp:** {{ ((b.temperature_c | float) | round(1)
+        | string | replace(''.0'', '''')) }}°
+
+        {% endif %}{% if b.get(''flow_rate'') %}- **Flow:** {{ ((b.flow_rate | float) | round(1) | string
+        | replace(''.0'', '''')) }} ml/s
+
+        {% endif %}{% if b.get(''duration_s'') %}{% set s = b.duration_s | int %}- **Brew time:** {{ s
+        // 60 }}:{{ ''%02d'' % (s % 60) }}
+
+        {% endif %}{% if b.get(''brewer'') and b.brewer != ''xBloom Studio'' %}- **Brewer:** {{ e(b.brewer)
+        }}
+
+        {% endif %}{% set ts = b.get(''tasting'') or {} %}{% if ts.get(''body'') %}{% set val = ts.get(''body'')
+        %}- **Body:** {% if val == ''light'' %}light{% elif val == ''medium'' %}medium{% elif val == ''full''
+        %}full{% elif val == ''low'' %}low{% elif val == ''high'' %}high{% else %}{{ e(val) }}{% endif
+        %}
+
+        {% endif %}{% if ts.get(''acidity'') %}{% set val = ts.get(''acidity'') %}- **Acidity:** {% if
+        val == ''light'' %}light{% elif val == ''medium'' %}medium{% elif val == ''full'' %}full{% elif
+        val == ''low'' %}low{% elif val == ''high'' %}high{% else %}{{ e(val) }}{% endif %}
+
+        {% endif %}{% if ts.get(''sweetness'') %}{% set val = ts.get(''sweetness'') %}- **Sweetness:**
+        {% if val == ''light'' %}light{% elif val == ''medium'' %}medium{% elif val == ''full'' %}full{%
+        elif val == ''low'' %}low{% elif val == ''high'' %}high{% else %}{{ e(val) }}{% endif %}
+
+        {% endif %}{% if ts.get(''clarity'') %}{% set val = ts.get(''clarity'') %}- **Clarity:** {% if
+        val == ''light'' %}light{% elif val == ''medium'' %}medium{% elif val == ''full'' %}full{% elif
+        val == ''low'' %}low{% elif val == ''high'' %}high{% else %}{{ e(val) }}{% endif %}
+
+        {% endif %}{% if ts.get(''hot_notes'') %}{% set val = ts.get(''hot_notes'') %}- **Hot:** {{ e(val)
+        }}
+
+        {% endif %}{% if ts.get(''warm_notes'') %}{% set val = ts.get(''warm_notes'') %}- **Warm:** {{
+        e(val) }}
+
+        {% endif %}{% if ts.get(''cool_notes'') %}{% set val = ts.get(''cool_notes'') %}- **Cool:** {{
+        e(val) }}
+
+        {% endif %}{% if ts.get(''overall_notes'') %}{% set val = ts.get(''overall_notes'') %}- **Overall:**
+        {{ e(val) }}
+
+        {% endif %}{% if ts.get(''finish'') %}{% set val = ts.get(''finish'') %}- **Finish:** {{ e(val)
+        }}
+
+        {% endif %}{% if b.get(''next_change'') %}- **Next change:** {{ e(b.next_change) }}
+
+        {% endif %}{% if b.get(''needs_review'') %}- **Needs review**
+
+        {% endif %}
+
+        </details>
+
+        {% endfor %}'
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_recent_brews
+      state_not: unknown
+    - condition: state
+      entity: sensor.xbloom_studio_recent_brews
+      state_not: unavailable
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
       content: '## By brewer'
     - type: markdown
       content: '{% for name, n in (state_attr(''sensor.xbloom_studio_brews'',''by_brewer'') or {}).items()

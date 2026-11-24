@@ -277,6 +277,9 @@ async def stats(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
         **_totals_facts(report.now),
         "previous_period": _totals_facts(report.before),
         "change_in_brews": report.change_in_brews,
+        # How this period's cups were made: days brewed, the usual dose for
+        # hot and iced, the coffee and recipe reached for most, the verdicts.
+        "habits": report.habits,
     }
 
 

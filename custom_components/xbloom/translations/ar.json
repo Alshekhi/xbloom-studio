@@ -754,6 +754,9 @@
       "coffee_lab_stats": {
         "name": "التحضيرات"
       },
+      "coffee_lab_recent_brews": {
+        "name": "آخر التحضيرات"
+      },
       "coffee_lab_last_count": {
         "name": "آخر تحضير محتسب",
         "state": {

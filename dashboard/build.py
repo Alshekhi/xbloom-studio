@@ -86,6 +86,20 @@ TEXT = {
         "v_versions": "Versions with this bag:", "k_grind": "grind {value}", "k_ratio": "1:{value}",
         "k_dose": "{value} g", "verdict_again": "Keep it like this", "verdict_fine": "Close, needs a tweak",
         "verdict_not_again": "Doesn't suit this coffee",
+        "h_summary": "Summary", "h_recent": "Recent brews",
+        "y_days": "Days brewed", "y_of": "of", "y_streak": "Most days in a row",
+        "y_cups": "Cups on a brewing day", "y_hot": "Usual hot cup", "y_iced": "Usual iced cup",
+        "y_dose": "{dose} g at 1:{ratio}", "y_coffee": "Most brewed coffee", "y_recipe": "Most brewed recipe",
+        "y_time": "Usually brewed", "y_verdicts": "Verdicts", "y_opened": "Bags opened",
+        "t_morning": "in the morning", "t_afternoon": "in the afternoon", "t_evening": "in the evening",
+        "t_night": "at night",
+        "b_dose": "Dose", "b_water": "Water", "b_grind": "Grind",
+        "b_flow": "Flow", "b_brewer": "Brewer", "b_next": "Next change",
+        "b_review": "Needs review", "b_ml_s": "ml/s",
+        "ts_body": "Body", "ts_acidity": "Acidity", "ts_sweetness": "Sweetness", "ts_clarity": "Clarity",
+        "ts_hot_notes": "Hot", "ts_warm_notes": "Warm", "ts_cool_notes": "Cool",
+        "ts_overall_notes": "Overall", "ts_finish": "Finish",
+        "sv_light": "light", "sv_medium": "medium", "sv_full": "full", "sv_low": "low", "sv_high": "high",
         "h_buy_again": "Buy it again?", "b_question": "**{bag}** is finished.",
         "b_answer": "Answer",
         "r_question": "**{recipe}** with {bag}{changes}.", "r_at": ", at ",
@@ -171,6 +185,20 @@ TEXT = {
         "v_versions": "النسخ مع هذا الكيس:", "k_grind": "درجة طحن {value}", "k_ratio": "1:{value}",
         "k_dose": "{value} غ", "verdict_again": "أعتمدها كما هي", "verdict_fine": "قريبة، تحتاج تعديل",
         "verdict_not_again": "لا تناسب هذا البن",
+        "h_summary": "الملخص", "h_recent": "آخر التحضيرات",
+        "y_days": "أيام التحضير", "y_of": "من", "y_streak": "أطول أيام متتالية",
+        "y_cups": "الأكواب في يوم التحضير", "y_hot": "كوبك الحار المعتاد", "y_iced": "كوبك البارد المعتاد",
+        "y_dose": "{dose} غ بنسبة 1:{ratio}", "y_coffee": "أكثر بن حضّرته", "y_recipe": "أكثر وصفة حضّرتها",
+        "y_time": "تحضّر عادةً", "y_verdicts": "التقييمات", "y_opened": "أكياس فُتحت",
+        "t_morning": "في الصباح", "t_afternoon": "بعد الظهر", "t_evening": "في المساء",
+        "t_night": "في الليل",
+        "b_dose": "الجرعة", "b_water": "الماء", "b_grind": "الطحن",
+        "b_flow": "التدفق", "b_brewer": "أداة التحضير", "b_next": "التعديل القادم",
+        "b_review": "يحتاج مراجعة", "b_ml_s": "مل/ث",
+        "ts_body": "القوام", "ts_acidity": "الحموضة", "ts_sweetness": "الحلاوة", "ts_clarity": "الصفاء",
+        "ts_hot_notes": "حارة", "ts_warm_notes": "دافئة", "ts_cool_notes": "باردة",
+        "ts_overall_notes": "بشكل عام", "ts_finish": "الطعم الأخير",
+        "sv_light": "خفيف", "sv_medium": "متوسط", "sv_full": "كامل", "sv_low": "منخفضة", "sv_high": "عالية",
         "h_buy_again": "هل تشتريه مجددًا؟", "b_question": "انتهى **{bag}**.",
         "b_answer": "الإجابة",
         "r_question": "**{recipe}** مع {bag}{changes}.", "r_at": "، ",
@@ -187,6 +215,8 @@ TEXT = {
 }
 
 E = "xbloom_studio"
+# How the brew record names a brew made by the xBloom (coffee_lab.lab.XBLOOM_BREWER).
+XBLOOM = "xBloom Studio"
 # Bags and recipes are added and edited in the integration's Configure.
 INTEGRATION = "/config/integrations/integration/xbloom"
 BUSY = ("grinding", "brewing")
@@ -529,6 +559,13 @@ def stats_view(t: dict) -> dict:
                 f"- **{t['previous']}:** {{{{ (a.get('previous_period') or {{}}).get('brews', 0) }}}}"
             )},
         ], present(stats)[:1]),
+        # Its heading is part of the card, so while the habits cannot be read
+        # neither shows, rather than a heading over an empty card.
+        {"type": "grid", "cards": [{"type": "markdown", "text_only": True, "show_empty": False,
+                                    "content": summary_card(t)}],
+         "visibility": [{"condition": "numeric_state", "entity": stats, "above": 0}]},
+        section(t["h_recent"], [{"type": "markdown", "content": recent_card(t)}],
+                [is_not(f"sensor.{E}_recent_brews", "unknown"), *present(f"sensor.{E}_recent_brews")[:1]]),
         section(t["h_by_brewer"], [
             {"type": "markdown", "content": (
                 f"{{% for name, n in (state_attr('{stats}','by_brewer') or {{}}).items() %}}"
@@ -544,6 +581,107 @@ def stats_view(t: dict) -> dict:
             chart(t["water_weekly"], "week", 90, [("xbloom:water_brewed", t["water_brewed"])]),
         ], present(stats)[:1]),
     ]}
+
+
+def _n(expr: str) -> str:
+    """A number as a person reads it: 17, not 17.0."""
+    return "((" + expr + " | float) | round(1) | string | replace('.0', ''))"
+
+
+def summary_card(t: dict) -> str:
+    """What the period's brews show, a line for each habit there is."""
+    stats = f"sensor.{E}_brews"
+    # Only the verdicts given, so no empty place between the separators.
+    verdicts = "{{ [" + ", ".join(
+        # Double quotes: a verdict can hold an apostrophe ("Doesn't").
+        f"(\"{t['verdict_' + k]}\" ~ ' (' ~ v.get('{k}') ~ ')') if v.get('{k}') else ''"
+        for k in ("again", "fine", "not_again")
+    ) + "] | select | join(' · ') }}"
+    usual = "".join(
+        f"{{% if u.get('{drink}') %}}- **{t['y_' + drink]}:** "
+        + t["y_dose"].replace("{dose}", "{{ " + _n(f"u['{drink}'].dose_g") + " }}")
+                     .replace("{ratio}", "{{ " + _n(f"u['{drink}'].ratio") + " }}")
+        + "\n{% endif %}"
+        for drink in ("hot", "iced")
+    )
+    times = "".join(
+        f"{{% {'if' if i == 0 else 'elif'} h.time_of_day == '{k}' %}}{t['t_' + k]}"
+        for i, k in enumerate(("morning", "afternoon", "evening", "night"))
+    ) + "{% endif %}"
+    return (
+        ESCAPE
+        + f"{{% set h = state_attr('{stats}', 'habits') or {{}} %}}"
+        + "{% if h %}{% set u = h.get('usual') or {} %}{% set v = h.get('verdicts') or {} %}"
+        + f"## {t['h_summary']}\n\n"
+        + f"- **{t['y_days']}:** {{{{ h.get('days_brewed', 0) }}}} {t['y_of']} {{{{ h.get('days_in_period', 0) }}}}\n"
+        + f"{{% if h.get('longest_streak_days', 0) > 1 %}}- **{t['y_streak']}:** {{{{ h.longest_streak_days }}}}\n{{% endif %}}"
+        + f"{{% if h.get('cups_per_brewing_day') %}}- **{t['y_cups']}:** {{{{ {_n('h.cups_per_brewing_day')} }}}}\n{{% endif %}}"
+        + usual
+        + f"{{% if h.get('top_coffee') %}}- **{t['y_coffee']}:** {{{{ e(h.top_coffee.name) }}}} ({{{{ h.top_coffee.brews }}}})\n{{% endif %}}"
+        + f"{{% if h.get('top_recipe') %}}- **{t['y_recipe']}:** {{{{ e(h.top_recipe.name) }}}} ({{{{ h.top_recipe.brews }}}})\n{{% endif %}}"
+        + f"{{% if h.get('time_of_day') %}}- **{t['y_time']}:** {times}\n{{% endif %}}"
+        + f"{{% if v %}}- **{t['y_verdicts']}:** " + verdicts + "\n{% endif %}"
+        + f"{{% if h.get('bags_opened') %}}- **{t['y_opened']}:** "
+        + "{% for b in h.bags_opened %}{{ e(b) }}{% if not loop.last %}" + t["sep"] + "{% endif %}{% endfor %}{% endif %}"
+        + "{% endif %}"
+    )
+
+
+def recent_card(t: dict) -> str:
+    """The latest brews, each a line that opens to how it was made and tasted.
+
+    A disclosure per brew: announced as collapsed or expanded and opened in
+    place, so the list stays short to move through and each brew is one step
+    from its detail.
+    """
+    recent = f"sensor.{E}_recent_brews"
+    scale = "".join(
+        f"{{% {'if' if i == 0 else 'elif'} val == '{k}' %}}{t['sv_' + k]}"
+        for i, k in enumerate(("light", "medium", "full", "low", "high"))
+    ) + "{% else %}{{ e(val) }}{% endif %}"
+    tasting = "".join(
+        f"{{% if ts.get('{k}') %}}{{% set val = ts.get('{k}') %}}- **{t['ts_' + k]}:** "
+        + (scale if k in ("body", "acidity", "sweetness", "clarity") else "{{ e(val) }}")
+        + "\n{% endif %}"
+        for k in ("body", "acidity", "sweetness", "clarity",
+                  "hot_notes", "warm_notes", "cool_notes", "overall_notes", "finish")
+    )
+    verdict = "".join(
+        f"{{% {'if' if i == 0 else 'elif'} b.verdict == '{k}' %}}{t['verdict_' + k]}"
+        for i, k in enumerate(("again", "fine", "not_again"))
+    ) + "{% endif %}"
+    # Only the parts the brew has, so no line starts with a separator. Inside
+    # the HTML of the summary markdown is not read, so names are escaped as
+    # HTML there, not as markdown.
+    summary = (
+        "{% set when = as_datetime(b.get('brewed_at') or '', none) %}"
+        "{% set verdict %}" + verdict + "{% endset %}"
+        "{{ [when.strftime('%d/%m %H:%M') if when else '', b.get('recipe') or '', b.get('bag') or '',"
+        " verdict] | select | join(' · ') | escape }}"
+    )
+    rows = (
+        f"{{% if b.get('dose_g') %}}- **{t['b_dose']}:** {{{{ {_n('b.dose_g')} }}}} {t['g']}"
+        f"{{% if b.get('ratio') %}} · 1:{{{{ {_n('b.ratio')} }}}}{{% endif %}}\n{{% endif %}}"
+        f"{{% if b.get('water_ml') %}}- **{t['b_water']}:** {{{{ b.water_ml | round(0) | int }}}} {t['ml']}\n{{% endif %}}"
+        # The grind is text in the record — a manual brew's can be "medium
+        # fine" — so it is shown as written, a trailing ".0" dropped.
+        f"{{% if b.get('grind') %}}- **{t['b_grind']}:** {{{{ e(b.grind | string | regex_replace('[.]0$', '')) }}}}\n{{% endif %}}"
+        f"{{% if b.get('temperature_c') %}}- **{t['temp']}:** {{{{ {_n('b.temperature_c')} }}}}°\n{{% endif %}}"
+        f"{{% if b.get('flow_rate') %}}- **{t['b_flow']}:** {{{{ {_n('b.flow_rate')} }}}} {t['b_ml_s']}\n{{% endif %}}"
+        "{% if b.get('duration_s') %}{% set s = b.duration_s | int %}"
+        f"- **{t['brew_time']}:** {{{{ s // 60 }}}}:{{{{ '%02d' % (s % 60) }}}}\n{{% endif %}}"
+        # The xBloom is the usual brewer; only another one is worth a line.
+        f"{{% if b.get('brewer') and b.brewer != '{XBLOOM}' %}}- **{t['b_brewer']}:** {{{{ e(b.brewer) }}}}\n{{% endif %}}"
+        + "{% set ts = b.get('tasting') or {} %}" + tasting
+        + f"{{% if b.get('next_change') %}}- **{t['b_next']}:** {{{{ e(b.next_change) }}}}\n{{% endif %}}"
+        + f"{{% if b.get('needs_review') %}}- **{t['b_review']}**\n{{% endif %}}"
+    )
+    return (
+        ESCAPE
+        + f"{{% for b in state_attr('{recent}', 'brews') or [] %}}"
+        + "<details><summary>" + summary + "</summary>\n\n" + rows + "\n</details>\n"
+        + "{% endfor %}"
+    )
 
 
 def chart(title: str, period: str, days: int, series: list[tuple[str, str]]) -> dict:

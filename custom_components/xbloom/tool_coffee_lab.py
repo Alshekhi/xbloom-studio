@@ -60,7 +60,9 @@ ACTIONS: dict[str, Spec] = {
     "stats": Spec(
         actions.stats,
         "brews, coffee, water and brews per brewer over a period, with the period "
-        "before (period)",
+        "before, and habits: days brewed, longest run of days, cups per brewing day, "
+        "the usual hot and iced dose and ratio, the coffee and recipe brewed most, "
+        "verdicts, the usual time of day when there is one, bags opened (period)",
     ),
     "set_active_bean": Spec(
         actions.set_active_bean, "choose the bag the xBloom draws from; nothing is counted",

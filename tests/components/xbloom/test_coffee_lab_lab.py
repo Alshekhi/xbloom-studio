@@ -157,6 +157,8 @@ async def test_stats_read_the_record():
     now = datetime(2026, 9, 26, 10, tzinfo=ZoneInfo("Asia/Riyadh"))
     report = await lab.async_stats("last_7_days", now)
     assert (report.now.brews, report.now.coffee_g) == (1, 18.0)
+    assert report.habits["days_brewed"] == 1
+    assert report.habits["top_coffee"] == {"name": "Kenya", "brews": 1}
 
 
 # ── The switch ───────────────────────────────────────────────────────────────
@@ -295,3 +297,29 @@ async def test_switching_to_notion_asks_for_it():
     flow, entry = _options_flow({"coffee_lab": True, "coffee_lab_store": "local"})
     result = await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"], "store": "notion"})
     assert result["step_id"] == "coffee_lab_notion"
+
+
+async def test_the_totals_stand_when_the_bags_cannot_be_read():
+    from homeassistant.exceptions import HomeAssistantError
+
+    lab = await _lab()
+    bag = await _bag(lab)
+    await lab.async_consume(bean_id=bag.id, grams=18, run_id="r1",
+                            brewed_at="2026-09-25T09:00:00+03:00")
+    lab.store.async_list_beans = AsyncMock(side_effect=HomeAssistantError("down"))
+    now = datetime(2026, 9, 26, 10, tzinfo=ZoneInfo("Asia/Riyadh"))
+    report = await lab.async_stats("last_7_days", now)
+    assert report.now.brews == 1 and report.habits == {}
+
+
+async def test_a_rolling_period_s_habits_count_its_own_number_of_days():
+    lab = await _lab()
+    bag = await _bag(lab)
+    zone = ZoneInfo("Asia/Riyadh")
+    for day, hour in ((19, 11), (20, 9), (26, 8)):
+        await lab.async_consume(bean_id=bag.id, grams=17, run_id=f"r{day}",
+                                brewed_at=f"2026-09-{day}T{hour:02d}:00:00+03:00")
+    report = await lab.async_stats("last_7_days", datetime(2026, 9, 26, 10, tzinfo=zone))
+    # The brew on the 19th is in the week's totals but before its seven days.
+    assert report.now.brews == 3
+    assert (report.habits["days_in_period"], report.habits["days_brewed"]) == (7, 2)
