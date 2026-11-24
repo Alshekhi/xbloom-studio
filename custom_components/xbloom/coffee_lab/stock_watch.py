@@ -19,9 +19,10 @@ from typing import Any
 
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util import dt as dt_util
 
-from ..const import DOMAIN
+from ..const import DOMAIN, SIGNAL_COFFEE_LAB_STOCK
 from .lab import STORE_UNREACHABLE, CoffeeLab
 from .models import KINDS, Bean
 from .stock import PACE_DAYS, Stock, crossing, figure, floor, stock_of
@@ -100,6 +101,7 @@ class StockWatch:
             elif event == "restored":
                 self._fire(EV_RESTORED, kind, stock, measure, level, value)
                 await self._tick_off(kind)
+        async_dispatcher_send(self.hass, SIGNAL_COFFEE_LAB_STOCK)
 
     def _fire(self, event: str, kind: str, stock: Stock, measure: str, level: float,
               value: float | None) -> None:

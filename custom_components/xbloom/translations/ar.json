@@ -464,6 +464,15 @@
           "on": "جاهزة",
           "off": "غير جاهزة"
         }
+      },
+      "coffee_lab_coffee_stock_low": {
+        "name": "البن: الكمية منخفضة"
+      },
+      "coffee_lab_tea_stock_low": {
+        "name": "الشاي: الكمية منخفضة"
+      },
+      "coffee_lab_xpod_stock_low": {
+        "name": "كبسولات xPod: الكمية منخفضة"
       }
     },
     "select": {
@@ -638,6 +647,32 @@
           "bag_and_teaser": "حكاية الكيس والتشويقة",
           "every_part": "كل الأجزاء"
         }
+      },
+      "coffee_lab_coffee_stock_measure": {
+        "name": "مقياس مخزون البن",
+        "state": {
+          "days": "الأيام",
+          "grams": "الغرامات",
+          "cups": "الأكواب",
+          "bags": "الأكياس"
+        }
+      },
+      "coffee_lab_tea_stock_measure": {
+        "name": "مقياس مخزون الشاي",
+        "state": {
+          "days": "الأيام",
+          "grams": "الغرامات",
+          "cups": "الأكواب",
+          "bags": "الأكياس"
+        }
+      },
+      "coffee_lab_xpod_stock_measure": {
+        "name": "مقياس مخزون كبسولات xPod",
+        "state": {
+          "days": "الأيام",
+          "pods": "الكبسولات",
+          "boxes": "العلب"
+        }
       }
     },
     "sensor": {
@@ -761,6 +796,15 @@
       },
       "brew_story": {
         "name": "حكاية التحضير"
+      },
+      "coffee_lab_coffee_stock": {
+        "name": "مخزون البن"
+      },
+      "coffee_lab_tea_stock": {
+        "name": "مخزون الشاي"
+      },
+      "coffee_lab_xpod_stock": {
+        "name": "مخزون كبسولات xPod"
       }
     },
     "switch": {
@@ -809,6 +853,15 @@
       },
       "brew_dose": {
         "name": "جرعة التحضير"
+      },
+      "coffee_lab_coffee_stock_level": {
+        "name": "حد مخزون البن"
+      },
+      "coffee_lab_tea_stock_level": {
+        "name": "حد مخزون الشاي"
+      },
+      "coffee_lab_xpod_stock_level": {
+        "name": "حد مخزون كبسولات xPod"
       }
     },
     "button": {

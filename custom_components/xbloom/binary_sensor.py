@@ -44,6 +44,8 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     async_add_entities([
         XBloomInRangeSensor(entry), XBloomBrewPausedSensor(entry), XBloomRecipeReadySensor(entry),
     ])
+    from .coffee_lab.entities import entities_for as coffee_lab_entities
+    async_add_entities(coffee_lab_entities(entry.runtime_data.coffee_lab, "binary_sensor"))
 
 
 class XBloomInRangeSensor(BinarySensorEntity):

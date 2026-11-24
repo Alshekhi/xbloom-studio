@@ -464,6 +464,15 @@
           "on": "Ready",
           "off": "Not ready"
         }
+      },
+      "coffee_lab_coffee_stock_low": {
+        "name": "Coffee running low"
+      },
+      "coffee_lab_tea_stock_low": {
+        "name": "Tea running low"
+      },
+      "coffee_lab_xpod_stock_low": {
+        "name": "xPods running low"
       }
     },
     "select": {
@@ -638,6 +647,32 @@
           "bag_and_teaser": "Bag story and teaser",
           "every_part": "Every part"
         }
+      },
+      "coffee_lab_coffee_stock_measure": {
+        "name": "Coffee stock measure",
+        "state": {
+          "days": "Days",
+          "grams": "Grams",
+          "cups": "Cups",
+          "bags": "Bags"
+        }
+      },
+      "coffee_lab_tea_stock_measure": {
+        "name": "Tea stock measure",
+        "state": {
+          "days": "Days",
+          "grams": "Grams",
+          "cups": "Cups",
+          "bags": "Bags"
+        }
+      },
+      "coffee_lab_xpod_stock_measure": {
+        "name": "xPods stock measure",
+        "state": {
+          "days": "Days",
+          "pods": "Pods",
+          "boxes": "Boxes"
+        }
       }
     },
     "sensor": {
@@ -761,6 +796,15 @@
       },
       "brew_story": {
         "name": "Brew Story"
+      },
+      "coffee_lab_coffee_stock": {
+        "name": "Coffee stock"
+      },
+      "coffee_lab_tea_stock": {
+        "name": "Tea stock"
+      },
+      "coffee_lab_xpod_stock": {
+        "name": "xPods stock"
       }
     },
     "switch": {
@@ -809,6 +853,15 @@
       },
       "brew_dose": {
         "name": "Brew Dose"
+      },
+      "coffee_lab_coffee_stock_level": {
+        "name": "Coffee stock level"
+      },
+      "coffee_lab_tea_stock_level": {
+        "name": "Tea stock level"
+      },
+      "coffee_lab_xpod_stock_level": {
+        "name": "xPods stock level"
       }
     },
     "button": {
