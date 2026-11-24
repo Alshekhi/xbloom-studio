@@ -731,15 +731,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         entry = self.config_entry
         current = bool(entry.data.get(CONF_ENABLE_FLASHING))
         errors: dict[str, str] = {}
-        stock_list = str(entry.data.get(CONF_STOCK_LIST) or "")
-        stock_notify = str(entry.data.get(CONF_STOCK_NOTIFY) or "")
         if user_input is not None:
-            stock_list = str(user_input.get("stock_list") or "").strip()
-            stock_notify = str(user_input.get("stock_notify") or "").strip()
-            # Where a reminder to buy is sent: a notify service, nothing else.
-            if stock_notify and not re.fullmatch(r"notify\.[a-z0-9_]+", stock_notify):
-                errors["stock_notify"] = "notify_service_invalid"
-        if user_input is not None and not errors:
             enabled = bool(user_input.get("enable"))
             self.hass.config_entries.async_update_entry(
                 entry, data={**entry.data, CONF_ENABLE_FLASHING: enabled}

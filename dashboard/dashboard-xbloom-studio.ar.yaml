@@ -77,14 +77,16 @@ views:
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set m = state_attr(''sensor.xbloom_studio_coffee_stock'', ''measure'')
-        %}{% set least = state_attr(''sensor.xbloom_studio_coffee_stock'', ''at_least'') %}{% if m ==
-        ''days'' %}الأيام المتبقية من البن: {% if least is not none %}{{ least }} على الأقل{% else %}{{
-        states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% elif m == ''grams'' %}الغرامات المتبقية
-        من البن: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'')
+        %}{% set least = state_attr(''sensor.xbloom_studio_coffee_stock'', ''at_least'') %}{% if states(''sensor.xbloom_studio_coffee_stock'')
+        in [''unknown'', ''unavailable''] and least is none %}لا تكفي التحضيرات بعد لمعرفة كم يدوم البن.{%
+        else %}{% if m == ''days'' %}الأيام المتبقية من البن: {% if least is not none %}{{ least }} على
+        الأقل{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% elif m == ''grams''
+        %}الغرامات المتبقية من البن: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'')
         }}{% endif %}{% elif m == ''cups'' %}الأكواب المتبقية من البن: {% if least is not none %}{{ least
         }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% elif m
         == ''bags'' %}الأكياس المتبقية من البن: {% if least is not none %}{{ least }} على الأقل{% else
-        %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% endif %}{% if is_state(''binary_sensor.xbloom_studio_coffee_stock_low'',
+        %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% endif %}{% endif %}{% if (state_attr(''sensor.xbloom_studio_coffee_stock'',
+        ''unknown'') or 0) > 0 %} زن الأكياس التي لم تُحسب بعد لاكتماله.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_coffee_stock_low'',
         ''on'') %} الكمية منخفضة.{% endif %}'
       visibility:
       - condition: state
@@ -100,15 +102,17 @@ views:
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set m = state_attr(''sensor.xbloom_studio_tea_stock'', ''measure'')
-        %}{% set least = state_attr(''sensor.xbloom_studio_tea_stock'', ''at_least'') %}{% if m == ''days''
-        %}الأيام المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
-        }}{% endif %}{% elif m == ''grams'' %}الغرامات المتبقية من الشاي: {% if least is not none %}{{
-        least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif
-        m == ''cups'' %}الأكواب المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else
-        %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''bags'' %}الأكياس المتبقية
-        من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
-        }}{% endif %}{% endif %}{% if is_state(''binary_sensor.xbloom_studio_tea_stock_low'', ''on'')
-        %} الكمية منخفضة.{% endif %}'
+        %}{% set least = state_attr(''sensor.xbloom_studio_tea_stock'', ''at_least'') %}{% if states(''sensor.xbloom_studio_tea_stock'')
+        in [''unknown'', ''unavailable''] and least is none %}لا تكفي التحضيرات بعد لمعرفة كم يدوم الشاي.{%
+        else %}{% if m == ''days'' %}الأيام المتبقية من الشاي: {% if least is not none %}{{ least }} على
+        الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''grams''
+        %}الغرامات المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
+        }}{% endif %}{% elif m == ''cups'' %}الأكواب المتبقية من الشاي: {% if least is not none %}{{ least
+        }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m ==
+        ''bags'' %}الأكياس المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{
+        states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% endif %}{% endif %}{% if (state_attr(''sensor.xbloom_studio_tea_stock'',
+        ''unknown'') or 0) > 0 %} زن الأكياس التي لم تُحسب بعد لاكتماله.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_tea_stock_low'',
+        ''on'') %} الكمية منخفضة.{% endif %}'
       visibility:
       - condition: state
         entity: sensor.xbloom_studio_recipe_kind
@@ -120,13 +124,16 @@ views:
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set m = state_attr(''sensor.xbloom_studio_xpod_stock'', ''measure'')
-        %}{% set least = state_attr(''sensor.xbloom_studio_xpod_stock'', ''at_least'') %}{% if m == ''days''
-        %}الأيام المتبقية من كبسولات xPod: {% if least is not none %}{{ least }} على الأقل{% else %}{{
-        states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{% elif m == ''pods'' %}الكبسولات المتبقية:
-        {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'')
-        }}{% endif %}{% elif m == ''boxes'' %}علب xPod المتبقية: {% if least is not none %}{{ least }}
-        على الأقل{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{% endif %}{% if
-        is_state(''binary_sensor.xbloom_studio_xpod_stock_low'', ''on'') %} الكمية منخفضة.{% endif %}'
+        %}{% set least = state_attr(''sensor.xbloom_studio_xpod_stock'', ''at_least'') %}{% if states(''sensor.xbloom_studio_xpod_stock'')
+        in [''unknown'', ''unavailable''] and least is none %}لا تكفي التحضيرات بعد لمعرفة كم يدوم كبسولات
+        xPod.{% else %}{% if m == ''days'' %}الأيام المتبقية من كبسولات xPod: {% if least is not none
+        %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{%
+        elif m == ''pods'' %}الكبسولات المتبقية: {% if least is not none %}{{ least }} على الأقل{% else
+        %}{{ states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{% elif m == ''boxes'' %}علب xPod
+        المتبقية: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'')
+        }}{% endif %}{% endif %}{% endif %}{% if (state_attr(''sensor.xbloom_studio_xpod_stock'', ''unknown'')
+        or 0) > 0 %} زن الأكياس التي لم تُحسب بعد لاكتماله.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_xpod_stock_low'',
+        ''on'') %} الكمية منخفضة.{% endif %}'
       visibility:
       - condition: state
         entity: sensor.xbloom_studio_recipe_kind
@@ -1407,14 +1414,16 @@ views:
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set m = state_attr(''sensor.xbloom_studio_coffee_stock'', ''measure'')
-        %}{% set least = state_attr(''sensor.xbloom_studio_coffee_stock'', ''at_least'') %}{% if m ==
-        ''days'' %}الأيام المتبقية من البن: {% if least is not none %}{{ least }} على الأقل{% else %}{{
-        states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% elif m == ''grams'' %}الغرامات المتبقية
-        من البن: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'')
+        %}{% set least = state_attr(''sensor.xbloom_studio_coffee_stock'', ''at_least'') %}{% if states(''sensor.xbloom_studio_coffee_stock'')
+        in [''unknown'', ''unavailable''] and least is none %}لا تكفي التحضيرات بعد لمعرفة كم يدوم البن.{%
+        else %}{% if m == ''days'' %}الأيام المتبقية من البن: {% if least is not none %}{{ least }} على
+        الأقل{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% elif m == ''grams''
+        %}الغرامات المتبقية من البن: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'')
         }}{% endif %}{% elif m == ''cups'' %}الأكواب المتبقية من البن: {% if least is not none %}{{ least
         }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% elif m
         == ''bags'' %}الأكياس المتبقية من البن: {% if least is not none %}{{ least }} على الأقل{% else
-        %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% endif %}{% if is_state(''binary_sensor.xbloom_studio_coffee_stock_low'',
+        %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% endif %}{% endif %}{% if (state_attr(''sensor.xbloom_studio_coffee_stock'',
+        ''unknown'') or 0) > 0 %} زن الأكياس التي لم تُحسب بعد لاكتماله.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_coffee_stock_low'',
         ''on'') %} الكمية منخفضة.{% endif %}'
     - type: tile
       entity: select.xbloom_studio_coffee_stock_measure
@@ -1449,15 +1458,17 @@ views:
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set m = state_attr(''sensor.xbloom_studio_tea_stock'', ''measure'')
-        %}{% set least = state_attr(''sensor.xbloom_studio_tea_stock'', ''at_least'') %}{% if m == ''days''
-        %}الأيام المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
-        }}{% endif %}{% elif m == ''grams'' %}الغرامات المتبقية من الشاي: {% if least is not none %}{{
-        least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif
-        m == ''cups'' %}الأكواب المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else
-        %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''bags'' %}الأكياس المتبقية
-        من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
-        }}{% endif %}{% endif %}{% if is_state(''binary_sensor.xbloom_studio_tea_stock_low'', ''on'')
-        %} الكمية منخفضة.{% endif %}'
+        %}{% set least = state_attr(''sensor.xbloom_studio_tea_stock'', ''at_least'') %}{% if states(''sensor.xbloom_studio_tea_stock'')
+        in [''unknown'', ''unavailable''] and least is none %}لا تكفي التحضيرات بعد لمعرفة كم يدوم الشاي.{%
+        else %}{% if m == ''days'' %}الأيام المتبقية من الشاي: {% if least is not none %}{{ least }} على
+        الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''grams''
+        %}الغرامات المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
+        }}{% endif %}{% elif m == ''cups'' %}الأكواب المتبقية من الشاي: {% if least is not none %}{{ least
+        }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m ==
+        ''bags'' %}الأكياس المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{
+        states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% endif %}{% endif %}{% if (state_attr(''sensor.xbloom_studio_tea_stock'',
+        ''unknown'') or 0) > 0 %} زن الأكياس التي لم تُحسب بعد لاكتماله.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_tea_stock_low'',
+        ''on'') %} الكمية منخفضة.{% endif %}'
     - type: tile
       entity: select.xbloom_studio_tea_stock_measure
       name:
@@ -1491,13 +1502,16 @@ views:
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set m = state_attr(''sensor.xbloom_studio_xpod_stock'', ''measure'')
-        %}{% set least = state_attr(''sensor.xbloom_studio_xpod_stock'', ''at_least'') %}{% if m == ''days''
-        %}الأيام المتبقية من كبسولات xPod: {% if least is not none %}{{ least }} على الأقل{% else %}{{
-        states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{% elif m == ''pods'' %}الكبسولات المتبقية:
-        {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'')
-        }}{% endif %}{% elif m == ''boxes'' %}علب xPod المتبقية: {% if least is not none %}{{ least }}
-        على الأقل{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{% endif %}{% if
-        is_state(''binary_sensor.xbloom_studio_xpod_stock_low'', ''on'') %} الكمية منخفضة.{% endif %}'
+        %}{% set least = state_attr(''sensor.xbloom_studio_xpod_stock'', ''at_least'') %}{% if states(''sensor.xbloom_studio_xpod_stock'')
+        in [''unknown'', ''unavailable''] and least is none %}لا تكفي التحضيرات بعد لمعرفة كم يدوم كبسولات
+        xPod.{% else %}{% if m == ''days'' %}الأيام المتبقية من كبسولات xPod: {% if least is not none
+        %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{%
+        elif m == ''pods'' %}الكبسولات المتبقية: {% if least is not none %}{{ least }} على الأقل{% else
+        %}{{ states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{% elif m == ''boxes'' %}علب xPod
+        المتبقية: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'')
+        }}{% endif %}{% endif %}{% endif %}{% if (state_attr(''sensor.xbloom_studio_xpod_stock'', ''unknown'')
+        or 0) > 0 %} زن الأكياس التي لم تُحسب بعد لاكتماله.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_xpod_stock_low'',
+        ''on'') %} الكمية منخفضة.{% endif %}'
     - type: tile
       entity: select.xbloom_studio_xpod_stock_measure
       name:

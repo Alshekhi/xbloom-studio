@@ -77,15 +77,18 @@ views:
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set m = state_attr(''sensor.xbloom_studio_coffee_stock'', ''measure'')
-        %}{% set least = state_attr(''sensor.xbloom_studio_coffee_stock'', ''at_least'') %}{% if m ==
-        ''days'' %}Days of coffee left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'')
-        }}{% endif %}{% elif m == ''grams'' %}Grams of coffee left: {% if least is not none %}at least
-        {{ least }}{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% elif m ==
-        ''cups'' %}Cups of coffee left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'')
+        %}{% set least = state_attr(''sensor.xbloom_studio_coffee_stock'', ''at_least'') %}{% if states(''sensor.xbloom_studio_coffee_stock'')
+        in [''unknown'', ''unavailable''] and least is none %}Not enough brews yet to tell how long the
+        coffee will last.{% else %}{% if m == ''days'' %}Days of coffee left: {% if least is not none
+        %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{%
+        elif m == ''grams'' %}Grams of coffee left: {% if least is not none %}at least {{ least }}{% else
+        %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% elif m == ''cups'' %}Cups of
+        coffee left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'')
         }}{% endif %}{% elif m == ''bags'' %}Bags of coffee left: {% if least is not none %}at least {{
         least }}{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% endif %}{%
-        if is_state(''binary_sensor.xbloom_studio_coffee_stock_low'', ''on'') %} Running low.{% endif
-        %}'
+        endif %}{% if (state_attr(''sensor.xbloom_studio_coffee_stock'', ''unknown'') or 0) > 0 %} Weigh
+        the bags not counted yet to complete it.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_coffee_stock_low'',
+        ''on'') %} Running low.{% endif %}'
       visibility:
       - condition: state
         entity: sensor.xbloom_studio_recipe_kind
@@ -100,13 +103,16 @@ views:
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set m = state_attr(''sensor.xbloom_studio_tea_stock'', ''measure'')
-        %}{% set least = state_attr(''sensor.xbloom_studio_tea_stock'', ''at_least'') %}{% if m == ''days''
-        %}Days of tea left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
-        }}{% endif %}{% elif m == ''grams'' %}Grams of tea left: {% if least is not none %}at least {{
-        least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''cups''
-        %}Cups of tea left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
-        }}{% endif %}{% elif m == ''bags'' %}Bags of tea left: {% if least is not none %}at least {{ least
-        }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% endif %}{% if is_state(''binary_sensor.xbloom_studio_tea_stock_low'',
+        %}{% set least = state_attr(''sensor.xbloom_studio_tea_stock'', ''at_least'') %}{% if states(''sensor.xbloom_studio_tea_stock'')
+        in [''unknown'', ''unavailable''] and least is none %}Not enough brews yet to tell how long the
+        tea will last.{% else %}{% if m == ''days'' %}Days of tea left: {% if least is not none %}at least
+        {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''grams''
+        %}Grams of tea left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
+        }}{% endif %}{% elif m == ''cups'' %}Cups of tea left: {% if least is not none %}at least {{ least
+        }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''bags'' %}Bags
+        of tea left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
+        }}{% endif %}{% endif %}{% endif %}{% if (state_attr(''sensor.xbloom_studio_tea_stock'', ''unknown'')
+        or 0) > 0 %} Weigh the bags not counted yet to complete it.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_tea_stock_low'',
         ''on'') %} Running low.{% endif %}'
       visibility:
       - condition: state
@@ -119,13 +125,16 @@ views:
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set m = state_attr(''sensor.xbloom_studio_xpod_stock'', ''measure'')
-        %}{% set least = state_attr(''sensor.xbloom_studio_xpod_stock'', ''at_least'') %}{% if m == ''days''
-        %}Days of xPods left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'')
-        }}{% endif %}{% elif m == ''pods'' %}Pods left: {% if least is not none %}at least {{ least }}{%
-        else %}{{ states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{% elif m == ''boxes'' %}Boxes
-        of xPods left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'')
-        }}{% endif %}{% endif %}{% if is_state(''binary_sensor.xbloom_studio_xpod_stock_low'', ''on'')
-        %} Running low.{% endif %}'
+        %}{% set least = state_attr(''sensor.xbloom_studio_xpod_stock'', ''at_least'') %}{% if states(''sensor.xbloom_studio_xpod_stock'')
+        in [''unknown'', ''unavailable''] and least is none %}Not enough brews yet to tell how long the
+        xPods will last.{% else %}{% if m == ''days'' %}Days of xPods left: {% if least is not none %}at
+        least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{% elif
+        m == ''pods'' %}Pods left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'')
+        }}{% endif %}{% elif m == ''boxes'' %}Boxes of xPods left: {% if least is not none %}at least
+        {{ least }}{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{% endif %}{%
+        endif %}{% if (state_attr(''sensor.xbloom_studio_xpod_stock'', ''unknown'') or 0) > 0 %} Weigh
+        the bags not counted yet to complete it.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_xpod_stock_low'',
+        ''on'') %} Running low.{% endif %}'
       visibility:
       - condition: state
         entity: sensor.xbloom_studio_recipe_kind
@@ -1401,15 +1410,18 @@ views:
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set m = state_attr(''sensor.xbloom_studio_coffee_stock'', ''measure'')
-        %}{% set least = state_attr(''sensor.xbloom_studio_coffee_stock'', ''at_least'') %}{% if m ==
-        ''days'' %}Days of coffee left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'')
-        }}{% endif %}{% elif m == ''grams'' %}Grams of coffee left: {% if least is not none %}at least
-        {{ least }}{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% elif m ==
-        ''cups'' %}Cups of coffee left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'')
+        %}{% set least = state_attr(''sensor.xbloom_studio_coffee_stock'', ''at_least'') %}{% if states(''sensor.xbloom_studio_coffee_stock'')
+        in [''unknown'', ''unavailable''] and least is none %}Not enough brews yet to tell how long the
+        coffee will last.{% else %}{% if m == ''days'' %}Days of coffee left: {% if least is not none
+        %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{%
+        elif m == ''grams'' %}Grams of coffee left: {% if least is not none %}at least {{ least }}{% else
+        %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% elif m == ''cups'' %}Cups of
+        coffee left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'')
         }}{% endif %}{% elif m == ''bags'' %}Bags of coffee left: {% if least is not none %}at least {{
         least }}{% else %}{{ states(''sensor.xbloom_studio_coffee_stock'') }}{% endif %}{% endif %}{%
-        if is_state(''binary_sensor.xbloom_studio_coffee_stock_low'', ''on'') %} Running low.{% endif
-        %}'
+        endif %}{% if (state_attr(''sensor.xbloom_studio_coffee_stock'', ''unknown'') or 0) > 0 %} Weigh
+        the bags not counted yet to complete it.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_coffee_stock_low'',
+        ''on'') %} Running low.{% endif %}'
     - type: tile
       entity: select.xbloom_studio_coffee_stock_measure
       name:
@@ -1443,13 +1455,16 @@ views:
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set m = state_attr(''sensor.xbloom_studio_tea_stock'', ''measure'')
-        %}{% set least = state_attr(''sensor.xbloom_studio_tea_stock'', ''at_least'') %}{% if m == ''days''
-        %}Days of tea left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
-        }}{% endif %}{% elif m == ''grams'' %}Grams of tea left: {% if least is not none %}at least {{
-        least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''cups''
-        %}Cups of tea left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
-        }}{% endif %}{% elif m == ''bags'' %}Bags of tea left: {% if least is not none %}at least {{ least
-        }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% endif %}{% if is_state(''binary_sensor.xbloom_studio_tea_stock_low'',
+        %}{% set least = state_attr(''sensor.xbloom_studio_tea_stock'', ''at_least'') %}{% if states(''sensor.xbloom_studio_tea_stock'')
+        in [''unknown'', ''unavailable''] and least is none %}Not enough brews yet to tell how long the
+        tea will last.{% else %}{% if m == ''days'' %}Days of tea left: {% if least is not none %}at least
+        {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''grams''
+        %}Grams of tea left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
+        }}{% endif %}{% elif m == ''cups'' %}Cups of tea left: {% if least is not none %}at least {{ least
+        }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''bags'' %}Bags
+        of tea left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
+        }}{% endif %}{% endif %}{% endif %}{% if (state_attr(''sensor.xbloom_studio_tea_stock'', ''unknown'')
+        or 0) > 0 %} Weigh the bags not counted yet to complete it.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_tea_stock_low'',
         ''on'') %} Running low.{% endif %}'
     - type: tile
       entity: select.xbloom_studio_tea_stock_measure
@@ -1484,13 +1499,16 @@ views:
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set m = state_attr(''sensor.xbloom_studio_xpod_stock'', ''measure'')
-        %}{% set least = state_attr(''sensor.xbloom_studio_xpod_stock'', ''at_least'') %}{% if m == ''days''
-        %}Days of xPods left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'')
-        }}{% endif %}{% elif m == ''pods'' %}Pods left: {% if least is not none %}at least {{ least }}{%
-        else %}{{ states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{% elif m == ''boxes'' %}Boxes
-        of xPods left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'')
-        }}{% endif %}{% endif %}{% if is_state(''binary_sensor.xbloom_studio_xpod_stock_low'', ''on'')
-        %} Running low.{% endif %}'
+        %}{% set least = state_attr(''sensor.xbloom_studio_xpod_stock'', ''at_least'') %}{% if states(''sensor.xbloom_studio_xpod_stock'')
+        in [''unknown'', ''unavailable''] and least is none %}Not enough brews yet to tell how long the
+        xPods will last.{% else %}{% if m == ''days'' %}Days of xPods left: {% if least is not none %}at
+        least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{% elif
+        m == ''pods'' %}Pods left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'')
+        }}{% endif %}{% elif m == ''boxes'' %}Boxes of xPods left: {% if least is not none %}at least
+        {{ least }}{% else %}{{ states(''sensor.xbloom_studio_xpod_stock'') }}{% endif %}{% endif %}{%
+        endif %}{% if (state_attr(''sensor.xbloom_studio_xpod_stock'', ''unknown'') or 0) > 0 %} Weigh
+        the bags not counted yet to complete it.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_xpod_stock_low'',
+        ''on'') %} Running low.{% endif %}'
     - type: tile
       entity: select.xbloom_studio_xpod_stock_measure
       name:

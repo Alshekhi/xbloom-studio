@@ -32,7 +32,8 @@ def test_days_and_cups_come_from_the_last_30_days_and_need_5_brews():
     brews = [brew(dose=18, days_ago=d) for d in range(6)]
     beans = [bag(remaining_g=180, tracked=True)]
     s = stock_of("coffee", beans, brews, NOW)
-    assert figure(s, "cups") == 10.0 and figure(s, "days") == 50.0
+    # 108 g over the 6 days brewed: 18 g a day.
+    assert figure(s, "cups") == 10.0 and figure(s, "days") == 10.0
     four = stock_of("coffee", beans, brews[:4], NOW)
     assert figure(four, "days") is None and figure(four, "cups") is None
 
@@ -40,7 +41,8 @@ def test_days_and_cups_come_from_the_last_30_days_and_need_5_brews():
 def test_brews_older_than_30_days_and_of_another_kind_do_not_count_toward_the_pace():
     beans = [bag(remaining_g=180, tracked=True), bag(id="t", kind="tea", remaining_g=50, tracked=True)]
     brews = [brew(days_ago=d) for d in range(5)] + [brew(days_ago=40), brew(bean="t")]
-    assert figure(stock_of("coffee", beans, brews, NOW), "days") == 60.0
+    # 90 g over 5 days: the brew 40 days ago and the tea do not count.
+    assert figure(stock_of("coffee", beans, brews, NOW), "days") == 10.0
 
 
 def test_an_xpod_box_counts_pods_and_boxes():
@@ -107,3 +109,18 @@ async def test_buy_again_yes_tells_the_watch_and_maybe_does_not():
     await lab.async_rate_bag("maybe", bag.id)
     await lab.async_rate_bag("yes", bag.id)
     assert [b.id for b in told] == [bag.id]
+
+
+# ── Final review ─────────────────────────────────────────────────────────────
+
+
+def test_tea_starts_counted_in_bags_at_one():
+    from custom_components.xbloom.coffee_lab.stock import DEFAULT_LEVEL, DEFAULT_MEASURE
+    assert DEFAULT_MEASURE["tea"] == "bags" and DEFAULT_LEVEL["bags"] == 1
+
+
+def test_the_pace_is_over_the_days_brewed_not_always_30():
+    # Six cups of 18 g over the last 6 days: 18 g a day, so 180 g lasts 10 days.
+    brews = [brew(dose=18, days_ago=d) for d in range(6)]
+    s = stock_of("coffee", [bag(remaining_g=180, tracked=True)], brews, NOW)
+    assert figure(s, "days") == 10.0

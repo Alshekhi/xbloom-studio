@@ -23,6 +23,8 @@ TEXT = {
         "stock_cups": "Cups of {kind} left: {n}", "stock_bags": "Bags of {kind} left: {n}",
         "stock_pods": "Pods left: {n}", "stock_boxes": "Boxes of xPods left: {n}",
         "stock_at_least": "at least {n}", "stock_low": "Running low.", "h_stock": "Stock",
+        "stock_not_yet": "Not enough brews yet to tell how long the {kind} will last.",
+        "stock_weigh": "Weigh the bags not counted yet to complete it.",
         "kind_coffee": "coffee", "kind_tea": "tea", "kind_xpod": "xPods",
         "h_now": "Right now", "h_in_progress": "Brew in progress", "h_bag": "Current bag", "pods_left": "Pods left: {n}", "k_xpod": "xPod box", "k_tea": "tea",
         "h_brew": "Brew with the xBloom", "h_adjust": "Adjust this brew",
@@ -102,6 +104,10 @@ TEXT = {
         "stock_cups": "الأكواب المتبقية من {kind}: {n}", "stock_bags": "الأكياس المتبقية من {kind}: {n}",
         "stock_pods": "الكبسولات المتبقية: {n}", "stock_boxes": "علب xPod المتبقية: {n}",
         "stock_at_least": "{n} على الأقل", "stock_low": "الكمية منخفضة.", "h_stock": "المخزون",
+        "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
+        "stock_weigh": "زن الأكياس التي لم تُحسب بعد لاكتماله.",
+        "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
+        "stock_weigh": "زن الأكياس التي لم تُحسب بعد لاكتماله.",
         "kind_coffee": "البن", "kind_tea": "الشاي", "kind_xpod": "كبسولات xPod",
         "h_now": "الآن", "h_in_progress": "تحضير جار", "h_bag": "الكيس الحالي", "pods_left": "الكبسولات المتبقية: {n}", "k_xpod": "علبة xPod", "k_tea": "شاي",
         "h_brew": "التحضير بماكينة xBloom", "h_adjust": "تعديل هذا التحضير",
@@ -590,8 +596,13 @@ def stock_line(t: dict, kind: str) -> str:
         ("{% if" if i == 0 else "{% elif") + f" m == '{m}' %}}"
         + t[f"stock_{m}"].replace("{kind}", t[f"kind_{kind}"]).replace("{n}", n)
         for i, m in enumerate(measures)) + "{% endif %}"
+    not_yet = t["stock_not_yet"].replace("{kind}", t[f"kind_{kind}"])
     return (ESCAPE + f"{{% set m = state_attr('{q}', 'measure') %}}"
-            f"{{% set least = state_attr('{q}', 'at_least') %}}" + lines
+            f"{{% set least = state_attr('{q}', 'at_least') %}}"
+            # Too few brews for days or cups: said in words, never "unknown".
+            + f"{{% if states('{q}') in ['unknown', 'unavailable'] and least is none %}}" + not_yet
+            + "{% else %}" + lines + "{% endif %}"
+            + f"{{% if (state_attr('{q}', 'unknown') or 0) > 0 %}} " + t["stock_weigh"] + "{% endif %}"
             + f"{{% if is_state('binary_sensor.{E}_{kind}_stock_low', 'on') %}} " + t["stock_low"]
             + "{% endif %}")
 

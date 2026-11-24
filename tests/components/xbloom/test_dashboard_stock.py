@@ -38,3 +38,12 @@ def test_the_bags_tab_has_measure_and_level_per_kind():
     for kind in KINDS:
         assert {f"select.xbloom_studio_{kind}_stock_measure",
                 f"number.xbloom_studio_{kind}_stock_level"} <= entities
+
+
+def test_a_figure_not_known_yet_says_so_in_words_and_asks_for_a_weighing():
+    build = _build()
+    for lang in ("en", "ar"):
+        t = build.TEXT[lang]
+        line = build.stock_line(t, "coffee")
+        assert t["stock_not_yet"].replace("{kind}", t["kind_coffee"]) in line and t["stock_weigh"] in line
+        assert "states('sensor.xbloom_studio_coffee_stock') in ['unknown', 'unavailable']" in line

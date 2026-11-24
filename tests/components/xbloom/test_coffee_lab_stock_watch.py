@@ -193,6 +193,7 @@ async def test_a_kind_already_low_when_first_known_reminds_after_the_first_look(
     await lab.async_set_stock_low_state("coffee", None)
     await watch.async_refresh()                         # the first look: silent
     assert home.fired == []
+    await lab.async_set_stock_measure("tea", "grams")
     await _bag(lab, kind="tea", status="open", remaining_g=100.0)   # below 250 g
     await watch.async_refresh()
     assert [d["kind"] for _, d in home.fired] == ["tea"]

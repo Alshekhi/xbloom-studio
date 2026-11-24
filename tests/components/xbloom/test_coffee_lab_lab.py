@@ -249,3 +249,4 @@ async def test_a_list_and_phone_left_empty_are_dropped():
     await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"], "stock_notify": ""})
     data = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
     assert CONF_STOCK_LIST not in data and CONF_STOCK_NOTIFY not in data
+

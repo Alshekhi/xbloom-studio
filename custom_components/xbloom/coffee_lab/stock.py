@@ -8,11 +8,14 @@ are only a floor: never low, since the item left out is usually not empty.
 Bags are always known.
 
 Days and cups come from the last 30 days of that kind's brews, every brewer,
-and need a few of them to mean anything. A kind can turn low only once the
+and need a few of them to mean anything. The pace is over the days those
+brews span, so a home with only a week of history is not read as brewing a
+quarter as much. A kind can turn low only once the
 home has had an item of it, so a home without tea never hears about tea.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -24,7 +27,8 @@ MEASURES: dict[str, tuple[str, ...]] = {
     "tea": ("days", "grams", "cups", "bags"),
     "xpod": ("days", "pods", "boxes"),
 }
-DEFAULT_MEASURE = {"coffee": "days", "tea": "grams", "xpod": "pods"}
+# Tea in bags: tins and pouches vary too much in size for one gram level.
+DEFAULT_MEASURE = {"coffee": "days", "tea": "bags", "xpod": "pods"}
 DEFAULT_LEVEL: dict[str, float] = {
     "days": 7, "grams": 250, "cups": 10, "bags": 1, "pods": 5, "boxes": 1,
 }
@@ -69,17 +73,19 @@ def stock_of(kind: str, beans: list[Bean], brews: list[Brew], now: datetime) -> 
     ids = {b.id for b in mine}
     since = now - timedelta(days=PACE_DAYS)
     used = [
-        r for r in brews
+        (r, when) for r in brews
         if r.bean_id in ids and (when := moment(r.brewed_at or r.recorded_at, now.tzinfo))
         and since <= when <= now
     ]
     cups = days = None
     if len(used) >= MIN_BREWS:
-        drawn = float(len(used)) if kind == "xpod" else sum(r.dose_g or 0.0 for r in used)
+        drawn = float(len(used)) if kind == "xpod" else sum(r.dose_g or 0.0 for r, _ in used)
         if drawn > 0:
             per_cup = drawn / len(used)
+            first = min(when for _, when in used)
+            span = min(PACE_DAYS, max(1, math.ceil((now - first).total_seconds() / 86400)))
             cups = round(amount / per_cup, 1)
-            days = round(amount / (drawn / PACE_DAYS), 1)
+            days = round(amount / (drawn / span), 1)
     return Stock(kind, bool(mine), amount if (on_hand or mine) else None, len(on_hand),
                  cups, days, unknown)
 
