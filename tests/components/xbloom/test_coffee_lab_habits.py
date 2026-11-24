@@ -132,3 +132,17 @@ def test_a_period_ending_at_midnight_does_not_reach_the_next_day():
     h = habits([], BEANS, start, end)
     assert h["days_in_period"] == 1
     assert h["bags_opened"] == []  # Hill Farm's second bag was opened on the 5th
+
+
+def test_each_coffee_and_recipe_of_the_period():
+    records = [brew(1, bean="b1", rating=3), brew(2, bean="b2", dose=18.0, recipe="Iced", ratio=8.0),
+               brew(3, bean="b3", rating=1), brew(4, bean="b1", recipe="Iced", ratio=8.0)]
+    h = habits(records, BEANS, START, NOW)
+    assert h["by_coffee"] == [
+        {"name": "Hill Farm", "brews": 3, "coffee_g": 52.0},
+        {"name": "Valley Lot", "brews": 1, "coffee_g": 17.0},
+    ]
+    assert h["by_recipe"] == [
+        {"name": "Daily Hot", "brews": 2, "verdicts": {"again": 1, "not_again": 1}},
+        {"name": "Iced", "brews": 2, "verdicts": {}},
+    ]

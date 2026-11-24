@@ -22,7 +22,9 @@ from homeassistant.util import dt as dt_util
 
 from .lab import XBLOOM_BREWER, CoffeeLab
 from .models import Brew
-from .stats import made_coffee, moment
+from .stats import by_month, by_week, made_coffee, moment
+from ..const import SIGNAL_COFFEE_LAB_HISTORY
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -85,13 +87,14 @@ def first_hour(records: list[Brew], zone: tzinfo) -> datetime | None:
     return min(times).replace(minute=0, second=0, microsecond=0) if times else None
 
 
-async def async_publish(hass: HomeAssistant, lab: CoffeeLab) -> None:
+async def async_publish(hass: HomeAssistant, lab: CoffeeLab, records: list[Brew] | None = None) -> None:
     """Replace the charts' statistics with what the record holds now."""
     from homeassistant.components.recorder import get_instance
     from homeassistant.components.recorder.models import StatisticMeanType
     from homeassistant.components.recorder.statistics import async_add_external_statistics
 
-    records = await lab.store.async_list_brews()
+    if records is None:
+        records = await lab.store.async_list_brews()
     zone = dt_util.get_default_time_zone()
     recorder = get_instance(hass)
     # Cleared first, so an hour that no longer has a brew loses its point.
@@ -117,11 +120,13 @@ async def async_publish(hass: HomeAssistant, lab: CoffeeLab) -> None:
 
 
 class ChartFeed:
-    """Rebuilds the statistics once changes settle; one rebuild at a time."""
+    """Once changes settle, works out the history tables (by month and by
+    week, to be read) and, with a recorder, rebuilds the charts' statistics."""
 
-    def __init__(self, hass: HomeAssistant, lab: CoffeeLab) -> None:
+    def __init__(self, hass: HomeAssistant, lab: CoffeeLab, *, charts: bool = True) -> None:
         self.hass = hass
         self.lab = lab
+        self.charts = charts
         self._pending: Callable[[], None] | None = None
 
     @callback
@@ -130,12 +135,18 @@ class ChartFeed:
             self._pending()
         self._pending = async_call_later(self.hass, SETTLE_S, self._run)
 
-    async def _run(self, _now: datetime) -> None:
+    async def _run(self, _now: datetime | None) -> None:
         self._pending = None
         try:
-            await async_publish(self.hass, self.lab)
+            records = await self.lab.store.async_list_brews()
+            now = dt_util.now()
+            self.lab.history = {"by_month": by_month(records, now), "by_week": by_week(records, now),
+                                "total": sum(1 for r in records if made_coffee(r))}
+            async_dispatcher_send(self.hass, SIGNAL_COFFEE_LAB_HISTORY)
+            if self.charts:
+                await async_publish(self.hass, self.lab, records)
         except Exception:  # noqa: BLE001 — a failed chart must not stop counting
-            _LOGGER.exception("Could not rebuild the brew charts")
+            _LOGGER.exception("Could not rebuild the brew history")
 
     @callback
     def cancel(self) -> None:

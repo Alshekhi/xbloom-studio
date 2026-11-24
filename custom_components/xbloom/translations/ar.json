@@ -822,6 +822,9 @@
       },
       "coffee_lab_todays_cup": {
         "name": "كوب اليوم"
+      },
+      "coffee_lab_brew_history": {
+        "name": "سجل التحضير"
       }
     },
     "switch": {

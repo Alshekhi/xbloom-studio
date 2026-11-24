@@ -822,6 +822,9 @@
       },
       "coffee_lab_todays_cup": {
         "name": "Today's cup"
+      },
+      "coffee_lab_brew_history": {
+        "name": "Brew history"
       }
     },
     "switch": {

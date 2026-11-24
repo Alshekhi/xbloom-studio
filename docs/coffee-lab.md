@@ -292,15 +292,26 @@ A cup is hot or iced by its ratio, as for suggestions. Tea and brews without
 a ratio, such as most manual brews, set no usual dose, and a brew stopped
 after grinding is not a cup. The AI tools' stats return the same.
 
-**Recent brews** is the time of the newest brew, with the latest brews as its
-`brews` attribute — recipe, bag, dose, how it was brewed, the verdict, tasting
-and next change, as `brew_history` gives them — for a dashboard to show each
-one.
+`habits` also lists each coffee of the period with its cups and the grams
+they took (`by_coffee`), and each recipe with its cups and the verdicts it was
+given (`by_recipe`), most brewed first. A brew stopped after grinding is not a
+cup, so these grams can be fewer than the coffee used.
+
+**Recent brews** is the time of the newest brew in the **Stats period**, with
+that period's brews as its `brews` attribute, newest first and up to 50 —
+recipe, bag, dose, how it was brewed, the verdict, tasting and next change, as
+`brew_history` gives them — for a dashboard to show each one.
+
+**Brew history** counts the brews in the record that made coffee, with brews,
+coffee and water for each of the last twelve months since the first brew
+(`by_month`) and each of the last eight weeks, Monday to Sunday (`by_week`),
+this one first: the numbers the charts draw, to be read. It is worked out
+again after each change and at midnight.
 
 ## Entities and actions
 
 **Coffee bag** (the bag in use), **Coffee left**, **Coffee bags** (with every
-bag as an attribute), **Brews** and **Stats period**, **Recent brews**, **Last brew counted**,
+bag as an attribute), **Brews** and **Stats period**, **Recent brews**, **Brew history**, **Last brew counted**,
 **Waiting brews**, the manual-brew controls, and those described above for
 rating, versions and suggestions. The actions are `xbloom.add_bean`,
 `xbloom.update_bean`, `xbloom.set_active_bean`, `xbloom.consume`,

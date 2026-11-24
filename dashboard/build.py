@@ -31,6 +31,12 @@ TEXT = {
         "d_roast": "Roast", "d_roast_date": "Roasted", "d_altitude": "Altitude", "d_notes": "Tasting notes",
         "d_m": "{n} m", "d_link": "Shop page",
         "open_next": "Open next: {bag}", "past_best": "past its best", "h_opening": "Opening bags",
+        "brewers": "Brewers", "h_by_coffee": "By coffee", "h_by_recipe": "By recipe",
+        "col_coffee": "Coffee", "col_cups": "Cups", "col_grams": "Grams", "col_recipe": "Recipe",
+        "col_verdicts": "Verdicts", "h_by_month": "By month", "h_by_week": "By week", "col_month": "Month",
+        "col_week": "Week of", "col_brews": "Brews",
+        "months": ("January", "February", "March", "April", "May", "June", "July", "August",
+                   "September", "October", "November", "December"),
         "h_todays_cup": "Today's cup", "tc_line": "{cup}", "tc_sep": ", ", "tc_end": ".",
         "r_liked": "you liked it", "r_not_yesterday": "not the coffee you had last",
         "r_use_soon": "best used soon", "r_past_best": "past its best", "r_open_next": "time to open it",
@@ -42,7 +48,7 @@ TEXT = {
         "h_now": "Right now", "h_in_progress": "Brew in progress", "h_bag": "Current bag", "pods_left": "Pods left: {n}", "k_xpod": "xPod box", "k_tea": "tea",
         "h_brew": "Brew with the xBloom", "h_adjust": "Adjust this brew",
         "h_save": "Save as a new recipe", "h_manual": "Manual brew", "h_stats": "Coffee stats",
-        "h_by_brewer": "By brewer", "h_connection": "Connection & status",
+        "h_connection": "Connection & status",
         "h_modules": "Modules", "h_grinder": "Grinder", "h_brewer": "Brewer", "h_scale": "Scale",
         "h_library": "Recipe library", "h_settings": "Settings", "h_stories": "Brew stories",
         "h_voice": "Voice announcements", "h_updates": "Updates", "h_events": "Recent machine events",
@@ -98,11 +104,10 @@ TEXT = {
         "v_versions": "Versions with this bag:", "k_grind": "grind {value}", "k_ratio": "1:{value}",
         "k_dose": "{value} g", "verdict_again": "Keep it like this", "verdict_fine": "Close, needs a tweak",
         "verdict_not_again": "Doesn't suit this coffee",
-        "h_summary": "Summary", "h_recent": "Recent brews",
+        "h_summary": "Summary", "h_recent": "Brews in this period",
         "y_days": "Days brewed", "y_of": "of", "y_streak": "Most days in a row",
         "y_cups": "Cups on a brewing day", "y_hot": "Usual hot cup", "y_iced": "Usual iced cup",
-        "y_dose": "{dose} g at 1:{ratio}", "y_coffee": "Most brewed coffee", "y_recipe": "Most brewed recipe",
-        "y_time": "Usually brewed", "y_verdicts": "Verdicts", "y_opened": "Bags opened",
+        "y_dose": "{dose} g at 1:{ratio}",         "y_time": "Usually brewed", "y_opened": "Bags opened",
         "t_morning": "in the morning", "t_afternoon": "in the afternoon", "t_evening": "in the evening",
         "t_night": "at night",
         "b_dose": "Dose", "b_water": "Water", "b_grind": "Grind",
@@ -143,6 +148,12 @@ TEXT = {
         "d_roast": "درجة التحميص", "d_roast_date": "تاريخ التحميص", "d_altitude": "الارتفاع",
         "d_notes": "النكهات", "d_m": "{n} م", "d_link": "صفحة المتجر",
         "open_next": "افتح بعده: {bag}", "past_best": "تجاوز أفضل وقته", "h_opening": "فتح الأكياس",
+        "brewers": "أدوات التحضير", "h_by_coffee": "حسب البن", "h_by_recipe": "حسب الوصفة",
+        "col_coffee": "البن", "col_cups": "الأكواب", "col_grams": "الغرامات", "col_recipe": "الوصفة",
+        "col_verdicts": "التقييمات", "h_by_month": "حسب الشهر", "h_by_week": "حسب الأسبوع", "col_month": "الشهر",
+        "col_week": "أسبوع", "col_brews": "التحضيرات",
+        "months": ("يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس",
+                   "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"),
         "h_todays_cup": "كوب اليوم", "tc_line": "{cup}", "tc_sep": "، ", "tc_end": ".",
         "r_liked": "أعجبتك", "r_not_yesterday": "ليست آخر قهوة حضّرتها",
         "r_use_soon": "يحسن استخدامها قريبًا", "r_past_best": "تجاوزت أفضل وقتها", "r_open_next": "حان وقت فتحها",
@@ -154,7 +165,7 @@ TEXT = {
         "h_now": "الآن", "h_in_progress": "تحضير جار", "h_bag": "الكيس الحالي", "pods_left": "الكبسولات المتبقية: {n}", "k_xpod": "علبة xPod", "k_tea": "شاي",
         "h_brew": "التحضير بماكينة xBloom", "h_adjust": "تعديل هذا التحضير",
         "h_save": "حفظ كوصفة جديدة", "h_manual": "تحضير يدوي", "h_stats": "إحصاءات القهوة",
-        "h_by_brewer": "حسب أداة التحضير", "h_connection": "الاتصال والحالة",
+        "h_connection": "الاتصال والحالة",
         "h_modules": "الوحدات", "h_grinder": "المطحنة", "h_brewer": "وحدة الصب", "h_scale": "الميزان",
         "h_library": "مكتبة الوصفات", "h_settings": "الإعدادات", "h_stories": "حكايات التحضير",
         "h_voice": "الإعلانات الصوتية", "h_updates": "التحديثات", "h_events": "أحدث أحداث الماكينة",
@@ -211,11 +222,10 @@ TEXT = {
         "v_versions": "النسخ مع هذا الكيس:", "k_grind": "درجة طحن {value}", "k_ratio": "1:{value}",
         "k_dose": "{value} غ", "verdict_again": "أعتمدها كما هي", "verdict_fine": "قريبة، تحتاج تعديل",
         "verdict_not_again": "لا تناسب هذا البن",
-        "h_summary": "الملخص", "h_recent": "آخر التحضيرات",
+        "h_summary": "الملخص", "h_recent": "تحضيرات هذه الفترة",
         "y_days": "أيام التحضير", "y_of": "من", "y_streak": "أطول أيام متتالية",
         "y_cups": "الأكواب في يوم التحضير", "y_hot": "كوبك الحار المعتاد", "y_iced": "كوبك البارد المعتاد",
-        "y_dose": "{dose} غ بنسبة 1:{ratio}", "y_coffee": "أكثر بن حضّرته", "y_recipe": "أكثر وصفة حضّرتها",
-        "y_time": "تحضّر عادةً", "y_verdicts": "التقييمات", "y_opened": "أكياس فُتحت",
+        "y_dose": "{dose} غ بنسبة 1:{ratio}",         "y_time": "تحضّر عادةً", "y_opened": "أكياس فُتحت",
         "t_morning": "في الصباح", "t_afternoon": "بعد الظهر", "t_evening": "في المساء",
         "t_night": "في الليل",
         "b_dose": "الجرعة", "b_water": "الماء", "b_grind": "الطحن",
@@ -617,39 +627,104 @@ def brew_view(t: dict) -> dict:
 
 def stats_view(t: dict) -> dict:
     stats = f"sensor.{E}_brews"
+    history = f"sensor.{E}_brew_history"
+    some = [{"condition": "numeric_state", "entity": stats, "above": 0}]
     return {"title": t["view_stats"], "path": "stats", "icon": "mdi:chart-bar", "type": "sections", "max_columns": 2, "sections": [
         section(t["h_stats"], [
             select(f"select.{E}_stats_period"),
             tile(stats),
-            {"type": "markdown", "content": (
-                f"{{% set a = states['{stats}'].attributes if states['{stats}'] else {{}} %}}"
-                f"- **{t['coffee_used']}:** {{{{ a.get('coffee_g', 0) | round(0) | int }}}} {t['g']}\n"
-                f"{{% if a.get('water_ml') %}}- **{t['water_brewed']}:** {{{{ a.get('water_ml') | round(0) | int }}}} {t['ml']}\n{{% endif %}}"
-                f"- **{t['previous']}:** {{{{ (a.get('previous_period') or {{}}).get('brews', 0) }}}}"
-            )},
+            {"type": "markdown", "content": coffee_stats_card(t)},
         ], present(stats)[:1]),
         # Its heading is part of the card, so while the habits cannot be read
         # neither shows, rather than a heading over an empty card.
         {"type": "grid", "cards": [{"type": "markdown", "text_only": True, "show_empty": False,
-                                    "content": summary_card(t)}],
-         "visibility": [{"condition": "numeric_state", "entity": stats, "above": 0}]},
+                                    "content": summary_card(t)}], "visibility": some},
+        {"type": "grid", "cards": [{"type": "markdown", "text_only": True, "show_empty": False,
+                                    "content": by_coffee_card(t)}], "visibility": some},
+        {"type": "grid", "cards": [{"type": "markdown", "text_only": True, "show_empty": False,
+                                    "content": by_recipe_card(t)}], "visibility": some},
         section(t["h_recent"], [{"type": "markdown", "content": recent_card(t)}],
                 [is_not(f"sensor.{E}_recent_brews", "unknown"), *present(f"sensor.{E}_recent_brews")[:1]]),
-        section(t["h_by_brewer"], [
-            {"type": "markdown", "content": (
-                f"{{% for name, n in (state_attr('{stats}','by_brewer') or {{}}).items() %}}"
-                f"- **{{{{ '{t['other']}' if name == 'other' else name }}}}**: {{{{ n }}}}\n{{% endfor %}}"
-            )},
-        ], [{"condition": "numeric_state", "entity": stats, "above": 0}]),
+        # The history as numbers to read, then the same drawn as charts.
         section(t["h_charts"], [
+            {"type": "markdown", "content": history_card(t)},
             chart(t["brews_daily"], "day", 30, [
                 ("xbloom:brews_xbloom", t["xbloom_brews"]), ("xbloom:brews_manual", t["manual_brews"])]),
             chart(t["brews_monthly"], "month", 365, [
                 ("xbloom:brews_xbloom", t["xbloom_brews"]), ("xbloom:brews_manual", t["manual_brews"])]),
             chart(t["coffee_weekly"], "week", 90, [("xbloom:coffee_used", t["coffee_used"])]),
             chart(t["water_weekly"], "week", 90, [("xbloom:water_brewed", t["water_brewed"])]),
-        ], present(stats)[:1]),
+        ], present(history)[:1]),
     ]}
+
+
+def coffee_stats_card(t: dict) -> str:
+    """The period's coffee, water, the period before, and the brewers in one line."""
+    stats = f"sensor.{E}_brews"
+    attr = lambda k: f"state_attr('{stats}', '{k}')"  # noqa: E731
+    return (
+        ESCAPE
+        + f"- **{t['coffee_used']}:** {{{{ ({attr('coffee_g')} or 0) | round(0) | int }}}} {t['g']}\n"
+        f"{{% if {attr('water_ml')} %}}- **{t['water_brewed']}:** {{{{ {attr('water_ml')} | round(0) | int }}}} {t['ml']}\n{{% endif %}}"
+        f"- **{t['previous']}:** {{{{ ({attr('previous_period')} or {{}}).get('brews', 0) }}}}\n"
+        f"{{% set brewers = {attr('by_brewer')} or {{}} %}}{{% if brewers %}}- **{t['brewers']}:** "
+        "{% for name, n in brewers.items() %}" + ISO
+        + f"{{{{ \"{t['other']}\" if name == 'other' else e(name) }}}}" + PDI
+        + " ({{ n }}){% if not loop.last %}" + t["sep"] + "{% endif %}{% endfor %}\n{% endif %}"
+    )
+
+
+def by_coffee_card(t: dict) -> str:
+    stats = f"sensor.{E}_brews"
+    return (
+        ESCAPE + f"{{% set rows = (state_attr('{stats}', 'habits') or {{}}).get('by_coffee') or [] %}}"
+        f"{{% if rows %}}## {t['h_by_coffee']}\n\n"
+        f"| {t['col_coffee']} | {t['col_cups']} | {t['col_grams']} |\n|---|---|---|\n"
+        "{% for r in rows %}| " + ISO + "{{ e(r.get('name')) }}" + PDI
+        + " | {{ r.get('brews', 0) }} | {{ (r.get('coffee_g') or 0) | round(0) | int }} |\n{% endfor %}{% endif %}"
+    )
+
+
+def verdict_counts(t: dict, var: str = "v") -> str:
+    """The verdicts given, each with its count; none left as an empty place."""
+    return "{{ [" + ", ".join(
+        # Double quotes: a verdict can hold an apostrophe ("Doesn't").
+        f"(\"{t['verdict_' + k]}\" ~ ' (' ~ {var}.get('{k}') ~ ')') if {var}.get('{k}') else ''"
+        for k in ("again", "fine", "not_again")
+    ) + "] | select | join(" + repr(t["sep"]) + ") }}"
+
+
+def by_recipe_card(t: dict) -> str:
+    stats = f"sensor.{E}_brews"
+    return (
+        ESCAPE + f"{{% set rows = (state_attr('{stats}', 'habits') or {{}}).get('by_recipe') or [] %}}"
+        # The heading is part of the card, so neither shows with nothing to list.
+        f"{{% if rows %}}## {t['h_by_recipe']}\n\n"
+        f"| {t['col_recipe']} | {t['col_cups']} | {t['col_verdicts']} |\n|---|---|---|\n"
+        "{% for r in rows %}{% set v = r.get('verdicts') or {} %}| " + ISO + "{{ e(r.get('name')) }}" + PDI
+        + " | {{ r.get('brews', 0) }} | " + verdict_counts(t) + " |\n{% endfor %}{% endif %}"
+    )
+
+
+def history_card(t: dict) -> str:
+    """Brews, coffee and water by month and by week: what the charts below draw."""
+    history = f"sensor.{E}_brew_history"
+    months = "[" + ", ".join(repr(m) for m in t["months"]) + "]"
+    # No water recorded (manual brews) is a blank cell, as the stats above leave it out.
+    row = (" | {{ r.get('brews', 0) }} | {{ (r.get('coffee_g') or 0) | round(0) | int }} " + t["g"]
+           + " | {% if r.get('water_ml') %}{{ r.get('water_ml') | round(0) | int }} " + t["ml"] + "{% endif %} |\n")
+    return (
+        f"{{% set names = {months} %}}"
+        f"{{% set this_year = ((state_attr('{history}', 'by_month') or [{{}}])[0].get('start') or '')[:4] %}}"
+        f"{{% if state_attr('{history}', 'by_month') or state_attr('{history}', 'by_week') %}}"
+        f"### {t['h_by_month']}\n\n| {t['col_month']} | {t['col_brews']} | {t['coffee']} | {t['water']} |\n|---|---|---|---|\n"
+        f"{{% for r in state_attr('{history}', 'by_month') or [] %}}{{% set d = r.get('start') or '0000-01' %}}"
+        "| {{ names[(d[5:7] | int) - 1] }} {{ d[:4] }}" + row + "{% endfor %}\n"
+        f"### {t['h_by_week']}\n\n| {t['col_week']} | {t['col_brews']} | {t['coffee']} | {t['water']} |\n|---|---|---|---|\n"
+        f"{{% for r in state_attr('{history}', 'by_week') or [] %}}{{% set d = r.get('start') or '0000-00-00' %}}"
+        # The year only for a week of another year than this one.
+        "| {{ d[8:10] }}/{{ d[5:7] }}{% if d[:4] != this_year %}/{{ d[:4] }}{% endif %}" + row + "{% endfor %}{% endif %}"
+    )
 
 
 def _n(expr: str) -> str:
@@ -660,12 +735,6 @@ def _n(expr: str) -> str:
 def summary_card(t: dict) -> str:
     """What the period's brews show, a line for each habit there is."""
     stats = f"sensor.{E}_brews"
-    # Only the verdicts given, so no empty place between the separators.
-    verdicts = "{{ [" + ", ".join(
-        # Double quotes: a verdict can hold an apostrophe ("Doesn't").
-        f"(\"{t['verdict_' + k]}\" ~ ' (' ~ v.get('{k}') ~ ')') if v.get('{k}') else ''"
-        for k in ("again", "fine", "not_again")
-    ) + "] | select | join(' · ') }}"
     usual = "".join(
         f"{{% if u.get('{drink}') %}}- **{t['y_' + drink]}:** "
         + t["y_dose"].replace("{dose}", "{{ " + _n(f"u['{drink}'].dose_g") + " }}")
@@ -680,16 +749,13 @@ def summary_card(t: dict) -> str:
     return (
         ESCAPE
         + f"{{% set h = state_attr('{stats}', 'habits') or {{}} %}}"
-        + "{% if h %}{% set u = h.get('usual') or {} %}{% set v = h.get('verdicts') or {} %}"
+        + "{% if h %}{% set u = h.get('usual') or {} %}"
         + f"## {t['h_summary']}\n\n"
         + f"- **{t['y_days']}:** {{{{ h.get('days_brewed', 0) }}}} {t['y_of']} {{{{ h.get('days_in_period', 0) }}}}\n"
         + f"{{% if h.get('longest_streak_days', 0) > 1 %}}- **{t['y_streak']}:** {{{{ h.longest_streak_days }}}}\n{{% endif %}}"
         + f"{{% if h.get('cups_per_brewing_day') %}}- **{t['y_cups']}:** {{{{ {_n('h.cups_per_brewing_day')} }}}}\n{{% endif %}}"
         + usual
-        + f"{{% if h.get('top_coffee') %}}- **{t['y_coffee']}:** {ISO}{{{{ e(h.top_coffee.name) }}}}{PDI} ({{{{ h.top_coffee.brews }}}})\n{{% endif %}}"
-        + f"{{% if h.get('top_recipe') %}}- **{t['y_recipe']}:** {ISO}{{{{ e(h.top_recipe.name) }}}}{PDI} ({{{{ h.top_recipe.brews }}}})\n{{% endif %}}"
         + f"{{% if h.get('time_of_day') %}}- **{t['y_time']}:** {times}\n{{% endif %}}"
-        + f"{{% if v %}}- **{t['y_verdicts']}:** " + verdicts + "\n{% endif %}"
         + f"{{% if h.get('bags_opened') %}}- **{t['y_opened']}:** "
         + "{% for b in h.bags_opened %}" + ISO + "{{ e(b) }}" + PDI + "{% if not loop.last %}" + t["sep"] + "{% endif %}{% endfor %}{% endif %}"
         + "{% endif %}"
@@ -697,7 +763,7 @@ def summary_card(t: dict) -> str:
 
 
 def recent_card(t: dict) -> str:
-    """The latest brews, each a line that opens to how it was made and tasted.
+    """The period's brews, each a line that opens to how it was made and tasted.
 
     A disclosure per brew: announced as collapsed or expanded and opened in
     place, so the list stays short to move through and each brew is one step

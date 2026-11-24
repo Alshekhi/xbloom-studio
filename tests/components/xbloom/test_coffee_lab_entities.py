@@ -242,15 +242,17 @@ async def test_a_kind_never_kept_has_no_stock_entities_available():
 async def test_recent_brews_show_the_newest_brew_and_each_in_full():
     from custom_components.xbloom.coffee_lab.entities import RecentBrewsSensor
 
+    from datetime import datetime, timedelta, timezone
     lab = await _lab()
     bag = await _bag(lab)
+    newest = (datetime.now(timezone.utc) - timedelta(days=1)).replace(microsecond=0)
     await lab.async_consume(bean_id=bag.id, grams=17, run_id="r1", recipe="Daily",
-                            brewed_at="2026-09-25T09:00:00+05:00")
+                            brewed_at=(newest - timedelta(days=1)).isoformat())
     await lab.async_consume(bean_id=bag.id, grams=20, run_id="r2", recipe="Iced",
-                            brewed_at="2026-09-26T09:00:00+05:00")
+                            brewed_at=newest.isoformat())
     sensor = RecentBrewsSensor(lab)
     await sensor.async_read()
-    assert sensor._attr_native_value.isoformat().startswith("2026-09-26T09:00")
+    assert sensor._attr_native_value.replace(second=0) == newest.replace(second=0)
     brews = sensor._attr_extra_state_attributes["brews"]
     assert [b["recipe"] for b in brews] == ["Iced", "Daily"]
     assert brews[0]["bag"] == bag.name and brews[0]["dose_g"] == 20
@@ -264,3 +266,46 @@ async def test_recent_brews_with_nothing_brewed():
     await sensor.async_read()
     assert sensor._attr_native_value is None
     assert sensor._attr_extra_state_attributes == {"brews": []}
+
+
+async def test_the_brews_listed_follow_the_stats_period():
+    from datetime import datetime, timedelta, timezone
+    from custom_components.xbloom.coffee_lab.entities import RecentBrewsSensor
+
+    lab = await _lab()
+    bag = await _bag(lab)
+    now = datetime.now(timezone.utc)
+    for n, days in enumerate((1, 3, 20, 40)):
+        await lab.async_consume(bean_id=bag.id, grams=17, run_id=f"p{n}", recipe=f"R{n}",
+                                brewed_at=(now - timedelta(days=days)).isoformat())
+    sensor = RecentBrewsSensor(lab)
+    await lab.async_set_stats_period("last_7_days")
+    await sensor.async_read()
+    assert [b["recipe"] for b in sensor._attr_extra_state_attributes["brews"]] == ["R0", "R1"]
+    await lab.async_set_stats_period("last_30_days")
+    await sensor.async_read()
+    assert [b["recipe"] for b in sensor._attr_extra_state_attributes["brews"]] == ["R0", "R1", "R2"]
+
+
+async def test_last_months_brews_are_not_crowded_out_by_this_months():
+    from datetime import timedelta
+    from homeassistant.util import dt as dt_util
+    from custom_components.xbloom.coffee_lab import entities
+    from custom_components.xbloom.coffee_lab.stats import window
+
+    lab = await _lab()
+    bag = await _bag(lab, remaining_g=5000.0)
+    w = window("last_month", dt_util.now())
+    await lab.async_consume(bean_id=bag.id, grams=17, run_id="old", recipe="Old",
+                            brewed_at=(w.start + timedelta(days=2)).isoformat())
+    for n in range(3):
+        await lab.async_consume(bean_id=bag.id, grams=17, run_id=f"new{n}", recipe="New",
+                                brewed_at=(w.end + timedelta(hours=n + 1)).isoformat())
+    await lab.async_set_stats_period("last_month")
+    old_limit, entities.RECENT_BREWS = entities.RECENT_BREWS, 2
+    try:
+        sensor = entities.RecentBrewsSensor(lab)
+        await sensor.async_read()
+    finally:
+        entities.RECENT_BREWS = old_limit
+    assert [b["recipe"] for b in sensor._attr_extra_state_attributes["brews"]] == ["Old"]

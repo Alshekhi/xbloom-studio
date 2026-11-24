@@ -56,10 +56,7 @@ def test_the_summary_reads_each_habit():
         "- **Cups on a brewing day:** 1.2",
         "- **Usual hot cup:** 17 g at 1:15",
         "- **Usual iced cup:** 20 g at 1:8",
-        "- **Most brewed coffee:** Hill Farm (8)",
-        "- **Most brewed recipe:** Daily \\| Hot (12)",
         "- **Usually brewed:** in the morning",
-        "- **Verdicts:** Keep it like this (5) · Doesn't suit this coffee (1)",
         "- **Bags opened:** Hill Farm, Valley Lot",
     ]
 
@@ -129,7 +126,6 @@ def test_names_keep_their_own_direction():
     attrs = {"sensor.xbloom_studio_brews": {"habits": HABITS},
              "sensor.xbloom_studio_recent_brews": {"brews": BREWS}}
     summary = _render(build.summary_card(build.TEXT["en"]), attrs, raw=True)
-    assert "\u2068Daily \\| Hot\u2069 (12)" in summary
     assert "\u2068Hill Farm\u2069, \u2068Valley Lot\u2069" in summary
     recent = _render(build.recent_card(build.TEXT["en"]), attrs, raw=True)
     assert "\u2068Daily | Hot\u2069 · \u2068Hill Farm\u2069" in recent
@@ -140,3 +136,80 @@ def test_a_brew_without_a_verdict_renders_under_strict_templates():
     out = _render(build.recent_card(build.TEXT["en"]),
                   {"sensor.xbloom_studio_recent_brews": {"brews": [{"recipe": "Plain", "id": "4"}]}})
     assert "<summary>Plain</summary>" in out
+
+
+STATS = "sensor.xbloom_studio_brews"
+HISTORY = "sensor.xbloom_studio_brew_history"
+
+
+def _card(build, needle, lang="en"):
+    view = build.stats_view(build.TEXT[lang])
+    return next(c for c in _cards(view) if c.get("type") == "markdown" and needle in c.get("content", ""))
+
+
+def test_the_brewers_are_one_line_in_coffee_stats_and_no_section_of_their_own():
+    build = _build()
+    card = _card(build, "'by_brewer'")
+    out = _render(card["content"], {STATS: {"coffee_g": 648, "water_ml": 8492, "by_brewer": {"xBloom Studio": 35, "V60": 1, "other": 2},
+                                            "previous_period": {"brews": 32}}})
+    assert "- **Brewers:** xBloom Studio (35), V60 (1), Other (2)" in out
+    headings = [c["content"] for c in _cards(build.stats_view(build.TEXT["en"])) if c.get("text_only")]
+    assert "## By brewer" not in headings
+
+
+def test_each_coffee_and_recipe_as_a_table():
+    build = _build()
+    habits = {**HABITS, "by_coffee": [{"name": "Hill Farm", "brews": 8, "coffee_g": 136.0}],
+              "by_recipe": [{"name": "Daily | Hot", "brews": 12, "verdicts": {"again": 2, "not_again": 1}}]}
+    coffee = _render(_card(build, "'by_coffee'")["content"], {STATS: {"habits": habits}})
+    assert "| Coffee | Cups | Grams |" in coffee and "| Hill Farm | 8 | 136 |" in coffee
+    recipe = _render(_card(build, "'by_recipe'")["content"], {STATS: {"habits": habits}})
+    assert "| Recipe | Cups | Verdicts |" in recipe
+    assert "| Daily \\| Hot | 12 | Keep it like this (2), Doesn't suit this coffee (1) |" in recipe
+
+
+def test_the_history_as_tables_above_the_charts():
+    build = _build()
+    section = next(s for s in build.stats_view(build.TEXT["en"])["sections"] if HISTORY in str(s))
+    kinds = [c["type"] for c in section["cards"]]
+    assert kinds.index("markdown", 1) < kinds.index("statistics-graph")
+    rows = {"by_month": [{"start": "2026-11-01", "brews": 26, "coffee_g": 460.0, "water_ml": 6800.0}],
+            "by_week": [{"start": "2026-11-23", "brews": 2, "coffee_g": 34.0, "water_ml": 510.0}]}
+    out = _render(_card(build, "'by_month'")["content"], {HISTORY: rows})
+    assert "| Month | Brews | Coffee | Water |" in out and "| November 2026 | 26 | 460 g | 6800 ml |" in out
+    assert "| Week of | Brews | Coffee | Water |" in out and "| 23/11 | 2 | 34 g | 510 ml |" in out
+    ar = _render(_card(build, "'by_month'", "ar")["content"], {HISTORY: rows})
+    assert "نوفمبر 2026" in ar
+
+
+def test_the_list_is_the_brews_of_this_period():
+    build = _build()
+    headings = [c["content"] for c in _cards(build.stats_view(build.TEXT["en"])) if c.get("text_only")]
+    assert "## Brews in this period" in headings
+
+
+def test_the_summary_leaves_the_coffee_recipe_and_verdicts_to_their_tables():
+    build = _build()
+    out = _render(build.summary_card(build.TEXT["en"]), {"sensor.xbloom_studio_brews": {"habits": HABITS}})
+    assert "Most brewed" not in out and "Verdicts" not in out
+
+
+def test_an_empty_coffee_or_recipe_table_shows_nothing():
+    build = _build()
+    for needle in ("'by_coffee'", "'by_recipe'"):
+        card = _card(build, needle)
+        assert card.get("show_empty") is False
+        assert _render(card["content"], {STATS: {"habits": {"by_coffee": [], "by_recipe": []}}}).strip() == ""
+
+
+def test_a_week_of_another_year_says_its_year_and_no_water_reads_blank():
+    build = _build()
+    rows = {"by_month": [], "by_week": [{"start": "2025-12-29", "brews": 1, "coffee_g": 17.0, "water_ml": 0.0}]}
+    out = _render(_card(build, "'by_month'")["content"], {HISTORY: rows, "sensor.xbloom_studio_brews": {}})
+    assert "| 29/12/2025 | 1 | 17 g |  |" in out
+
+
+def test_no_history_shows_no_tables():
+    build = _build()
+    out = _render(_card(build, "'by_month'")["content"], {HISTORY: {"by_month": [], "by_week": []}})
+    assert out.strip() == ""
