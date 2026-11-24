@@ -304,10 +304,14 @@
         "data": {
           "enable": "Track coffee bags",
           "brewers": "Brewers",
-          "store": "Where to keep it"
+          "store": "Where to keep it",
+          "stock_list": "Shopping list",
+          "stock_notify": "Phone"
         },
         "data_description": {
-          "brewers": "Offered when recording a brew made without the xBloom."
+          "brewers": "Offered when recording a brew made without the xBloom.",
+          "stock_list": "Where Coffee Lab adds what is running low, and a coffee to buy again.",
+          "stock_notify": "A notify service, for example notify.mobile_app_my_phone, told when something goes on the list."
         }
       },
       "brew_stories": {
@@ -435,7 +439,8 @@
       "notion_duplicate": "The page has more than one database called {detail}. Keep one.",
       "notion_half": "The page is missing {detail}. Add it, or use a page with neither.",
       "notion_fields": "These fields are missing or of the wrong type — {detail}.",
-      "altitude_range": "The top of the altitude range is below its bottom."
+      "altitude_range": "The top of the altitude range is below its bottom.",
+      "notify_service_invalid": "Enter a notify service, such as notify.mobile_app_my_phone."
     },
     "abort": {
       "no_recipes": "No recipes saved yet.",
