@@ -6,12 +6,12 @@ can your own automations or a service outside Home Assistant.
 
 | Event | When | Payload |
 |---|---|---|
-| `xbloom_brew_started` | the machine has accepted the brew — every step, including execute | `recipe_name`, `total_pours`, `recipe_water_ml`, `pours` (each pour's running water total `water_ml` and the wait after it `wait_s`), `settings` (`grind`, `water_ml`, `ratio`, `temperature_c` and `flow_rate` when every pour shares them, `dose_g`) |
-| `xbloom_brew_completed` | **The brew finished.** Key on this one. | `recipe_id`, `recipe_name`, `dose_g`, `cup_type`, `outcome`, `started_at`, `first_pour_at`, `ended_at`, `duration_s` (first pour to the machine's end signal; empty when either went unheard), and what it was made with: `grind`, `water_ml`, `ratio`, `temperature_c`, `flow_rate` (a value the pours disagree on is omitted rather than guessed). When the tank's low-water switch read low at the end, also `tank_low: true`, and `water_left_ml` when the switch tripped during this brew |
+| `xbloom_brew_started` | the machine has accepted the brew — every step, including execute | `recipe_name`, `total_pours`, `recipe_water_ml`, `pours` (each pour's running water total `water_ml` and the wait after it `wait_s`), `settings` (`grind`, `water_ml`, `ratio`, `temperature_c` and `flow_rate` when every pour shares them, `dose_g`), `cup_type` |
+| `xbloom_brew_completed` | **The brew finished.** Key on this one. | `recipe_id`, `recipe_name`, `dose_g`, `cup_type`, `outcome`, `started_at`, `first_pour_at`, `ended_at`, `duration_s` (first pour to the machine's end signal; empty when either went unheard), and what it was made with: `grind`, `water_ml`, `ratio`, `temperature_c`, `flow_rate` (a value the pours disagree on is omitted rather than guessed). When the tank's low-water switch read low at the end, also `tank_low: true`, and `water_left_ml` when the switch tripped during this brew. With Coffee Lab on, `focus`: what to notice in this cup, or empty when there is nothing (see [What to notice](#what-to-notice)) |
 | `xbloom_brew_failed` | The brew could not start, or the machine gave up on it | `reason`, `recipe_name`, sometimes `step` / `error`; with `reason: no_water`, `water_needed_ml`, the recipe's water |
 | `xbloom_brew_stopped` | Someone stopped the brew | `by`, `recipe_name`, `ground` (whether the grinder had run), `dose_g` |
 | `xbloom_brew_timeout` | Ten minutes passed with no ending heard from the machine; time a brew spends paused for water does not count, for up to an hour | `recipe_name` |
-| `xbloom_rating_due` | With Coffee Lab on: a quarter of an hour after the last cup of a sitting, for every brew still waiting for its verdict, whoever started it. The **Ask how the coffee was** blueprint is built on it | `brews`: each question as `brew_id`, `recipe`, `bag`, `changes`, `cups`. Answer one with the `xbloom.rate_brew` action and its `brew_id` |
+| `xbloom_rating_due` | With Coffee Lab on: a quarter of an hour after the last cup of a sitting, for every brew still waiting for its verdict, whoever started it. The **Ask how the coffee was** blueprint is built on it | `brews`: each question as `brew_id`, `recipe`, `bag`, `changes`, `cups`, `focus` (the sentence of what was to be noticed in it, or empty). Answer one with the `xbloom.rate_brew` action and its `brew_id` |
 | `xbloom_machine_brew_started` | A brew started from one of the machine's own recipe slots, which Home Assistant did not send and so cannot follow | |
 
 **Every event of one brew also carries its `run_id`**, the same on each, so a
@@ -19,7 +19,9 @@ consumer can tell brews apart and handle a repeated event once. `start_brew`
 returns it when asked for a response. Give `start_brew` a `context` — any value
 — and every event of that brew carries it back unchanged, so an automation can
 route the outcome to whoever started the brew. Events are kept in Home
-Assistant's history, and so is a `context` sent with one.
+Assistant's history, and so is a `context` sent with one. A brew started with
+a `notify_target` names it on its events too, so an automation can leave to
+that caller what the caller is already told.
 
 With Coffee Lab on, every event of a brew also says what it draws from, as
 chosen when it started: `bean_id` and `bean_name` for the bag of coffee,
@@ -129,6 +131,31 @@ still follows it to `done`, as long as Home Assistant is holding the Bluetooth
 link at the time. Key on the sensor when you want every brew, and on the events
 when you want the ones Home Assistant started and everything they carry.
 
+## What to notice
+
+With Coffee Lab on, a brew started from Home Assistant with a bag of coffee is
+checked as it starts for anything to notice in the cup, against the last cup of
+the same recipe with the same coffee — any bag of it, so a coffee bought again
+keeps its history. There is something only when:
+
+| `case` | When |
+|---|---|
+| `next_change` | The grind, ratio or water temperature is the change asked for after that cup |
+| `changed` | The grind, ratio or water temperature differs from that cup |
+| `new_bag` | The same recipe and settings, from a new bag of the coffee |
+| `first_time` | The recipe has never been brewed with this coffee |
+
+The same recipe with the same coffee at the same settings has nothing to
+notice, and neither does a different dose: at one ratio it changes how much is
+made, not the cup. Then `focus` is empty, and nothing more is said.
+
+Otherwise `focus` is `{"case", "changes", "text"}`: `changes` lists each
+`{"setting", "before", "now"}`, and `text` is one sentence in the brew story's
+language — written by the story agent when **Brew Stories** is set to it, and
+otherwise a built-in sentence. The **Brew announcements** blueprint says it
+with the coffee being ready and can send it to a phone; the brew's callback
+carries it; and its rating question shows it again as a reminder.
+
 ## Callbacks
 
 A service outside Home Assistant can be told how a brew it started went,
@@ -153,14 +180,14 @@ target; it can never supply a URL.
 
 With Coffee Lab on, a brew that completed and is worth asking about gets one
 more message, later and on its own: `xbloom.rating.due`. Coffee Lab keeps a
-question per recipe, bag and version (grind, ratio, dose): cups of the same
+question per recipe, bag and version (grind and ratio): cups of the same
 one share it, and a different one gets its own, up to three at a time. The
 message is sent a quarter of an hour after the caller's last cup — when the
 dashboard's card appears too — and covers every question of theirs still
 unanswered, so cups brewed close together are asked about once. Its `data` is
 `{"event": "rating_due", "final": false, "run_id", "brew_id", "recipe", "bag",
 "changes", "brews"}`: `brews` lists each question as `{"brew_id", "recipe",
-"bag", "changes", "cups"}`, and the top-level fields repeat the first. Its
+"bag", "changes", "cups", "focus"}`, and the top-level fields repeat the first. Its
 `context` is the brews'. The receiver asks the person how each was and keeps
 each answer with the `coffee_lab` tool's `rate_brew` and that `brew_id`; the
 answer is kept on every cup of the question and closes its card. Left
@@ -182,7 +209,7 @@ change and test `trigger.to_state.attributes.event_type`:
 | `event_type` | When | Attributes |
 |---|---|---|
 | `brew_started` | the first pour begins | `recipe_name` |
-| `brew_done` | the cup is ready: for a brew Home Assistant started, at its completion; otherwise on the machine's own end signal, or its done screen when that goes unheard | `recipe_name`, `duration_s` (first pour to the end; empty when the first pour went unheard); for a brew Home Assistant started that ended with the water low, `tank_low`, and `water_left_ml` when the switch tripped during it |
+| `brew_done` | the cup is ready: for a brew Home Assistant started, at its completion; otherwise on the machine's own end signal, or its done screen when that goes unheard | `recipe_name`, `duration_s` (first pour to the end; empty when the first pour went unheard); for a brew Home Assistant started that ended with the water low, `tank_low`, and `water_left_ml` when the switch tripped during it; when its cup has something to notice, `focus` (the sentence); and `notify_target` when it was started with one |
 | `grinder_started` / `grinder_stopped` | the burrs start and stop | |
 | `brewer_started` | the brewer takes over | |
 | `pour_started` | each pour begins | `pour_index` (0-based) |
@@ -197,7 +224,7 @@ change and test `trigger.to_state.attributes.event_type`:
 
 | Event | Fired when | Data |
 |---|---|---|
-| `xbloom_brew_started` | the machine accepts the brew (also fires with Connect off); a refused brew fires `xbloom_brew_failed` instead | `recipe_name`, `total_pours`, `recipe_water_ml`, `pours` (each pour's running water total `water_ml` and the wait after it `wait_s`), `settings` (`grind`, `water_ml`, `ratio`, `temperature_c` and `flow_rate` when every pour shares them, `dose_g`) |
+| `xbloom_brew_started` | the machine accepts the brew (also fires with Connect off); a refused brew fires `xbloom_brew_failed` instead | `recipe_name`, `total_pours`, `recipe_water_ml`, `pours` (each pour's running water total `water_ml` and the wait after it `wait_s`), `settings` (`grind`, `water_ml`, `ratio`, `temperature_c` and `flow_rate` when every pour shares them, `dose_g`), `cup_type` |
 | `xbloom_connect_ready` / `_connecting` / `_failed` / `_stopped` / `_auto_stopped` | the live session changes state | `reason` on failures and stops; `for_recipe: true` on connecting and ready when the session was opened only to send a picked recipe |
 | `xbloom_scale_weight_stable` | the weight settles while you're on the scale | `weight_g`, `unit` |
 | `xbloom_grinder_knob_changed` | a grinder knob is turned | `parameter`, `value` |

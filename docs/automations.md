@@ -20,7 +20,7 @@ it is; Home Assistant shows a repair notice when a newer one is available.
 
 | Blueprint | What it does | Import |
 |---|---|---|
-| **Brew announcements** | Announces the coffee ready, or a brew that could not start, to the whole home; the brew starting, each step of it, and a cancellation can go to a speaker by the machine, the only one that says the recipe name. | [Import][bp-brew] |
+| **Brew announcements** | Announces the coffee ready, or a brew that could not start, to the whole home; the brew starting, each step of it, and a cancellation can go to a speaker by the machine, the only one that says the recipe name. With Coffee Lab on, what to notice in the cup is said with its being ready, when there is anything, and **Phone for what to notice** sends it to a phone too. | [Import][bp-brew] |
 | **Live-session announcements** | Speaks live feedback while you turn the machine's knobs — weight, grind size, temperature, which module you're on. Needs the **Connect** switch on. | [Import][bp-live] |
 | **Machine fault announcements** | Speaks up when the water is too low to finish a brew and by how much, when a brew pauses for water, when the grinder is out of beans, or when the machine reports a dose or gear problem. | [Import][bp-fault] |
 | **Brew story announcements** | Speaks the brew story as it appears, in the story's own language: the bag's part and the teaser for the next cup, or every story part, as the **Spoken story parts** select says. Never the line about each pour. Needs **Brew Stories** on. | [Import][bp-story] |

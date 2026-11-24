@@ -5,11 +5,16 @@ machine-started event for a brew from one of the machine's own slots), then
 shown as Brew Stage moves: the pour line while a pour runs, a story part from
 the wait it was planned for until the next one, the "you" line while the
 coffee drains. The brew is remembered once, when it is done.
+
+A brew started from Home Assistant also gets what to notice in it, when there
+is anything (`focus.py`), whether Brew Stories is on or not: decided as it
+starts, carried by its completion (`focus_of`).
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from homeassistant.core import callback
@@ -20,9 +25,10 @@ from homeassistant.util import dt as dt_util
 from ..brew_stage import _follow
 from ..const import CONF_STORY_AGENT
 from . import LANGUAGES, MODES
-from .agent import AGENT_KINDS, TASK_NAME, build_request, parse_reply, slot_key
+from .agent import AGENT_KINDS, TASK_NAME, build_request, parse_focus, parse_reply, slot_key
 from .compose import BrewTexts, compose
 from .content import Content
+from .focus import decide as decide_focus, sentence as focus_sentence
 from .memory import STORAGE_KEY, STORAGE_VERSION, StoryMemory
 from .plan import Slot, plan_slots
 
@@ -66,6 +72,8 @@ class StoryRuntime:
         self._agent_texts: list[str] = []
         # The built-in texts of an agent brew: its facts, teaser and big story.
         self._built: BrewTexts | None = None
+        # What to notice in the brew under way: its run_id, case and sentence.
+        self._focus: dict[str, Any] | None = None
 
     def set_mode(self, mode: str) -> None:
         """Brew Stories on or off; off clears what a brew under way shows."""
@@ -160,15 +168,58 @@ class StoryRuntime:
                           "process": bean.process if bean else None})
         return rated[:RATED_BREWS]
 
+    async def _decide_focus(
+        self, run_id: str | None, recipe: str | None, settings: dict, bean_id: str | None,
+        content: Content, cup_type: Any = None,
+    ) -> None:
+        """What to notice in this brew, if anything; none when it cannot be told.
+
+        Only a coffee brew: an xPod or tea brew does not draw from the bag of
+        coffee in use, whatever `bean_id` names.
+        """
+        from ..coffee_lab.inventory import kind_of_cup
+
+        self._focus = None
+        lab = getattr(self.entry.runtime_data, "coffee_lab", None)
+        if lab is None or not bean_id or not run_id or kind_of_cup(cup_type) != "coffee":
+            return
+        from ..coffee_lab.lab import STORE_UNREACHABLE
+        from ..coffee_lab.store import UnknownBean
+        try:
+            # A brew still waiting to be saved is one of the coffee's cups.
+            await lab.async_retry_pending()
+            bean = await lab.store.async_get_bean(bean_id)
+            beans = await lab.store.async_list_beans(selectable_only=False)
+            # Each bag of the coffee's own brews, so a recipe last brewed with
+            # it long ago, behind other coffees' brews, is still found.
+            brews = [b for other in beans if other.id == bean.id or other.same_coffee(bean)
+                     for b in await lab.store.async_list_brews(bean_id=other.id,
+                                                               limit=HISTORY_BREWS)]
+        except (UnknownBean, *STORE_UNREACHABLE) as err:
+            _LOGGER.info("Brew Stories: what to notice not decided for bag %s (%s)", bean_id, err)
+            return
+        brews.sort(key=_brewed_at, reverse=True)
+        found = decide_focus(recipe, settings, bean, beans, brews)
+        if found is not None:
+            self._focus = {"run_id": run_id, "focus": found, "text": focus_sentence(found, content)}
+
+    def focus_of(self, run_id: str | None) -> dict[str, Any] | None:
+        """What to notice in a brew, as its completion carries it; None when nothing."""
+        if not run_id or self._focus is None or self._focus["run_id"] != run_id:
+            return None
+        return self._focus["focus"].as_data(self._focus["text"])
+
     async def _begin(
         self, plan: list[dict] | None, bean_id: str | None,
-        recipe: str | None = None, settings: dict | None = None,
+        recipe: str | None = None, settings: dict | None = None, run_id: str | None = None,
+        cup_type: Any = None,
     ) -> None:
         self._texts, self._bag, self._built, self._recorded = None, None, None, False
         self._publish(dict(NOTHING))
+        content = await self._content_now()
+        await self._decide_focus(run_id, recipe, settings or {}, bean_id, content, cup_type)
         if self.mode not in MODES or self.mode == "off":
             return
-        content = await self._content_now()
         self._bag, history = await self._bag_and_history(bean_id)
         slots = plan_slots(plan, self._bag is not None)
         built = compose(slots, plan, self._bag, history, self.memory, content,
@@ -193,7 +244,7 @@ class StoryRuntime:
             # Tied to the entry: cancelled on unload, never awaited at shutdown.
             self._agent_task = self.entry.async_create_background_task(
                 self.hass, self._ask_agent(self._brew_id, asked, plan, recipe, settings or {},
-                                           self._bag, history, content.lang),
+                                           self._bag, history, content),
                 "xbloom brew story agent")
         else:
             self._texts = built
@@ -208,15 +259,21 @@ class StoryRuntime:
 
     async def _ask_agent(
         self, brew_id: int, asked: BrewTexts, plan: list[dict] | None, recipe: str | None,
-        settings: dict, bag: dict | None, history: list[dict], language: str,
+        settings: dict, bag: dict | None, history: list[dict], content: Content,
     ) -> None:
-        """One request for this cup's parts; a failure leaves them empty."""
+        """One request for this cup's parts; a failure leaves them empty.
+
+        It also writes the sentence of what to notice, when the brew has one;
+        without a reply that sentence stays the built-in one.
+        """
         if self.agent_entity is None:
             _LOGGER.warning("Brew Stories: no story agent is set; this cup's parts are left empty")
             return
+        focus = self._focus
         instructions, structure = build_request(
             asked, plan, recipe, settings, bag, history, await self._rated(), self.memory,
-            language)
+            content.lang, words=content.entry("words"), verdicts=content.entry("verdicts"),
+            focus=focus["focus"].as_data(focus["text"]) if focus else None)
         try:
             async with asyncio.timeout(AGENT_TIMEOUT_S):
                 response = await self.hass.services.async_call(
@@ -236,6 +293,8 @@ class StoryRuntime:
             return
         stories = parse_reply(asked, data)
         self._texts.stories.update(stories)
+        if focus is not None and focus is self._focus and (written := parse_focus(data)):
+            focus["text"] = written
         self._agent_texts = [
             (data.get(slot_key(slot)) or "").strip() for slot in stories
             if isinstance(data.get(slot_key(slot)), str) and data.get(slot_key(slot)).strip()]
@@ -265,7 +324,8 @@ class StoryRuntime:
 
     async def async_brew_started(self, data: dict[str, Any]) -> None:
         await self._begin(data.get("pours") or None, data.get("bean_id"),
-                          data.get("recipe_name"), data.get("settings"))
+                          data.get("recipe_name"), data.get("settings"), data.get("run_id"),
+                          data.get("cup_type"))
 
     async def async_machine_brew_started(self) -> None:
         lab = getattr(self.entry.runtime_data, "coffee_lab", None)
@@ -334,6 +394,12 @@ class StoryRuntime:
         if shown != self.current:
             self.current = shown
             async_dispatcher_send(self.hass, signal_story(self.entry.entry_id))
+
+
+def _brewed_at(brew) -> datetime:
+    """When a brew was made, for ordering brews read bag by bag."""
+    when = dt_util.parse_datetime(brew.brewed_at or brew.recorded_at or "")
+    return when if when is not None else datetime.min.replace(tzinfo=timezone.utc)
 
 
 def _brew_facts(brew) -> dict[str, Any]:

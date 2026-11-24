@@ -98,8 +98,12 @@ variables:
       {%- set bag = (b.bag | string | regex_replace("[^\\w\\s'&().,-]", '') | trim)[:40] -%}
       {%- set words = (recipe ~ ' مع ' ~ bag ~ changed) if lang == 'ar'
                       else (recipe ~ ' with ' ~ bag ~ changed) -%}
+      {#- What was to be noticed in it, as said when it was ready: written by
+          a story agent, so kept to plain text as the names are. -#}
+      {%- set focus = (b.focus | default('', true) | string
+                       | regex_replace("[^\\w\\s'&().,:?،؟-]", ' ') | trim)[:200] -%}
       {%- set ns.out = ns.out + [{'brew_id': b.brew_id | string | regex_replace('[^A-Za-z0-9-]', ''),
-                                   'words': words}] -%}
+                                   'words': words, 'focus': focus}] -%}
     {%- endfor -%}
     {{ ns.out }}
 
@@ -142,6 +146,7 @@ action:
                     message: >-
                       {{ ('كيف كانت ' ~ repeat.item.words ~ '؟') if lang == 'ar'
                          else ('How was ' ~ repeat.item.words ~ '?') }}
+                      {{- (' ' ~ repeat.item.focus) if repeat.item.focus else '' }}
                     data:
                       tag: "xbloom-rating-{{ repeat.item.brew_id }}"
                       actions: >-
@@ -171,6 +176,8 @@ action:
                   {{ 'How was ' ~ ws[0] ~ '?' if ws | count == 1
                      else 'How were your coffees? ' ~ ws | join(', and ') ~ '.' }}
                 {%- endif -%}
+                {#- One coffee: what was to be noticed in it, as a reminder. -#}
+                {{- (' ' ~ coffees[0].focus) if coffees | count == 1 and coffees[0].focus else '' }}
               # Only ids, in the order the question named the coffees: no
               # name reaches the agent's instructions.
               extra_system_prompt: >-

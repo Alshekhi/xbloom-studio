@@ -32,11 +32,12 @@ _THIS_CUP = ("What this recipe does for this coffee (its temperatures, pours and
              "smell or taste for now and as it cools.")
 _COACH = ("What changed since the last brew of this recipe with this bag and what to check "
           "in the cup because of it, given that brew's verdict, tasting and planned change; "
-          "then one pattern from the rated history, only if a real one exists.")
+          "then one pattern from the rated history, only if a real one exists. When nothing "
+          "changed, never say so: start with what to check.")
 _COACH_UNRATED = ("This recipe with this bag has no verdict yet: say what changed since the "
                   "last brew of it, if anything, and what to notice in this cup so the verdict "
                   "means something; then one pattern from the rated history, only if a real "
-                  "one exists.")
+                  "one exists. When nothing changed, never say so.")
 _COACH_FIRST = ("There is no earlier brew of this recipe with this bag: say what to check in "
                 "this cup, given the coffee and the recipe; then one pattern from the rated "
                 "history, only if a real one exists.")
@@ -55,7 +56,17 @@ and claim nothing about this coffee beyond its fields below. The screen
 already shows each pour's volume, temperature and pattern: do not repeat those
 numbers, say what they do.
 Give the roaster's notes no order, timing or strength they do not state.
-When the data does not support something, leave it out."""
+When the data does not support something, leave it out.
+{words}"""
+
+# Why a cup has something to notice (stories/focus.py), for the agent's sentence.
+_FOCUS_CASES = {
+    "first_time": "this recipe has never been brewed with this coffee",
+    "new_bag": "this is a new bag of a coffee brewed with this recipe before, at the same settings",
+    "changed": "these settings changed since the last cup of this recipe with this coffee",
+    "next_change": ("these settings changed since the last cup of this recipe with this coffee, "
+                    "and they are the change asked for after it"),
+}
 
 
 def slot_key(slot: Slot) -> str:
@@ -90,10 +101,20 @@ def _brews(brews: list[dict[str, Any]], keys: tuple[str, ...]) -> str:
 def build_request(
     texts: BrewTexts, plan: list[dict] | None, recipe: str | None, settings: dict[str, Any],
     bag: dict | None, bag_brews: list[dict], rated: list[dict], memory: StoryMemory,
-    language: str,
+    language: str, *, words: dict[str, Any] | None = None,
+    verdicts: dict[str, str] | None = None, focus: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
-    """The instructions and the structure of one brew's request."""
-    parts = [_RULES.format(language=_LANGUAGE_NAMES.get(language, "English"))]
+    """The instructions and the structure of one brew's request.
+
+    `words` are the content's own for the cup and the coffee, `verdicts` the
+    names a person sees for each verdict, and `focus` the case this cup is in
+    (`focus.Focus.as_data`), when it has one.
+    """
+    names = verdicts or {}
+    bag_brews = [_named(b, names) for b in bag_brews]
+    rated = [_named(b, names) for b in rated]
+    parts = [_RULES.format(language=_LANGUAGE_NAMES.get(language, "English"),
+                           words=_words_rule(words))]
     pours = [{k: p.get(k) for k in ("volume_ml", "temperature_c", "pattern", "wait_s")}
              for p in plan or []]
     parts.append(f"This brew: recipe {json.dumps(recipe, ensure_ascii=False)}, settings "
@@ -134,9 +155,9 @@ def build_request(
         coach = _COACH_NO_BAG
         parts.append("There is no bag for this brew: say nothing about a particular coffee.")
     if rated:
-        parts.append("Rated history, newest first, for patterns (a verdict is again, fine "
-                     "or not again): " + _brews(rated, ("bag", "country", "process", "recipe",
-                                                        "settings", "verdict")))
+        parts.append("Rated history, newest first, for patterns (each verdict as the person "
+                     "chose it): " + _brews(rated, ("bag", "country", "process", "recipe",
+                                                     "settings", "verdict")))
     else:
         parts.append("There is no rated history: say nothing about patterns.")
     structure: dict[str, Any] = {}
@@ -145,7 +166,39 @@ def build_request(
             structure[slot_key(slot)] = {
                 "description": _THIS_CUP if slot.kind == "bag" else coach,
                 "required": True, "selector": {"text": {}}}
+    if focus is not None:
+        why = _FOCUS_CASES.get(focus["case"], focus["case"])
+        changed = {c["setting"]: [c["before"], c["now"]] for c in focus.get("changes") or []}
+        structure["focus"] = {
+            "description": (
+                "One sentence of at most 18 words, said aloud when the coffee is ready: what "
+                f"to notice when it is tasted, because {why}"
+                + (f" (setting: before, now): {json.dumps(changed)}" if changed else "")
+                + ". Name only the numbers given."),
+            "required": True, "selector": {"text": {}}}
     return "\n\n".join(parts), structure
+
+
+def _named(brew: dict[str, Any], verdicts: dict[str, str]) -> dict[str, Any]:
+    """A brew with its verdict as the name the person chose, never its code."""
+    if brew.get("verdict") in verdicts:
+        return {**brew, "verdict": verdicts[brew["verdict"]]}
+    return brew
+
+
+def _words_rule(words: dict[str, Any] | None) -> str:
+    if not words:
+        return ""
+    rule = f'Call the cup "{words["cup"]}" and the coffee "{words["coffee"]}" every time'
+    if words.get("avoid"):
+        rule += ", never " + ", ".join(f'"{w}"' for w in words["avoid"])
+    return rule + "."
+
+
+def parse_focus(data: dict[str, Any]) -> str | None:
+    """The agent's sentence of what to notice, if it wrote one."""
+    value = data.get("focus")
+    return value.strip() or None if isinstance(value, str) else None
 
 
 def parse_reply(texts: BrewTexts, data: dict[str, Any]) -> dict[Slot, tuple[str, str]]:

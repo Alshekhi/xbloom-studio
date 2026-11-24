@@ -99,7 +99,11 @@ views:
         | round(1) | string | replace(''.0'', '''') }} بدل 1:{{ (c.saved | float) | round(1) | string
         | replace(''.0'', '''') }}{% else %}بجرعة {{ (c.value | float) | round(1) | string | replace(''.0'',
         '''') }} غ بدل {{ (c.saved | float) | round(1) | string | replace(''.0'', '''') }} غ{% endif %}{%
-        if not loop.last %}، {% endif %}{% endfor %}{% endif %}.'
+        if not loop.last %}، {% endif %}{% endfor %}{% endif %}.{% set f = state_attr(''sensor.xbloom_studio_brew_to_rate'',
+        ''focus'') %}{% if f %}
+
+
+        {{ e(f) }}{% endif %}'
     - type: tile
       entity: select.xbloom_studio_verdict
       name: الحكم

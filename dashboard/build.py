@@ -895,7 +895,8 @@ def next_change_card(t: dict) -> str:
 
 
 def rating_card(t: dict) -> str:
-    """The question: which recipe with which bag, and what was changed."""
+    """The question: which recipe with which bag, what was changed, and what
+    was to be noticed in it, as said when it was ready."""
     q = f"sensor.{E}_brew_to_rate"
     num = "{{ (c.%s | float) | round(1) | string | replace('.0', '') }}"
     change = (
@@ -911,7 +912,9 @@ def rating_card(t: dict) -> str:
         "{recipe}", f"{{{{ e(states('{q}')) }}}}"
     ).replace(
         "{bag}", f"{{{{ e(state_attr('{q}', 'bag')) }}}}"
-    ).replace("{changes}", changes)
+    ).replace("{changes}", changes) + (
+        f"{{% set f = state_attr('{q}', 'focus') %}}{{% if f %}}\n\n{{{{ e(f) }}}}{{% endif %}}"
+    )
 
 
 def suggestion_card(t: dict, bag: str) -> str:

@@ -113,5 +113,27 @@
       "Natural": "Natural",
       "Other": null
     }
+  },
+  "words": {
+    "cup": "cup",
+    "coffee": "coffee",
+    "avoid": []
+  },
+  "verdicts": {
+    "again": "Keep it like this",
+    "fine": "Close, needs a tweak",
+    "not_again": "Doesn't suit this coffee"
+  },
+  "focus": {
+    "first_time": "the first cup of this recipe with this coffee: is it balanced, and do you taste what the roaster describes?",
+    "new_bag": "a new bag of this coffee with the same recipe: does it taste like the last bag?",
+    "changed": "{changes} since the last cup of this recipe with this coffee: what changed in the taste?",
+    "next_change": "{changes}, the change asked for last time: is what was missing better?",
+    "changes": {
+      "grind": "the grind is {now} instead of {before}",
+      "ratio": "the ratio is 1:{now} instead of 1:{before}",
+      "temperature_c": "the water is {now} degrees instead of {before}"
+    },
+    "and": ", and "
   }
 }

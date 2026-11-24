@@ -123,9 +123,20 @@ def question_brews(questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     # Names typed by people, read by other agents: one capped line each.
     return [
         {"brew_id": q["brew_id"], "recipe": hub_text(q["recipe"]), "bag": hub_text(q["bag"]),
-         "changes": q.get("changes") or [], "cups": len(q.get("brew_ids") or [q["brew_id"]])}
+         "changes": q.get("changes") or [], "cups": len(q.get("brew_ids") or [q["brew_id"]]),
+         # What was to be noticed in it, as said when it was ready; None when nothing.
+         "focus": focus_text(q)}
         for q in questions
     ]
+
+
+def focus_text(question: dict[str, Any]) -> str | None:
+    """What was to be noticed in a question's cup, as one capped line."""
+    from ..community import hub_text
+
+    text = (question.get("focus") or {}).get("text")
+    # Written by a story agent: one capped line, as any text from outside.
+    return hub_text(text, 300) if text else None
 
 
 def change_label(changes: list[dict[str, Any]]) -> str:
@@ -508,6 +519,8 @@ class CoffeeLab:
                 question = {
                     **same, **timing, "brew_id": done.brew_id, "run_id": run_id,
                     "brew_ids": [*same["brew_ids"], done.brew_id],
+                    # The later cup's focus, or the earlier one's.
+                    "focus": args.get("focus") or same.get("focus"),
                 }
                 questions[questions.index(same)] = question
             else:
@@ -516,6 +529,7 @@ class CoffeeLab:
                     "recipe": recipe, "bean_id": done.bean_id, "bag": bean.name,
                     "version": version,
                     "changes": version_changes(version, self.recipe_lookup(recipe)),
+                    "focus": args.get("focus"),
                     **timing,
                 }
                 questions = [*questions, question][-MAX_OPEN_QUESTIONS:]
@@ -707,6 +721,7 @@ class CoffeeLab:
         recipe_source: str | None = None, outcome: str | None = None,
         settings: dict[str, Any] | None = None, unattributed: bool = False,
         xpod_id: str | None = None, tea_id: str | None = None,
+        focus: dict[str, Any] | None = None,
     ) -> Consumption:
         """Apply one brew to its bag and the record.
 
@@ -719,6 +734,8 @@ class CoffeeLab:
             "bean_id": _drawn_from(cup_type, bean_id, xpod_id, tea_id), "grams": grams, "cup_type": cup_type, "recipe": recipe,
             "brewer": brewer, "brewed_at": brewed_at, "recipe_source": recipe_source,
             "outcome": outcome, "settings": settings, "unattributed": unattributed,
+            # What to notice in the cup, for the question about it.
+            "focus": focus,
         })
 
     async def _async_queue_and_count(
@@ -818,6 +835,9 @@ class CoffeeLab:
         cup_type: Any, recipe: str | None, brewer: str | None,
         brewed_at: str | None, recipe_source: str | None, outcome: str | None,
         settings: dict[str, Any] | None, unattributed: bool,
+        # Read by the question (`_async_maybe_ask`), not kept on the brew;
+        # absent from a brew queued before it was carried.
+        focus: dict[str, Any] | None = None,
     ) -> Consumption:
         def record(bag: str | None, review: Review | None = None) -> Brew:
             return Brew(

@@ -61,9 +61,14 @@ def test_a_delivery_field_for_another_method_is_sent_empty(name):
     import jinja2
     env = jinja2.Environment()
     for a in (a for a in _actions(_load(name)["action"]) if a["action"] == "xbloom.announce"):
+        # A call that always uses one method (the phone for what to notice)
+        # is checked for that method alone.
+        fixed = a["data"]["method"]
+        methods = (fixed,) if "{{" not in str(fixed) else ("alexa", "tts", "notify")
         for field, own in (("notify_service", "notify"), ("tts_engine", "tts")):
             template = a["data"][field]
-            for method in ("alexa", "tts", "notify"):
+            for method in methods:
                 rendered = env.from_string(template).render(
-                    method=method, notify_service="mobile_app_typed_without_prefix", tts_engine="tts.piper")
+                    method=method, notify_service="mobile_app_typed_without_prefix", tts_engine="tts.piper",
+                    focus_notify="notify.mobile_app_test")
                 assert (rendered != "") == (method == own), (name, field, method, rendered)

@@ -10,7 +10,9 @@ EN = json.loads((FOLDER / "en.json").read_text(encoding="utf-8"))
 AR = json.loads((FOLDER / "ar.json").read_text(encoding="utf-8"))
 KNOWN = {"pour", "volume", "temperature", "name", "country", "region", "producer", "process",
          "varietal", "roast", "altitude", "days_since_roast", "days_since_open", "brew_count",
-         "last_rating", "next_change", "title", "topic", "chapter", "n"}
+         "last_rating", "next_change", "title", "topic", "chapter", "n",
+         # What to notice in a cup (stories/focus.py).
+         "changes", "before", "now"}
 TOPICS = ("bloom", "extraction", "origin", "process", "roast", "water")
 
 
@@ -36,8 +38,10 @@ def _texts(node, path=""):
 
 def test_both_languages_have_the_same_shape():
     shape_en, shape_ar = _shape(EN), _shape(AR)
-    # Count forms differ by language; everything else matches.
+    # Count forms differ by language, and so do the words a story agent must
+    # not use; everything else matches.
     shape_en.pop("counts"), shape_ar.pop("counts")
+    shape_en["words"].pop("avoid"), shape_ar["words"].pop("avoid")
     assert shape_en == shape_ar
 
 

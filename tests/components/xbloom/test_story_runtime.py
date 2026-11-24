@@ -305,7 +305,9 @@ async def test_the_request_carries_this_bags_brews_and_the_rated_history():
     await _started(runtime, bag.id)
     await runtime._agent_task
     instructions = runtime.hass.services.async_call.await_args.args[2]["instructions"]
-    assert "Morning" in instructions and "Gedeb" in instructions and '"again"' in instructions
+    assert "Morning" in instructions and "Gedeb" in instructions
+    # The verdict as the person chose it, never its code.
+    assert '"Keep it like this"' in instructions and '"again"' not in instructions
 
 
 async def test_a_late_reply_shows_its_part_only_while_that_slot_runs():
@@ -454,3 +456,70 @@ async def test_spoken_story_parts_starts_on_bag_and_teaser_and_keeps_a_pick():
     await select.async_select_option("every_part")
     assert select.current_option == "every_part"
     select.async_write_ha_state.assert_called_once()
+
+
+# ── What to notice ───────────────────────────────────────────────────────────
+
+
+async def _focus_brew(runtime, bag, run_id="run-9", cup_type=2):
+    await runtime.async_brew_started({
+        "recipe_name": "R", "pours": pour_plan(RECIPE), "bean_id": bag.id, "run_id": run_id,
+        "settings": {"grind": 50, "ratio": 15}, "cup_type": cup_type})
+
+
+async def test_a_first_cup_has_a_focus_even_with_brew_stories_off():
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    runtime, _ = await _runtime(lab)
+    runtime.set_mode("off")
+    await _focus_brew(runtime, bag)
+    focus = runtime.focus_of("run-9")
+    assert focus["case"] == "first_time" and focus["text"].startswith("The first cup")
+    assert runtime.focus_of("another-run") is None
+
+
+async def test_the_same_cup_again_has_no_focus():
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    await lab.async_consume(bean_id=bag.id, grams=15, run_id="earlier", recipe="R",
+                            settings={"grind": "50", "ratio": 15})
+    runtime, _ = await _runtime(lab)
+    await _focus_brew(runtime, bag)
+    assert runtime.focus_of("run-9") is None
+
+
+async def test_the_agent_writes_the_focus_sentence_and_without_a_reply_it_stays_built_in():
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    runtime, _ = await _agent_runtime(lab, reply={**REPLY, "focus": "Agent focus."})
+    await _focus_brew(runtime, bag)
+    await runtime._agent_task
+    [call] = runtime.hass.services.async_call.await_args_list
+    assert "focus" in call.args[2]["structure"]
+    assert runtime.focus_of("run-9")["text"] == "Agent focus."
+
+    runtime, _ = await _agent_runtime(lab, reply=HomeAssistantError("down"))
+    await _focus_brew(runtime, bag, "run-10")
+    await runtime._agent_task
+    assert runtime.focus_of("run-10")["text"].startswith("The first cup")
+
+
+async def test_an_xpod_brew_has_no_focus_about_the_bag_of_coffee_in_use():
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    runtime, _ = await _runtime(lab)
+    await _focus_brew(runtime, bag, cup_type=1)
+    assert runtime.focus_of("run-9") is None
+
+
+async def test_a_recipe_brewed_with_the_coffee_long_ago_is_not_a_first_time():
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    other = await _bag(lab, name="Brazil", status="open")
+    await lab.async_consume(bean_id=bag.id, grams=15, run_id="old", recipe="R",
+                            settings={"grind": "50", "ratio": 15})
+    for n in range(HISTORY_BREWS + 5):
+        await lab.async_consume(bean_id=other.id, grams=1, run_id=f"other-{n}", recipe="X")
+    runtime, _ = await _runtime(lab)
+    await _focus_brew(runtime, bag)
+    assert runtime.focus_of("run-9") is None

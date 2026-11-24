@@ -39,6 +39,7 @@ def async_count_completed_brews(hass: HomeAssistant, lab: CoffeeLab) -> Callable
             settings={key: data.get(key) for key in SETTINGS},
             unattributed=bool(data.get("unattributed")),
             xpod_id=data.get("xpod_id"), tea_id=data.get("tea_id"),
+            focus=data.get("focus"),
         )
         _LOGGER.info("Coffee Lab: brew %s %s (%s)", data.get("run_id"), result.result, result.reason)
 

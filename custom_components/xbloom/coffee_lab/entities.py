@@ -26,7 +26,7 @@ from homeassistant.helpers.event import async_track_state_change_event, async_tr
 from ..tool_common import refuse
 from ..const import DOMAIN, SIGNAL_COFFEE_LAB_UPDATED
 from . import actions
-from .lab import CoffeeLab
+from .lab import CoffeeLab, focus_text
 from .inventory import kind_of_cup
 from .models import BUY_AGAIN, ISSUES, KINDS, VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
@@ -285,7 +285,9 @@ class RatingQuestionSensor(CoffeeLabEntity, SensorEntity):
         self._attr_native_value = question["recipe"] if question else None
         self._attr_extra_state_attributes = (
             {"bag": question["bag"], "brew_id": question["brew_id"],
-             "changes": question.get("changes") or []}
+             "changes": question.get("changes") or [],
+             # What was to be noticed in it, said when it was ready.
+             "focus": focus_text(question)}
             if question else {}
         )
 

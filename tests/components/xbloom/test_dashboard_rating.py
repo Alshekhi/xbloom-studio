@@ -29,3 +29,10 @@ def test_the_verdicts_say_what_happens_next():
     build = _build()
     assert [build.TEXT["en"][f"verdict_{v}"] for v in ("again", "fine", "not_again")] == [
         "Keep it like this", "Close, needs a tweak", "Doesn't suit this coffee"]
+
+
+def test_the_question_shows_what_was_to_be_noticed_when_there_is_something():
+    build = _build()
+    card = build.rating_card(build.TEXT["en"])
+    assert "state_attr('sensor.xbloom_studio_brew_to_rate', 'focus')" in card
+    assert "{% if f %}" in card

@@ -380,3 +380,19 @@ async def test_the_verdict_picker_rates_only_the_question_shown():
         await select.async_select_option("again")
     [brew] = await store.async_list_brews()
     assert (brew.id, brew.rating) == (result.brew_id, 3)
+
+
+async def test_what_was_to_be_noticed_rides_on_the_question():
+    from custom_components.xbloom.coffee_lab.lab import question_brews
+    lab, store, bag = await _lab()
+    focus = {"case": "changed", "changes": [], "text": "Is it less sour?"}
+    await lab.async_consume(bean_id=bag.id, grams=15, run_id="run-1", recipe="Test Hot",
+                            settings={"grind": "50", "ratio": 16.0}, focus=focus)
+    [question] = lab._open_questions()
+    assert question["focus"] == focus
+    assert question_brews([question])[0]["focus"] == "Is it less sour?"
+    # A cup with nothing to notice keeps the question's focus.
+    await lab.async_consume(bean_id=bag.id, grams=15, run_id="run-2", recipe="Test Hot",
+                            settings={"grind": "50", "ratio": 16.0})
+    [question] = lab._open_questions()
+    assert question["focus"] == focus and len(question["brew_ids"]) == 2

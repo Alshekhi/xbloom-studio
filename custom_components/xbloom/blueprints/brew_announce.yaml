@@ -77,6 +77,16 @@ blueprint:
           default: ""
           selector:
             text:
+        focus_notify_service:
+          name: Phone for what to notice
+          description: >
+            Optional, for example notify.mobile_app_my_phone. When a cup has
+            something to notice, the coffee being ready and what to notice in
+            it are sent here too. Not for a brew whose caller is told of its
+            end itself.
+          default: ""
+          selector:
+            text:
     content:
       name: What to announce
       icon: mdi:text-box-outline
@@ -258,6 +268,13 @@ variables:
         {{ parts | join(' and ') }}
       {%- endif -%}
     {%- endif -%}
+  # What to notice in the cup, said with its being ready; empty when nothing.
+  focus_text: >-
+    {{ trigger.to_state.attributes.get('focus') or ''
+       if trigger.id == 'done_recipe'
+          and trigger.to_state.attributes.get('event_type') == 'brew_done' else '' }}
+  focus_line: "{{ ('. ' ~ focus_text) if focus_text else '' }}"
+  focus_notify: !input focus_notify_service
   all_speakers: !input speakers
   nearby_speakers_input: !input progress_speakers
   nearby_speakers: >-
@@ -281,11 +298,11 @@ variables:
             and trigger.to_state.attributes.get('event_type') == 'brew_done' -%}
       {%- set name = recipe_name if announce_recipe else '' -%}
       {%- if not (announce_recipe or announce_duration) -%}
-        {%- if lang == 'ar' %}قهوتك جاهزة{% else %}Your coffee is ready{% endif %}{% if tank_line %}. {{ tank_line }}{% endif -%}
+        {%- if lang == 'ar' %}قهوتك جاهزة{% else %}Your coffee is ready{% endif %}{% if tank_line %}. {{ tank_line }}{% endif %}{{ focus_line -}}
       {%- elif lang == 'ar' -%}
-        {%- if name %}انتهى تحضير {{ name }}{% else %}انتهى تحضير قهوتك{% endif %}{% if duration %}، واستغرق {{ duration }}{% endif %}{% if tank_line %}. {{ tank_line }}{% endif -%}
+        {%- if name %}انتهى تحضير {{ name }}{% else %}انتهى تحضير قهوتك{% endif %}{% if duration %}، واستغرق {{ duration }}{% endif %}{% if tank_line %}. {{ tank_line }}{% endif %}{{ focus_line -}}
       {%- else -%}
-        {%- if name %}Finished preparing {{ name }}{% else %}Your coffee is ready{% endif %}{% if duration %}. It took {{ duration }}{% endif %}{% if tank_line %}. {{ tank_line }}{% endif -%}
+        {%- if name %}Finished preparing {{ name }}{% else %}Your coffee is ready{% endif %}{% if duration %}. It took {{ duration }}{% endif %}{% if tank_line %}. {{ tank_line }}{% endif %}{{ focus_line -}}
       {%- endif -%}
     {#- An empty grinder is the machine's own fault: the fault blueprint speaks
         it the moment the machine reports it, so saying it again here as a
@@ -354,7 +371,7 @@ variables:
   separate_nearby: "{{ nearby_speakers_input | length > 0 }}"
   home_message: >-
     {%- if trigger.id == 'done_recipe' -%}
-      {%- if lang == 'ar' %}قهوتك جاهزة{% else %}Your coffee is ready{% endif -%}
+      {%- if lang == 'ar' %}قهوتك جاهزة{% else %}Your coffee is ready{% endif %}{{ focus_line -}}
     {%- elif trigger.id == 'failed' -%}
       {%- if lang == 'ar' %}تعذر تحضير قهوتك، {{ failure }}{% else %}Could not brew your coffee: {{ failure }}{% endif -%}
     {%- else -%}
@@ -460,6 +477,26 @@ action:
                 notify_service: "{{ notify_service if method == 'notify' else '' }}"
                 alexa_type: "{{ alexa_type }}"
                 kind: announcement
+  # The phone for what to notice: only when there is something, never twice
+  # to the phone the announcements already go to, and never for a brew whose
+  # caller is told of its end itself.
+  - if:
+      - condition: template
+        value_template: >-
+          {{ focus_text != '' and focus_notify | trim != ''
+             and not trigger.to_state.attributes.get('notify_target')
+             and not (method == 'notify' and focus_notify | trim == notify_service | trim) }}
+    then:
+      - action: xbloom.announce
+        data:
+          message: >-
+            {%- if lang == 'ar' %}قهوتك جاهزة. {% else %}Your coffee is ready. {% endif -%}
+            {{ focus_text }}
+          method: notify
+          targets: []
+          tts_engine: ""
+          notify_service: "{{ focus_notify }}"
+          kind: announcement
 
 mode: queued
 max: 5

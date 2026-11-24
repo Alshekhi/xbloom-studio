@@ -26,7 +26,7 @@ from homeassistant.exceptions import ServiceValidationError
 from xbloom.exceptions import XBloomAPIError
 
 from ..tool_common import refuse
-from .lab import STORE_UNREACHABLE, CoffeeLab, Consumption
+from .lab import STORE_UNREACHABLE, CoffeeLab, Consumption, focus_text
 from .inventory import CUP_OF_KIND, in_use as _in_use
 from .models import TASTE_NOTES, TASTE_SCALES, VERDICT_OF, Bean, Brew
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER, Totals
@@ -159,6 +159,8 @@ def question_facts(question: dict[str, Any]) -> dict[str, Any]:
         "brew_id": question["brew_id"], "recipe": question["recipe"], "bag": question["bag"],
         "changed_from_recipe": question.get("changes") or [],
         "cups": len(question.get("brew_ids") or [question["brew_id"]]),
+        # What the person was told to notice in it, when anything.
+        "focus": focus_text(question),
     }
 
 

@@ -114,7 +114,7 @@ async def test_a_brew_started_on_the_dashboard_is_asked_by_the_card_and_the_even
     [(event, data)] = hass.bus.fired
     assert event == "xbloom_rating_due"
     assert data == {"brews": [{"brew_id": result.brew_id, "recipe": "Test Hot", "bag": "Kenya",
-                               "changes": [], "cups": 1}]}
+                               "changes": [], "cups": 1, "focus": None}]}
     assert lab.rating_question["announced"] is True
 
 

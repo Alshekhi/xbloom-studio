@@ -11,6 +11,7 @@ whether the speaker is reached, how Alexa reads it — still needs the machine.
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 from typing import Any
 
@@ -78,6 +79,9 @@ def render(
 
     env = jinja2.Environment(extensions=["jinja2.ext.loopcontrols"])
     env.globals.update(states=_state, state_attr=_attr)
+    # Home Assistant's own filter, as it defines it.
+    env.filters["regex_replace"] = lambda value, find="", replace="", ignorecase=False: re.sub(
+        find, replace, str(value), flags=re.IGNORECASE if ignorecase else 0)
     context: dict[str, Any] = {"trigger": trigger}
     for key, value in blueprint["variables"].items():
         if isinstance(value, Input):

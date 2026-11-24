@@ -408,6 +408,9 @@ def brew_started_payload(recipe_name, total_pours: int, recipe: dict, meta: dict
         # What this brew is made with, so a change since the last brew of the
         # same recipe can be told from the record rather than guessed.
         "settings": {**_brew_settings(recipe), "dose_g": recipe.get("dose_g")},
+        # What it is brewed in: a coffee cup draws from the bag, an xPod or
+        # tea cup from the box or tea in use.
+        "cup_type": recipe.get("cup_type"),
         **meta,
     }
 
@@ -1019,6 +1022,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 meta["run_id"], target, meta.get("context"),
                 bool(data.get("notify_progress")),
             )
+            # Named on the brew's events, so an automation can leave to the
+            # caller what the caller is already told.
+            meta["notify_target"] = target
 
         # Coffee Lab: the bag is fixed now, as the brew starts. Choosing another
         # bag while it runs must not recharge this brew to it.
@@ -1380,6 +1386,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                             **_brew_settings(recipe),
                             # The tank, when its switch read low at the end.
                             **(water.completion_fields() if water is not None else {}),
+                            # What to notice in this cup, or None when nothing
+                            # (stories/focus.py).
+                            "focus": (
+                                stories.focus_of(meta["run_id"])
+                                if (stories := getattr(entry.runtime_data, "stories", None))
+                                else None
+                            ),
                             **meta,
                         },
                     )

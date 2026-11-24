@@ -960,7 +960,13 @@ class XBloomBrewEventBleEntity(EventEntity):
                  "duration_s": event.data.get("duration_s"),
                  # The tank, when its switch read low at the end.
                  **{k: event.data[k] for k in ("tank_low", "water_left_ml")
-                    if k in event.data}},
+                    if k in event.data},
+                 # What to notice in the cup, said with its being ready, and
+                 # the caller told of its end itself, if any.
+                 **({"focus": text} if (text := (event.data.get("focus") or {}).get("text"))
+                    else {}),
+                 **({"notify_target": event.data["notify_target"]}
+                    if event.data.get("notify_target") else {})},
             )
             self._first_pour_at = None
             self._last_recipe_name = None
