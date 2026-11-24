@@ -114,9 +114,25 @@ async def test_buy_again_yes_tells_the_watch_and_maybe_does_not():
 # ── Final review ─────────────────────────────────────────────────────────────
 
 
-def test_tea_starts_counted_in_bags_at_one():
-    from custom_components.xbloom.coffee_lab.stock import DEFAULT_LEVEL, DEFAULT_MEASURE
-    assert DEFAULT_MEASURE["tea"] == "bags" and DEFAULT_LEVEL["bags"] == 1
+def test_tea_starts_counted_in_grams_at_its_own_level():
+    from custom_components.xbloom.coffee_lab.stock import DEFAULT_MEASURE, default_level
+    assert DEFAULT_MEASURE["tea"] == "grams" and default_level("tea", "grams") == 50
+    assert default_level("coffee", "grams") == 250
+
+
+def test_a_brew_with_no_bag_counts_toward_the_coffee_pace():
+    beans = [bag(remaining_g=180, tracked=True)]
+    brews = [brew(days_ago=d) for d in range(3)] + [brew(days_ago=d, bean=None) for d in (3, 4)]
+    assert figure(stock_of("coffee", beans, brews, NOW), "days") == 10.0
+
+
+@pytest.mark.parametrize("stored, value, least, expected", [
+    (True, None, 9.0, (False, "restored")),   # what is counted alone is above the level
+    (True, None, 3.0, (True, None)),
+    (False, None, 3.0, (False, None)),        # a floor never turns low
+])
+def test_a_floor_above_the_level_restores(stored, value, least, expected):
+    assert crossing(stored, value, 7, least) == expected
 
 
 def test_the_pace_is_over_the_days_brewed_not_always_30():

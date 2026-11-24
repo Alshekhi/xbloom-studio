@@ -189,8 +189,8 @@ again** keeps whether you would buy it again — yes, maybe or no.
 Coffee Lab keeps a **stock** figure for each kind the home has had — coffee,
 xPod boxes, tea — counted over every item on hand: a counted item by what is
 left, an unopened one not yet counted by its size. Choose what it is counted
-in with **Stock measure** — days, grams, cups or bags; for xPods days, pods or
-boxes — and below which it is running low with **Stock level** (0 turns it
+in with **Stock measure** — days, grams, cups or bags (for tea, packs: its
+tins or pouches); for xPods days, pods or boxes — and below which it is running low with **Stock level** (0 turns it
 off). Days and cups come from the last 30 days of brews of that kind, and need
 at least five of them.
 

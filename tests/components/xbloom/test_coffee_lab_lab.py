@@ -250,3 +250,21 @@ async def test_a_list_and_phone_left_empty_are_dropped():
     data = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
     assert CONF_STOCK_LIST not in data and CONF_STOCK_NOTIFY not in data
 
+
+
+
+async def test_a_phone_whose_notify_service_does_not_exist_is_refused():
+    flow, entry = _options_flow({})
+    flow.hass.services.has_service = lambda domain, service: service == "mobile_app_test"
+    form = await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"],
+                                             "stock_notify": "notify.mobile_app_typo"})
+    assert form["errors"] == {"stock_notify": "notify_service_unknown"}
+
+
+async def test_a_saved_phone_that_has_gone_does_not_block_the_other_settings():
+    from custom_components.xbloom.const import CONF_STOCK_NOTIFY
+    flow, entry = _options_flow({CONF_STOCK_NOTIFY: "notify.mobile_app_old"})
+    flow.hass.services.has_service = lambda domain, service: False
+    result = await flow.async_step_coffee_lab({"enable": False, "brewers": ["V60"],
+                                               "stock_notify": "notify.mobile_app_old"})
+    assert not result.get("errors")

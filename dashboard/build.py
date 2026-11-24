@@ -22,6 +22,7 @@ TEXT = {
         "stock_days": "Days of {kind} left: {n}", "stock_grams": "Grams of {kind} left: {n}",
         "stock_cups": "Cups of {kind} left: {n}", "stock_bags": "Bags of {kind} left: {n}",
         "stock_pods": "Pods left: {n}", "stock_boxes": "Boxes of xPods left: {n}",
+        "stock_packs": "Packs of tea left: {n}",
         "stock_at_least": "at least {n}", "stock_low": "Running low.", "h_stock": "Stock",
         "stock_not_yet": "Not enough brews yet to tell how long the {kind} will last.",
         "stock_weigh": "Weigh the bags not counted yet to complete it.",
@@ -103,6 +104,7 @@ TEXT = {
         "stock_days": "الأيام المتبقية من {kind}: {n}", "stock_grams": "الغرامات المتبقية من {kind}: {n}",
         "stock_cups": "الأكواب المتبقية من {kind}: {n}", "stock_bags": "الأكياس المتبقية من {kind}: {n}",
         "stock_pods": "الكبسولات المتبقية: {n}", "stock_boxes": "علب xPod المتبقية: {n}",
+        "stock_packs": "العبوات المتبقية من الشاي: {n}",
         "stock_at_least": "{n} على الأقل", "stock_low": "الكمية منخفضة.", "h_stock": "المخزون",
         "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
         "stock_weigh": "زن الأكياس التي لم تُحسب بعد لاكتماله.",
@@ -594,7 +596,9 @@ def stock_line(t: dict, kind: str) -> str:
     measures = ("days", "pods", "boxes") if kind == "xpod" else ("days", "grams", "cups", "bags")
     lines = "".join(
         ("{% if" if i == 0 else "{% elif") + f" m == '{m}' %}}"
-        + t[f"stock_{m}"].replace("{kind}", t[f"kind_{kind}"]).replace("{n}", n)
+        # Tea in tins and pouches: packs, never "bags" taken for tea bags.
+        + t["stock_packs" if (kind, m) == ("tea", "bags") else f"stock_{m}"]
+        .replace("{kind}", t[f"kind_{kind}"]).replace("{n}", n)
         for i, m in enumerate(measures)) + "{% endif %}"
     not_yet = t["stock_not_yet"].replace("{kind}", t[f"kind_{kind}"])
     return (ESCAPE + f"{{% set m = state_attr('{q}', 'measure') %}}"

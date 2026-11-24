@@ -109,7 +109,7 @@ views:
         %}الغرامات المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
         }}{% endif %}{% elif m == ''cups'' %}الأكواب المتبقية من الشاي: {% if least is not none %}{{ least
         }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m ==
-        ''bags'' %}الأكياس المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{
+        ''bags'' %}العبوات المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{
         states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% endif %}{% endif %}{% if (state_attr(''sensor.xbloom_studio_tea_stock'',
         ''unknown'') or 0) > 0 %} زن الأكياس التي لم تُحسب بعد لاكتماله.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_tea_stock_low'',
         ''on'') %} الكمية منخفضة.{% endif %}'
@@ -1465,7 +1465,7 @@ views:
         %}الغرامات المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
         }}{% endif %}{% elif m == ''cups'' %}الأكواب المتبقية من الشاي: {% if least is not none %}{{ least
         }} على الأقل{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m ==
-        ''bags'' %}الأكياس المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{
+        ''bags'' %}العبوات المتبقية من الشاي: {% if least is not none %}{{ least }} على الأقل{% else %}{{
         states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% endif %}{% endif %}{% if (state_attr(''sensor.xbloom_studio_tea_stock'',
         ''unknown'') or 0) > 0 %} زن الأكياس التي لم تُحسب بعد لاكتماله.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_tea_stock_low'',
         ''on'') %} الكمية منخفضة.{% endif %}'

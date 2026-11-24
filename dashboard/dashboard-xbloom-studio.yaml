@@ -109,7 +109,7 @@ views:
         {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''grams''
         %}Grams of tea left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
         }}{% endif %}{% elif m == ''cups'' %}Cups of tea left: {% if least is not none %}at least {{ least
-        }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''bags'' %}Bags
+        }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''bags'' %}Packs
         of tea left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
         }}{% endif %}{% endif %}{% endif %}{% if (state_attr(''sensor.xbloom_studio_tea_stock'', ''unknown'')
         or 0) > 0 %} Weigh the bags not counted yet to complete it.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_tea_stock_low'',
@@ -1461,7 +1461,7 @@ views:
         {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''grams''
         %}Grams of tea left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
         }}{% endif %}{% elif m == ''cups'' %}Cups of tea left: {% if least is not none %}at least {{ least
-        }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''bags'' %}Bags
+        }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'') }}{% endif %}{% elif m == ''bags'' %}Packs
         of tea left: {% if least is not none %}at least {{ least }}{% else %}{{ states(''sensor.xbloom_studio_tea_stock'')
         }}{% endif %}{% endif %}{% endif %}{% if (state_attr(''sensor.xbloom_studio_tea_stock'', ''unknown'')
         or 0) > 0 %} Weigh the bags not counted yet to complete it.{% endif %}{% if is_state(''binary_sensor.xbloom_studio_tea_stock_low'',

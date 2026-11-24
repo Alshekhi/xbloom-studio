@@ -440,7 +440,8 @@
       "notion_half": "The page is missing {detail}. Add it, or use a page with neither.",
       "notion_fields": "These fields are missing or of the wrong type — {detail}.",
       "altitude_range": "The top of the altitude range is below its bottom.",
-      "notify_service_invalid": "Enter a notify service, such as notify.mobile_app_my_phone."
+      "notify_service_invalid": "Enter a notify service, such as notify.mobile_app_my_phone.",
+      "notify_service_unknown": "There is no such notify service. Check its name under Developer tools, Actions."
     },
     "abort": {
       "no_recipes": "No recipes saved yet.",
@@ -668,7 +669,7 @@
           "days": "Days",
           "grams": "Grams",
           "cups": "Cups",
-          "bags": "Bags"
+          "bags": "Packs"
         }
       },
       "coffee_lab_xpod_stock_measure": {
@@ -2062,7 +2063,8 @@
         "left_pods": "Pods left: {n}.",
         "left_boxes": "Boxes left: {n}.",
         "added": "Added to {list}.",
-        "buy_again": "Time to buy {name} again."
+        "buy_again": "Time to buy {name} again.",
+        "left_packs": "Packs left: {n}."
       }
     }
   },

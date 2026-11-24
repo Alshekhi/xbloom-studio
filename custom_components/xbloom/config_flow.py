@@ -443,6 +443,11 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             # Where a reminder to buy is sent: a notify service, nothing else.
             if stock_notify and not re.fullmatch(r"notify\.[a-z0-9_]+", stock_notify):
                 errors["stock_notify"] = "notify_service_invalid"
+            # Checked when chosen: one saved earlier and since gone must not
+            # stop every other Coffee Lab setting from being changed.
+            elif (stock_notify and stock_notify != entry.data.get(CONF_STOCK_NOTIFY)
+                  and not self.hass.services.has_service("notify", stock_notify[7:])):
+                errors["stock_notify"] = "notify_service_unknown"
         if user_input is not None and not errors:
             enabled = bool(user_input.get("enable"))
             # Blank lines and repeats dropped, the order kept.

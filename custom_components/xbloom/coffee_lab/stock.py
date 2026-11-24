@@ -27,11 +27,17 @@ MEASURES: dict[str, tuple[str, ...]] = {
     "tea": ("days", "grams", "cups", "bags"),
     "xpod": ("days", "pods", "boxes"),
 }
-# Tea in bags: tins and pouches vary too much in size for one gram level.
-DEFAULT_MEASURE = {"coffee": "days", "tea": "bags", "xpod": "pods"}
+DEFAULT_MEASURE = {"coffee": "days", "tea": "grams", "xpod": "pods"}
 DEFAULT_LEVEL: dict[str, float] = {
     "days": 7, "grams": 250, "cups": 10, "bags": 1, "pods": 5, "boxes": 1,
 }
+# Where a kind's own starting level differs: tea is weighed in far smaller
+# amounts than coffee, so 250 g would be low the moment a tin is added.
+_KIND_LEVEL: dict[tuple[str, str], float] = {("tea", "grams"): 50}
+
+
+def default_level(kind: str, measure: str) -> float:
+    return _KIND_LEVEL.get((kind, measure), DEFAULT_LEVEL[measure])
 PACE_DAYS = 30
 # Fewer brews than this in the window say too little about a pace.
 MIN_BREWS = 5
@@ -74,7 +80,10 @@ def stock_of(kind: str, beans: list[Bean], brews: list[Brew], now: datetime) -> 
     since = now - timedelta(days=PACE_DAYS)
     used = [
         (r, when) for r in brews
-        if r.bean_id in ids and (when := moment(r.brewed_at or r.recorded_at, now.tzinfo))
+        # A brew from no bag, with a dose, was coffee from somewhere: it
+        # still says how fast coffee goes.
+        if (r.bean_id in ids or (kind == "coffee" and r.bean_id is None and r.dose_g))
+        and (when := moment(r.brewed_at or r.recorded_at, now.tzinfo))
         and since <= when <= now
     ]
     cups = days = None
@@ -106,14 +115,22 @@ def figure(stock: Stock, measure: str) -> float | None:
     return floor(stock, measure)
 
 
-def crossing(stored: bool | None, value: float | None, level: float) -> tuple[bool | None, str | None]:
+def crossing(
+    stored: bool | None, value: float | None, level: float, least: float | None = None,
+) -> tuple[bool | None, str | None]:
     """The low state after this figure, and "low" or "restored" when it crossed.
 
     Only a known figure against a level above 0 moves it: one that becomes
-    unknown, or a level set to 0, leaves it as it was and tells nothing. With
-    no state yet — the first time — it is set without telling.
+    unknown, or a level set to 0, leaves it as it was and tells nothing —
+    except that what is counted (`least`) reaching the level already ends a
+    low, whatever the items not counted hold. With no state yet — the first
+    time — it is set without telling.
     """
-    if value is None or not level:
+    if not level:
+        return stored, None
+    if value is None:
+        if stored and least is not None and least >= level:
+            return False, "restored"
         return stored, None
     low = value < level
     if stored is None or stored == low:

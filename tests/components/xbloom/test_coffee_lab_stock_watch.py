@@ -194,7 +194,8 @@ async def test_a_kind_already_low_when_first_known_reminds_after_the_first_look(
     await watch.async_refresh()                         # the first look: silent
     assert home.fired == []
     await lab.async_set_stock_measure("tea", "grams")
-    await _bag(lab, kind="tea", status="open", remaining_g=100.0)   # below 250 g
+    await lab.async_set_stock_level("tea", 150)
+    await _bag(lab, kind="tea", status="open", remaining_g=100.0)   # below 150 g
     await watch.async_refresh()
     assert [d["kind"] for _, d in home.fired] == ["tea"]
 
@@ -223,3 +224,93 @@ async def test_an_unexpected_failure_in_a_reminder_does_not_stop_the_answer_or_t
     lab.on_buy_again = watch.async_buy_again
     await lab.async_rate_bag("yes", finished.id)        # a missing word: logged, not raised
     assert (await lab.store.async_get_bean(finished.id)).buy_again == "yes"
+
+
+
+# ── The eight follow-ups ─────────────────────────────────────────────────────
+
+
+async def test_restocking_with_a_bag_not_counted_still_restores_when_the_rest_is_enough():
+    home, lab, watch = await _low_coffee()
+    await lab.async_set_stock_measure("coffee", "grams")
+    await lab.async_set_stock_level("coffee", 200)
+    await lab.async_set_stock_low_state("coffee", True)
+    await lab.async_set_stock_item("coffee", "uid-x")
+    home.items.append({"summary": "Coffee beans", "uid": "uid-x", "status": "needs_action"})
+    await _bag(lab, status="open", tracked=False, remaining_g=None)   # not counted
+    await watch.async_refresh()                  # 250 g counted >= 200: restored
+    assert _events(home) == ["xbloom_stock_restored"] and home.completed == [("todo.test_list", "uid-x")]
+
+
+async def test_a_tick_off_that_fails_keeps_the_item_to_try_again():
+    home, lab, watch = await _low_coffee()
+    await watch.async_refresh()
+    home.fail.add("todo.update_item")
+    await _bag(lab, status="unopened")
+    await watch.async_refresh()
+    assert lab.stock_item("coffee") == "uid-1"
+
+
+async def test_an_added_item_whose_uid_cannot_be_read_is_ticked_off_by_its_name():
+    home, lab, watch = await _low_coffee()
+    real_call = home.call
+    reads = []
+
+    async def flaky(domain, service, data=None, **kw):
+        if (domain, service) == ("todo", "get_items"):
+            reads.append(1)
+            if len(reads) == 2:
+                raise HomeAssistantError("unavailable")
+        return await real_call(domain, service, data, **kw)
+
+    home.hass.services.async_call = flaky
+    await watch.async_refresh()
+    assert home.added == [("todo.test_list", "Coffee beans")]
+    await _bag(lab, status="unopened")
+    await watch.async_refresh()
+    assert home.completed == [("todo.test_list", "uid-1")]
+
+
+async def test_a_store_down_at_startup_is_tried_again(monkeypatch):
+    from custom_components.xbloom.coffee_lab import stock_watch
+    later = []
+    monkeypatch.setattr(stock_watch, "async_call_later", lambda hass, delay, action: later.append(delay) or (lambda: None))
+    home, lab, watch = await _low_coffee()
+    lab.store.async_list_beans = _raising
+    await watch.async_refresh()
+    assert later == [stock_watch.RETRY_S]
+
+
+async def _raising(*a, **k):
+    raise HomeAssistantError("down")
+
+
+async def test_buy_again_answered_twice_reminds_once():
+    home = _Home()
+    lab = await _lab()
+    finished = await _bag(lab, status="finished", roaster="Test Roaster")
+    watch = await _watch(home, lab)
+    await watch.async_buy_again(finished)
+    await watch.async_buy_again(finished)
+    assert len(home.fired) == 1 and len(home.notified) == 1
+
+
+async def test_its_own_writes_do_not_start_another_look():
+    home, lab, watch = await _low_coffee()
+    changes = []
+    lab.on_change = lambda: changes.append(1)
+    await watch.async_refresh()
+    assert changes == []
+
+
+async def test_tea_counted_in_packs_is_said_as_packs():
+    home = _Home()
+    lab = await _lab()
+    await _bag(lab, kind="tea", status="open", remaining_g=40.0)
+    await lab.async_set_stock_measure("tea", "bags")
+    await lab.async_set_stock_level("tea", 2)
+    await lab.async_set_stock_low_state("tea", False)
+    watch = await _watch(home, lab)
+    watch._texts = {**TEXTS, "left_packs": "Packs left: {n}."}
+    await watch.async_refresh()
+    assert home.notified[0][1].startswith("Tea: running low. Packs left: 1.")
