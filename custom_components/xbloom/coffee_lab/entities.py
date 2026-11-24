@@ -32,6 +32,7 @@ from .lab import CoffeeLab, focus_text
 from .inventory import kind_of_cup
 from .models import BUY_AGAIN, ISSUES, KINDS, VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
+from .opening import USUAL_DAYS, fading, open_next, usual_dose
 from .stock import MEASURES, figure, floor
 
 _LOGGER = logging.getLogger(__name__)
@@ -242,7 +243,16 @@ class BagsSensor(CoffeeLabEntity, SensorEntity):
     async def async_read(self) -> None:
         beans = await self.lab.store.async_list_beans()
         self._attr_native_value = len(beans)
-        self._attr_extra_state_attributes = {"bags": [actions.bean_facts(b) for b in beans]}
+        now = dt_util.now()
+        brews = await self.lab.store.async_list_brews(since=now - timedelta(days=USUAL_DAYS))
+        rules = self.lab.opening
+        nxt = open_next(beans, usual_dose(brews, now), now, rules)
+        self._attr_extra_state_attributes = {
+            "bags": [actions.bean_facts(b) for b in beans],
+            # The sealed bag to open now, when it is time; the open ones past their best.
+            "open_next": nxt.id if nxt else None,
+            "fading": [b.id for b in beans if fading(b, now, rules)],
+        }
 
 
 class StatsSensor(CoffeeLabEntity, SensorEntity):
@@ -619,6 +629,42 @@ class StockLevelNumber(StockEntity, NumberEntity):
         await self.lab.async_set_stock_level(self.kind, value)
 
 
+class _OpeningNumber(CoffeeLabEntity, NumberEntity):
+    """One of the opening rules: a setting kept in Coffee Lab's state."""
+
+    _attr_mode = NumberMode.BOX
+    _attr_native_step = 1
+    _setting = ""
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, f"opening_{self._setting}")
+        from .lab import OPENING_RANGES
+        self._attr_native_min_value, self._attr_native_max_value = OPENING_RANGES[self._setting]
+
+    async def async_read(self) -> None:
+        self._attr_native_value = getattr(self.lab.opening, self._setting)
+
+    async def async_set_native_value(self, value: float) -> None:
+        await self.lab.async_set_opening(**{self._setting: int(value)})
+
+
+class OpenLimitNumber(_OpeningNumber):
+    _setting = "limit"
+    _attr_icon = "mdi:sack-outline"
+
+
+class RestDaysNumber(_OpeningNumber):
+    _setting = "rest_days"
+    _attr_icon = "mdi:timer-sand"
+    _attr_native_unit_of_measurement = "d"
+
+
+class FadeDaysNumber(_OpeningNumber):
+    _setting = "fade_days"
+    _attr_icon = "mdi:weather-windy"
+    _attr_native_unit_of_measurement = "d"
+
+
 def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
     """The Coffee Lab entities of one platform, or none when it is off."""
     if lab is None:
@@ -632,7 +678,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
             RemainingSensor, BagsSensor, StatsSensor, RecentBrewsSensor, LastCountSensor, WaitingBrewsSensor,
             RatingQuestionSensor, BagQuestionSensor, RecipeKindSensor,
         ],
-        "number": [ManualDoseNumber],
+        "number": [ManualDoseNumber, OpenLimitNumber, RestDaysNumber, FadeDaysNumber],
         "button": [RecordManualBrewButton],
     }
     # Only a store edited elsewhere — Notion — can be out of date here.

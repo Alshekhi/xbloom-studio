@@ -27,6 +27,7 @@ from .inventory import Deduct, Flag, Skip, decide_consumption, kind_of_cup
 from .models import SELECTABLE, VERDICTS, Bean, Brew, Review
 from .pending import PendingBrews
 from .habits import habits
+from .opening import Opening
 from .stats import DEFAULT_PERIOD, PERIODS, Report, earliest_needed, period_report, window
 from .store import (
     STORAGE_VERSION, CoffeeLabStore, ProcessedRuns, Storage, StoreRefused, UnknownBean,
@@ -36,6 +37,8 @@ from .store import (
 
 _LOGGER = logging.getLogger(__name__)
 # The rolling stats periods, by how many days the habits count.
+# What each opening setting may be set to.
+OPENING_RANGES = {"limit": (1, 4), "rest_days": (0, 30), "fade_days": (7, 90)}
 ROLLING_DAYS = {"last_7_days": 7, "last_30_days": 30}
 
 STATE_KEY = f"{DOMAIN}.coffee_lab_state"
@@ -731,6 +734,18 @@ class CoffeeLab:
         levels = dict(self._state.get("stock_levels") or {})
         levels[kind] = {**(levels.get(kind) or {}), self.stock_measure(kind): float(level)}
         await self._async_set_state(stock_levels=levels)
+
+    @property
+    def opening(self) -> Opening:
+        """How many bags may be open, how long one rests, when an open one fades."""
+        return Opening(**{**asdict(Opening()), **(self._state.get("opening") or {})})
+
+    async def async_set_opening(self, **values: int) -> None:
+        for key, value in values.items():
+            low, high = OPENING_RANGES[key]
+            if not low <= int(value) <= high:
+                raise ValueError(f"{key} out of range: {value}")
+        await self._async_set_state(opening={**asdict(self.opening), **{k: int(v) for k, v in values.items()}})
 
     @property
     def stock_seeded(self) -> bool:

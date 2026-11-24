@@ -876,6 +876,15 @@
       },
       "coffee_lab_xpod_stock_level": {
         "name": "xPod stock level"
+      },
+      "coffee_lab_opening_limit": {
+        "name": "Open bags at once"
+      },
+      "coffee_lab_opening_rest_days": {
+        "name": "Rest after roasting"
+      },
+      "coffee_lab_opening_fade_days": {
+        "name": "Open bag fades after"
       }
     },
     "button": {

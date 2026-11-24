@@ -231,3 +231,34 @@ def test_a_bag_with_a_shop_page_links_to_it():
     # Nothing that could break out of the link is shown as one.
     assert "Shop page" not in render("https://shop.example/p) [x](y")
     assert "Shop page" not in render("javascript:alert(1)")
+
+
+def _lists(build, bags, open_next=None, fading=(), lang="en"):
+    view = build.bags_view(build.TEXT[lang])
+    cards = [c for c in _cards(view) if c.get("type") == "markdown" and "sensor.xbloom_studio_coffee_bags" in str(c.get("content"))]
+    attrs = {"sensor.xbloom_studio_coffee_bags": {"bags": bags, "open_next": open_next, "fading": list(fading)},
+             "select.xbloom_studio_coffee_bag": {"id": None}}
+    return [_render(c["content"], {}, attrs) for c in cards]
+
+
+def test_the_bag_to_open_next_is_named_only_when_it_is_time():
+    build = _build()
+    open_list, unopened, _ = _lists(build, BAGS, open_next="u2")
+    assert "Open next: **Ridge Top**" in unopened
+    open_list, unopened, _ = _lists(build, BAGS)
+    assert "Open next" not in unopened
+
+
+def test_an_open_bag_past_its_best_says_so():
+    build = _build()
+    open_list, _, _ = _lists(build, BAGS, fading=["o1"])
+    assert "opened 6 days ago · past its best" in open_list
+    open_list, _, _ = _lists(build, BAGS)
+    assert "past its best" not in open_list
+
+
+def test_the_opening_settings_are_on_the_bags_tab():
+    build = _build()
+    entities = {c.get("entity") for c in _cards(build.bags_view(build.TEXT["en"]))}
+    assert {"number.xbloom_studio_open_bags_at_once", "number.xbloom_studio_rest_after_roasting",
+            "number.xbloom_studio_open_bag_fades_after"} <= entities

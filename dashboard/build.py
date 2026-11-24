@@ -30,6 +30,7 @@ TEXT = {
         "d_roaster": "Roaster", "d_region": "Region", "d_producer": "Producer", "d_varietal": "Variety",
         "d_roast": "Roast", "d_roast_date": "Roasted", "d_altitude": "Altitude", "d_notes": "Tasting notes",
         "d_m": "{n} m", "d_link": "Shop page",
+        "open_next": "Open next: {bag}", "past_best": "past its best", "h_opening": "Opening bags",
         "stock_not_yet": "Not enough brews yet to tell how long the {kind} will last.",
         "stock_weigh": "Weigh the bags not counted yet to complete it.",
         "kind_coffee": "coffee", "kind_tea": "tea", "kind_xpod": "xPods",
@@ -136,6 +137,7 @@ TEXT = {
         "d_roaster": "المحمصة", "d_region": "المنطقة", "d_producer": "المُنتِج", "d_varietal": "الصنف",
         "d_roast": "درجة التحميص", "d_roast_date": "تاريخ التحميص", "d_altitude": "الارتفاع",
         "d_notes": "النكهات", "d_m": "{n} م", "d_link": "صفحة المتجر",
+        "open_next": "افتح بعده: {bag}", "past_best": "تجاوز أفضل وقته", "h_opening": "فتح الأكياس",
         "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
         "stock_weigh": "زن الأكياس التي لم تُحسب بعد لاكتماله.",
         "kind_coffee": "البن", "kind_tea": "الشاي", "kind_xpod": "كبسولات xPod",
@@ -860,6 +862,7 @@ def bags_view(t: dict) -> dict:
         name + amount
         + "{% if b.get('opened_on') %}{% set days = (now().date() - as_datetime(b.get('opened_on')).date()).days %} · "
         + opened_ago(t) + "{% endif %}"
+        + f"{{% if b.id in (state_attr('{bags}', 'fading') or []) %}} · {t['past_best']}{{% endif %}}"
     )
     # An unopened bag holds what it was sold as, unless it was weighed.
     unopened_text = (
@@ -920,7 +923,11 @@ def bags_view(t: dict) -> dict:
         + "{% set sealed = all | selectattr('status', 'eq', 'unopened') | list %}"
         "{% set dated = sealed | selectattr('roast_date', 'defined') | selectattr('roast_date') | sort(attribute='roast_date') | list %}"
         "{% set ordered = dated + (sealed | reject('in', dated) | list) %}"
-        f"{{% if ordered %}}## {t['h_unopened_bags']}\n\n{{% for b in ordered %}}" + unopened_line + "{% endfor %}{% endif %}"
+        # The one to open now, only when it is time.
+        + f"{{% set nxt = all | selectattr('id', 'eq', state_attr('{bags}', 'open_next')) | list %}}"
+        f"{{% if ordered %}}## {t['h_unopened_bags']}\n\n"
+        + "{% if nxt %}" + t["open_next"].replace("{bag}", "**" + ISO + "{{ e(nxt[0].name) }}" + PDI + "**") + "\n\n{% endif %}"
+        "{% for b in ordered %}" + unopened_line + "{% endfor %}{% endif %}"
     )
     bag_list = lambda content: {"type": "markdown", "text_only": True, "show_empty": False, "content": content}  # noqa: E731
     return {"title": t["view_bags"], "path": "bags", "icon": "mdi:shopping", "type": "sections", "max_columns": 2, "sections": [
@@ -935,6 +942,10 @@ def bags_view(t: dict) -> dict:
             ]),
             {"type": "markdown", "text_only": True, "content": f"[{t['add_bags']}]({INTEGRATION})"},
         ], "visibility": present(bags)[:1]},
+        section(t["h_opening"], [
+            tile(f"number.{E}_{n}", features=[{"type": "numeric-input", "style": "buttons"}])
+            for n in ("open_bags_at_once", "rest_after_roasting", "open_bag_fades_after")
+        ], available(f"number.{E}_open_bags_at_once")),
         # Per kind the home has had: what is left, what it is counted in,
         # and the level below which it is running low.
         *(section(t["h_stock"] + f" · {t[f'kind_{kind}']}", [

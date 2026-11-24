@@ -1526,7 +1526,8 @@ views:
         | round(0) | int }} غ متبقية{% endif %}{% if b.get(''opened_on'') %}{% set days = (now().date()
         - as_datetime(b.get(''opened_on'')).date()).days %}، {% if days == 0 %}فُتح اليوم{% elif days
         == 1 %}فُتح أمس{% elif days == 2 %}فُتح قبل يومين{% elif days <= 10 %}فُتح قبل {{ days }} أيام{%
-        else %}فُتح قبل {{ days }} يومًا{% endif %}{% endif %}{% endset %}{% set more %}{% if b.get(''roaster'')
+        else %}فُتح قبل {{ days }} يومًا{% endif %}{% endif %}{% if b.id in (state_attr(''sensor.xbloom_studio_coffee_bags'',
+        ''fading'') or []) %}، تجاوز أفضل وقته{% endif %}{% endset %}{% set more %}{% if b.get(''roaster'')
         %}- **المحمصة:** {{ e(b.get(''roaster'')) }}
 
         {% endif %}{% if b.get(''region'') %}- **المنطقة:** {{ e(b.get(''region'')) }}
@@ -1568,17 +1569,22 @@ views:
         %}{% set all = state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'') or [] %}{% set sealed
         = all | selectattr(''status'', ''eq'', ''unopened'') | list %}{% set dated = sealed | selectattr(''roast_date'',
         ''defined'') | selectattr(''roast_date'') | sort(attribute=''roast_date'') | list %}{% set ordered
-        = dated + (sealed | reject(''in'', dated) | list) %}{% if ordered %}## الأكياس غير المفتوحة
+        = dated + (sealed | reject(''in'', dated) | list) %}{% set nxt = all | selectattr(''id'', ''eq'',
+        state_attr(''sensor.xbloom_studio_coffee_bags'', ''open_next'')) | list %}{% if ordered %}## الأكياس
+        غير المفتوحة
 
 
-        {% for b in ordered %}{% set line %}⁨{{ b.name }}⁩{% if b.get(''kind'') == ''xpod'' %} (علبة xPod){%
-        elif b.get(''kind'') == ''tea'' %} (شاي){% endif %}{{ '' (قيد الاستخدام)'' if b.id in current
-        }}{% for x in [b.get(''country''), b.get(''process'')] if x and x != ''Other'' %}، {{ x }}{% endfor
-        %}، {% if b.get(''kind'') == ''xpod'' and b.get(''pods_left'') is not none %}{{ ''الكبسولات المتبقية:
-        '' ~ b.get(''pods_left'') ~ '''' }}{% elif b.get(''remaining_g'') is not none %}{{ b.get(''remaining_g'')
-        | round(0) | int }} غ متبقية{% elif b.get(''bag_size_g'') %}{{ '''' ~ (b.get(''bag_size_g'') |
-        round(0) | int) ~ '' غ'' }}{% else %}غير متتبع{% endif %}{% endset %}{% set more %}{% if b.get(''roaster'')
-        %}- **المحمصة:** {{ e(b.get(''roaster'')) }}
+        {% if nxt %}افتح بعده: **⁨{{ e(nxt[0].name) }}⁩**
+
+
+        {% endif %}{% for b in ordered %}{% set line %}⁨{{ b.name }}⁩{% if b.get(''kind'') == ''xpod''
+        %} (علبة xPod){% elif b.get(''kind'') == ''tea'' %} (شاي){% endif %}{{ '' (قيد الاستخدام)'' if
+        b.id in current }}{% for x in [b.get(''country''), b.get(''process'')] if x and x != ''Other''
+        %}، {{ x }}{% endfor %}، {% if b.get(''kind'') == ''xpod'' and b.get(''pods_left'') is not none
+        %}{{ ''الكبسولات المتبقية: '' ~ b.get(''pods_left'') ~ '''' }}{% elif b.get(''remaining_g'') is
+        not none %}{{ b.get(''remaining_g'') | round(0) | int }} غ متبقية{% elif b.get(''bag_size_g'')
+        %}{{ '''' ~ (b.get(''bag_size_g'') | round(0) | int) ~ '' غ'' }}{% else %}غير متتبع{% endif %}{%
+        endset %}{% set more %}{% if b.get(''roaster'') %}- **المحمصة:** {{ e(b.get(''roaster'')) }}
 
         {% endif %}{% if b.get(''region'') %}- **المنطقة:** {{ e(b.get(''region'')) }}
 
@@ -1637,6 +1643,42 @@ views:
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_coffee_bags
+      state_not: unavailable
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## فتح الأكياس'
+    - type: tile
+      entity: number.xbloom_studio_open_bags_at_once
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: numeric-input
+        style: buttons
+    - type: tile
+      entity: number.xbloom_studio_rest_after_roasting
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: numeric-input
+        style: buttons
+    - type: tile
+      entity: number.xbloom_studio_open_bag_fades_after
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: numeric-input
+        style: buttons
+    visibility:
+    - condition: state
+      entity: number.xbloom_studio_open_bags_at_once
       state_not: unavailable
   - type: grid
     cards:

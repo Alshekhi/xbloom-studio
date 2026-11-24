@@ -876,6 +876,15 @@
       },
       "coffee_lab_xpod_stock_level": {
         "name": "حد مخزون كبسولات xPod"
+      },
+      "coffee_lab_opening_limit": {
+        "name": "الأكياس المفتوحة في وقت واحد"
+      },
+      "coffee_lab_opening_rest_days": {
+        "name": "الراحة بعد التحميص"
+      },
+      "coffee_lab_opening_fade_days": {
+        "name": "يفقد الكيس المفتوح نكهته بعد"
       }
     },
     "button": {
