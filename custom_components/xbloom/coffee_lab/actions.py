@@ -128,13 +128,41 @@ def _consumption_facts(result: Consumption, bean: Bean | None) -> dict[str, Any]
 # ── Reading ──────────────────────────────────────────────────────────────────
 
 
+def stock_facts(lab: CoffeeLab) -> dict[str, Any]:
+    """What is left of each kind the home has had, as Coffee Lab last worked it out.
+
+    `value` is the figure in the chosen measure, or None while an item's
+    amount is not known, when `at_least` gives what is counted.
+    """
+    from .stock import figure, floor
+
+    def whole(value: float | None) -> int | None:
+        return None if value is None else round(value)
+
+    facts: dict[str, Any] = {}
+    for kind, stock in lab.stock.items():
+        if not stock.kept:
+            continue
+        measure, level = lab.stock_measure(kind), lab.stock_level(kind)
+        value = figure(stock, measure)
+        facts[kind] = {
+            "measure": measure, "value": whole(value),
+            "at_least": whole(floor(stock, measure)) if value is None else None,
+            "low": bool(lab.stock_low_state(kind)) and value is not None and level > 0,
+            "pods" if kind == "xpod" else "grams": whole(stock.amount),
+            "bags": stock.bags, "cups": whole(stock.cups), "days": whole(stock.days),
+        }
+    return facts
+
+
 async def list_beans(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
-    return {"bags": [bean_facts(b) for b in await lab.store.async_list_beans()]}
+    return {"bags": [bean_facts(b) for b in await lab.store.async_list_beans()],
+            "stock": stock_facts(lab)}
 
 
 async def active_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     bean = await lab.async_active_bean()
-    facts: dict[str, Any] = {"bag": bean_facts(bean) if bean else None}
+    facts: dict[str, Any] = {"bag": bean_facts(bean) if bean else None, "stock": stock_facts(lab)}
     if questions := lab.rating_questions_due():
         facts["rating_questions"] = [question_facts(q) for q in questions]
     if (bag := lab.bag_question) is not None:
