@@ -153,8 +153,8 @@ async def test_stats_read_the_record():
     lab = await _lab()
     bag = await _bag(lab)
     await lab.async_consume(bean_id=bag.id, grams=18, run_id="r1",
-                            brewed_at="2026-09-25T09:00:00+03:00")
-    now = datetime(2026, 9, 26, 10, tzinfo=ZoneInfo("Asia/Riyadh"))
+                            brewed_at="2026-09-25T09:00:00+05:00")
+    now = datetime(2026, 9, 26, 10, tzinfo=ZoneInfo("Etc/GMT-5"))
     report = await lab.async_stats("last_7_days", now)
     assert (report.now.brews, report.now.coffee_g) == (1, 18.0)
     assert report.habits["days_brewed"] == 1
@@ -305,9 +305,9 @@ async def test_the_totals_stand_when_the_bags_cannot_be_read():
     lab = await _lab()
     bag = await _bag(lab)
     await lab.async_consume(bean_id=bag.id, grams=18, run_id="r1",
-                            brewed_at="2026-09-25T09:00:00+03:00")
+                            brewed_at="2026-09-25T09:00:00+05:00")
     lab.store.async_list_beans = AsyncMock(side_effect=HomeAssistantError("down"))
-    now = datetime(2026, 9, 26, 10, tzinfo=ZoneInfo("Asia/Riyadh"))
+    now = datetime(2026, 9, 26, 10, tzinfo=ZoneInfo("Etc/GMT-5"))
     report = await lab.async_stats("last_7_days", now)
     assert report.now.brews == 1 and report.habits == {}
 
@@ -315,10 +315,10 @@ async def test_the_totals_stand_when_the_bags_cannot_be_read():
 async def test_a_rolling_period_s_habits_count_its_own_number_of_days():
     lab = await _lab()
     bag = await _bag(lab)
-    zone = ZoneInfo("Asia/Riyadh")
+    zone = ZoneInfo("Etc/GMT-5")
     for day, hour in ((19, 11), (20, 9), (26, 8)):
         await lab.async_consume(bean_id=bag.id, grams=17, run_id=f"r{day}",
-                                brewed_at=f"2026-09-{day}T{hour:02d}:00:00+03:00")
+                                brewed_at=f"2026-09-{day}T{hour:02d}:00:00+05:00")
     report = await lab.async_stats("last_7_days", datetime(2026, 9, 26, 10, tzinfo=zone))
     # The brew on the 19th is in the week's totals but before its seven days.
     assert report.now.brews == 3
@@ -329,7 +329,19 @@ async def test_a_sealed_bag_is_counted_from_its_size_once_brewed():
     lab = await _lab()
     bag = await _bag(lab, tracked=False, remaining_g=None, status="unopened", bag_size_g=250.0)
     result = await lab.async_consume(bean_id=bag.id, grams=17, run_id="run-1",
-                                     brewed_at="2026-09-25T09:00:00+03:00")
+                                     brewed_at="2026-09-25T09:00:00+05:00")
     assert (result.result, result.remaining_g, result.opened) == ("counted", 233.0, True)
     after = await lab.store.async_get_bean(bag.id)
     assert (after.tracked, after.remaining_g, after.status, after.opened_on) == (True, 233.0, "open", "2026-09-25")
+
+
+async def test_every_brew_written_is_told_at_once():
+    lab = await _lab()
+    bag = await _bag(lab)
+    told = []
+    lab.on_brew_recorded = told.append
+    await lab.async_consume(bean_id=bag.id, grams=18, run_id="r1", recipe="K")
+    untracked = await _bag(lab, name="Other", tracked=False, remaining_g=None, status="open")
+    await lab.async_consume(bean_id=untracked.id, grams=18, run_id="r2")
+    await lab.async_consume(bean_id=None, grams=18, run_id="r3")
+    assert len(told) == 3 and all(b.dose_g == 18 for b in told)

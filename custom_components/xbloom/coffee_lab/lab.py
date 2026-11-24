@@ -27,6 +27,7 @@ from .inventory import Deduct, Flag, Skip, decide_consumption, kind_of_cup
 from .models import SELECTABLE, VERDICTS, Bean, Brew, Review
 from .pending import PendingBrews
 from .habits import habits
+from .opening import Opening
 from .stats import DEFAULT_PERIOD, PERIODS, Report, earliest_needed, period_report, window
 from .store import (
     STORAGE_VERSION, CoffeeLabStore, ProcessedRuns, Storage, StoreRefused, UnknownBean,
@@ -36,6 +37,8 @@ from .store import (
 
 _LOGGER = logging.getLogger(__name__)
 # The rolling stats periods, by how many days the habits count.
+# What each opening setting may be set to.
+OPENING_RANGES = {"limit": (1, 4), "rest_days": (0, 30), "fade_days": (7, 90)}
 ROLLING_DAYS = {"last_7_days": 7, "last_30_days": 30}
 
 STATE_KEY = f"{DOMAIN}.coffee_lab_state"
@@ -276,6 +279,8 @@ class CoffeeLab:
         self.on_bag_chosen: Callable[[str | None], None] = lambda bean_id: None
         # Told when a finished bag is answered buy again: yes (StockWatch).
         self.on_buy_again: Callable[[Bean], Any] = lambda bean: None
+        # Told of every brew written, the moment it is (today's cup).
+        self.on_brew_recorded: Callable[[Brew], Any] = lambda brew: None
         # What is left of each kind, as StockWatch last worked it out.
         self.stock: dict[str, Any] = {}
         # Told of each question opened, so it can be asked of whoever started
@@ -732,6 +737,36 @@ class CoffeeLab:
         levels[kind] = {**(levels.get(kind) or {}), self.stock_measure(kind): float(level)}
         await self._async_set_state(stock_levels=levels)
 
+    async def _async_write_brew(self, brew: Brew) -> Brew:
+        written = await self.store.async_create_brew(brew)
+        self.on_brew_recorded(written)
+        return written
+
+    @property
+    def todays_cup_skips(self) -> dict[str, int]:
+        """How often each cup was passed over with Another, by bag and recipe."""
+        return dict(self._state.get("todays_cup_skips") or {})
+
+    async def async_count_skip(self, bag_id: str, recipe: str | None) -> None:
+        skips = self.todays_cup_skips
+        key = f"{bag_id}|{recipe or ''}"
+        skips[key] = skips.get(key, 0) + 1
+        # Quiet: nothing shown depends on it, and today's cup must not be
+        # worked out again because of it.
+        await self._async_set_state(quiet=True, todays_cup_skips=skips)
+
+    @property
+    def opening(self) -> Opening:
+        """How many bags may be open, how long one rests, when an open one fades."""
+        return Opening(**{**asdict(Opening()), **(self._state.get("opening") or {})})
+
+    async def async_set_opening(self, **values: int) -> None:
+        for key, value in values.items():
+            low, high = OPENING_RANGES[key]
+            if not low <= int(value) <= high:
+                raise ValueError(f"{key} out of range: {value}")
+        await self._async_set_state(opening={**asdict(self.opening), **{k: int(v) for k, v in values.items()}})
+
     @property
     def stock_seeded(self) -> bool:
         """Whether stock has been looked at once: the first look only records."""
@@ -926,7 +961,7 @@ class CoffeeLab:
             bag = entry["bag"]
             written = None
             if not await self.store.async_has_run(run_id):
-                written = await self.store.async_create_brew(record(bag["bean_id"]))
+                written = await self._async_write_brew(record(bag["bean_id"]))
             await self._runs.async_add(run_id)
             if bag.get("finished"):
                 try:
@@ -963,7 +998,7 @@ class CoffeeLab:
             # brew still happened, with a real dose, against a real bag.
             written = None
             if decision.record_brew:
-                written = await self.store.async_create_brew(record(decision.bean_id))
+                written = await self._async_write_brew(record(decision.bean_id))
             # Marked after writing: had the write failed, the queue retries it.
             await self._runs.async_add(run_id)
             self.on_change()
@@ -976,7 +1011,7 @@ class CoffeeLab:
         if isinstance(decision, Flag):
             # Recorded for review with the arithmetic left alone: a brew missing
             # from the record cannot be reconciled later by looking.
-            await self.store.async_create_brew(
+            await self._async_write_brew(
                 record(bean_id if bean else None, Review(decision.reason, decision.detail))
             )
             await self._runs.async_add(run_id)
@@ -1011,7 +1046,7 @@ class CoffeeLab:
             "remaining_g": decision.new_remaining_g,
             "opened": decision.open_bag, "finished": decision.finish,
         })
-        written = await self.store.async_create_brew(record(decision.bean_id))
+        written = await self._async_write_brew(record(decision.bean_id))
         # Marked once both writes are in; until then the queue holds the run,
         # and a second delivery of it is refused there.
         await self._runs.async_add(run_id)
@@ -1052,7 +1087,7 @@ class CoffeeLab:
             # no item has none. A pod is ground like a bag's coffee, so a
             # stopped xPod brew is recorded for review against its box.
             return Consumption("skipped", reason="no_bag_used")
-        await self.store.async_create_brew(Brew(
+        await self._async_write_brew(Brew(
             id="", brewed_at=brewed_at or dt_util.utcnow().isoformat(),
             recorded_at=dt_util.utcnow().isoformat(), dose_g=_grams(grams),
             brewer=XBLOOM_BREWER, bean_id=bean_id, dripper=cup_label(cup_type),

@@ -819,6 +819,9 @@
       },
       "coffee_lab_xpod_stock": {
         "name": "xPod stock"
+      },
+      "coffee_lab_todays_cup": {
+        "name": "Today's cup"
       }
     },
     "switch": {
@@ -876,6 +879,15 @@
       },
       "coffee_lab_xpod_stock_level": {
         "name": "xPod stock level"
+      },
+      "coffee_lab_opening_limit": {
+        "name": "Open bags at once"
+      },
+      "coffee_lab_opening_rest_days": {
+        "name": "Rest after roasting"
+      },
+      "coffee_lab_opening_fade_days": {
+        "name": "Open bag fades after"
       }
     },
     "button": {
@@ -986,6 +998,12 @@
       },
       "leave_recipe_unchanged": {
         "name": "Leave Recipe Unchanged"
+      },
+      "coffee_lab_use_todays_cup": {
+        "name": "Use today's cup"
+      },
+      "coffee_lab_another_cup": {
+        "name": "Another cup"
       }
     },
     "text": {

@@ -32,6 +32,8 @@ from .lab import CoffeeLab, focus_text
 from .inventory import kind_of_cup
 from .models import BUY_AGAIN, ISSUES, KINDS, VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
+from .opening import USUAL_DAYS, fading, open_next, usual_dose
+from .todays_cup_runtime import SIGNAL_TODAYS_CUP
 from .stock import MEASURES, figure, floor
 
 _LOGGER = logging.getLogger(__name__)
@@ -242,7 +244,16 @@ class BagsSensor(CoffeeLabEntity, SensorEntity):
     async def async_read(self) -> None:
         beans = await self.lab.store.async_list_beans()
         self._attr_native_value = len(beans)
-        self._attr_extra_state_attributes = {"bags": [actions.bean_facts(b) for b in beans]}
+        now = dt_util.now()
+        brews = await self.lab.store.async_list_brews(since=now - timedelta(days=USUAL_DAYS))
+        rules = self.lab.opening
+        nxt = open_next(beans, usual_dose(brews, now), now, rules)
+        self._attr_extra_state_attributes = {
+            "bags": [actions.bean_facts(b) for b in beans],
+            # The sealed bag to open now, when it is time; the open ones past their best.
+            "open_next": nxt.id if nxt else None,
+            "fading": [b.id for b in beans if fading(b, now, rules)],
+        }
 
 
 class StatsSensor(CoffeeLabEntity, SensorEntity):
@@ -619,6 +630,115 @@ class StockLevelNumber(StockEntity, NumberEntity):
         await self.lab.async_set_stock_level(self.kind, value)
 
 
+class TodaysCupSensor(CoffeeLabEntity, SensorEntity):
+    """Today's cup: the bag as state while it is offered (once a day, from the
+    usual time); the pick, whether it is due and from when, as attributes."""
+
+    _attr_icon = "mdi:coffee-outline"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "todays_cup")
+        # Named here: "Today's" would otherwise give "today_s".
+        self.entity_id = "sensor.xbloom_studio_todays_cup"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_TODAYS_CUP, self._changed))
+        # Whether it is due turns with the clock: at the usual time, and at midnight.
+        self.async_on_remove(async_track_time_interval(self.hass, self._tick, QUESTION_TICK))
+
+    @callback
+    def _tick(self, _now) -> None:
+        self._changed()
+
+    async def async_read(self) -> None:
+        """The bag while the card is due; empty otherwise. The pick stays in the
+        attributes either way, for an agent asked for another cup."""
+        cup = getattr(self.lab, "todays_cup", None)
+        pick = cup.pick if cup is not None else None
+        is_due = bool(cup is not None and cup.due())
+        start = cup.shows_from() if cup is not None else None
+        self._attr_native_value = pick.bag if pick and is_due else None
+        self._attr_extra_state_attributes = {
+            "bag_id": pick.bag_id, "bag": pick.bag, "recipe": pick.recipe,
+            "source": pick.recipe_source, "hub_id": pick.hub_id, "drink": pick.drink,
+            "dose_g": pick.dose_g, "reasons": list(pick.reasons), "due": is_due,
+            "shows_from": start.isoformat() if start else None,
+        } if pick else {}
+
+
+class _TodaysCupButton(CoffeeLabEntity, ButtonEntity):
+    def _cup(self):
+        cup = getattr(self.lab, "todays_cup", None)
+        if cup is None:
+            raise refuse("suggestion_none")
+        return cup
+
+
+class UseTodaysCupButton(_TodaysCupButton):
+    """Pick today's cup on the Brew tab: bag, recipe and dose. Nothing is started."""
+
+    _attr_icon = "mdi:check"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "use_todays_cup")
+        # Named here: "Today's" would otherwise give "today_s".
+        self.entity_id = "button.xbloom_studio_use_todays_cup"
+
+    async def async_press(self) -> None:
+        await self._cup().async_use()
+
+
+class AnotherCupButton(_TodaysCupButton):
+    """The next cup on offer."""
+
+    _attr_icon = "mdi:swap-horizontal"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "another_cup")
+        # Named here: "Today's" would otherwise give "today_s".
+        self.entity_id = "button.xbloom_studio_another_cup"
+
+    async def async_press(self) -> None:
+        await self._cup().async_another()
+
+
+class _OpeningNumber(CoffeeLabEntity, NumberEntity):
+    """One of the opening rules: a setting kept in Coffee Lab's state."""
+
+    _attr_mode = NumberMode.BOX
+    _attr_native_step = 1
+    _setting = ""
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, f"opening_{self._setting}")
+        from .lab import OPENING_RANGES
+        self._attr_native_min_value, self._attr_native_max_value = OPENING_RANGES[self._setting]
+
+    async def async_read(self) -> None:
+        self._attr_native_value = getattr(self.lab.opening, self._setting)
+
+    async def async_set_native_value(self, value: float) -> None:
+        await self.lab.async_set_opening(**{self._setting: int(value)})
+
+
+class OpenLimitNumber(_OpeningNumber):
+    _setting = "limit"
+    _attr_icon = "mdi:sack-outline"
+
+
+class RestDaysNumber(_OpeningNumber):
+    _setting = "rest_days"
+    _attr_icon = "mdi:timer-sand"
+    _attr_native_unit_of_measurement = "d"
+
+
+class FadeDaysNumber(_OpeningNumber):
+    _setting = "fade_days"
+    _attr_icon = "mdi:weather-windy"
+    _attr_native_unit_of_measurement = "d"
+
+
 def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
     """The Coffee Lab entities of one platform, or none when it is off."""
     if lab is None:
@@ -630,10 +750,10 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
         ],
         "sensor": [
             RemainingSensor, BagsSensor, StatsSensor, RecentBrewsSensor, LastCountSensor, WaitingBrewsSensor,
-            RatingQuestionSensor, BagQuestionSensor, RecipeKindSensor,
+            RatingQuestionSensor, BagQuestionSensor, RecipeKindSensor, TodaysCupSensor,
         ],
-        "number": [ManualDoseNumber],
-        "button": [RecordManualBrewButton],
+        "number": [ManualDoseNumber, OpenLimitNumber, RestDaysNumber, FadeDaysNumber],
+        "button": [RecordManualBrewButton, UseTodaysCupButton, AnotherCupButton],
     }
     # Only a store edited elsewhere — Notion — can be out of date here.
     if lab.store.remote:

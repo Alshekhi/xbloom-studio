@@ -30,6 +30,12 @@ TEXT = {
         "d_roaster": "Roaster", "d_region": "Region", "d_producer": "Producer", "d_varietal": "Variety",
         "d_roast": "Roast", "d_roast_date": "Roasted", "d_altitude": "Altitude", "d_notes": "Tasting notes",
         "d_m": "{n} m", "d_link": "Shop page",
+        "open_next": "Open next: {bag}", "past_best": "past its best", "h_opening": "Opening bags",
+        "h_todays_cup": "Today's cup", "tc_line": "{cup}", "tc_sep": ", ", "tc_end": ".",
+        "r_liked": "you liked it", "r_not_yesterday": "not the coffee you had last",
+        "r_use_soon": "best used soon", "r_past_best": "past its best", "r_open_next": "time to open it",
+        "r_rated_again": "rated Keep it like this with it", "r_brewed_with_bag": "brewed with it before",
+        "r_like_this_coffee": "brewed with coffee like it", "r_community": "a community recipe",
         "stock_not_yet": "Not enough brews yet to tell how long the {kind} will last.",
         "stock_weigh": "Weigh the bags not counted yet to complete it.",
         "kind_coffee": "coffee", "kind_tea": "tea", "kind_xpod": "xPods",
@@ -136,6 +142,12 @@ TEXT = {
         "d_roaster": "المحمصة", "d_region": "المنطقة", "d_producer": "المُنتِج", "d_varietal": "الصنف",
         "d_roast": "درجة التحميص", "d_roast_date": "تاريخ التحميص", "d_altitude": "الارتفاع",
         "d_notes": "النكهات", "d_m": "{n} م", "d_link": "صفحة المتجر",
+        "open_next": "افتح بعده: {bag}", "past_best": "تجاوز أفضل وقته", "h_opening": "فتح الأكياس",
+        "h_todays_cup": "كوب اليوم", "tc_line": "{cup}", "tc_sep": "، ", "tc_end": ".",
+        "r_liked": "أعجبتك", "r_not_yesterday": "ليست آخر قهوة حضّرتها",
+        "r_use_soon": "يحسن استخدامها قريبًا", "r_past_best": "تجاوزت أفضل وقتها", "r_open_next": "حان وقت فتحها",
+        "r_rated_again": "قيّمت الوصفة معها بـ أعتمدها كما هي", "r_brewed_with_bag": "حضّرتها معها من قبل",
+        "r_like_this_coffee": "حضّرتها مع قهوة مشابهة", "r_community": "وصفة من المجتمع",
         "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
         "stock_weigh": "زن الأكياس التي لم تُحسب بعد لاكتماله.",
         "kind_coffee": "البن", "kind_tea": "الشاي", "kind_xpod": "كبسولات xPod",
@@ -327,6 +339,31 @@ def section(title: str, cards: list[dict], visibility: list[dict] | None = None)
     return out
 
 
+TODAYS_CUP_REASONS = ('liked', 'not_yesterday', 'use_soon', 'past_best', 'open_next', 'rated_again', 'brewed_with_bag', 'like_this_coffee', 'community')
+
+
+def todays_cup_card(t: dict) -> str:
+    """The bag, the recipe and the dose, then why, in one sentence.
+
+    The reasons are codes; each is worded here, the first with a capital.
+    """
+    cup = f"sensor.{E}_todays_cup"
+    words = "{" + ", ".join(f"'{k}': \"{t['r_' + k]}\"" for k in TODAYS_CUP_REASONS) + "}"
+    named = lambda key: "('" + ISO + "' ~ e(a.get('" + key + "')) ~ '" + PDI + "')"  # noqa: E731
+    return (
+        ESCAPE
+        + "{% set a = {" + ", ".join(f"'{k}': state_attr('{cup}', '{k}')" for k in ("bag", "recipe", "dose_g", "reasons")) + "} %}"
+        + "{% set cup = [" + named("bag") + ", " + named("recipe") + " if a.get('recipe') else '',"
+        " (((a.get('dose_g') or 0) | float | round(1) | string | replace('.0', '')) ~ ' " + t["g"] + "')"
+        " if a.get('recipe') else ''] | select | join(' · ') %}"
+        "{% set words = " + words + " %}{% set ns = namespace(said=[]) %}"
+        "{% for r in a.get('reasons') or [] %}{% if r in words %}{% set ns.said = ns.said + [words[r]] %}"
+        "{% endif %}{% endfor %}{% set why = ns.said | join(" + repr(t["tc_sep"]) + ") %}"
+        + t["tc_line"].replace("{cup}", "{{ cup }}")
+        + "{% if why %}\n\n{{ why[:1] | upper }}{{ why[1:] }}" + t["tc_end"] + "{% endif %}"
+    )
+
+
 def brew_view(t: dict) -> dict:
     bag = f"select.{E}_coffee_bag"
     kind = f"sensor.{E}_recipe_kind"
@@ -349,6 +386,19 @@ def brew_view(t: dict) -> dict:
             is_(kind, k), is_(kind, "unknown"), is_(kind, "unavailable"),
         ]}
     return {"title": t["view_brew"], "path": "brew", "icon": "mdi:coffee", "type": "sections", "max_columns": 2, "sections": [
+        # Today's cup: while the machine is idle, nothing is picked yet, and
+        # there is a cup to offer.
+        {"type": "grid", "cards": [
+            heading(t["h_todays_cup"]),
+            {"type": "markdown", "content": todays_cup_card(t)},
+            press(f"button.{E}_use_todays_cup"),
+            press(f"button.{E}_another_cup"),
+        ], "visibility": [
+            *present(f"sensor.{E}_todays_cup"),
+            is_not(f"sensor.{E}_brew_status", "grinding"),
+            is_not(f"sensor.{E}_brew_status", "brewing"),
+            is_(f"select.{E}_recipe", "unknown"),
+        ]},
         section(t["h_now"], [
             tile(f"sensor.{E}_brew_status"),
             tile(f"binary_sensor.{E}_in_range", name=t["machine"]),
@@ -860,6 +910,7 @@ def bags_view(t: dict) -> dict:
         name + amount
         + "{% if b.get('opened_on') %}{% set days = (now().date() - as_datetime(b.get('opened_on')).date()).days %} · "
         + opened_ago(t) + "{% endif %}"
+        + f"{{% if b.id in (state_attr('{bags}', 'fading') or []) %}} · {t['past_best']}{{% endif %}}"
     )
     # An unopened bag holds what it was sold as, unless it was weighed.
     unopened_text = (
@@ -920,7 +971,11 @@ def bags_view(t: dict) -> dict:
         + "{% set sealed = all | selectattr('status', 'eq', 'unopened') | list %}"
         "{% set dated = sealed | selectattr('roast_date', 'defined') | selectattr('roast_date') | sort(attribute='roast_date') | list %}"
         "{% set ordered = dated + (sealed | reject('in', dated) | list) %}"
-        f"{{% if ordered %}}## {t['h_unopened_bags']}\n\n{{% for b in ordered %}}" + unopened_line + "{% endfor %}{% endif %}"
+        # The one to open now, only when it is time.
+        + f"{{% set nxt = all | selectattr('id', 'eq', state_attr('{bags}', 'open_next')) | list %}}"
+        f"{{% if ordered %}}## {t['h_unopened_bags']}\n\n"
+        + "{% if nxt %}" + t["open_next"].replace("{bag}", "**" + ISO + "{{ e(nxt[0].name) }}" + PDI + "**") + "\n\n{% endif %}"
+        "{% for b in ordered %}" + unopened_line + "{% endfor %}{% endif %}"
     )
     bag_list = lambda content: {"type": "markdown", "text_only": True, "show_empty": False, "content": content}  # noqa: E731
     return {"title": t["view_bags"], "path": "bags", "icon": "mdi:shopping", "type": "sections", "max_columns": 2, "sections": [
@@ -935,6 +990,10 @@ def bags_view(t: dict) -> dict:
             ]),
             {"type": "markdown", "text_only": True, "content": f"[{t['add_bags']}]({INTEGRATION})"},
         ], "visibility": present(bags)[:1]},
+        section(t["h_opening"], [
+            tile(f"number.{E}_{n}", features=[{"type": "numeric-input", "style": "buttons"}])
+            for n in ("open_bags_at_once", "rest_after_roasting", "open_bag_fades_after")
+        ], available(f"number.{E}_open_bags_at_once")),
         # Per kind the home has had: what is left, what it is counted in,
         # and the level below which it is running low.
         *(section(t["h_stock"] + f" · {t[f'kind_{kind}']}", [

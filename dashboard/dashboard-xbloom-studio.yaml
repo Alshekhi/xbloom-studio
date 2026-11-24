@@ -10,6 +10,68 @@ views:
     cards:
     - type: markdown
       text_only: true
+      content: '## Today''s cup'
+    - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = {''bag'': state_attr(''sensor.xbloom_studio_todays_cup'',
+        ''bag''), ''recipe'': state_attr(''sensor.xbloom_studio_todays_cup'', ''recipe''), ''dose_g'':
+        state_attr(''sensor.xbloom_studio_todays_cup'', ''dose_g''), ''reasons'': state_attr(''sensor.xbloom_studio_todays_cup'',
+        ''reasons'')} %}{% set cup = [(''⁨'' ~ e(a.get(''bag'')) ~ ''⁩''), (''⁨'' ~ e(a.get(''recipe''))
+        ~ ''⁩'') if a.get(''recipe'') else '''', (((a.get(''dose_g'') or 0) | float | round(1) | string
+        | replace(''.0'', '''')) ~ '' g'') if a.get(''recipe'') else ''''] | select | join('', '') %}{%
+        set words = {''liked'': "you liked it", ''not_yesterday'': "not the coffee you had last", ''use_soon'':
+        "best used soon", ''past_best'': "past its best", ''open_next'': "time to open it", ''rated_again'':
+        "rated Keep it like this with it", ''brewed_with_bag'': "brewed with it before", ''like_this_coffee'':
+        "brewed with coffee like it", ''community'': "a community recipe"} %}{% set ns = namespace(said=[])
+        %}{% for r in a.get(''reasons'') or [] %}{% if r in words %}{% set ns.said = ns.said + [words[r]]
+        %}{% endif %}{% endfor %}{% set why = ns.said | join('', '') %}{{ cup }}{% if why %}
+
+
+        {{ why[:1] | upper }}{{ why[1:] }}.{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_use_todays_cup
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_use_todays_cup
+    - type: tile
+      entity: button.xbloom_studio_another_cup
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_another_cup
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_todays_cup
+      state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_todays_cup
+      state_not: unknown
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: grinding
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: brewing
+    - condition: state
+      entity: select.xbloom_studio_recipe
+      state: unknown
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
       content: '## Right now'
     - type: tile
       entity: sensor.xbloom_studio_brew_status
@@ -1507,8 +1569,9 @@ views:
         | round(0) | int) ~ '' g left'' }}{% else %}{{ b.get(''remaining_g'') | round(0) | int }} g left{%
         endif %}{% if b.get(''opened_on'') %}{% set days = (now().date() - as_datetime(b.get(''opened_on'')).date()).days
         %}, {% if days == 0 %}opened today{% elif days == 1 %}opened yesterday{% else %}opened {{ days
-        }} days ago{% endif %}{% endif %}{% endset %}{% set more %}{% if b.get(''roaster'') %}- **Roaster:**
-        {{ e(b.get(''roaster'')) }}
+        }} days ago{% endif %}{% endif %}{% if b.id in (state_attr(''sensor.xbloom_studio_coffee_bags'',
+        ''fading'') or []) %}, past its best{% endif %}{% endset %}{% set more %}{% if b.get(''roaster'')
+        %}- **Roaster:** {{ e(b.get(''roaster'')) }}
 
         {% endif %}{% if b.get(''region'') %}- **Region:** {{ e(b.get(''region'')) }}
 
@@ -1550,16 +1613,21 @@ views:
         %}{% set all = state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'') or [] %}{% set sealed
         = all | selectattr(''status'', ''eq'', ''unopened'') | list %}{% set dated = sealed | selectattr(''roast_date'',
         ''defined'') | selectattr(''roast_date'') | sort(attribute=''roast_date'') | list %}{% set ordered
-        = dated + (sealed | reject(''in'', dated) | list) %}{% if ordered %}## Unopened bags
+        = dated + (sealed | reject(''in'', dated) | list) %}{% set nxt = all | selectattr(''id'', ''eq'',
+        state_attr(''sensor.xbloom_studio_coffee_bags'', ''open_next'')) | list %}{% if ordered %}## Unopened
+        bags
 
 
-        {% for b in ordered %}{% set line %}⁨{{ b.name }}⁩{% if b.get(''kind'') == ''xpod'' %} (xPod box){%
-        elif b.get(''kind'') == ''tea'' %} (tea){% endif %}{{ '' (in use)'' if b.id in current }}{% for
-        x in [b.get(''country''), b.get(''process'')] if x and x != ''Other'' %}, {{ x }}{% endfor %},
-        {% if b.get(''kind'') == ''xpod'' and b.get(''pods_left'') is not none %}{{ ''Pods left: '' ~
-        b.get(''pods_left'') ~ '''' }}{% elif b.get(''remaining_g'') is not none %}{{ b.get(''remaining_g'')
-        | round(0) | int }} g left{% elif b.get(''bag_size_g'') %}{{ '''' ~ (b.get(''bag_size_g'') | round(0)
-        | int) ~ '' g'' }}{% else %}not tracked{% endif %}{% endset %}{% set more %}{% if b.get(''roaster'')
+        {% if nxt %}Open next: **⁨{{ e(nxt[0].name) }}⁩**
+
+
+        {% endif %}{% for b in ordered %}{% set line %}⁨{{ b.name }}⁩{% if b.get(''kind'') == ''xpod''
+        %} (xPod box){% elif b.get(''kind'') == ''tea'' %} (tea){% endif %}{{ '' (in use)'' if b.id in
+        current }}{% for x in [b.get(''country''), b.get(''process'')] if x and x != ''Other'' %}, {{
+        x }}{% endfor %}, {% if b.get(''kind'') == ''xpod'' and b.get(''pods_left'') is not none %}{{
+        ''Pods left: '' ~ b.get(''pods_left'') ~ '''' }}{% elif b.get(''remaining_g'') is not none %}{{
+        b.get(''remaining_g'') | round(0) | int }} g left{% elif b.get(''bag_size_g'') %}{{ '''' ~ (b.get(''bag_size_g'')
+        | round(0) | int) ~ '' g'' }}{% else %}not tracked{% endif %}{% endset %}{% set more %}{% if b.get(''roaster'')
         %}- **Roaster:** {{ e(b.get(''roaster'')) }}
 
         {% endif %}{% if b.get(''region'') %}- **Region:** {{ e(b.get(''region'')) }}
@@ -1620,6 +1688,42 @@ views:
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_coffee_bags
+      state_not: unavailable
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## Opening bags'
+    - type: tile
+      entity: number.xbloom_studio_open_bags_at_once
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: numeric-input
+        style: buttons
+    - type: tile
+      entity: number.xbloom_studio_rest_after_roasting
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: numeric-input
+        style: buttons
+    - type: tile
+      entity: number.xbloom_studio_open_bag_fades_after
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: numeric-input
+        style: buttons
+    visibility:
+    - condition: state
+      entity: number.xbloom_studio_open_bags_at_once
       state_not: unavailable
   - type: grid
     cards:

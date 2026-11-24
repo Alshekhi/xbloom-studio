@@ -88,8 +88,8 @@ async def test_finishing_wins_over_opening():
 async def test_brews_come_back_newest_first_across_time_zones():
     storage = FakeStorage()
     store = await _store(storage)
-    # 07:00Z is later than 09:00+03:00 (06:00Z), though it sorts first as text.
-    await store.async_create_brew(Brew(id="", brewed_at="2026-09-25T09:00:00+03:00",
+    # 07:00Z is later than 09:00+05:00 (04:00Z), though it sorts first as text.
+    await store.async_create_brew(Brew(id="", brewed_at="2026-09-25T09:00:00+05:00",
                                        recorded_at="", dose_g=15.0))
     await store.async_create_brew(Brew(id="", brewed_at="2026-09-25T07:00:00Z",
                                        recorded_at="", dose_g=16.0,

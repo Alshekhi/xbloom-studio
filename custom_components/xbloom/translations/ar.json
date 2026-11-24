@@ -819,6 +819,9 @@
       },
       "coffee_lab_xpod_stock": {
         "name": "مخزون كبسولات xPod"
+      },
+      "coffee_lab_todays_cup": {
+        "name": "كوب اليوم"
       }
     },
     "switch": {
@@ -876,6 +879,15 @@
       },
       "coffee_lab_xpod_stock_level": {
         "name": "حد مخزون كبسولات xPod"
+      },
+      "coffee_lab_opening_limit": {
+        "name": "الأكياس المفتوحة في وقت واحد"
+      },
+      "coffee_lab_opening_rest_days": {
+        "name": "الراحة بعد التحميص"
+      },
+      "coffee_lab_opening_fade_days": {
+        "name": "يفقد الكيس المفتوح نكهته بعد"
       }
     },
     "button": {
@@ -986,6 +998,12 @@
       },
       "leave_recipe_unchanged": {
         "name": "أبقِ الوصفة كما هي"
+      },
+      "coffee_lab_use_todays_cup": {
+        "name": "استخدم كوب اليوم"
+      },
+      "coffee_lab_another_cup": {
+        "name": "كوب آخر"
       }
     },
     "text": {

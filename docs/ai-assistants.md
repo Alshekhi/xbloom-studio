@@ -27,6 +27,11 @@ answers. With Coffee Lab on, it needs the bag the coffee comes from, or
 `unattributed`. With `notify_target`, the caller is told how the brew ends by
 [callback](events.md#callbacks).
 
+With Coffee Lab on, `todays_cup` gives the cup to brew next — a bag, a recipe
+and the dose — and why. It is offered when someone asks what to brew; to brew
+it, `prepare_brew` with that bag, recipe and dose, saving a community recipe
+first.
+
 `search_hub`, `suggest_hub` and `hub_recipe` reach the
 [community hub](recipes.md#community-recipes): Studio recipes by keyword,
 origin, process, variety, roast or flavor, one suggested for a bag, and one read in

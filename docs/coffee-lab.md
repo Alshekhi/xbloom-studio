@@ -193,8 +193,9 @@ xPod boxes, tea — counted over every item on hand: a counted item by what is
 left, an unopened one not yet counted by its size. Choose what it is counted
 in with **Stock measure** — days, grams, cups or bags (for tea, packs: its
 tins or pouches); for xPods days, pods or boxes — and below which it is running low with **Stock level** (0 turns it
-off). Days and cups come from the last 30 days of brews of that kind, and need
-at least five of them.
+off). Days and cups come from the last 30 days of brews of that kind, each brew
+counting half as much a week older, so the figure follows a change of habit
+within days; they need at least five brews.
 
 An item whose amount is not known — opened before it was counted — is left
 out, and the figure becomes "at least" what is counted: it never turns low on
@@ -213,6 +214,63 @@ after this is installed only records where things stand.
 The Bags tab shows what is left of each kind at any time. The Brew tab says
 so only while what the picked recipe draws from is running low. The AI tools
 see it too, mentioning a low stock once while already talking about coffee.
+
+## Opening bags
+
+Coffee fades once its bag is open, so Coffee Lab keeps few coffee bags open
+and says when to open the next. Three settings, on the dashboard's Bags tab:
+
+| Setting | Default | What it does |
+|---|---|---|
+| **Open bags at once** | 2 | Above this, no sealed bag is named to open |
+| **Rest after roasting** | 7 days | A sealed bag roasted more recently waits for an older one |
+| **Open bag fades after** | 28 days | An open bag open longer is past its best |
+
+A sealed bag is named to open next — **Coffee bags**' `open_next` — when fewer
+bags are open than the limit and what is left in them is two usual doses or
+less, or when no open bag holds a dose. It is the oldest roast that has
+rested; with none rested, the oldest roast. An open bag past its best is
+listed in `fading`. The usual dose is the hot dose brewed most over the last
+30 days, else their average, else 15 g.
+
+## Today's cup
+
+**Today's cup** is the cup to brew next: an open bag, a recipe for it and the
+dose, with the reasons it was chosen. It is worked out again when Coffee Lab
+changes, when the Drink setting changes, at midnight and when a brew ends —
+not while one runs.
+
+- **The bag**, among the open bags holding a dose: a liked coffee first —
+  liked when any recipe was rated *Keep it like this* with it or the same
+  coffee before, not liked when every recipe tried was rated *Doesn't suit
+  this coffee*, and a **Buy again** answer settles it; between coffees liked
+  alike, not the one brewed last; and a bag that would pass its best before
+  it is finished at that pace is brewed more. A bag past its best only when
+  nothing else qualifies; with no open bag holding a dose, the sealed bag to
+  open next.
+- **The recipe**: those rated *Keep it like this* with the bag, taking turns;
+  then its other recipes, from the brews with it or with coffee like it; else
+  a [community recipe](recipes.md#community-recipes) for it; else none.
+- **The dose**: the usual dose for the drink, within what the recipe's cup
+  takes; for iced with no usual iced dose, the recipe's own.
+
+It is offered once a day: on the Brew tab until the day's first coffee is
+brewed, then not again until the next day. When the first cup of the day has
+a habit — at least ten of the last 30 days, the middle 60 % of them within
+four hours of each other — it appears an hour before the early end of that
+range rather than at midnight. A brew given a date but no time says nothing
+about the hour and is left out of it.
+Asked for, an AI assistant offers it at any time, for a second cup.
+
+**Use today's cup** picks the bag, the recipe — adding a community one to the
+library first — and the dose on the Brew tab, which prepares the machine; the
+brew is started as any other. **Another cup** offers the next one.
+
+**Today's cup** carries `bag`, `bag_id`, `recipe`, `source` (`own` or
+`community`), `hub_id`, `drink`, `dose_g`, `due` (offered now), `shows_from`
+(the usual time, when there is one) and `reasons`: for the bag `liked`,
+`not_yesterday`, `use_soon`, `past_best` or `open_next`; for the recipe
+`rated_again`, `brewed_with_bag`, `like_this_coffee` or `community`.
 
 ## How you brew
 

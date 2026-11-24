@@ -43,7 +43,8 @@ repair appears if one has waited more than an hour.
 
 ## The views
 
-- **Brew** — what is happening now, the water poured so far, the water left
+- **Brew** — once a day, until the day's first coffee and while nothing is picked, today's cup: a bag, a recipe and the dose,
+  with why, to use or pass over; what is happening now, the water poured so far, the water left
   and how much is missing while a brew runs low, the bag in use, a recipe for that bag,
   brewing a recipe, one-off adjustments, saving a new recipe, and manual brews.
   Choosing a bag, or **Suggest a recipe**, fills a picker with your own recipes brewed with this
@@ -68,7 +69,8 @@ repair appears if one has waited more than an hour.
   from the brew record, so they cover every brew in it.
 - **Bags** — the open bags, each with what is left and how long it has been
   open, the bag in use first; the unopened bags, oldest roast first, each with
-  its size; each bag opening to where and how it was made, with its shop page
+  its size, and which to open next when it is time; open bags past their best
+  marked; the opening settings; each bag opening to where and how it was made, with its shop page
   when it has one; a link to where bags are added and edited; and, for each kind the
   home has had, what is left — about so many days or cups, or the grams, bags,
   pods or boxes — with its measure and level.

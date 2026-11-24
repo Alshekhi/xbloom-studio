@@ -536,3 +536,36 @@ async def test_browse_offers_the_accounts_lists_only_signed_in():
     assert select.options == ["search"] and select.current_option == "search"
     browser.signed_in = True
     assert select.current_option == "tea"
+
+
+async def test_a_community_recipe_for_a_given_bag_and_drink():
+    browser, client, *_ = _browser(recipes=({**LISTED, "water_ratio": 15.0},))
+    bag = SimpleNamespace(id="b", country="Kenya", process="Washed", name="Test Bag",
+                          tracked=False, remaining_g=None, varietal="", roast="", roaster_notes="")
+    found = await browser.async_community_for(bag, "hot")
+    assert found["id"] == LISTED["id"]
+    # Asking leaves the picker and the Community tab as they were.
+    assert browser.results == [] and browser.choice is None
+
+
+async def test_none_when_the_hub_has_nothing():
+    browser, client, *_ = _browser(recipes=())
+    bag = SimpleNamespace(id="b", country="Kenya", process="Washed", name="Test Bag",
+                          tracked=False, remaining_g=None, varietal="", roast="", roaster_notes="")
+    assert await browser.async_community_for(bag, "hot") is None
+
+
+async def test_adding_and_using_a_given_hub_recipe():
+    browser, client, share, coordinator = _browser()
+    browser.async_use = AsyncMock()
+    await browser.async_add_and_use_recipe({"id": LISTED["id"], "name": LISTED["name"]})
+    coordinator.async_add_recipe.assert_awaited()
+    browser.async_use.assert_awaited_once_with("Test Kenya Hot")
+
+
+async def test_using_a_given_hub_recipe_leaves_the_community_tab_as_it_was():
+    browser, client, share, coordinator = _browser()
+    browser.async_use = AsyncMock()
+    browser.picked_id, browser.detail = 999, {"id": 999, "name": "Shown"}
+    await browser.async_add_and_use_recipe({"id": LISTED["id"], "name": LISTED["name"]})
+    assert (browser.picked_id, browser.detail) == (999, {"id": 999, "name": "Shown"})

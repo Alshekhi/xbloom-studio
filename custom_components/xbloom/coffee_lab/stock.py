@@ -8,7 +8,7 @@ are only a floor: never low, since the item left out is usually not empty.
 Bags are always known.
 
 Days and cups come from the last 30 days of that kind's brews, every brewer,
-and need a few of them to mean anything. The pace is over the days those
+the recent ones weighing more, and need a few of them to mean anything. The pace is over the days those
 brews span, so a home with only a week of history is not read as brewing a
 quarter as much. A kind can turn low only once the
 home has had an item of it, so a home without tea never hears about tea.
@@ -39,6 +39,9 @@ _KIND_LEVEL: dict[tuple[str, str], float] = {("tea", "grams"): 50}
 def default_level(kind: str, measure: str) -> float:
     return _KIND_LEVEL.get((kind, measure), DEFAULT_LEVEL[measure])
 PACE_DAYS = 30
+# Each brew counts half as much a week older, so the pace follows a change of
+# habit within days while one unusual day does not swing it.
+HALF_LIFE_DAYS = 7
 # Fewer brews than this in the window say too little about a pace.
 MIN_BREWS = 5
 # The measures counted from the amount, which an item left out makes a floor.
@@ -59,6 +62,10 @@ class Stock:
     unknown: tuple[str, ...] = ()
 
 
+def _weight(age_days: float) -> float:
+    return 0.5 ** (max(0.0, age_days) / HALF_LIFE_DAYS)
+
+
 def _amount(bean: Bean) -> float | None:
     if bean.kind == "xpod":
         return float(bean.pods_left) if bean.tracked and bean.pods_left is not None else None
@@ -69,14 +76,10 @@ def _amount(bean: Bean) -> float | None:
     return None
 
 
-def stock_of(kind: str, beans: list[Bean], brews: list[Brew], now: datetime) -> Stock:
-    """`beans` every item, finished ones too; `brews` newest first."""
-    mine = [b for b in beans if b.kind == kind]
-    on_hand = [b for b in mine if b.status in _ON_HAND]
-    known = [(b, _amount(b)) for b in on_hand]
-    amount = sum(a for _, a in known if a is not None)
-    unknown = tuple(b.id for b, a in known if a is None)
-    ids = {b.id for b in mine}
+def pace(kind: str, beans: list[Bean], brews: list[Brew], now: datetime) -> tuple[float, float] | None:
+    """(per cup, per day) a kind is used at — grams, or pods for xPods — or
+    None with too few brews to tell. `beans` every item, finished ones too."""
+    ids = {b.id for b in beans if b.kind == kind}
     since = now - timedelta(days=PACE_DAYS)
     used = [
         (r, when) for r in brews
@@ -86,15 +89,35 @@ def stock_of(kind: str, beans: list[Bean], brews: list[Brew], now: datetime) -> 
         and (when := moment(r.brewed_at or r.recorded_at, now.tzinfo))
         and since <= when <= now
     ]
+    if len(used) < MIN_BREWS:
+        return None
+
+    def drawn_by(r: Brew) -> float:
+        return 1.0 if kind == "xpod" else float(r.dose_g or 0.0)
+
+    weights = [_weight((now - when).total_seconds() / 86400) for _, when in used]
+    drawn = sum(w * drawn_by(r) for w, (r, _) in zip(weights, used))
+    if drawn <= 0:
+        return None
+    first = min(when for _, when in used)
+    span = min(PACE_DAYS, max(1, math.ceil((now - first).total_seconds() / 86400)))
+    # Every day of the span counts, a day without a brew included, weighted
+    # as the brews are.
+    return drawn / sum(weights), drawn / sum(_weight(d) for d in range(span))
+
+
+def stock_of(kind: str, beans: list[Bean], brews: list[Brew], now: datetime) -> Stock:
+    """`beans` every item, finished ones too; `brews` newest first."""
+    mine = [b for b in beans if b.kind == kind]
+    on_hand = [b for b in mine if b.status in _ON_HAND]
+    known = [(b, _amount(b)) for b in on_hand]
+    amount = sum(a for _, a in known if a is not None)
+    unknown = tuple(b.id for b, a in known if a is None)
     cups = days = None
-    if len(used) >= MIN_BREWS:
-        drawn = float(len(used)) if kind == "xpod" else sum(r.dose_g or 0.0 for r, _ in used)
-        if drawn > 0:
-            per_cup = drawn / len(used)
-            first = min(when for _, when in used)
-            span = min(PACE_DAYS, max(1, math.ceil((now - first).total_seconds() / 86400)))
-            cups = round(amount / per_cup, 1)
-            days = round(amount / (drawn / span), 1)
+    if (rate := pace(kind, beans, brews, now)) is not None:
+        per_cup, per_day = rate
+        cups = round(amount / per_cup, 1)
+        days = round(amount / per_day, 1)
     return Stock(kind, bool(mine), amount if (on_hand or mine) else None, len(on_hand),
                  cups, days, unknown)
 
