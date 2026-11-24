@@ -148,9 +148,6 @@ views:
       entity: select.xbloom_studio_what_was_wrong
       state_not: unavailable
     - condition: state
-      entity: select.xbloom_studio_what_was_wrong
-      state_not: unknown
-    - condition: state
       entity: sensor.xbloom_studio_brew_status
       state_not: grinding
     - condition: state
@@ -611,11 +608,10 @@ views:
 
         النسخ مع هذا الكيس: {% for v in o.versions %}{{ [((''درجة طحن '' ~ ((v.grind | float) | round(1)
         | string | replace(''.0'', '''')) ~ '''') if v.grind is not none else ''''), ((''1:'' ~ ((v.ratio
-        | float) | round(1) | string | replace(''.0'', '''')) ~ '''') if v.ratio is not none else ''''),
-        (('''' ~ ((v.dose_g | float) | round(1) | string | replace(''.0'', '''')) ~ '' غ'') if v.dose_g
-        is not none else '''')] | select | join(''، '') }} — {% if v.verdict == ''again'' %}أكرّرها{%
-        elif v.verdict == ''fine'' %}لا بأس بها{% else %}لن أكرّرها{% endif %}{% if not loop.last %};
-        {% endif %}{% endfor %}.{% endif %}{% elif source == ''community'' %}من المجتمع، شاركها {{ ''xBloom''
+        | float) | round(1) | string | replace(''.0'', '''')) ~ '''') if v.ratio is not none else '''')]
+        | select | join(''، '') }} — {% if v.verdict == ''again'' %}أعتمدها كما هي{% elif v.verdict ==
+        ''fine'' %}قريبة، تحتاج تعديل{% else %}لا تناسب هذا البن{% endif %}{% if not loop.last %}; {%
+        endif %}{% endfor %}.{% endif %}{% elif source == ''community'' %}من المجتمع، شاركها {{ ''xBloom''
         if state_attr(''select.xbloom_studio_suggested_recipe'', ''official'') else e(state_attr(''select.xbloom_studio_suggested_recipe'',
         ''author'')) }}. استخدامها يضيفها إلى وصفاتك.{% endif %}'
       visibility:

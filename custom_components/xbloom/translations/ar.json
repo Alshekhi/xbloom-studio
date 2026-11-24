@@ -554,9 +554,9 @@
       "coffee_lab_rate_brew": {
         "name": "الحكم",
         "state": {
-          "again": "أكرّرها",
-          "fine": "لا بأس بها",
-          "not_again": "لن أكرّرها"
+          "again": "أعتمدها كما هي",
+          "fine": "قريبة، تحتاج تعديل",
+          "not_again": "لا تناسب هذا البن"
         }
       },
       "coffee_lab_buy_again": {
@@ -1786,7 +1786,7 @@
         },
         "verdict": {
           "name": "الحكم",
-          "description": "هل يستحق أن يُكرَّر."
+          "description": "ما الخطوة التالية مع هذه الوصفة وهذا البن."
         },
         "issue": {
           "name": "ما المشكلة",
@@ -1935,9 +1935,9 @@
     },
     "verdict": {
       "options": {
-        "again": "أكرّرها",
-        "fine": "لا بأس بها",
-        "not_again": "لن أكرّرها"
+        "again": "أعتمدها كما هي",
+        "fine": "قريبة، تحتاج تعديل",
+        "not_again": "لا تناسب هذا البن"
       }
     },
     "suggestion_source": {

@@ -2,7 +2,7 @@ blueprint:
   name: "xBloom — Ask how the coffee was"
   description: >
     Asks how each coffee was, a quarter of an hour after the last cup, once for
-    cups brewed close together: on a phone, with Again / Fine / Not again
+    cups brewed close together: on a phone, with Keep it like this / Close, needs a tweak / Doesn't suit this coffee
     buttons that keep the verdict, or aloud through a voice assistant, whose
     conversation agent keeps the answer and anything said about the taste. The
     voice assistant's agent needs the xBloom Studio tools turned on. An answer
@@ -69,8 +69,8 @@ variables:
   prefix: XBLOOM_RATE
   verdicts: [again, fine, not_again]
   labels: >-
-    {{ {'again': 'أكرّرها', 'fine': 'لا بأس بها', 'not_again': 'لن أكرّرها'} if lang == 'ar'
-       else {'again': 'Again', 'fine': 'Fine', 'not_again': 'Not again'} }}
+    {{ {'again': 'أعتمدها كما هي', 'fine': 'قريبة، تحتاج تعديل', 'not_again': 'لا تناسب هذا البن'} if lang == 'ar'
+       else {'again': 'Keep it like this', 'fine': 'Close, needs a tweak', 'not_again': "Doesn't suit this coffee"} }}
   # Each coffee in words, as the dashboard's card says it.
   coffees: >-
     {%- set ns = namespace(out=[]) -%}
@@ -180,7 +180,8 @@ action:
                 {{ coffees | map(attribute='brew_id') | join(', ') }}. For each
                 coffee the person talks about, keep only what they say, in their
                 words, with the coffee_lab tool's rate_brew for that brew_id:
-                the verdict (again, fine or not_again), what was wrong if they
+                the verdict (again: keep it like this; fine: close, needs a
+                tweak; not_again: does not suit this coffee), what was wrong if they
                 say it was sour, bitter, too weak or too strong (issue: sour,
                 bitter, weak or strong), and anything about how it tasted.
                 Do nothing else with this conversation unless they

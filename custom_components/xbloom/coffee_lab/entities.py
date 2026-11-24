@@ -312,7 +312,7 @@ class RateBrewSelect(CoffeeLabEntity, SelectEntity):
 
 
 class CupIssueSelect(CoffeeLabEntity, SelectEntity):
-    """What was wrong with a brew just rated Fine or Not again.
+    """What was wrong with a brew just rated Fine.
 
     Available only while one waits to be asked; picking an answer sets its
     Next Change (Nothing sets none) and the question goes.

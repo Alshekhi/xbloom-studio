@@ -1,7 +1,7 @@
 """Versions of a recipe with a bag: what was changed, how each was, what next.
 
-A version is a recipe brewed with a bag at a grind, ratio and dose
-(`coffee_lab.lab.brew_version`). The brew record holds every version tried
+A version is a recipe brewed with a bag at a grind and ratio
+(`coffee_lab.lab.brew_version`); the dose is how much is made, not a version. The brew record holds every version tried
 and the verdicts given, so from it come:
 
   * the rated versions side by side, so the better one is not a memory;
@@ -107,7 +107,7 @@ def versions_of(brews: list[Brew], recipe: str, bean_id: str) -> list[dict[str, 
     for brew in brews:  # newest first, as every store returns them
         if brew.rating is None or not _same_pair(brew, recipe, {bean_id}):
             continue
-        version = brew_version(brew.dose_g, brew.settings)
+        version = brew_version(brew.settings)
         key = tuple(version.values())
         if key in seen:
             seen[key]["brews"] += 1
@@ -217,7 +217,8 @@ class VersionDesk:
         version = keep["version"]
         scaled = scale_recipe(
             saved,
-            dose_g=float(version["dose_g"] or saved["dose_g"]),
+            # The recipe's own dose: a version is its grind and ratio.
+            dose_g=float(saved["dose_g"]),
             ratio=float(version["ratio"] or normalize_ratio(saved)),
             grind_size=int(version["grind"] or saved.get("grinder_size") or 0),
         )

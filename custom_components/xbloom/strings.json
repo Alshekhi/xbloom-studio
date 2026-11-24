@@ -554,9 +554,9 @@
       "coffee_lab_rate_brew": {
         "name": "Verdict",
         "state": {
-          "again": "Again",
-          "fine": "Fine",
-          "not_again": "Not again"
+          "again": "Keep it like this",
+          "fine": "Close, needs a tweak",
+          "not_again": "Doesn't suit this coffee"
         }
       },
       "coffee_lab_buy_again": {
@@ -1786,7 +1786,7 @@
         },
         "verdict": {
           "name": "Verdict",
-          "description": "Whether it is worth brewing again."
+          "description": "What to do next with this recipe and this coffee."
         },
         "issue": {
           "name": "What was wrong",
@@ -1935,9 +1935,9 @@
     },
     "verdict": {
       "options": {
-        "again": "Again",
-        "fine": "Fine",
-        "not_again": "Not again"
+        "again": "Keep it like this",
+        "fine": "Close, needs a tweak",
+        "not_again": "Doesn't suit this coffee"
       }
     },
     "suggestion_source": {

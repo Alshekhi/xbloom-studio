@@ -37,7 +37,7 @@ def test_the_ratio_stays_within_the_machine_s():
     assert issue_change("strong", {"ratio": 25.0}, SAVED) is None
 
 
-async def test_what_was_wrong_is_asked_after_fine_or_not_again_and_sets_the_next_change():
+async def test_what_was_wrong_is_asked_after_fine_and_sets_the_next_change():
     lab, store, bag = await _lab()
     await _brew(lab, bag, "run-1", grind="50")
     with _at(lab, 16):
@@ -52,8 +52,9 @@ async def test_what_was_wrong_is_asked_after_fine_or_not_again_and_sets_the_next
         assert pending_change(brews, "Test Hot", {bag.id})["settings"] == {"grind": 47.0}
 
 
-@pytest.mark.parametrize("verdict", ["again"])
-async def test_a_cup_liked_is_not_asked_what_was_wrong(verdict):
+@pytest.mark.parametrize("verdict", ["again", "not_again"])
+async def test_only_a_cup_close_but_needing_a_tweak_is_asked_what_was_wrong(verdict):
+    # Not again: a recipe that does not suit the coffee is left, not adjusted.
     lab, store, bag = await _lab()
     await _brew(lab, bag, "run-1")
     with _at(lab, 16):

@@ -72,17 +72,32 @@ def _rounded(value: Any, digits: int) -> float | None:
         return None
 
 
-def brew_version(dose: Any, settings: dict[str, Any]) -> dict[str, float | None]:
-    """What tells two brews of one recipe apart: grind, ratio and dose.
+def brew_version(settings: dict[str, Any]) -> dict[str, float | None]:
+    """What tells two brews of one recipe apart in the cup: grind and ratio.
 
-    The record keeps the grind as text ("50" or "50.0"), so all three are
-    compared as rounded numbers.
+    Not the dose: at one ratio the water follows the coffee, so a dose
+    changes how much is made rather than how it tastes. Each brew still
+    records its own. The record keeps the grind as text ("50" or "50.0"),
+    so both are compared as rounded numbers.
     """
     return {
         "grind": _rounded(settings.get("grind"), 1),
         "ratio": _rounded(settings.get("ratio"), 2),
-        "dose_g": _rounded(dose, 1),
     }
+
+
+def _without_dose(item: dict[str, Any]) -> dict[str, Any]:
+    """A question or kept version as stored before the dose left the version."""
+    if "dose_g" not in (item.get("version") or {}):
+        return item
+    changes = [c for c in item.get("changes") or [] if c.get("setting") != "dose_g"]
+    item = {
+        **item, "version": {k: v for k, v in item["version"].items() if k != "dose_g"},
+        "changes": changes,
+    }
+    if "label" in item:
+        item["label"] = change_label(changes)
+    return item
 
 
 def version_changes(version: dict[str, Any], saved: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -93,7 +108,6 @@ def version_changes(version: dict[str, Any], saved: dict[str, Any] | None) -> li
     saved_version = {
         "grind": _rounded(saved.get("grinder_size", saved.get("grind_size")), 1),
         "ratio": _rounded(ratio, 2),
-        "dose_g": _rounded(saved.get("dose_g"), 1),
     }
     return [
         {"setting": key, "value": value, "saved": saved_version[key]}
@@ -122,7 +136,6 @@ def change_label(changes: list[dict[str, Any]]) -> str:
     words = {
         "grind": lambda v: f"grind {number(v)}",
         "ratio": lambda v: f"ratio 1:{number(v)}",
-        "dose_g": lambda v: f"{number(v)} g",
     }
     return ", ".join(words[c["setting"]](c["value"]) for c in changes if c["setting"] in words)
 
@@ -239,7 +252,7 @@ class CoffeeLab:
         # Entities subscribe to this; anything that changes what they show calls it.
         self.on_change = on_change
         # The saved recipe of a name, from the integration's library: what the
-        # question compares a brew's grind, ratio and dose against.
+        # question compares a brew's grind and ratio against.
         self.recipe_lookup: Callable[[str], dict[str, Any] | None] = lambda name: None
         # The community hub's names for a bag's country and process
         # (coffee_names.HubNames); None leaves them as typed.
@@ -391,7 +404,7 @@ class CoffeeLab:
 
     # ── How it was ───────────────────────────────────────────────────────
     #
-    # A question per recipe, bag and version (grind, ratio, dose) that has no
+    # A question per recipe, bag and version (grind, ratio) that has no
     # verdict yet. Cups of the same one brewed close together share their
     # question, and the answer is kept on each of them; a different recipe,
     # bag or version gets its own. Each is due a while after its last cup, so
@@ -407,7 +420,7 @@ class CoffeeLab:
         for question in questions or []:
             expires = dt_util.parse_datetime(question["expires_at"])
             if expires is None or now < expires:
-                open_.append({"brew_ids": [question["brew_id"]], **question})
+                open_.append({"brew_ids": [question["brew_id"]], **_without_dose(question)})
         return open_
 
     async def _async_set_questions(self, questions: list[dict[str, Any]], **values: Any) -> None:
@@ -465,13 +478,13 @@ class CoffeeLab:
             return
         try:
             recipe = args["recipe"]
-            version = brew_version(args.get("grams"), args.get("settings") or {})
+            version = brew_version(args.get("settings") or {})
             since = dt_util.utcnow() - QUESTION_LOOKBACK
             for brew in await self.store.async_list_brews(since=since):
                 if (
                     brew.rating is not None and brew.bean_id == done.bean_id
                     and (brew.recipe or "").casefold() == recipe.casefold()
-                    and brew_version(brew.dose_g, brew.settings) == version
+                    and brew_version(brew.settings) == version
                 ):
                     return
             now = dt_util.utcnow()
@@ -524,7 +537,7 @@ class CoffeeLab:
         A question's answer is kept on every cup it covers. With no question
         and no brew named, the most recent brew. `issue`, what was wrong
         (ISSUES), sets the Next Change from the version brewed unless one is
-        given in words (`issue_change`). A verdict of Fine or Not again leaves
+        given in words (`issue_change`). A verdict of Fine leaves
         what was wrong to be asked next (`issue_question`); an issue given
         alone answers that.
         """
@@ -565,7 +578,7 @@ class CoffeeLab:
         if issue and next_change is None and source is None and rated is not None:
             # No question to read the version from: the brew's own record.
             change = issue_change(
-                issue, brew_version(rated.dose_g, rated.settings), self._saved_recipe(rated.recipe),
+                issue, brew_version(rated.settings), self._saved_recipe(rated.recipe),
             )
             if change:
                 rated = await self.store.async_rate_brew(named, rating=None, tasting=None, next_change=change)
@@ -582,10 +595,12 @@ class CoffeeLab:
             ):
                 keeps.append({"recipe": question["recipe"], "version": question["version"],
                               "changes": changes, "label": change_label(changes)})
-            # Not liked, and nothing said about why: what was wrong is asked
-            # next, for as long as the question would have stayed open.
+            # Close but needing a tweak, and nothing said about why: what was
+            # wrong is asked next, for as long as the question would have
+            # stayed open. Not after Not again: a recipe that does not suit
+            # the coffee is left for another, not adjusted.
             follow_up = None
-            if verdict in ("fine", "not_again") and not issue and next_change is None:
+            if verdict == "fine" and not issue and next_change is None:
                 follow_up = {
                     key: question.get(key) for key in ("brew_id", "brew_ids", "recipe", "bag", "version")
                 } | {"expires_at": (dt_util.utcnow() + QUESTION_LAPSE).isoformat()}
@@ -599,7 +614,7 @@ class CoffeeLab:
 
     @property
     def issue_question(self) -> dict[str, Any] | None:
-        """A brew rated Fine or Not again, waiting to be asked what was wrong."""
+        """A brew rated Fine, waiting to be asked what was wrong."""
         asked = self._state.get("issue_question")
         if not asked:
             return None
@@ -612,7 +627,8 @@ class CoffeeLab:
         keeps = self._state.get("versions_to_keep")
         if keeps is None and self._state.get("version_to_keep"):
             keeps = [self._state["version_to_keep"]]  # kept by an earlier version
-        return [dict(k) for k in keeps or []]
+        # One that changed only the dose is no longer a version of its own.
+        return [k for k in map(_without_dose, keeps or []) if k.get("changes")]
 
     @property
     def version_to_keep(self) -> dict[str, Any] | None:

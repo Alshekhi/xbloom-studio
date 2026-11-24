@@ -148,9 +148,6 @@ views:
       entity: select.xbloom_studio_what_was_wrong
       state_not: unavailable
     - condition: state
-      entity: select.xbloom_studio_what_was_wrong
-      state_not: unknown
-    - condition: state
       entity: sensor.xbloom_studio_brew_status
       state_not: grinding
     - condition: state
@@ -607,12 +604,11 @@ views:
 
         Versions with this bag: {% for v in o.versions %}{{ [((''grind '' ~ ((v.grind | float) | round(1)
         | string | replace(''.0'', '''')) ~ '''') if v.grind is not none else ''''), ((''1:'' ~ ((v.ratio
-        | float) | round(1) | string | replace(''.0'', '''')) ~ '''') if v.ratio is not none else ''''),
-        (('''' ~ ((v.dose_g | float) | round(1) | string | replace(''.0'', '''')) ~ '' g'') if v.dose_g
-        is not none else '''')] | select | join('', '') }} — {% if v.verdict == ''again'' %}Again{% elif
-        v.verdict == ''fine'' %}Fine{% else %}Not again{% endif %}{% if not loop.last %}; {% endif %}{%
-        endfor %}.{% endif %}{% elif source == ''community'' %}From the community, shared by {{ ''xBloom''
-        if state_attr(''select.xbloom_studio_suggested_recipe'', ''official'') else e(state_attr(''select.xbloom_studio_suggested_recipe'',
+        | float) | round(1) | string | replace(''.0'', '''')) ~ '''') if v.ratio is not none else '''')]
+        | select | join('', '') }} — {% if v.verdict == ''again'' %}Keep it like this{% elif v.verdict
+        == ''fine'' %}Close, needs a tweak{% else %}Doesn''t suit this coffee{% endif %}{% if not loop.last
+        %}; {% endif %}{% endfor %}.{% endif %}{% elif source == ''community'' %}From the community, shared
+        by {{ ''xBloom'' if state_attr(''select.xbloom_studio_suggested_recipe'', ''official'') else e(state_attr(''select.xbloom_studio_suggested_recipe'',
         ''author'')) }}. Using it adds it to your recipes.{% endif %}'
       visibility:
       - condition: state

@@ -45,7 +45,8 @@ ACTIONS: dict[str, Spec] = {
     ),
     "rate_brew": Spec(
         actions.rate_brew,
-        "keep what the person said about a brew: verdict (again, fine, not_again), "
+        "keep what the person said about a brew: verdict — again (keep it like this), "
+        "fine (close, needs a tweak) or not_again (does not suit this coffee) — "
         "body, acidity, sweetness, clarity, hot/warm/cool/overall notes, finish, and "
         "next_change, such as \"grind 52\", or issue — what was wrong: sour, bitter, "
         "weak (too weak) or strong (too strong), none for nothing — which sets the "

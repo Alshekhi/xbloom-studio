@@ -198,16 +198,50 @@ async def test_the_open_question_reaches_an_agent_once_due():
 
 
 def test_versions_compare_as_numbers():
-    assert brew_version(15, {"grind": "50", "ratio": 16}) == brew_version(15.0, {"grind": "50.0", "ratio": 16.0})
+    assert brew_version({"grind": "50", "ratio": 16}) == brew_version({"grind": "50.0", "ratio": 16.0})
 
 
 def test_changes_are_against_the_saved_recipe():
-    version = brew_version(18, {"grind": "50", "ratio": 15})
+    version = brew_version({"grind": "50", "ratio": 15})
     assert version_changes(version, SAVED) == [
         {"setting": "ratio", "value": 15.0, "saved": 16.0},
-        {"setting": "dose_g", "value": 18.0, "saved": 15.0},
     ]
     assert version_changes(version, None) == []
+
+
+async def test_a_dose_alone_changes_no_version_so_its_cups_share_one_question():
+    # The water follows the coffee at one ratio: a dose is how much is made.
+    lab, store, bag = await _lab()
+    await _brew(lab, bag, "run-1", grams=15)
+    await _brew(lab, bag, "run-2", grams=12)
+    [question] = lab._open_questions()
+    assert len(question["brew_ids"]) == 2
+    assert question["changes"] == []
+
+
+async def test_a_question_stored_with_a_dose_is_read_without_it():
+    lab, store, bag = await _lab()
+    await lab._async_set_state(rating_questions=[{
+        "brew_id": "b1", "recipe": "Test Hot", "bean_id": bag.id, "bag": "Kenya",
+        "version": {"grind": 50.0, "ratio": 16.0, "dose_g": 12.0},
+        "changes": [{"setting": "dose_g", "value": 12.0, "saved": 15.0}],
+        "due_at": "2000-01-01T00:00:00+00:00", "expires_at": "2999-01-01T00:00:00+00:00",
+    }])
+    [question] = lab._open_questions()
+    assert (question["version"], question["changes"]) == ({"grind": 50.0, "ratio": 16.0}, [])
+
+
+async def test_a_kept_version_that_changed_only_the_dose_is_no_longer_offered():
+    lab, store, bag = await _lab()
+    await lab._async_set_state(versions_to_keep=[
+        {"recipe": "Test Hot", "version": {"grind": 50.0, "ratio": 16.0, "dose_g": 12.0},
+         "changes": [{"setting": "dose_g", "value": 12.0, "saved": 15.0}], "label": "12 g"},
+        {"recipe": "Test Hot", "version": {"grind": 52.0, "ratio": 16.0, "dose_g": 12.0},
+         "changes": [{"setting": "grind", "value": 52.0, "saved": 50.0},
+                     {"setting": "dose_g", "value": 12.0, "saved": 15.0}], "label": "grind 52, 12 g"},
+    ])
+    [keep] = lab.versions_to_keep
+    assert (keep["version"], keep["label"]) == ({"grind": 52.0, "ratio": 16.0}, "grind 52")
 
 
 def test_notion_writes_and_reads_back_the_same_verdict_and_tasting():

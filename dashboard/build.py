@@ -76,8 +76,8 @@ TEXT = {
         "v_leave": "Leave the recipe as it is",
         "v_confirm_make": "Change the saved recipe to these settings?",
         "v_versions": "Versions with this bag:", "k_grind": "grind {value}", "k_ratio": "1:{value}",
-        "k_dose": "{value} g", "verdict_again": "Again", "verdict_fine": "Fine",
-        "verdict_not_again": "Not again",
+        "k_dose": "{value} g", "verdict_again": "Keep it like this", "verdict_fine": "Close, needs a tweak",
+        "verdict_not_again": "Doesn't suit this coffee",
         "h_buy_again": "Buy it again?", "b_question": "**{bag}** is finished.",
         "b_answer": "Answer",
         "r_question": "**{recipe}** with {bag}{changes}.", "r_at": ", at ",
@@ -151,8 +151,8 @@ TEXT = {
         "v_leave": "أبقِ الوصفة كما هي",
         "v_confirm_make": "تغيير الوصفة المحفوظة إلى هذه الإعدادات؟",
         "v_versions": "النسخ مع هذا الكيس:", "k_grind": "درجة طحن {value}", "k_ratio": "1:{value}",
-        "k_dose": "{value} غ", "verdict_again": "أكرّرها", "verdict_fine": "لا بأس بها",
-        "verdict_not_again": "لن أكرّرها",
+        "k_dose": "{value} غ", "verdict_again": "أعتمدها كما هي", "verdict_fine": "قريبة، تحتاج تعديل",
+        "verdict_not_again": "لا تناسب هذا البن",
         "h_buy_again": "هل تشتريه مجددًا؟", "b_question": "انتهى **{bag}**.",
         "b_answer": "الإجابة",
         "r_question": "**{recipe}** مع {bag}{changes}.", "r_at": "، ",
@@ -234,6 +234,15 @@ def is_not(entity: str, state: str) -> dict:
     return {"condition": "state", "entity": entity, "state_not": state}
 
 
+def available(entity: str) -> list[dict]:
+    """Shown while the entity exists, whatever it holds.
+
+    For a select that waits for a pick: with nothing picked it reads
+    `unknown`, which `present` would hide it by.
+    """
+    return [{"condition": "state", "entity": entity, "state_not": "unavailable"}]
+
+
 def not_busy() -> list[dict]:
     return [{"condition": "state", "entity": f"sensor.{E}_brew_status", "state_not": s} for s in BUSY]
 
@@ -290,14 +299,14 @@ def brew_view(t: dict) -> dict:
             {"type": "markdown", "text_only": True, "content": rating_card(t)},
             select(f"select.{E}_verdict", name=t["r_verdict"]),
         ], [*present(f"sensor.{E}_brew_to_rate"), *not_busy()]),
-        # After a Fine or Not again: what was wrong sets what to change next time.
+        # After a Fine: what was wrong sets what to change next time.
         section(t["r_issue"], [
             {"type": "markdown", "text_only": True, "content": ESCAPE + t["w_which"].replace(
                 "{recipe}", f"{{{{ e(state_attr('select.{E}_what_was_wrong', 'recipe')) }}}}"
             ).replace("{bag}", f"{{{{ e(state_attr('select.{E}_what_was_wrong', 'bag')) }}}}")},
             # Named apart from the heading above it, or it is said twice.
             select(f"select.{E}_what_was_wrong", name=t["b_answer"]),
-        ], [*present(f"select.{E}_what_was_wrong"), *not_busy()]),
+        ], [*available(f"select.{E}_what_was_wrong"), *not_busy()]),
         section(t["h_buy_again"], [
             {"type": "markdown", "text_only": True, "content": ESCAPE + t["b_question"].replace(
                 "{bag}", f"{{{{ e(states('sensor.{E}_finished_bag')) }}}}")},
@@ -843,9 +852,12 @@ def _num(expr: str) -> str:
 
 
 def version_words(t: dict, var: str) -> str:
-    """One version in a few words: "grind 52, 1:15, 18 g", only what it has."""
+    """One version in a few words: "grind 52, 1:15", only what it has.
+
+    A version is its grind and ratio; the dose is how much was made.
+    """
     parts = []
-    for key, text in (("grind", "k_grind"), ("ratio", "k_ratio"), ("dose_g", "k_dose")):
+    for key, text in (("grind", "k_grind"), ("ratio", "k_ratio")):
         before, after = t[text].split("{value}")
         number = f"(({var}.{key} | float) | round(1) | string | replace('.0', ''))"
         parts.append(f"(('{before}' ~ {number} ~ '{after}') if {var}.{key} is not none else '')")

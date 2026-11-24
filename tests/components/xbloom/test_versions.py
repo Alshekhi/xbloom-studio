@@ -49,8 +49,8 @@ def test_a_next_time_note_is_read_for_its_settings(text, found):
 def test_rated_versions_are_side_by_side_newest_first():
     brews = [brew("3", "52", 3), brew("2", "50", 2), brew("1", "50", 1), brew("0", "54")]
     assert versions_of(brews, "test hot", "bag") == [
-        {"grind": 52.0, "ratio": 16.0, "dose_g": 15.0, "verdict": "again", "brews": 1},
-        {"grind": 50.0, "ratio": 16.0, "dose_g": 15.0, "verdict": "fine", "brews": 2},
+        {"grind": 52.0, "ratio": 16.0, "verdict": "again", "brews": 1},
+        {"grind": 50.0, "ratio": 16.0, "verdict": "fine", "brews": 2},
     ]
 
 
@@ -133,6 +133,17 @@ async def test_keeping_a_version_rescales_the_saved_recipe(as_new):
         assert name == "Test Hot" and kept["id"] == "77"
     assert kept["grinder_size"] == 54
     assert lab.version_to_keep is None
+
+
+async def test_keeping_a_version_brewed_at_another_dose_keeps_the_recipe_s_dose():
+    lab, store, bag = await _lab()
+    await _brew(lab, bag, "run-1", grind="54", grams=12)
+    await lab.async_rate(verdict="again")
+    assert lab.version_to_keep["label"] == "grind 54"
+    desk, hass, coordinator, registry = _desk(lab, [SAVED])
+    await desk.async_keep_version(as_new=False)
+    [kept] = coordinator.async_replace_recipe.await_args.args
+    assert (kept["grinder_size"], kept["dose_g"]) == (54, 15.0)
 
 
 async def test_leaving_the_recipe_as_it_is_closes_the_offer_and_changes_nothing():

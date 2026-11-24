@@ -105,10 +105,11 @@ them; after an hour a repair says so.
 
 A while after a brew, Coffee Lab asks how it was: **Brew to rate** names the
 recipe and the bag a quarter of an hour after the last cup, when the coffee can
-have been tasted, and **Verdict** answers it — **Again**, **Fine** or **Not
-again**. Unanswered, the question goes after a day.
+have been tasted, and **Verdict** answers it — **Keep it like this**,
+**Close, needs a tweak** or **Doesn't suit this coffee**. Unanswered, the question goes after a day.
 
-A question is asked once for a recipe with a bag at one grind, ratio and dose,
+A question is asked once for a recipe with a bag at one grind and ratio —
+the dose is how much is made, so it makes no question of its own —
 and not again once it has a verdict. Cups of the same one brewed close
 together share a question, and its answer is kept on each of them; a
 different recipe, bag or setting gets a question of its own. Up to three are
@@ -119,7 +120,7 @@ clarity, how it was hot, warm and cool, overall, the finish — and a **Next
 change**, such as "grind 52", with the `xbloom.rate_brew` action or by telling
 an AI assistant. Only what is given is kept.
 
-After a verdict of **Fine** or **Not again**, **What was wrong** is asked
+After a verdict of **Close, needs a tweak**, **What was wrong** is asked
 next, for as long as the question would have stayed open. Its answer sets the
 Next change for you, counted from the grind and ratio the cup was brewed at:
 
@@ -148,7 +149,7 @@ The next time the recipe is picked with that bag, **Next Change** offers the
 change asked for, and **Use Next Change** sets the Brew tab's one-off
 adjustments to it; the saved recipe stays as it is. The versions tried and
 their verdicts are side by side on the Brew tab. A changed version rated
-**Again** is offered to keep, as **Version to Keep**: **Make Version the
+**Keep it like this** is offered to keep, as **Version to Keep**: **Make Version the
 Recipe** changes the saved recipe, **Save Version as New Recipe** keeps both,
 and **Leave Recipe Unchanged** keeps neither and closes the offer.
 
@@ -158,7 +159,7 @@ Choosing a bag looks for a recipe for it at once, and **Suggest Recipe** looks
 again: your own first,
 ranked by how close the bags they were brewed with are — this bag, then the
 same origin and process, then the same origin — and by their verdicts, with
-a recipe last rated **Not again** with this bag left out — and, after them,
+a recipe last rated **Doesn't suit this coffee** with this bag left out — and, after them,
 [community recipes](recipes.md#community-recipes) for coffee like it, the
 closest to the bag's process, variety, roast and roaster notes first. **Suggested Recipe** offers them all, your own first and
 each community one marked as such, with the best already chosen; its
