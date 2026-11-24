@@ -23,7 +23,7 @@ from homeassistant.util import dt as dt_util
 from xbloom import spec
 
 from ..const import DOMAIN
-from .inventory import Deduct, Flag, Skip, decide_consumption, in_use, kind_of_cup
+from .inventory import Deduct, Flag, Skip, decide_consumption, kind_of_cup
 from .models import SELECTABLE, VERDICTS, Bean, Brew, Review
 from .pending import PendingBrews
 from .stats import DEFAULT_PERIOD, PERIODS, Report, earliest_needed, period_report
@@ -666,32 +666,6 @@ class CoffeeLab:
             return None
         return dict(question)
 
-    async def _async_bag_finished(self, bean: Bean) -> None:
-        """A bag was finished: ask about it, and hand on the bag in use."""
-        await self._async_ask_about_bag(bean)
-        await self._async_hand_on(bean)
-
-    async def _async_hand_on(self, bean: Bean) -> None:
-        """A finished bag in use gives way to the next bag of its coffee.
-
-        That is the bag a name of it would mean (`inventory.in_use`): the one
-        open, or the unopened one roasted first. Only chosen, nothing counted;
-        it opens at its first brew. With none, or none to tell apart, nothing
-        is in use, as after any finished bag. The brew that finished it is
-        already in the record, so a store that cannot be read here leaves the
-        choice as it was, to be cleared when next read.
-        """
-        key = ACTIVE_KEYS.get(bean.kind)
-        if key is None or self._state.get(key) != bean.id:
-            return
-        try:
-            beans = await self.store.async_list_beans()
-        except STORE_UNREACHABLE as err:
-            _LOGGER.warning("Could not read the bags to choose the next of %s: %s", bean.name, err)
-            return
-        picks = in_use([b for b in beans if b.id != bean.id and b.same_coffee(bean)])
-        await self._async_set_state(**{key: picks[0].id if len(picks) == 1 else None})
-
     async def _async_ask_about_bag(self, bean: Bean) -> None:
         if bean.buy_again:
             return
@@ -877,7 +851,7 @@ class CoffeeLab:
             await self._runs.async_add(run_id)
             if bag.get("finished"):
                 try:
-                    await self._async_bag_finished(await self.store.async_get_bean(bag["bean_id"]))
+                    await self._async_ask_about_bag(await self.store.async_get_bean(bag["bean_id"]))
                 except UnknownBean:
                     pass
             self.on_change()
@@ -962,7 +936,7 @@ class CoffeeLab:
         # and a second delivery of it is refused there.
         await self._runs.async_add(run_id)
         if decision.finish and bean is not None:
-            await self._async_bag_finished(bean)
+            await self._async_ask_about_bag(bean)
         self.on_change()
         return Consumption(
             "counted", bean_id=decision.bean_id, grams=decision.grams,
@@ -1040,10 +1014,10 @@ class CoffeeLab:
 
     async def async_finish(self, bean_id: str) -> Bean:
         bean = await self.store.async_finish_bag(bean_id, dt_util.now().date().isoformat())
-        await self._async_bag_finished(bean)
         for key in ACTIVE_KEYS.values():
             if self._state.get(key) == bean_id:
                 await self._async_set_state(**{key: None})
+        await self._async_ask_about_bag(bean)
         self.on_change()
         return bean
 
