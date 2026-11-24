@@ -154,7 +154,7 @@ async def test_stats_read_the_record():
     bag = await _bag(lab)
     await lab.async_consume(bean_id=bag.id, grams=18, run_id="r1",
                             brewed_at="2026-09-25T09:00:00+03:00")
-    now = datetime(2026, 9, 26, 10, tzinfo=ZoneInfo("Asia/Riyadh"))
+    now = datetime(2026, 9, 26, 10, tzinfo=ZoneInfo("Etc/GMT-3"))
     report = await lab.async_stats("last_7_days", now)
     assert (report.now.brews, report.now.coffee_g) == (1, 18.0)
     assert report.habits["days_brewed"] == 1
@@ -307,7 +307,7 @@ async def test_the_totals_stand_when_the_bags_cannot_be_read():
     await lab.async_consume(bean_id=bag.id, grams=18, run_id="r1",
                             brewed_at="2026-09-25T09:00:00+03:00")
     lab.store.async_list_beans = AsyncMock(side_effect=HomeAssistantError("down"))
-    now = datetime(2026, 9, 26, 10, tzinfo=ZoneInfo("Asia/Riyadh"))
+    now = datetime(2026, 9, 26, 10, tzinfo=ZoneInfo("Etc/GMT-3"))
     report = await lab.async_stats("last_7_days", now)
     assert report.now.brews == 1 and report.habits == {}
 
@@ -315,7 +315,7 @@ async def test_the_totals_stand_when_the_bags_cannot_be_read():
 async def test_a_rolling_period_s_habits_count_its_own_number_of_days():
     lab = await _lab()
     bag = await _bag(lab)
-    zone = ZoneInfo("Asia/Riyadh")
+    zone = ZoneInfo("Etc/GMT-3")
     for day, hour in ((19, 11), (20, 9), (26, 8)):
         await lab.async_consume(bean_id=bag.id, grams=17, run_id=f"r{day}",
                                 brewed_at=f"2026-09-{day}T{hour:02d}:00:00+03:00")

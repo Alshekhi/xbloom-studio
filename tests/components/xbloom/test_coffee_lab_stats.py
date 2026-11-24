@@ -7,9 +7,9 @@ from custom_components.xbloom.coffee_lab.stats import (
     PERIODS, period_report, totals, window,
 )
 
-RIYADH = ZoneInfo("Asia/Riyadh")
-NOW = datetime(2026, 9, 26, 10, 0, tzinfo=RIYADH)
-SEPTEMBER = (datetime(2026, 9, 1, tzinfo=RIYADH), datetime(2026, 10, 1, tzinfo=RIYADH))
+ZONE = ZoneInfo("Etc/GMT-3")
+NOW = datetime(2026, 9, 26, 10, 0, tzinfo=ZONE)
+SEPTEMBER = (datetime(2026, 9, 1, tzinfo=ZONE), datetime(2026, 10, 1, tzinfo=ZONE))
 
 
 def brew(when, dose=16.0, water=None, brewer="xBloom Studio", recorded=""):
@@ -27,7 +27,7 @@ def test_a_month_adds_up_its_brews():
 
 
 def test_a_brew_belongs_to_the_local_month():
-    # 23:30 UTC on 31 August is 02:30 on 1 September in Riyadh.
+    # 23:30 UTC on 31 August is 02:30 on 1 September at UTC+3.
     assert totals([brew("2026-08-31T23:30:00Z")], *SEPTEMBER).brews == 1
 
 
@@ -75,18 +75,18 @@ def test_the_periods_offered_are_keys_not_labels():
 
 def test_windows_and_what_they_compare_with():
     w = window("today", NOW)
-    assert (w.start, w.end) == (datetime(2026, 9, 26, tzinfo=RIYADH), NOW)
-    assert (w.before_start, w.before_end) == (datetime(2026, 9, 25, tzinfo=RIYADH), w.start)
+    assert (w.start, w.end) == (datetime(2026, 9, 26, tzinfo=ZONE), NOW)
+    assert (w.before_start, w.before_end) == (datetime(2026, 9, 25, tzinfo=ZONE), w.start)
 
-    assert window("last_7_days", NOW).start == datetime(2026, 9, 19, 10, 0, tzinfo=RIYADH)
+    assert window("last_7_days", NOW).start == datetime(2026, 9, 19, 10, 0, tzinfo=ZONE)
 
     w = window("last_month", NOW)
-    assert (w.start, w.end) == (datetime(2026, 8, 1, tzinfo=RIYADH),
-                                datetime(2026, 9, 1, tzinfo=RIYADH))
-    assert w.before_start == datetime(2026, 7, 1, tzinfo=RIYADH)
+    assert (w.start, w.end) == (datetime(2026, 8, 1, tzinfo=ZONE),
+                                datetime(2026, 9, 1, tzinfo=ZONE))
+    assert w.before_start == datetime(2026, 7, 1, tzinfo=ZONE)
 
-    w = window("this_month", datetime(2026, 1, 5, tzinfo=RIYADH))
-    assert w.before_start == datetime(2025, 12, 1, tzinfo=RIYADH)
+    w = window("this_month", datetime(2026, 1, 5, tzinfo=ZONE))
+    assert w.before_start == datetime(2025, 12, 1, tzinfo=ZONE)
 
 
 def test_a_report_counts_the_window_and_the_one_before():
