@@ -49,7 +49,7 @@ async def test_what_was_wrong_is_asked_after_fine_or_not_again_and_sets_the_next
         await lab.async_rate(issue="sour", brew_id=asked["brew_id"])
         assert lab.issue_question is None, "answered, it goes"
         brews = await store.async_list_brews()
-        assert pending_change(brews, "Test Hot", bag.id)["settings"] == {"grind": 47.0}
+        assert pending_change(brews, "Test Hot", {bag.id})["settings"] == {"grind": 47.0}
 
 
 @pytest.mark.parametrize("verdict", ["again"])
@@ -68,7 +68,7 @@ async def test_nothing_wrong_sets_nothing_and_closes_the_question():
         await lab.async_rate(verdict="not_again")
         await lab.async_rate(issue="none")
     assert lab.issue_question is None
-    assert pending_change(await store.async_list_brews(), "Test Hot", bag.id) is None
+    assert pending_change(await store.async_list_brews(), "Test Hot", {bag.id}) is None
 
 
 async def test_an_issue_given_with_the_verdict_is_not_asked_again():
@@ -77,7 +77,7 @@ async def test_an_issue_given_with_the_verdict_is_not_asked_again():
     with _at(lab, 16):
         await lab.async_rate(verdict="fine", issue="bitter")
     assert lab.issue_question is None
-    assert pending_change(await store.async_list_brews(), "Test Hot", bag.id)["settings"] == {"grind": 53.0}
+    assert pending_change(await store.async_list_brews(), "Test Hot", {bag.id})["settings"] == {"grind": 53.0}
 
 
 async def test_the_action_says_what_it_set_and_takes_an_issue_alone():

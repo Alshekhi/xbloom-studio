@@ -664,7 +664,7 @@ async def prepare_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]
             data["unattributed"] = True
         else:
             if args.get("bean") or args.get("bean_id"):
-                data["bean_id"] = (await resolve_bean(machine.lab, args, selectable_only=True)).id
+                data["bean_id"] = (await resolve_bean(machine.lab, args, in_use=True)).id
             elif await _recipe_kind(machine, args) == "coffee":
                 raise refuse("bag_required")
     await machine.call("prepare_brew", data)
@@ -703,7 +703,7 @@ async def start_brew(machine: Machine, args: dict[str, Any]) -> dict[str, Any]:
             data["unattributed"] = True
         else:
             if args.get("bean") or args.get("bean_id"):
-                bag = await resolve_bean(machine.lab, args)
+                bag = await resolve_bean(machine.lab, args, in_use=True)
                 data["bean_id"] = bag.id
                 # The item in use is the one the dashboard should show.
                 await machine.lab.async_select(bag.id)

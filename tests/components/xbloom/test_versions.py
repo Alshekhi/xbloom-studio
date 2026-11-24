@@ -55,10 +55,17 @@ def test_rated_versions_are_side_by_side_newest_first():
 
 
 def test_only_the_latest_brew_s_change_is_offered():
-    assert pending_change([brew("2", "50", next_change="grind 52")], "Test Hot", "bag")["settings"] == {"grind": 52.0}
+    assert pending_change([brew("2", "50", next_change="grind 52")], "Test Hot", {"bag"})["settings"] == {"grind": 52.0}
     # The brew after it followed the change and asked for nothing more.
-    assert pending_change([brew("3", "52"), brew("2", "50", next_change="grind 52")], "Test Hot", "bag") is None
-    assert pending_change([brew("2", "50", next_change="grind 52", bean="other")], "Test Hot", "bag") is None
+    assert pending_change([brew("3", "52"), brew("2", "50", next_change="grind 52")], "Test Hot", {"bag"}) is None
+    assert pending_change([brew("2", "50", next_change="grind 52", bean="other")], "Test Hot", {"bag"}) is None
+
+
+def test_a_change_asked_with_an_earlier_bag_of_the_coffee_is_offered_for_the_next():
+    brews = [brew("2", "50", next_change="grind 52", bean="old")]
+    assert pending_change(brews, "Test Hot", {"new", "old"})["settings"] == {"grind": 52.0}
+    # The new bag's own latest brew followed it, so nothing is left.
+    assert pending_change([brew("3", "52", bean="new"), *brews], "Test Hot", {"new", "old"}) is None
 
 
 # ── The desk: using the change, keeping the version ──────────────────────────
@@ -155,3 +162,21 @@ async def test_an_xpod_recipe_s_next_change_is_the_one_asked_with_the_box_in_use
             patch.object(versions, "async_dispatcher_send"):
         await desk.async_refresh()
     assert desk.next_change["settings"] == {"grind": 52.0}
+
+
+@pytest.mark.parametrize("roaster, offered", [("Test Roaster", True), ("Other Roaster", False)])
+async def test_the_desk_offers_a_change_from_a_bag_of_the_same_coffee_and_roaster(roaster, offered):
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, roaster="Test Roaster")
+    new = await store.async_add_bean(name="kenya", status="unopened", roaster=roaster)
+    await lab.async_select(new.id)
+    desk, hass, coordinator, registry = _desk(lab, [SAVED])
+    hass.states.get = lambda eid: SimpleNamespace(
+        state="Test Hot", attributes={"name": "Test Hot", "cup_type": 2})
+    store.async_list_brews = AsyncMock(return_value=[
+        brew("2", "50", next_change="grind 52", bean=bag.id),
+    ])
+    with patch.object(versions.er, "async_get", return_value=registry), \
+            patch.object(versions, "async_dispatcher_send"):
+        await desk.async_refresh()
+    assert (desk.next_change is not None) == offered

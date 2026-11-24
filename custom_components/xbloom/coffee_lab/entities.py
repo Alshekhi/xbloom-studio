@@ -42,16 +42,27 @@ QUESTION_TICK = timedelta(minutes=1)
 
 
 def bag_labels(beans: list[Bean]) -> dict[str, str]:
-    """A label per bag, unique: a name shared by two bags is numbered.
+    """A label per bag, unique.
 
-    Held by id underneath, so a label is only ever what a person picks from.
+    A name shared by several bags — a coffee bought again — carries each
+    bag's roast date, which is what tells them apart; when the dates do not,
+    the bags are numbered. Held by id underneath, so a label is only ever
+    what a person picks from.
     """
-    labels: dict[str, str] = {}
-    seen: dict[str, int] = {}
+    by_name: dict[str, list[Bean]] = {}
     for bean in beans:
-        seen[bean.name] = seen.get(bean.name, 0) + 1
-        labels[bean.id] = bean.name if seen[bean.name] == 1 else f"{bean.name} {seen[bean.name]}"
-    return labels
+        by_name.setdefault(bean.name, []).append(bean)
+    labels: dict[str, str] = {}
+    for name, bags in by_name.items():
+        dates = [b.roast_date for b in bags]
+        dated = len(bags) > 1 and all(dates) and len(set(dates)) == len(dates)
+        for n, bean in enumerate(bags, start=1):
+            if dated:
+                labels[bean.id] = f"{name} ({bean.roast_date})"
+            else:
+                labels[bean.id] = name if n == 1 else f"{name} {n}"
+    # Read in the order the bags came, as the picker shows them.
+    return {bean.id: labels[bean.id] for bean in beans}
 
 
 class CoffeeLabEntity(Entity):

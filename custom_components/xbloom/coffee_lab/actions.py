@@ -4,9 +4,12 @@ Each takes the lab and its arguments and returns facts, or raises a translated
 refusal. The tool and the services are thin wrappers over these, so a rule —
 which bag a name means, when a bag may be finished — exists once.
 
-A bag is named by its name, or by its id when two bags share one. A name that
-matches more than one open or unopened bag is refused rather than guessed:
-two bags of the same coffee are two physical bags.
+A bag is named by its name, or by its id. A coffee bought again keeps its
+name, so several bags may share one: two physical bags of the same coffee.
+Where a name chooses the bag coffee is drawn from — picking the bag in use,
+brewing, coffee used elsewhere, finishing a bag — it means the bag in use
+(`_in_use`). Where it changes one bag's amount or details, a shared name is
+refused rather than guessed.
 """
 from __future__ import annotations
 
@@ -64,10 +67,31 @@ def bean_facts(bean: Bean) -> dict[str, Any]:
     return facts
 
 
+def _in_use(beans: list[Bean]) -> list[Bean]:
+    """Of bags sharing a name, the ones it can mean when drawing coffee.
+
+    The open bag, since that is the one being drunk; with none open, the
+    unopened bag roasted first, since that is the one to open next. More than
+    one left — two open, or unopened bags no roast date tells apart — is for
+    the caller to refuse.
+    """
+    if opened := [b for b in beans if b.status == "open"]:
+        return opened
+    unopened = [b for b in beans if b.status == "unopened"]
+    if len(unopened) < 2 or not all(b.roast_date for b in unopened):
+        return unopened
+    first = min(b.roast_date for b in unopened)
+    return [b for b in unopened if b.roast_date == first]
+
+
 async def resolve_bean(
-    lab: CoffeeLab, args: dict[str, Any], *, selectable_only: bool = True
+    lab: CoffeeLab, args: dict[str, Any], *, selectable_only: bool = True, in_use: bool = False,
 ) -> Bean:
-    """The one bag `bean` (a name) or `bean_id` means, or a refusal."""
+    """The one bag `bean` (a name) or `bean_id` means, or a refusal.
+
+    `in_use`: a name shared by several open or unopened bags means the bag in
+    use (`_in_use`), for callers that draw coffee from it.
+    """
     if bean_id := args.get("bean_id"):
         try:
             bean = await lab.store.async_get_bean(bean_id)
@@ -82,6 +106,10 @@ async def resolve_bean(
     matches = [b for b in beans if b.name.lower() == wanted]
     if not matches:
         raise refuse("bag_not_found", name=name)
+    # Only bags of one kind: a coffee and a tea under one name are two
+    # different things, not one coffee bought again.
+    if len(matches) > 1 and in_use and selectable_only and len({b.kind for b in matches}) == 1:
+        matches = _in_use(matches)
     if len(matches) > 1:
         raise refuse("bag_ambiguous", name=name)
     return matches[0]
@@ -97,7 +125,7 @@ async def _bag_for_counting(lab: CoffeeLab, args: dict[str, Any]) -> tuple[str, 
     a refusal.
     """
     try:
-        bean = await resolve_bean(lab, args)
+        bean = await resolve_bean(lab, args, in_use=True)
     except ServiceValidationError:
         raise
     except STORE_UNREACHABLE:
@@ -243,7 +271,7 @@ async def stats(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
 
 
 async def set_active_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
-    bean = await resolve_bean(lab, args)
+    bean = await resolve_bean(lab, args, in_use=True)
     await lab.async_select(bean.id)
     return {"active_bag": bean_facts(bean)}
 
@@ -284,7 +312,7 @@ async def start_tracking(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]
 
 
 async def finish_bag(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
-    bean = await resolve_bean(lab, args)
+    bean = await resolve_bean(lab, args, in_use=True)
     if (why := CoffeeLab.finish_refusal(bean)) is not None:
         raise refuse(
             why, name=bean.name, remaining_g=f"{bean.remaining_g or 0:g}", pods=bean.pods_left or 0,
@@ -343,9 +371,17 @@ async def add_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     # The hub names coffee's countries and processes; a tea's are its own.
     check_altitude(values.get("altitude_m"), values.get("altitude_max_m"))
     checked = await in_hub_words(lab, values) if values.get("kind") != "tea" else {}
-    bean = await lab.store.async_add_bean(name=str(args["name"]).strip(), **values)
+    name = str(args["name"]).strip()
+    # The bags already under this name: the same coffee bought again, which
+    # keeps its name. Read before the new bag joins them.
+    same_name = [
+        {"id": b.id, "status": b.status, "roast_date": b.roast_date or None}
+        for b in await lab.store.async_list_beans()
+        if b.name.strip().casefold() == name.casefold()
+    ]
+    bean = await lab.store.async_add_bean(name=name, **values)
     lab.on_change()
-    return {"added": bean_facts(bean), **checked}
+    return {"added": bean_facts(bean), **({"same_name": same_name} if same_name else {}), **checked}
 
 
 def altitude_range_wrong(low: float | None, high: float | None) -> bool:

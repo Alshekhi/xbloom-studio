@@ -91,6 +91,17 @@ class Bean:
     pods_left: int | None = None
     pod_id: str = ""
 
+    def same_coffee(self, other: "Bean") -> bool:
+        """Whether two bags hold the same coffee: one name, roaster and kind.
+
+        A coffee bought again is a second bag under the same name; what was
+        learnt brewing the first carries to it. The roaster is part of it, so
+        two roasters' coffees that happen to share a name stay apart.
+        """
+        def key(bean: Bean) -> tuple[str, str, str]:
+            return (bean.kind, bean.name.strip().casefold(), bean.roaster.strip().casefold())
+        return key(self) == key(other)
+
 
 @dataclass(frozen=True)
 class Review:

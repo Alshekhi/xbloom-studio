@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import timedelta
+from collections.abc import Collection
 from typing import Any
 
 from homeassistant.components.button import ButtonEntity
@@ -93,8 +94,8 @@ def parse_next_change(text: str) -> dict[str, float]:
     return found
 
 
-def _same_pair(brew: Brew, recipe: str, bean_id: str) -> bool:
-    return brew.bean_id == bean_id and (brew.recipe or "").casefold() == recipe.casefold()
+def _same_pair(brew: Brew, recipe: str, bean_ids: Collection[str]) -> bool:
+    return brew.bean_id in bean_ids and (brew.recipe or "").casefold() == recipe.casefold()
 
 
 def versions_of(brews: list[Brew], recipe: str, bean_id: str) -> list[dict[str, Any]]:
@@ -104,7 +105,7 @@ def versions_of(brews: list[Brew], recipe: str, bean_id: str) -> list[dict[str, 
     """
     seen: dict[tuple, dict[str, Any]] = {}
     for brew in brews:  # newest first, as every store returns them
-        if brew.rating is None or not _same_pair(brew, recipe, bean_id):
+        if brew.rating is None or not _same_pair(brew, recipe, {bean_id}):
             continue
         version = brew_version(brew.dose_g, brew.settings)
         key = tuple(version.values())
@@ -115,14 +116,18 @@ def versions_of(brews: list[Brew], recipe: str, bean_id: str) -> list[dict[str, 
     return list(seen.values())
 
 
-def pending_change(brews: list[Brew], recipe: str, bean_id: str) -> dict[str, Any] | None:
-    """What the last brew of a recipe with a bag asked to change, if anything.
+def pending_change(
+    brews: list[Brew], recipe: str, bean_ids: Collection[str],
+) -> dict[str, Any] | None:
+    """What the last brew of a recipe with a coffee asked to change, if anything.
 
-    Only the latest brew counts: once a brew has followed the change, there is
-    nothing left to offer until someone asks for another.
+    `bean_ids` are the bags of that coffee (`Bean.same_coffee`), so a change
+    asked with one bag is offered for the next bag of it. Only the latest
+    brew counts: once a brew has followed the change, there is nothing left
+    to offer until someone asks for another.
     """
     for brew in brews:
-        if not _same_pair(brew, recipe, bean_id):
+        if not _same_pair(brew, recipe, bean_ids):
             continue
         if not brew.next_change:
             return None
@@ -167,9 +172,20 @@ class VersionDesk:
         found = None
         if recipe and bean_id:
             since = dt_util.utcnow() - LOOKBACK
-            found = pending_change(await self._lab.store.async_list_brews(since=since), recipe, bean_id)
+            found = pending_change(
+                await self._lab.store.async_list_brews(since=since), recipe,
+                await self._same_coffee(bean_id),
+            )
         self.recipe, self.next_change = recipe, found
         async_dispatcher_send(self._hass, self.signal)
+
+    async def _same_coffee(self, bean_id: str) -> set[str]:
+        """The bag in use and every other bag of its coffee, finished ones too."""
+        beans = await self._lab.store.async_list_beans(selectable_only=False)
+        bag = next((b for b in beans if b.id == bean_id), None)
+        if bag is None:
+            return {bean_id}
+        return {b.id for b in beans if b.same_coffee(bag)}
 
     async def async_use_next_change(self) -> None:
         """Set the one-off adjustments to what was asked for; the recipe stays."""

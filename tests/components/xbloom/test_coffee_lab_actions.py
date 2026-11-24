@@ -22,11 +22,86 @@ async def _refused(coro) -> str:
 # ── Which bag a name means ───────────────────────────────────────────────────
 
 
-async def test_a_name_shared_by_two_bags_is_refused_not_guessed():
+async def test_a_name_shared_by_two_open_bags_is_refused_not_guessed():
     lab = await _lab()
-    await _bag(lab)
+    await _bag(lab, status="open")
     await _bag(lab, status="open")
     assert await _refused(actions.set_active_bean(lab, {"bean": "kenya"})) == "bag_ambiguous"
+
+
+async def test_a_shared_name_means_the_open_bag_before_an_unopened_one():
+    lab = await _lab()
+    await _bag(lab, roast_date="2026-09-01")
+    opened = await _bag(lab, status="open", roast_date="2026-11-01")
+    facts = await actions.set_active_bean(lab, {"bean": "Kenya"})
+    assert facts["active_bag"]["id"] == opened.id
+
+
+async def test_a_shared_name_means_the_unopened_bag_roasted_first():
+    lab = await _lab()
+    await _bag(lab, roast_date="2026-11-01")
+    older = await _bag(lab, roast_date="2026-10-01")
+    facts = await actions.set_active_bean(lab, {"bean": "Kenya"})
+    assert facts["active_bag"]["id"] == older.id
+
+
+@pytest.mark.parametrize("dates", [("2026-10-01", "2026-10-01"), ("2026-10-01", "")])
+async def test_unopened_bags_no_roast_date_tells_apart_are_refused(dates):
+    lab = await _lab()
+    for date in dates:
+        await _bag(lab, roast_date=date)
+    assert await _refused(actions.set_active_bean(lab, {"bean": "Kenya"})) == "bag_ambiguous"
+
+
+async def test_coffee_used_elsewhere_comes_from_the_open_one_of_a_shared_name():
+    lab = await _lab()
+    await _bag(lab, roast_date="2026-11-01")
+    opened = await _bag(lab, status="open", roast_date="2026-09-01")
+    await actions.consume(lab, {"bean": "Kenya", "grams": 10.0})
+    [brew] = await lab.store.async_list_brews()
+    assert brew.bean_id == opened.id
+
+
+async def test_finishing_a_shared_name_finishes_the_open_one():
+    lab = await _lab()
+    await _bag(lab, roast_date="2026-11-01")
+    opened = await _bag(lab, status="open", remaining_g=2.0, roast_date="2026-09-01")
+    facts = await actions.finish_bag(lab, {"bean": "Kenya"})
+    assert facts["finished"]["id"] == opened.id
+
+
+async def test_a_name_shared_by_a_coffee_and_a_tea_is_refused_not_guessed():
+    lab = await _lab()
+    await _bag(lab, status="open")
+    await _bag(lab, kind="tea")
+    assert await _refused(actions.consume(lab, {"bean": "Kenya", "grams": 5.0})) == "bag_ambiguous"
+
+
+@pytest.mark.parametrize("action, args", [
+    (actions.start_tracking, {"grams": 200.0}),
+    (actions.update_bean, {"roaster": "Somewhere"}),
+])
+async def test_weighing_or_correcting_a_shared_name_still_needs_the_id(action, args):
+    # A guess here would change the wrong bag's amount or details.
+    lab = await _lab()
+    await _bag(lab, roast_date="2026-11-01")
+    await _bag(lab, status="open", roast_date="2026-09-01")
+    assert await _refused(action(lab, {"bean": "Kenya", **args})) == "bag_ambiguous"
+
+
+async def test_a_bag_added_under_a_name_in_use_keeps_it_and_names_the_others():
+    lab = await _lab()
+    first = await _bag(lab, status="open", roast_date="2026-09-01")
+    await _bag(lab, name="Brazil")
+    facts = await actions.add_bean(lab, {"name": "kenya ", "roast_date": "2026-11-01"})
+    assert facts["added"]["name"] == "kenya"
+    assert facts["same_name"] == [{"id": first.id, "status": "open", "roast_date": "2026-09-01"}]
+
+
+async def test_a_bag_added_under_a_new_name_names_no_others():
+    lab = await _lab()
+    facts = await actions.add_bean(lab, {"name": "Kenya"})
+    assert "same_name" not in facts
 
 
 async def test_an_id_settles_a_shared_name():

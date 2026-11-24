@@ -27,9 +27,16 @@ def test_with_coffee_lab_off_there_are_no_entities():
     assert all(entities_for(None, platform) == [] for platform in PLATFORMS)
 
 
-def test_a_shared_name_is_numbered_so_every_label_is_unique():
-    beans = [Bean(id=i, name=n, status="open") for i, n in (("a", "Kenya"), ("b", "Kenya"), ("c", "Brazil"))]
-    assert bag_labels(beans) == {"a": "Kenya", "b": "Kenya 2", "c": "Brazil"}
+def test_a_shared_name_is_told_apart_by_roast_date():
+    beans = [Bean(id=i, name=n, status="open", roast_date=d)
+             for i, n, d in (("a", "Kenya", "2026-09-01"), ("b", "Kenya", "2026-11-01"), ("c", "Brazil", ""))]
+    assert bag_labels(beans) == {"a": "Kenya (2026-09-01)", "b": "Kenya (2026-11-01)", "c": "Brazil"}
+
+
+@pytest.mark.parametrize("dates", [("", ""), ("2026-09-01", ""), ("2026-09-01", "2026-09-01")])
+def test_a_shared_name_without_distinct_roast_dates_is_numbered(dates):
+    beans = [Bean(id=i, name="Kenya", status="open", roast_date=d) for i, d in zip("ab", dates)]
+    assert bag_labels(beans) == {"a": "Kenya", "b": "Kenya 2"}
 
 
 async def test_picking_a_label_selects_that_bag_by_id():
