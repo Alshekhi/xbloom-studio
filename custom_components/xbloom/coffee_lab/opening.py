@@ -80,9 +80,12 @@ def open_next(beans: list[Bean], dose: float, now: datetime, opening: Opening) -
     if not sealed:
         return None
     with_a_dose = [b for b in open_ if holds_a_dose(b, dose)]
-    known_left = sum(b.remaining_g or 0.0 for b in open_ if b.tracked and b.remaining_g is not None)
-    unknown = any(not b.tracked or b.remaining_g is None for b in open_)
-    nearly_done = not unknown and known_left <= DOSES_LEFT * dose
+    # What the open bags hold for brewing: a bag under a dose holds none. One
+    # whose amount is not known may hold plenty, so with it they are never
+    # nearly done — naming a bag to open too soon is what this exists to stop.
+    unknown = any(not b.tracked or b.remaining_g is None for b in with_a_dose)
+    left = sum(b.remaining_g or 0.0 for b in with_a_dose if b.tracked)
+    nearly_done = not unknown and left <= DOSES_LEFT * dose
     if with_a_dose and not (len(open_) < opening.limit and nearly_done):
         return None
 

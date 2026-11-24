@@ -31,6 +31,7 @@ from ..tool_common import fail
 from .habits import habits
 from .lab import STORE_UNREACHABLE, CoffeeLab
 from .opening import USUAL_DAYS, usual_dose
+from .stock import pace
 from .todays_cup import OwnRecipe, Pick, candidates
 
 _LOGGER = logging.getLogger(__name__)
@@ -70,6 +71,8 @@ class TodaysCup:
         self.index = 0
         # A refresh asked for during a brew, run once it ends.
         self.waiting = False
+        # The coffee used a day, last worked out.
+        self.daily_g: float | None = None
         self._refreshing = asyncio.Lock()
         self._pending: Callable[[], None] | None = None
         self._last_refresh: float | None = None
@@ -145,6 +148,10 @@ class TodaysCup:
             except STORE_UNREACHABLE as err:
                 _LOGGER.warning("Coffee Lab: today's cup kept as it was: %s", err)
                 return
+            # A brew started while the store was read keeps its pick.
+            if self.busy():
+                self.waiting = True
+                return
             drink = "iced" if getattr(self.browser, "drink", "any") == "iced" else "hot"
             library = of_drink(self._library() or [], drink)
             own = {
@@ -154,8 +161,11 @@ class TodaysCup:
             }
             dose = self._dose(drink, brews, now)
             rules = self.lab.opening
-            per_day = habits(brews, beans, now - timedelta(days=USUAL_DAYS), now)["cups_per_brewing_day"]
-            daily_g = (dose or 15.0) * (per_day or 1.0)
+            # The coffee used a day, as the stock reckons it; one dose a day
+            # with too few brews to tell.
+            rate = pace("coffee", beans, brews, now)
+            daily_g = rate[1] if rate else (dose or 15.0)
+            self.daily_g = daily_g
             picks = candidates(beans, brews, own, {}, drink, now, rules, dose or 15.0, daily_g)
             first = picks[0] if picks else None
             if first is not None and first.recipe is None:

@@ -76,14 +76,10 @@ def _amount(bean: Bean) -> float | None:
     return None
 
 
-def stock_of(kind: str, beans: list[Bean], brews: list[Brew], now: datetime) -> Stock:
-    """`beans` every item, finished ones too; `brews` newest first."""
-    mine = [b for b in beans if b.kind == kind]
-    on_hand = [b for b in mine if b.status in _ON_HAND]
-    known = [(b, _amount(b)) for b in on_hand]
-    amount = sum(a for _, a in known if a is not None)
-    unknown = tuple(b.id for b, a in known if a is None)
-    ids = {b.id for b in mine}
+def pace(kind: str, beans: list[Bean], brews: list[Brew], now: datetime) -> tuple[float, float] | None:
+    """(per cup, per day) a kind is used at — grams, or pods for xPods — or
+    None with too few brews to tell. `beans` every item, finished ones too."""
+    ids = {b.id for b in beans if b.kind == kind}
     since = now - timedelta(days=PACE_DAYS)
     used = [
         (r, when) for r in brews
@@ -93,22 +89,35 @@ def stock_of(kind: str, beans: list[Bean], brews: list[Brew], now: datetime) -> 
         and (when := moment(r.brewed_at or r.recorded_at, now.tzinfo))
         and since <= when <= now
     ]
-    cups = days = None
-    if len(used) >= MIN_BREWS:
-        def drawn_by(r: Brew) -> float:
-            return 1.0 if kind == "xpod" else float(r.dose_g or 0.0)
+    if len(used) < MIN_BREWS:
+        return None
 
-        weights = [_weight((now - when).total_seconds() / 86400) for _, when in used]
-        drawn = sum(w * drawn_by(r) for w, (r, _) in zip(weights, used))
-        if drawn > 0:
-            per_cup = drawn / sum(weights)
-            first = min(when for _, when in used)
-            span = min(PACE_DAYS, max(1, math.ceil((now - first).total_seconds() / 86400)))
-            # Every day of the span counts, a day without a brew included,
-            # weighted as the brews are.
-            per_day = drawn / sum(_weight(d) for d in range(span))
-            cups = round(amount / per_cup, 1)
-            days = round(amount / per_day, 1)
+    def drawn_by(r: Brew) -> float:
+        return 1.0 if kind == "xpod" else float(r.dose_g or 0.0)
+
+    weights = [_weight((now - when).total_seconds() / 86400) for _, when in used]
+    drawn = sum(w * drawn_by(r) for w, (r, _) in zip(weights, used))
+    if drawn <= 0:
+        return None
+    first = min(when for _, when in used)
+    span = min(PACE_DAYS, max(1, math.ceil((now - first).total_seconds() / 86400)))
+    # Every day of the span counts, a day without a brew included, weighted
+    # as the brews are.
+    return drawn / sum(weights), drawn / sum(_weight(d) for d in range(span))
+
+
+def stock_of(kind: str, beans: list[Bean], brews: list[Brew], now: datetime) -> Stock:
+    """`beans` every item, finished ones too; `brews` newest first."""
+    mine = [b for b in beans if b.kind == kind]
+    on_hand = [b for b in mine if b.status in _ON_HAND]
+    known = [(b, _amount(b)) for b in on_hand]
+    amount = sum(a for _, a in known if a is not None)
+    unknown = tuple(b.id for b, a in known if a is None)
+    cups = days = None
+    if (rate := pace(kind, beans, brews, now)) is not None:
+        per_cup, per_day = rate
+        cups = round(amount / per_cup, 1)
+        days = round(amount / per_day, 1)
     return Stock(kind, bool(mine), amount if (on_hand or mine) else None, len(on_hand),
                  cups, days, unknown)
 

@@ -127,3 +127,14 @@ async def test_the_bag_list_names_the_bag_to_open_and_those_past_their_best():
     attrs = sensor._attr_extra_state_attributes
     assert attrs["open_next"] == nxt.id
     assert attrs["fading"] == [old.id]
+
+
+def test_a_bag_under_a_dose_counts_as_empty_toward_nearly_done():
+    beans = [opened("a", 10), opened("b", 25), sealed("s", 20)]
+    assert open_next(beans, 15, NOW, Opening(limit=3)).id == "s"
+
+
+def test_an_open_bag_of_unknown_amount_never_reads_as_nearly_done():
+    # It may hold plenty: naming a sealed bag now could open one too soon.
+    beans = [opened("a", None), opened("b", 5), sealed("s", 20)]
+    assert open_next(beans, 17, NOW, Opening(limit=3)) is None

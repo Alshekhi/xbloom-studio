@@ -7,7 +7,7 @@ from custom_components.xbloom.coffee_lab.stats import (
     PERIODS, period_report, totals, window,
 )
 
-ZONE = ZoneInfo("Etc/GMT-3")
+ZONE = ZoneInfo("Etc/GMT-5")
 NOW = datetime(2026, 9, 26, 10, 0, tzinfo=ZONE)
 SEPTEMBER = (datetime(2026, 9, 1, tzinfo=ZONE), datetime(2026, 10, 1, tzinfo=ZONE))
 
@@ -20,14 +20,14 @@ def brew(when, dose=16.0, water=None, brewer="xBloom Studio", recorded=""):
 def test_a_month_adds_up_its_brews():
     t = totals([
         brew("2026-09-24T22:22:00Z", 16, 256),
-        brew("2026-09-10T08:00:00+03:00", 20, 300),
-        brew("2026-08-30T08:00:00+03:00", 18, 270),
+        brew("2026-09-10T08:00:00+05:00", 20, 300),
+        brew("2026-08-30T08:00:00+05:00", 18, 270),
     ], *SEPTEMBER)
     assert (t.brews, t.coffee_g, t.water_ml) == (2, 36.0, 556.0)
 
 
 def test_a_brew_belongs_to_the_local_month():
-    # 23:30 UTC on 31 August is 02:30 on 1 September at UTC+3.
+    # 23:30 UTC on 31 August is 04:30 on 1 September at UTC+5.
     assert totals([brew("2026-08-31T23:30:00Z")], *SEPTEMBER).brews == 1
 
 
@@ -91,9 +91,9 @@ def test_windows_and_what_they_compare_with():
 
 def test_a_report_counts_the_window_and_the_one_before():
     r = period_report([
-        brew("2026-09-25T09:00:00+03:00", 16, 256),
-        brew("2026-09-24T09:00:00+03:00", 15, None, "V60"),
-        brew("2026-09-15T09:00:00+03:00", 20, 300),
+        brew("2026-09-25T09:00:00+05:00", 16, 256),
+        brew("2026-09-24T09:00:00+05:00", 15, None, "V60"),
+        brew("2026-09-15T09:00:00+05:00", 20, 300),
     ], "last_7_days", NOW)
     assert (r.now.brews, r.now.coffee_g, r.now.water_ml) == (2, 31.0, 256.0)
     assert r.before.brews == 1 and r.change_in_brews == 1
@@ -115,7 +115,7 @@ def test_a_brew_flagged_for_another_reason_still_counts():
 
 
 def test_the_coffee_total_leaves_out_tea_and_keeps_xpods():
-    tea = Brew(id="t", brewed_at="2026-09-10T08:00:00+03:00", recorded_at="", dose_g=5.0, dripper="Tea")
-    pod = Brew(id="p", brewed_at="2026-09-11T08:00:00+03:00", recorded_at="", dose_g=15.0, dripper="xPod")
-    t = totals([tea, pod, brew("2026-09-12T08:00:00+03:00", 16)], *SEPTEMBER)
+    tea = Brew(id="t", brewed_at="2026-09-10T08:00:00+05:00", recorded_at="", dose_g=5.0, dripper="Tea")
+    pod = Brew(id="p", brewed_at="2026-09-11T08:00:00+05:00", recorded_at="", dose_g=15.0, dripper="xPod")
+    t = totals([tea, pod, brew("2026-09-12T08:00:00+05:00", 16)], *SEPTEMBER)
     assert (t.brews, t.coffee_g) == (3, 31.0)

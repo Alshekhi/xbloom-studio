@@ -166,3 +166,13 @@ def test_a_new_home_is_not_read_as_brewing_less():
     brews = [brew(dose=20, days_ago=d) for d in range(5)]
     s = stock_of("coffee", [bag(remaining_g=200, tracked=True)], brews, NOW)
     assert figure(s, "days") == pytest.approx(10, abs=0.5)
+
+
+def test_the_pace_is_the_one_the_stock_figure_uses():
+    from custom_components.xbloom.coffee_lab.stock import pace
+    brews = [brew(dose=18, days_ago=d) for d in range(6)]
+    beans = [bag(remaining_g=180, tracked=True)]
+    per_cup, per_day = pace("coffee", beans, brews, NOW)
+    s = stock_of("coffee", beans, brews, NOW)
+    assert round(180 / per_day, 1) == s.days and round(180 / per_cup, 1) == s.cups
+    assert pace("coffee", beans, brews[:4], NOW) is None

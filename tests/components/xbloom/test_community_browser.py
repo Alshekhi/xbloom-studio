@@ -561,3 +561,11 @@ async def test_adding_and_using_a_given_hub_recipe():
     await browser.async_add_and_use_recipe({"id": LISTED["id"], "name": LISTED["name"]})
     coordinator.async_add_recipe.assert_awaited()
     browser.async_use.assert_awaited_once_with("Test Kenya Hot")
+
+
+async def test_using_a_given_hub_recipe_leaves_the_community_tab_as_it_was():
+    browser, client, share, coordinator = _browser()
+    browser.async_use = AsyncMock()
+    browser.picked_id, browser.detail = 999, {"id": 999, "name": "Shown"}
+    await browser.async_add_and_use_recipe({"id": LISTED["id"], "name": LISTED["name"]})
+    assert (browser.picked_id, browser.detail) == (999, {"id": 999, "name": "Shown"})

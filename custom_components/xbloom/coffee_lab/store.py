@@ -189,7 +189,7 @@ class LocalStore(CoffeeLabStore):
         self, *, since: datetime | None = None, limit: int | None = None,
         bean_id: str | None = None,
     ) -> list[Brew]:
-        # Compared as instants: as text, "…Z" and "…+03:00" do not sort in time.
+        # Compared as instants: as text, "…Z" and "…+05:00" do not sort in time.
         zone = since.tzinfo if since is not None else timezone.utc
         dated = [
             (m, b) for b in self._brews

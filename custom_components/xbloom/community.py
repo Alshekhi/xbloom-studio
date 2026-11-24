@@ -625,9 +625,17 @@ class CommunityBrowser:
         return found["recipes"][0] if found["recipes"] else None
 
     async def async_add_and_use_recipe(self, recipe: dict[str, Any]) -> None:
-        """Read a hub recipe in full, add it to the library and pick it."""
-        await self._async_pick_recipe(recipe)
-        await self.async_add_and_use()
+        """Read a hub recipe in full, add it to the library and pick it.
+
+        The Community tab keeps the recipe it was showing.
+        """
+        shown = (self.picked_id, self.detail)
+        try:
+            await self._async_pick_recipe(recipe)
+            await self.async_add_and_use()
+        finally:
+            self.picked_id, self.detail = shown
+            self._changed()
 
     def own_facts(self) -> list[dict[str, Any]]:
         return [

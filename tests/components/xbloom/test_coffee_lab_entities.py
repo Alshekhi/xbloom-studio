@@ -245,9 +245,9 @@ async def test_recent_brews_show_the_newest_brew_and_each_in_full():
     lab = await _lab()
     bag = await _bag(lab)
     await lab.async_consume(bean_id=bag.id, grams=17, run_id="r1", recipe="Daily",
-                            brewed_at="2026-09-25T09:00:00+03:00")
+                            brewed_at="2026-09-25T09:00:00+05:00")
     await lab.async_consume(bean_id=bag.id, grams=20, run_id="r2", recipe="Iced",
-                            brewed_at="2026-09-26T09:00:00+03:00")
+                            brewed_at="2026-09-26T09:00:00+05:00")
     sensor = RecentBrewsSensor(lab)
     await sensor.async_read()
     assert sensor._attr_native_value.isoformat().startswith("2026-09-26T09:00")

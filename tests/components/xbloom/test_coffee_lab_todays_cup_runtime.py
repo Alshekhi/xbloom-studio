@@ -257,3 +257,37 @@ async def test_use_keeps_the_dose_within_what_the_slider_takes():
                                         if eid == "number.xbloom_studio_brew_dose" else real_get(eid))
     await cup.async_use()
     assert home.calls[-1][1]["value"] == 18
+
+
+async def test_the_daily_grams_are_the_coffee_pace_alone():
+    home = _Home()
+    cup, lab, bag, _ = await _cup(home)
+    tea = await lab.store.async_add_bean(name="Green Leaf", status="open", kind="tea",
+                                         tracked=True, remaining_g=100.0)
+    for n in range(6):
+        when = (datetime.now(timezone.utc) - timedelta(days=n, hours=2)).isoformat()
+        await lab.async_consume(bean_id=bag.id, grams=17, run_id=f"c{n}", recipe="Daily", brewed_at=when)
+        await lab.async_consume(bean_id=tea.id, grams=4, run_id=f"t{n}", brewed_at=when)
+    await cup.async_refresh()
+    from custom_components.xbloom.coffee_lab.stock import pace
+    beans = await lab.store.async_list_beans(selectable_only=False)
+    brews = await lab.store.async_list_brews()
+    assert cup.daily_g == pytest.approx(pace("coffee", beans, brews, datetime.now(timezone.utc))[1], rel=0.05)
+
+
+async def test_a_brew_started_during_the_read_keeps_the_pick():
+    home = _Home()
+    cup, lab, *_ = await _cup(home)
+    await cup.async_refresh()
+    first = cup.pick
+    await lab.store.async_add_bean(name="Valley Lot", status="open", tracked=True,
+                                   remaining_g=200.0, bag_size_g=250.0, opened_on=TODAY)
+    real = lab.store.async_list_brews
+
+    async def brew_starts(*a, **kw):
+        home.status = "grinding"
+        return await real(*a, **kw)
+
+    lab.store.async_list_brews = brew_starts
+    await cup.async_refresh(reset=True)
+    assert cup.pick == first and cup.waiting
