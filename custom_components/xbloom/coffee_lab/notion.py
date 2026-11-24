@@ -82,6 +82,7 @@ VARIETAL_COLUMN, ROAST_COLUMN = "Variety", "Roast"
 # Where and when a bag's coffee was made, added the same way.
 ROAST_DATE_COLUMN, PRODUCER_COLUMN, ALTITUDE_COLUMN = "Roast Date", "Producer", "Altitude m"
 ALTITUDE_MAX_COLUMN = "Altitude Max m"
+PRODUCT_URL_COLUMN = "Product URL"
 # A Notion page id: 32 hex digits, with or without its dashes.
 _PAGE_ID = re.compile(r"[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}")
 NEXT_CHANGE = "Next Change"
@@ -219,6 +220,7 @@ def bean_from_page(page: dict) -> Bean:
         roaster_notes=_plain(props.get("Roaster Notes")),
         roast_date=_date(props.get(ROAST_DATE_COLUMN)),
         producer=_plain(props.get(PRODUCER_COLUMN)),
+        product_url=(props.get(PRODUCT_URL_COLUMN) or {}).get("url") or "",
         altitude_m=_number(props.get(ALTITUDE_COLUMN)),
         altitude_max_m=_number(props.get(ALTITUDE_MAX_COLUMN)),
         opened_on=_date(props.get("Opened Date")),
@@ -269,6 +271,8 @@ def bean_properties(values: dict[str, Any]) -> dict[str, Any]:
             out[label] = {"date": {"start": value} if value else None}
         elif key in ("altitude_m", "altitude_max_m"):
             out[ALTITUDE_COLUMN if key == "altitude_m" else ALTITUDE_MAX_COLUMN] = {"number": value}
+        elif key == "product_url":
+            out[PRODUCT_URL_COLUMN] = {"url": value or None}
         else:
             label = {"roaster": "Roaster", "country": "Country", "region": "Region",
                      "roaster_notes": "Roaster Notes", "producer": PRODUCER_COLUMN}[key]
@@ -516,13 +520,13 @@ class NotionStore(CoffeeLabStore):
             raise fail("notion_failed", error=str(err)) from err
 
     async def _ensure_columns(self, database_id: str, props: dict[str, Any]) -> None:
-        """Add the number, text and date columns `props` writes that the database lacks.
+        """Add the number, text, date and link columns `props` writes that the database lacks.
 
         Select columns are added by `_ensure_options` with their option.
         """
         kinds = {
             name: kind for name, value in props.items()
-            for kind in ("number", "rich_text", "date") if kind in value
+            for kind in ("number", "rich_text", "date", "url") if kind in value
         }
         async with self._schema_lock:
             if self._columns.get(database_id) is None:

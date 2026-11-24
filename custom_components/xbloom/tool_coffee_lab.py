@@ -91,7 +91,7 @@ ACTIONS: dict[str, Spec] = {
         actions.add_bean,
         "a new bag (kind: coffee, xpod — a box of xPods, counted in pods — or tea; "
         "bag_size_g, remaining_g to count it down, pods for an xPod box, status, roaster, "
-        "country, region, producer, altitude_m, altitude_max_m, process, varietal, roast, roast_date, roaster_notes). "
+        "country, region, producer, altitude_m, altitude_max_m, process, varietal, roast, roast_date, roaster_notes, product_url). "
         "An xPod brew takes "
         "one pod from the xPod box in use, a tea brew its grams from the tea in use, "
         "never from a bag of coffee. The country, process, varietal and roast are kept "
@@ -105,7 +105,7 @@ ACTIONS: dict[str, Spec] = {
     "update_bean": Spec(
         actions.update_bean,
         "correct a bag's details (new_name, kind, bag_size_g, status, roaster, country, "
-        "region, producer, altitude_m, altitude_max_m, process, varietal, roast, roast_date, roaster_notes), "
+        "region, producer, altitude_m, altitude_max_m, process, varietal, roast, roast_date, roaster_notes, product_url), "
         "the hub's names as for add_bean",
         one_of=BAG,
     ),
@@ -170,6 +170,7 @@ ARGUMENTS: dict[str, tuple[Any, str]] = {
     "country": (str, "Where it was grown, as a country name."),
     "region": (str, "The region within the country."),
     "producer": (str, "Who grew it: a farmer, farm, cooperative or washing station."),
+    "product_url": (str, "Optional: the shop's page for the bag, a web link, given only when the bag has one; empty clears it. Never in roaster_notes."),
     "altitude_m": (
         vol.All(vol.Coerce(float), vol.Range(min=0, max=3500)),
         "How high it was grown, in metres; the bottom of the range when there is one.",

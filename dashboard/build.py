@@ -29,7 +29,7 @@ TEXT = {
         "h_open_bags": "Open bags", "h_unopened_bags": "Unopened bags", "g_size": "{n} g",
         "d_roaster": "Roaster", "d_region": "Region", "d_producer": "Producer", "d_varietal": "Variety",
         "d_roast": "Roast", "d_roast_date": "Roasted", "d_altitude": "Altitude", "d_notes": "Tasting notes",
-        "d_m": "{n} m",
+        "d_m": "{n} m", "d_link": "Shop page",
         "stock_not_yet": "Not enough brews yet to tell how long the {kind} will last.",
         "stock_weigh": "Weigh the bags not counted yet to complete it.",
         "kind_coffee": "coffee", "kind_tea": "tea", "kind_xpod": "xPods",
@@ -135,7 +135,7 @@ TEXT = {
         "h_open_bags": "الأكياس المفتوحة", "h_unopened_bags": "الأكياس غير المفتوحة", "g_size": "{n} غ",
         "d_roaster": "المحمصة", "d_region": "المنطقة", "d_producer": "المُنتِج", "d_varietal": "الصنف",
         "d_roast": "درجة التحميص", "d_roast_date": "تاريخ التحميص", "d_altitude": "الارتفاع",
-        "d_notes": "النكهات", "d_m": "{n} م",
+        "d_notes": "النكهات", "d_m": "{n} م", "d_link": "صفحة المتجر",
         "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
         "stock_weigh": "زن الأكياس التي لم تُحسب بعد لاكتماله.",
         "kind_coffee": "البن", "kind_tea": "الشاي", "kind_xpod": "كبسولات xPod",
@@ -877,7 +877,13 @@ def bags_view(t: dict) -> dict:
     details = "".join(
         f"{{% if b.get('{key}') %}}- **{t['d_' + key]}:** {{{{ e(b.get('{key}')) }}}}\n{{% endif %}}"
         for key in ("roaster", "region", "producer", "varietal", "roast", "roast_date")
-    ) + altitude + f"{{% if b.get('roaster_notes') %}}- **{t['d_notes']}:** {{{{ e(b.get('roaster_notes')) }}}}\n{{% endif %}}"
+    ) + altitude + f"{{% if b.get('roaster_notes') %}}- **{t['d_notes']}:** {{{{ e(b.get('roaster_notes')) }}}}\n{{% endif %}}" + (
+        # Only a web link, and one with nothing that would end the markdown
+        # link early.
+        "{% set url = b.get('product_url') or '' %}"
+        "{% if url is match('https?://[^\\\\s()<>]+$') %}"
+        f"- [{t['d_link']}]({{{{ url }}}})\n{{% endif %}}"
+    )
 
     def entry(text: str) -> str:
         """A bag's line that opens to its details; a plain line when it has none.

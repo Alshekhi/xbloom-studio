@@ -631,6 +631,10 @@ add_bean:
       selector:
         text:
           multiline: true
+    product_url:
+      selector:
+        text:
+          type: url
     kind:
       selector:
         select:
@@ -715,6 +719,10 @@ update_bean:
       selector:
         text:
           multiline: true
+    product_url:
+      selector:
+        text:
+          type: url
     kind:
       selector:
         select:

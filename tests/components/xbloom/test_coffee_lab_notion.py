@@ -136,7 +136,7 @@ def test_a_bag_round_trips():
               "process": "Washed", "varietal": "SL28, SL34", "roast": "Light Roast",
               "roaster_notes": "berry", "opened_on": "2026-09-20",
               "roast_date": "2026-09-12", "producer": "Gatomboya Cooperative", "altitude_m": 1800.0,
-              "altitude_max_m": 2000.0}
+              "altitude_max_m": 2000.0, "product_url": "https://shop.example/p/1"}
     bean = bean_from_page(_page_from(bean_properties(values)))
     assert {k: getattr(bean, k) for k in values} == values
 
@@ -351,3 +351,7 @@ async def test_a_column_of_another_type_is_refused_never_changed():
         await store.async_add_bean(name="Kenya", status="unopened", roast="Light Roast")
     assert caught.value.translation_key == "notion_column_type"
     assert not [c for c in notion.calls if c[0] in ("PATCH", "POST")], "nothing written"
+
+
+def test_a_cleared_shop_page_is_written_as_empty():
+    assert bean_properties({"product_url": ""}) == {"Product URL": {"url": None}}

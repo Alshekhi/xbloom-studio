@@ -342,7 +342,8 @@
           "process": "المعالجة",
           "varietal": "السلالة",
           "roast": "درجة التحميص",
-          "roaster_notes": "ملاحظات المحمصة"
+          "roaster_notes": "ملاحظات المحمصة",
+          "product_url": "صفحة المتجر"
         },
         "data_description": {
           "remaining_g": "بعد الوزن. اتركه فارغا لتسجيل التحضيرات دون خصمها من الكيس.",
@@ -374,7 +375,8 @@
           "process": "المعالجة",
           "varietal": "السلالة",
           "roast": "درجة التحميص",
-          "roaster_notes": "ملاحظات المحمصة"
+          "roaster_notes": "ملاحظات المحمصة",
+          "product_url": "صفحة المتجر"
         },
         "data_description": {
           "remaining_g": "بعد الوزن. اتركه فارغا لتسجيل التحضيرات دون خصمها من الكيس.",
@@ -443,7 +445,8 @@
       "notion_fields": "هذه الحقول مفقودة أو من نوع خاطئ — {detail}.",
       "altitude_range": "أعلى مدى الارتفاع أقل من أدناه.",
       "notify_service_invalid": "أدخل خدمة إشعارات، مثل notify.mobile_app_my_phone.",
-      "notify_service_unknown": "لا توجد خدمة إشعارات بهذا الاسم. تحقق من اسمها في أدوات المطور، الإجراءات."
+      "notify_service_unknown": "لا توجد خدمة إشعارات بهذا الاسم. تحقق من اسمها في أدوات المطور، الإجراءات.",
+      "product_url": "أدخل رابط ويب يبدأ بـ https://."
     },
     "abort": {
       "no_recipes": "لا توجد وصفات محفوظة بعد.",
@@ -1158,6 +1161,9 @@
     },
     "altitude_range": {
       "message": "أعلى مدى الارتفاع، {high} م، أقل من أدناه، {low} م."
+    },
+    "not_a_link": {
+      "message": "يجب أن يكون {argument} رابط ويب يبدأ بـ https://."
     }
   },
   "services": {
@@ -1297,6 +1303,10 @@
           "name": "ملاحظات المحمصة",
           "description": "ملاحظات التذوق من المحمصة."
         },
+        "product_url": {
+          "name": "صفحة المتجر",
+          "description": "صفحة الكيس في المتجر، رابط ويب."
+        },
         "kind": {
           "name": "النوع",
           "description": "كيس قهوة، أو علبة كبسولات xPod، أو شاي."
@@ -1374,6 +1384,10 @@
         "roaster_notes": {
           "name": "ملاحظات المحمصة",
           "description": "ملاحظات التذوق من المحمصة."
+        },
+        "product_url": {
+          "name": "صفحة المتجر",
+          "description": "صفحة الكيس في المتجر، رابط ويب."
         },
         "kind": {
           "name": "النوع",

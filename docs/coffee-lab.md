@@ -37,7 +37,8 @@ as typed, and the action's response names it under `not_on_hub`. The
 what community suggestions match. A bag can also say where and when its
 coffee was made: its **producer** (the farmer, farm, cooperative or washing
 station), the **altitude** it was grown at, in metres, one height or a range,
-and the **roast date**.
+and the **roast date**. Where it has one, a bag can keep its **shop page**, a
+web link, which the Bags tab links to.
 
 ## Coffee, xPod boxes and tea
 

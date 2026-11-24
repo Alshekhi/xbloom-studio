@@ -13,6 +13,8 @@ refused rather than guessed.
 """
 from __future__ import annotations
 
+import re
+
 import uuid
 from dataclasses import asdict
 from datetime import timedelta
@@ -41,6 +43,8 @@ DESCRIPTIVE = ("roaster", "country", "region", "process", "varietal", "roast", "
 # Where and when its coffee was made, which both take too. Not text alone:
 # a date and a height.
 ORIGIN = ("roast_date", "producer", "altitude_m", "altitude_max_m")
+# Where it was bought: the shop's page for it.
+LINK = ("product_url",)
 # Those the community hub names, so a bag's are kept in its words.
 HUB_FIELDS = ("country", "process", "varietal", "roast")
 
@@ -63,7 +67,7 @@ def bean_facts(bean: Bean) -> dict[str, Any]:
         # A box is counted in pods; its grams were never weighed.
         facts["pods_left"] = bean.pods_left if bean.tracked else None
         facts["remaining_g"] = None
-    facts.update({key: getattr(bean, key) for key in (*DESCRIPTIVE, *ORIGIN) if getattr(bean, key)})
+    facts.update({key: getattr(bean, key) for key in (*DESCRIPTIVE, *ORIGIN, *LINK) if getattr(bean, key)})
     return facts
 
 
@@ -338,8 +342,24 @@ async def finish_bag(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     return {"finished": bean_facts(finished)}
 
 
+def is_product_link(value: Any) -> bool:
+    """Empty, or a web link: what a bag's shop page may be."""
+    link = str(value or "").strip()
+    # What the dashboard can show as a link: nothing that would end it early.
+    return not link or re.match(r"https?://[^\s()<>]+$", link) is not None
+
+
+def product_link(value: Any) -> str:
+    """A shop's page as given, or "" to clear it; anything but a web link is refused."""
+    if not is_product_link(value):
+        raise refuse("not_a_link", argument="product_url")
+    return str(value or "").strip()
+
+
 def _bag_values(args: dict[str, Any]) -> dict[str, Any]:
     values = {key: args[key] for key in (*DESCRIPTIVE, *ORIGIN) if args.get(key) is not None}
+    if args.get("product_url") is not None:
+        values["product_url"] = product_link(args["product_url"])
     for key in ("bag_size_g", "status", "kind"):
         if args.get(key) is not None:
             values[key] = args[key]

@@ -545,6 +545,8 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             vol.Optional("roast_date", description=suggested("roast_date")): selector.DateSelector(),
             vol.Optional("roaster_notes", description=suggested("roaster_notes")):
                 selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
+            vol.Optional("product_url", description=suggested("product_url")):
+                selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.URL)),
         })
 
     async def async_step_add_bag(
@@ -560,6 +562,8 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             elif coffee_lab_actions.altitude_range_wrong(
                     values.get("altitude_m"), values.get("altitude_max_m")):
                 errors["altitude_max_m"] = "altitude_range"
+            elif not coffee_lab_actions.is_product_link(values.get("product_url")):
+                errors["product_url"] = "product_url"
             else:
                 facts = await coffee_lab_actions.add_bean(lab, values)
                 return self.async_create_entry(
@@ -601,6 +605,8 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
             elif coffee_lab_actions.altitude_range_wrong(
                     user_input.get("altitude_m"), user_input.get("altitude_max_m")):
                 errors["altitude_max_m"] = "altitude_range"
+            elif not coffee_lab_actions.is_product_link(user_input.get("product_url")):
+                errors["product_url"] = "product_url"
             else:
                 # A field emptied in the form is not sent at all, so every
                 # field is set: absent means cleared.
@@ -609,6 +615,11 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                                roast_date=user_input.get("roast_date", ""),
                                altitude_m=user_input.get("altitude_m"),
                                altitude_max_m=user_input.get("altitude_max_m"))
+                # Written only when it changed: a database's own "Product URL"
+                # column of another type then stops no other edit.
+                link = str(user_input.get("product_url") or "").strip()
+                if link != bean.product_url:
+                    details["product_url"] = link
                 # The hub names coffee's countries and processes; a tea's are its own.
                 if user_input.get("kind", bean.kind) != "tea":
                     await coffee_lab_actions.in_hub_words(lab, details)

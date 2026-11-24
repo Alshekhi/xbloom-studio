@@ -56,6 +56,7 @@ import jinja2
 def _render(template, states, attrs):
     env = jinja2.Environment(undefined=jinja2.StrictUndefined)
     env.filters["regex_replace"] = lambda s, find, repl: re.sub(find, repl, s)
+    env.tests["match"] = lambda s, pattern: re.match(pattern, s) is not None
     env.globals["states"] = lambda e: states.get(e, "unknown")
     env.globals["state_attr"] = lambda e, n: attrs.get(e, {}).get(n)
     env.globals["is_state"] = lambda e, v: states.get(e) == v
@@ -216,3 +217,17 @@ def test_a_plain_bag_after_one_with_details_starts_a_new_markdown_block():
     out = _render(cards[1]["content"], {}, {"sensor.xbloom_studio_coffee_bags": {"bags": bags},
                                            "select.xbloom_studio_coffee_bag": {"id": None}})
     assert "</details>\n\n- Plain · 250 g" in out
+
+
+def test_a_bag_with_a_shop_page_links_to_it():
+    build = _build()
+    view = build.bags_view(build.TEXT["en"])
+    cards = [c for c in _cards(view) if c.get("type") == "markdown" and "sensor.xbloom_studio_coffee_bags" in str(c.get("content"))]
+    def render(url):
+        bag = {"id": "s", "name": "Shop", "status": "unopened", "bag_size_g": 250, "product_url": url}
+        return _render(cards[1]["content"], {}, {"sensor.xbloom_studio_coffee_bags": {"bags": [bag]},
+                                                "select.xbloom_studio_coffee_bag": {"id": None}})
+    assert "- [Shop page](https://shop.example/p/1)" in render("https://shop.example/p/1")
+    # Nothing that could break out of the link is shown as one.
+    assert "Shop page" not in render("https://shop.example/p) [x](y")
+    assert "Shop page" not in render("javascript:alert(1)")

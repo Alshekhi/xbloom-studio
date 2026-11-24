@@ -342,7 +342,8 @@
           "process": "Process",
           "varietal": "Variety",
           "roast": "Roast",
-          "roaster_notes": "Roaster notes"
+          "roaster_notes": "Roaster notes",
+          "product_url": "Shop page"
         },
         "data_description": {
           "remaining_g": "Weighed. Leave blank to record brews without counting the bag down.",
@@ -374,7 +375,8 @@
           "process": "Process",
           "varietal": "Variety",
           "roast": "Roast",
-          "roaster_notes": "Roaster notes"
+          "roaster_notes": "Roaster notes",
+          "product_url": "Shop page"
         },
         "data_description": {
           "remaining_g": "Weighed. Leave blank to record brews without counting the bag down.",
@@ -443,7 +445,8 @@
       "notion_fields": "These fields are missing or of the wrong type — {detail}.",
       "altitude_range": "The top of the altitude range is below its bottom.",
       "notify_service_invalid": "Enter a notify service, such as notify.mobile_app_my_phone.",
-      "notify_service_unknown": "There is no such notify service. Check its name under Developer tools, Actions."
+      "notify_service_unknown": "There is no such notify service. Check its name under Developer tools, Actions.",
+      "product_url": "Enter a web link, starting with https://."
     },
     "abort": {
       "no_recipes": "No recipes saved yet.",
@@ -1158,6 +1161,9 @@
     },
     "altitude_range": {
       "message": "The top of the altitude range, {high} m, is below its bottom, {low} m."
+    },
+    "not_a_link": {
+      "message": "{argument} must be a web link, starting with https://."
     }
   },
   "services": {
@@ -1297,6 +1303,10 @@
           "name": "Roaster notes",
           "description": "The roaster's tasting notes."
         },
+        "product_url": {
+          "name": "Shop page",
+          "description": "The shop's page for the bag, a web link."
+        },
         "kind": {
           "name": "Kind",
           "description": "A bag of coffee, a box of xPods, or tea."
@@ -1374,6 +1384,10 @@
         "roaster_notes": {
           "name": "Roaster notes",
           "description": "The roaster's tasting notes."
+        },
+        "product_url": {
+          "name": "Shop page",
+          "description": "The shop's page for the bag, a web link."
         },
         "kind": {
           "name": "Kind",

@@ -102,3 +102,35 @@ async def test_the_bag_form_keeps_an_altitude_range_and_refuses_one_upside_down(
         {"name": "Kenya", "status": "open", "altitude_m": 1300.0, "altitude_max_m": 1650.0})
     after = await lab.store.async_get_bean(bag.id)
     assert (after.altitude_m, after.altitude_max_m) == (1300.0, 1650.0)
+
+
+async def test_editing_a_bag_sets_clears_and_checks_its_shop_page():
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    flow = _flow(lab)
+    await flow.async_step_edit_bag({"bag": bag.id})
+    await flow.async_step_edit_bag_details({"name": "Kenya", "status": "open",
+                                            "product_url": "https://shop.example/p/1"})
+    assert (await lab.store.async_get_bean(bag.id)).product_url == "https://shop.example/p/1"
+    await flow.async_step_edit_bag({"bag": bag.id})
+    result = await flow.async_step_edit_bag_details({"name": "Kenya", "status": "open",
+                                                     "product_url": "not a link"})
+    assert result["errors"] == {"product_url": "product_url"}
+    assert (await lab.store.async_get_bean(bag.id)).product_url == "https://shop.example/p/1"
+    await flow.async_step_edit_bag({"bag": bag.id})
+    await flow.async_step_edit_bag_details({"name": "Kenya", "status": "open"})
+    assert (await lab.store.async_get_bean(bag.id)).product_url == ""
+
+
+async def test_an_edit_leaves_an_unchanged_shop_page_unwritten():
+    # A database's own "Product URL" column of another type is refused on
+    # write; an edit that does not touch the link must not trip over it.
+    from unittest.mock import AsyncMock
+    lab = await _lab()
+    bag = await _bag(lab, status="open")
+    flow = _flow(lab)
+    real = lab.store.async_update_bean
+    lab.store.async_update_bean = AsyncMock(side_effect=real)
+    await flow.async_step_edit_bag({"bag": bag.id})
+    await flow.async_step_edit_bag_details({"name": "Kenya", "status": "open"})
+    assert "product_url" not in lab.store.async_update_bean.call_args.kwargs

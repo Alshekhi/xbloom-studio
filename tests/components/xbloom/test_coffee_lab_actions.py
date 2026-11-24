@@ -399,3 +399,30 @@ async def test_an_unknown_figure_is_given_as_at_least():
                                  days=1.2, unknown=("u",))}
     stock = (await actions.list_beans(lab, {}))["stock"]["coffee"]
     assert (stock["value"], stock["at_least"], stock["low"]) == (None, 1, False)
+
+
+async def test_a_bag_keeps_its_shop_page_and_refuses_anything_else():
+    import pytest
+    from homeassistant.exceptions import ServiceValidationError
+    lab = await _lab()
+    facts = await actions.add_bean(lab, {"name": "Kenya", "product_url": " https://shop.example/p/1 "})
+    assert facts["added"]["product_url"] == "https://shop.example/p/1"
+    with pytest.raises(ServiceValidationError):
+        await actions.update_bean(lab, {"bean": "Kenya", "product_url": "shop.example/p/1"})
+    facts = await actions.update_bean(lab, {"bean": "Kenya", "product_url": ""})
+    assert "product_url" not in facts["updated"]
+
+
+async def test_a_bag_without_a_shop_page_needs_none():
+    lab = await _lab()
+    facts = await actions.add_bean(lab, {"name": "Kenya"})
+    assert "product_url" not in facts["added"]
+
+
+async def test_a_link_the_dashboard_could_not_show_is_refused():
+    import pytest
+    from homeassistant.exceptions import ServiceValidationError
+    lab = await _lab()
+    for bad in ("https://shop.example/p_(1)", "HTTPS://shop.example/p", "https://shop example"):
+        with pytest.raises(ServiceValidationError):
+            await actions.add_bean(lab, {"name": "Kenya", "product_url": bad})

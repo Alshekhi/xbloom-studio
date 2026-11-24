@@ -1527,6 +1527,9 @@ views:
         {% endif %}{% if b.get(''roaster_notes'') %}- **Tasting notes:** {{ e(b.get(''roaster_notes''))
         }}
 
+        {% endif %}{% set url = b.get(''product_url'') or '''' %}{% if url is match(''https?://[^\\s()<>]+$'')
+        %}- [Shop page]({{ url }})
+
         {% endif %}{% endset %}{% if more | trim %}<details><summary>{{ line | escape }}</summary>
 
 
@@ -1575,6 +1578,9 @@ views:
 
         {% endif %}{% if b.get(''roaster_notes'') %}- **Tasting notes:** {{ e(b.get(''roaster_notes''))
         }}
+
+        {% endif %}{% set url = b.get(''product_url'') or '''' %}{% if url is match(''https?://[^\\s()<>]+$'')
+        %}- [Shop page]({{ url }})
 
         {% endif %}{% endset %}{% if more | trim %}<details><summary>{{ line | escape }}</summary>
 

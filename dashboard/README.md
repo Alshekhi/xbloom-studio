@@ -68,7 +68,8 @@ repair appears if one has waited more than an hour.
   from the brew record, so they cover every brew in it.
 - **Bags** — the open bags, each with what is left and how long it has been
   open, the bag in use first; the unopened bags, oldest roast first, each with
-  its size; a link to where bags are added and edited; and, for each kind the
+  its size; each bag opening to where and how it was made, with its shop page
+  when it has one; a link to where bags are added and edited; and, for each kind the
   home has had, what is left — about so many days or cups, or the grams, bags,
   pods or boxes — with its measure and level.
 - **Community** — signed in to the xBloom account, first For You (with
