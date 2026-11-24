@@ -208,9 +208,9 @@ A finished bag answered **buy again: yes**, with no other bag of that coffee on
 hand, goes on the list by name and fires `xbloom_buy_again`. The first look
 after this is installed only records where things stand.
 
-The Brew tab shows what is left of what the picked recipe draws from, and the
-AI tools see it too, mentioning a low stock once while already talking about
-coffee.
+The Bags tab shows what is left of each kind at any time. The Brew tab says
+so only while what the picked recipe draws from is running low. The AI tools
+see it too, mentioning a low stock once while already talking about coffee.
 
 ## How you brew
 

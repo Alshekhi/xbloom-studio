@@ -27,8 +27,10 @@ BREWS = [
 ]
 
 
-def _render(template: str, attrs: dict) -> str:
-    env = jinja2.Environment()
+def _render(template: str, attrs: dict, raw: bool = False) -> str:
+    # Strict, as the dashboard's markdown card renders: a missing key is an
+    # error there, not an empty value.
+    env = jinja2.Environment(undefined=jinja2.StrictUndefined)
     env.filters["regex_replace"] = lambda s, find, repl: re.sub(find, repl, s)
     env.globals["state_attr"] = lambda entity, name: attrs.get(entity, {}).get(name)
     def as_datetime(text, default=None):
@@ -37,7 +39,9 @@ def _render(template: str, attrs: dict) -> str:
         except ValueError:
             return default
     env.globals["as_datetime"] = as_datetime
-    return env.from_string(template).render()
+    out = env.from_string(template).render()
+    # The direction marks around names are checked on their own below.
+    return out if raw else out.replace("\u2068", "").replace("\u2069", "")
 
 
 def test_the_summary_reads_each_habit():
@@ -118,3 +122,21 @@ def test_no_summary_while_the_habits_could_not_be_read():
     build = _build()
     out = _render(build.summary_card(build.TEXT["en"]), {"sensor.xbloom_studio_brews": {"habits": {}}})
     assert out.strip() == ""
+
+
+def test_names_keep_their_own_direction():
+    build = _build()
+    attrs = {"sensor.xbloom_studio_brews": {"habits": HABITS},
+             "sensor.xbloom_studio_recent_brews": {"brews": BREWS}}
+    summary = _render(build.summary_card(build.TEXT["en"]), attrs, raw=True)
+    assert "\u2068Daily \\| Hot\u2069 (12)" in summary
+    assert "\u2068Hill Farm\u2069, \u2068Valley Lot\u2069" in summary
+    recent = _render(build.recent_card(build.TEXT["en"]), attrs, raw=True)
+    assert "\u2068Daily | Hot\u2069 · \u2068Hill Farm\u2069" in recent
+
+
+def test_a_brew_without_a_verdict_renders_under_strict_templates():
+    build = _build()
+    out = _render(build.recent_card(build.TEXT["en"]),
+                  {"sensor.xbloom_studio_recent_brews": {"brews": [{"recipe": "Plain", "id": "4"}]}})
+    assert "<summary>Plain</summary>" in out

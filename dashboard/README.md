@@ -66,8 +66,11 @@ repair appears if one has waited more than an hour.
   brewer; and charts of the brew history: brews per day and per month, coffee used and
   water brewed per week. The charts read statistics the integration keeps
   from the brew record, so they cover every brew in it.
-- **Bags** — every open or unopened bag, choosing the one in use, and a link
-  to where bags are added and edited.
+- **Bags** — the open bags, each with what is left and how long it has been
+  open, the bag in use first; the unopened bags, oldest roast first, each with
+  its size; a link to where bags are added and edited; and, for each kind the
+  home has had, what is left — about so many days or cups, or the grams, bags,
+  pods or boxes — with its measure and level.
 - **Community** — signed in to the xBloom account, first For You (with
   Another), Trending recipes and Tea recipes, as the xBloom app offers them to
   the account, each with Add, and Show xPod recipes. Then, signed in or not,

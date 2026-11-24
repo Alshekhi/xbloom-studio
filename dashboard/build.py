@@ -19,18 +19,21 @@ HERE = Path(__file__).parent
 TEXT = {
     "en": {
         "machine": "Machine", "view_brew": "Brew", "view_stats": "Stats", "view_bags": "Bags", "view_xbloom": "xBloom",
-        "stock_days": "Days of {kind} left: {n}", "stock_grams": "Grams of {kind} left: {n}",
-        "stock_cups": "Cups of {kind} left: {n}", "stock_bags": "Bags of {kind} left: {n}",
-        "stock_pods": "Pods left: {n}", "stock_boxes": "Boxes of xPods left: {n}",
-        "stock_packs": "Packs of tea left: {n}",
-        "stock_at_least": "at least {n}", "stock_low": "Running low.", "h_stock": "Stock",
+        "stock_left": "{Kind} left: {n}", "stock_low_left": "Running low on {kind}: {n} left.",
+        "stock_out": "No {kind} left.",
+        "stock_about": "about {n}", "stock_at_least": "at least {n}", "stock_low": "Running low.", "h_stock": "Stock",
+        "Kind_coffee": "Coffee", "Kind_tea": "Tea", "Kind_xpod": "xPods",
+        "u_days": ("{n} day", "{n} days"), "u_cups": ("{n} cup", "{n} cups"),
+        "u_bags": ("{n} bag", "{n} bags"), "u_packs": ("{n} pack", "{n} packs"),
+        "u_pods": ("{n} pod", "{n} pods"), "u_boxes": ("{n} box", "{n} boxes"), "u_grams": "{n} g",
+        "h_open_bags": "Open bags", "h_unopened_bags": "Unopened bags", "g_size": "{n} g",
         "stock_not_yet": "Not enough brews yet to tell how long the {kind} will last.",
         "stock_weigh": "Weigh the bags not counted yet to complete it.",
         "kind_coffee": "coffee", "kind_tea": "tea", "kind_xpod": "xPods",
         "h_now": "Right now", "h_in_progress": "Brew in progress", "h_bag": "Current bag", "pods_left": "Pods left: {n}", "k_xpod": "xPod box", "k_tea": "tea",
         "h_brew": "Brew with the xBloom", "h_adjust": "Adjust this brew",
         "h_save": "Save as a new recipe", "h_manual": "Manual brew", "h_stats": "Coffee stats",
-        "h_by_brewer": "By brewer", "h_bags": "Bags on hand", "h_connection": "Connection & status",
+        "h_by_brewer": "By brewer", "h_connection": "Connection & status",
         "h_modules": "Modules", "h_grinder": "Grinder", "h_brewer": "Brewer", "h_scale": "Scale",
         "h_library": "Recipe library", "h_settings": "Settings", "h_stories": "Brew stories",
         "h_voice": "Voice announcements", "h_updates": "Updates", "h_events": "Recent machine events",
@@ -115,20 +118,25 @@ TEXT = {
     },
     "ar": {
         "machine": "الآلة", "view_brew": "التحضير", "view_stats": "الإحصاءات", "view_bags": "الأكياس", "view_xbloom": "xBloom",
-        "stock_days": "الأيام المتبقية من {kind}: {n}", "stock_grams": "الغرامات المتبقية من {kind}: {n}",
-        "stock_cups": "الأكواب المتبقية من {kind}: {n}", "stock_bags": "الأكياس المتبقية من {kind}: {n}",
-        "stock_pods": "الكبسولات المتبقية: {n}", "stock_boxes": "علب xPod المتبقية: {n}",
-        "stock_packs": "العبوات المتبقية من الشاي: {n}",
-        "stock_at_least": "{n} على الأقل", "stock_low": "الكمية منخفضة.", "h_stock": "المخزون",
-        "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
-        "stock_weigh": "زن الأكياس التي لم تُحسب بعد لاكتماله.",
+        "stock_left": "المتبقي من {Kind}: {n}", "stock_low_left": "مخزون {Kind} منخفض، والمتبقي {n}.",
+        "stock_out": "نفد مخزون {Kind}.",
+        "stock_about": "{n} تقريبًا", "stock_at_least": "{n} على الأقل", "stock_low": "الكمية منخفضة.", "h_stock": "المخزون",
+        "Kind_coffee": "القهوة", "Kind_tea": "الشاي", "Kind_xpod": "كبسولات xPod",
+        # One, two, three to ten, eleven and up.
+        "u_days": ("يوم واحد", "يومان", "{n} أيام", "{n} يومًا"),
+        "u_cups": ("كوب واحد", "كوبان", "{n} أكواب", "{n} كوبًا"),
+        "u_bags": ("كيس واحد", "كيسان", "{n} أكياس", "{n} كيسًا"),
+        "u_packs": ("عبوة واحدة", "عبوتان", "{n} عبوات", "{n} عبوة"),
+        "u_pods": ("كبسولة واحدة", "كبسولتان", "{n} كبسولات", "{n} كبسولة"),
+        "u_boxes": ("علبة واحدة", "علبتان", "{n} علب", "{n} علبة"), "u_grams": "{n} غ",
+        "h_open_bags": "الأكياس المفتوحة", "h_unopened_bags": "الأكياس غير المفتوحة", "g_size": "{n} غ",
         "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
         "stock_weigh": "زن الأكياس التي لم تُحسب بعد لاكتماله.",
         "kind_coffee": "البن", "kind_tea": "الشاي", "kind_xpod": "كبسولات xPod",
         "h_now": "الآن", "h_in_progress": "تحضير جار", "h_bag": "الكيس الحالي", "pods_left": "الكبسولات المتبقية: {n}", "k_xpod": "علبة xPod", "k_tea": "شاي",
         "h_brew": "التحضير بماكينة xBloom", "h_adjust": "تعديل هذا التحضير",
         "h_save": "حفظ كوصفة جديدة", "h_manual": "تحضير يدوي", "h_stats": "إحصاءات القهوة",
-        "h_by_brewer": "حسب أداة التحضير", "h_bags": "الأكياس المتوفرة", "h_connection": "الاتصال والحالة",
+        "h_by_brewer": "حسب أداة التحضير", "h_connection": "الاتصال والحالة",
         "h_modules": "الوحدات", "h_grinder": "المطحنة", "h_brewer": "وحدة الصب", "h_scale": "الميزان",
         "h_library": "مكتبة الوصفات", "h_settings": "الإعدادات", "h_stories": "حكايات التحضير",
         "h_voice": "الإعلانات الصوتية", "h_updates": "التحديثات", "h_events": "أحدث أحداث الماكينة",
@@ -217,6 +225,10 @@ TEXT = {
 E = "xbloom_studio"
 # How the brew record names a brew made by the xBloom (coffee_lab.lab.XBLOOM_BREWER).
 XBLOOM = "xBloom Studio"
+# Unicode first-strong isolate and its end: a name between them keeps its own
+# direction, so an Arabic name does not pull "(12)" or a separator into its
+# right-to-left run.
+ISO, PDI = "\u2068", "\u2069"
 # Bags and recipes are added and edited in the integration's Configure.
 INTEGRATION = "/config/integrations/integration/xbloom"
 BUSY = ("grinding", "brewing")
@@ -338,10 +350,11 @@ def brew_view(t: dict) -> dict:
             tile(f"sensor.{E}_coffee_left", visibility=[*present(f"sensor.{E}_coffee_left"), *coffee]),
             tile(f"select.{E}_xpod_box", visibility=[is_(kind, "xpod"), *present(f"select.{E}_xpod_box")]),
             tile(f"select.{E}_tea", visibility=[is_(kind, "tea"), *present(f"select.{E}_tea")]),
-            # What is left of what the picked recipe draws from.
-            stock_card(t, "coffee", visibility=[*coffee, *available(f"sensor.{E}_coffee_stock")]),
-            stock_card(t, "tea", visibility=[is_(kind, "tea"), *available(f"sensor.{E}_tea_stock")]),
-            stock_card(t, "xpod", visibility=[is_(kind, "xpod"), *available(f"sensor.{E}_xpod_stock")]),
+            # What the picked recipe draws from, only while it is running low;
+            # how much is left at any time is on the Bags tab.
+            stock_low_card(t, "coffee", visibility=[*coffee, is_(f"binary_sensor.{E}_coffee_stock_low", "on")]),
+            stock_low_card(t, "tea", visibility=[is_(kind, "tea"), is_(f"binary_sensor.{E}_tea_stock_low", "on")]),
+            stock_low_card(t, "xpod", visibility=[is_(kind, "xpod"), is_(f"binary_sensor.{E}_xpod_stock_low", "on")]),
             # Only while a brew could not be saved; it is retried by itself.
             tile(f"sensor.{E}_waiting_brews", visibility=[
                 {"condition": "numeric_state", "entity": f"sensor.{E}_waiting_brews", "above": 0}]),
@@ -617,12 +630,12 @@ def summary_card(t: dict) -> str:
         + f"{{% if h.get('longest_streak_days', 0) > 1 %}}- **{t['y_streak']}:** {{{{ h.longest_streak_days }}}}\n{{% endif %}}"
         + f"{{% if h.get('cups_per_brewing_day') %}}- **{t['y_cups']}:** {{{{ {_n('h.cups_per_brewing_day')} }}}}\n{{% endif %}}"
         + usual
-        + f"{{% if h.get('top_coffee') %}}- **{t['y_coffee']}:** {{{{ e(h.top_coffee.name) }}}} ({{{{ h.top_coffee.brews }}}})\n{{% endif %}}"
-        + f"{{% if h.get('top_recipe') %}}- **{t['y_recipe']}:** {{{{ e(h.top_recipe.name) }}}} ({{{{ h.top_recipe.brews }}}})\n{{% endif %}}"
+        + f"{{% if h.get('top_coffee') %}}- **{t['y_coffee']}:** {ISO}{{{{ e(h.top_coffee.name) }}}}{PDI} ({{{{ h.top_coffee.brews }}}})\n{{% endif %}}"
+        + f"{{% if h.get('top_recipe') %}}- **{t['y_recipe']}:** {ISO}{{{{ e(h.top_recipe.name) }}}}{PDI} ({{{{ h.top_recipe.brews }}}})\n{{% endif %}}"
         + f"{{% if h.get('time_of_day') %}}- **{t['y_time']}:** {times}\n{{% endif %}}"
         + f"{{% if v %}}- **{t['y_verdicts']}:** " + verdicts + "\n{% endif %}"
         + f"{{% if h.get('bags_opened') %}}- **{t['y_opened']}:** "
-        + "{% for b in h.bags_opened %}{{ e(b) }}{% if not loop.last %}" + t["sep"] + "{% endif %}{% endfor %}{% endif %}"
+        + "{% for b in h.bags_opened %}" + ISO + "{{ e(b) }}" + PDI + "{% if not loop.last %}" + t["sep"] + "{% endif %}{% endfor %}{% endif %}"
         + "{% endif %}"
     )
 
@@ -647,7 +660,7 @@ def recent_card(t: dict) -> str:
                   "hot_notes", "warm_notes", "cool_notes", "overall_notes", "finish")
     )
     verdict = "".join(
-        f"{{% {'if' if i == 0 else 'elif'} b.verdict == '{k}' %}}{t['verdict_' + k]}"
+        f"{{% {'if' if i == 0 else 'elif'} b.get('verdict') == '{k}' %}}{t['verdict_' + k]}"
         for i, k in enumerate(("again", "fine", "not_again"))
     ) + "{% endif %}"
     # Only the parts the brew has, so no line starts with a separator. Inside
@@ -656,7 +669,7 @@ def recent_card(t: dict) -> str:
     summary = (
         "{% set when = as_datetime(b.get('brewed_at') or '', none) %}"
         "{% set verdict %}" + verdict + "{% endset %}"
-        "{{ [when.strftime('%d/%m %H:%M') if when else '', b.get('recipe') or '', b.get('bag') or '',"
+        "{{ [when.strftime('%d/%m %H:%M') if when else '', ('\u2068' ~ b.recipe ~ '\u2069') if b.get('recipe') else '', ('\u2068' ~ b.bag ~ '\u2069') if b.get('bag') else '',"
         " verdict] | select | join(' · ') | escape }}"
     )
     rows = (
@@ -725,74 +738,165 @@ def opened_ago(t: dict) -> str:
     )
 
 
-def stock_line(t: dict, kind: str) -> str:
-    """What is left of a kind, in its chosen measure; "at least" while some
-    of it is not counted; and a word while it is running low."""
+def counted(t: dict, unit: str, n: str) -> str:
+    """`n` of a unit, counted the language's way: "1 day", "5 days"; in
+    Arabic one, two, three to ten, and eleven and up each have their form."""
+    forms = t[f"u_{unit}"]
+    if isinstance(forms, str):
+        return forms.replace("{n}", "{{ " + n + " }}")
+    if len(forms) == 2:
+        one, many = forms
+        return ("{% if " + n + " == 1 %}" + one.replace("{n}", "1") + "{% else %}"
+                + many.replace("{n}", "{{ " + n + " }}") + "{% endif %}")
+    one, two, few, many = forms
+    return ("{% if " + n + " == 1 %}" + one + "{% elif " + n + " == 2 %}" + two
+            + "{% elif 3 <= " + n + " <= 10 %}" + few.replace("{n}", "{{ " + n + " }}")
+            + "{% else %}" + many.replace("{n}", "{{ " + n + " }}") + "{% endif %}")
+
+
+def stock_amount(t: dict, kind: str) -> str:
+    """What is left of a kind in its chosen measure, as words: "about 67
+    days", "640 g", "at least 12 days" while some of it is not counted.
+
+    Days and cups are reckoned from the pace of brewing, so they are said as
+    "about"; grams, bags, pods and boxes are counted, so they are not.
+    """
     q = f"sensor.{E}_{kind}_stock"
-    n = ("{% if least is not none %}" + t["stock_at_least"].replace("{n}", "{{ least }}")
-         + "{% else %}{{ states('" + q + "') }}{% endif %}")
     measures = ("days", "pods", "boxes") if kind == "xpod" else ("days", "grams", "cups", "bags")
-    lines = "".join(
-        ("{% if" if i == 0 else "{% elif") + f" m == '{m}' %}}"
+    parts = []
+    for i, m in enumerate(measures):
         # Tea in tins and pouches: packs, never "bags" taken for tea bags.
-        + t["stock_packs" if (kind, m) == ("tea", "bags") else f"stock_{m}"]
-        .replace("{kind}", t[f"kind_{kind}"]).replace("{n}", n)
-        for i, m in enumerate(measures)) + "{% endif %}"
-    not_yet = t["stock_not_yet"].replace("{kind}", t[f"kind_{kind}"])
-    return (ESCAPE + f"{{% set m = state_attr('{q}', 'measure') %}}"
+        unit = "packs" if (kind, m) == ("tea", "bags") else m
+        words = counted(t, unit, "n")
+        if m in ("days", "cups"):
+            words = ("{% if least is not none %}" + t["stock_at_least"].replace("{n}", words)
+                     + "{% else %}" + t["stock_about"].replace("{n}", words) + "{% endif %}")
+        else:
+            words = ("{% if least is not none %}" + t["stock_at_least"].replace("{n}", words)
+                     + "{% else %}" + words + "{% endif %}")
+        parts.append(("{% if" if i == 0 else "{% elif") + f" m == '{m}' %}}" + words)
+    return "".join(parts) + "{% endif %}"
+
+
+def stock_vars(kind: str) -> str:
+    """The measure, the floor while some of it is not counted, and the figure
+    as a whole number, for stock_amount and the lines around it."""
+    q = f"sensor.{E}_{kind}_stock"
+    return (f"{{% set m = state_attr('{q}', 'measure') %}}"
             f"{{% set least = state_attr('{q}', 'at_least') %}}"
+            f"{{% set n = ((least if least is not none else states('{q}')) | float(0) | round(0) | int) %}}")
+
+
+def stock_out(t: dict, kind: str) -> str:
+    return t["stock_out"].replace("{kind}", t[f"kind_{kind}"]).replace("{Kind}", t[f"Kind_{kind}"])
+
+
+def stock_line(t: dict, kind: str) -> str:
+    """What is left of a kind, always: the Bags tab's line, with a word while
+    it is running low, or why there is no figure yet."""
+    q = f"sensor.{E}_{kind}_stock"
+    not_yet = t["stock_not_yet"].replace("{kind}", t[f"kind_{kind}"])
+    return (ESCAPE
             # Too few brews for days or cups: said in words, never "unknown".
-            + f"{{% if states('{q}') in ['unknown', 'unavailable'] and least is none %}}" + not_yet
-            + "{% else %}" + lines + "{% endif %}"
+            + f"{{% if states('{q}') in ['unknown', 'unavailable'] and state_attr('{q}', 'at_least') is none %}}" + not_yet
+            + "{% else %}" + stock_vars(kind)
+            # Nothing left is said as such, never "about 0 days".
+            + "{% if n == 0 and least is none %}" + stock_out(t, kind)
+            + "{% else %}" + t["stock_left"].replace("{Kind}", t[f"Kind_{kind}"]).replace("{n}", stock_amount(t, kind))
+            + "{% endif %}{% endif %}"
             + f"{{% if (state_attr('{q}', 'unknown') or 0) > 0 %}} " + t["stock_weigh"] + "{% endif %}"
             + f"{{% if is_state('binary_sensor.{E}_{kind}_stock_low', 'on') %}} " + t["stock_low"]
             + "{% endif %}")
+
+
+def stock_low_line(t: dict, kind: str) -> str:
+    """The Brew tab's line, shown only while the kind is running low."""
+    return (stock_vars(kind) + "{% if n == 0 and least is none %}" + stock_out(t, kind) + "{% else %}"
+            + t["stock_low_left"].replace("{kind}", t[f"kind_{kind}"]).replace("{Kind}", t[f"Kind_{kind}"])
+            .replace("{n}", stock_amount(t, kind)) + "{% endif %}")
 
 
 def stock_card(t: dict, kind: str, **extra) -> dict:
     return {"type": "markdown", "text_only": True, "content": stock_line(t, kind), **extra}
 
 
+def stock_low_card(t: dict, kind: str, **extra) -> dict:
+    return {"type": "markdown", "text_only": True, "content": stock_low_line(t, kind), **extra}
+
+
 def bags_view(t: dict) -> dict:
-    """What is on hand: each bag, how much is left and how long it has been open.
+    """What is on hand: the open bags, how much is left and how long each has
+    been open, then the unopened ones, each with its size.
 
     Choosing the bag to brew with is the Brew tab's; this tab only lists.
     """
     bags = f"sensor.{E}_coffee_bags"
     bag = f"select.{E}_coffee_bag"
-    left = t["g_of"].replace("{left}", "' ~ (b.remaining_g | round(0) | int) ~ '").replace("{size}", "' ~ (b.bag_size_g | round(0) | int) ~ '")
-    pods = t["pods_left"].replace("{n}", "' ~ b.pods_left ~ '")
-    line = (
-        "- **{{ b.name }}**"
-        f"{{% if b.kind == 'xpod' %}} ({t['k_xpod']}){{% elif b.kind == 'tea' %}} ({t['k_tea']}){{% endif %}}"
-        f"{{{{ ' ({t['in_use']})' if b.id in current }}}}"
-        # Where it is from; "Other" says nothing about the process.
-        "{% for x in [b.country, b.process] if x and x != 'Other' %} · {{ x }}{% endfor %}"
-        " · {% if b.kind == 'xpod' %}{{ ('" + pods + "') if b.pods_left is not none else '" + t["not_tracked"] + "' }}"
-        "{% elif b.remaining_g is none %}" + t["not_tracked"]
-        + "{% elif b.bag_size_g %}{{ '" + left + "' }}"
-        + "{% else %}{{ b.remaining_g | round(0) | int }} " + t["g_left"] + "{% endif %}"
-        + "{% if b.status == 'unopened' %} · " + t["unopened"]
-        + "{% elif b.opened_on %}{% set days = (now().date() - as_datetime(b.opened_on).date()).days %} · "
+    left = t["g_of"].replace("{left}", "' ~ (b.get('remaining_g') | round(0) | int) ~ '").replace("{size}", "' ~ (b.get('bag_size_g') | round(0) | int) ~ '")
+    pods = t["pods_left"].replace("{n}", "' ~ b.get('pods_left') ~ '")
+    size = t["g_size"].replace("{n}", "' ~ (b.get('bag_size_g') | round(0) | int) ~ '")
+    def name(in_use: str = "") -> str:
+        return (
+            "- **" + ISO + "{{ b.name }}" + PDI + "**"
+            f"{{% if b.get('kind') == 'xpod' %}} ({t['k_xpod']}){{% elif b.get('kind') == 'tea' %}} ({t['k_tea']}){{% endif %}}"
+            + in_use
+            # Where it is from; "Other" says nothing about the process.
+            + "{% for x in [b.get('country'), b.get('process')] if x and x != 'Other' %} · {{ x }}{% endfor %}"
+        )
+    amount = (
+        " · {% if b.get('kind') == 'xpod' %}{{ ('" + pods + "') if b.get('pods_left') is not none else '" + t["not_tracked"] + "' }}"
+        "{% elif b.get('remaining_g') is none %}" + t["not_tracked"]
+        + "{% elif b.get('bag_size_g') %}{{ '" + left + "' }}"
+        + "{% else %}{{ b.get('remaining_g') | round(0) | int }} " + t["g_left"] + "{% endif %}"
+    )
+    open_line = (
+        name(f"{{{{ ' ({t['in_use']})' if b.id in current }}}}") + amount
+        + "{% if b.get('opened_on') %}{% set days = (now().date() - as_datetime(b.get('opened_on')).date()).days %} · "
         + opened_ago(t) + "{% endif %}\n"
     )
+    # An unopened bag holds what it was sold as, unless it was weighed.
+    unopened_line = (
+        name(f"{{{{ ' ({t['in_use']})' if b.id in current }}}}") + " · {% if b.get('kind') == 'xpod' and b.get('pods_left') is not none %}{{ '" + pods + "' }}"
+        "{% elif b.get('remaining_g') is not none %}{{ b.get('remaining_g') | round(0) | int }} " + t["g_left"]
+        + "{% elif b.get('bag_size_g') %}{{ '" + size + "' }}"
+        + "{% else %}" + t["not_tracked"] + "{% endif %}\n"
+    )
+    setup = (
+        f"{{% set current = [state_attr('{bag}','id'), state_attr('select.{E}_xpod_box','id'), state_attr('select.{E}_tea','id')] %}}"
+        f"{{% set all = state_attr('{bags}','bags') or [] %}}"
+    )
+    open_card = (
+        setup
+        + "{% set opened = all | rejectattr('status', 'eq', 'unopened') | list %}"
+        # The bag in use first, then the rest from least left; untracked last.
+        "{% set in_use = opened | selectattr('id', 'in', current) | list %}"
+        "{% set rest = opened | rejectattr('id', 'in', current) | list %}"
+        "{% set counted = rest | selectattr('remaining_g', 'defined') | rejectattr('remaining_g', 'none') | sort(attribute='remaining_g') | list %}"
+        "{% set ordered = in_use + counted + (rest | reject('in', counted) | list) %}"
+        # The heading is part of the card, so neither shows with nothing open.
+        f"{{% if ordered %}}## {t['h_open_bags']}\n\n{{% for b in ordered %}}" + open_line + "{% endfor %}{% endif %}"
+    )
+    unopened_card = (
+        setup
+        # Oldest roast first: the one to open next.
+        + "{% set sealed = all | selectattr('status', 'eq', 'unopened') | list %}"
+        "{% set dated = sealed | selectattr('roast_date', 'defined') | selectattr('roast_date') | sort(attribute='roast_date') | list %}"
+        "{% set ordered = dated + (sealed | reject('in', dated) | list) %}"
+        f"{{% if ordered %}}## {t['h_unopened_bags']}\n\n{{% for b in ordered %}}" + unopened_line + "{% endfor %}{% endif %}"
+    )
+    bag_list = lambda content: {"type": "markdown", "text_only": True, "show_empty": False, "content": content}  # noqa: E731
     return {"title": t["view_bags"], "path": "bags", "icon": "mdi:shopping", "type": "sections", "max_columns": 2, "sections": [
-        section(t["h_bags"], [
-            {"type": "markdown", "content": (
-                f"{{% set current = [state_attr('{bag}','id'), state_attr('select.{E}_xpod_box','id'), state_attr('select.{E}_tea','id')] %}}"
-                f"{{% set all = state_attr('{bags}','bags') or [] %}}"
-                # The bag in use first, then the rest from least left; untracked last.
-                "{% set in_use = all | selectattr('id', 'in', current) | list %}"
-                "{% set rest = all | rejectattr('id', 'in', current) | list %}"
-                "{% set ordered = in_use + (rest | rejectattr('remaining_g', 'none') | sort(attribute='remaining_g') | list)"
-                " + (rest | selectattr('remaining_g', 'none') | list) %}"
-                "{% for b in ordered %}" + line + f"{{% else %}}{t['no_bags']}{{% endfor %}}"
-            )},
+        {"type": "grid", "cards": [
+            bag_list(open_card),
+            bag_list(unopened_card),
+            {"type": "markdown", "text_only": True,
+             "content": f"{{% if not (state_attr('{bags}','bags') or []) %}}{t['no_bags']}{{% endif %}}",
+             "show_empty": False},
             press(f"button.{E}_refresh_coffee_bags", visibility=[
                 {"condition": "state", "entity": f"button.{E}_refresh_coffee_bags", "state_not": "unavailable"},
             ]),
             {"type": "markdown", "text_only": True, "content": f"[{t['add_bags']}]({INTEGRATION})"},
-        ], present(bags)[:1]),
+        ], "visibility": present(bags)[:1]},
         # Per kind the home has had: what is left, what it is counted in,
         # and the level below which it is running low.
         *(section(t["h_stock"] + f" · {t[f'kind_{kind}']}", [
