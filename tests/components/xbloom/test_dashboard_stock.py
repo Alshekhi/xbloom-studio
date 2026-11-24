@@ -134,11 +134,13 @@ def test_open_and_unopened_bags_are_listed_apart():
     build = _build()
     open_list, unopened, empty = _bag_cards(build)
     assert open_list.startswith("## Open bags")
-    assert "- **Hill Farm** (in use) · Kenya · Washed · 36 of 250 g left · opened 6 days ago" in open_list
+    # Nothing more to tell about it: a plain line, its names escaped as markdown.
+    assert "- Hill Farm \\(in use\\) · Kenya · Washed · 36 of 250 g left · opened 6 days ago" in open_list
     assert "Valley Lot" not in open_list
     assert unopened.splitlines()[0] == "## Unopened bags"
     # Oldest roast first, each with what it holds.
-    assert unopened.splitlines()[2:] == ["- **Ridge Top** · 250 g", "- **Valley Lot** · Peru · Natural · 250 g"]
+    assert unopened.index("<summary>Ridge Top · 250 g</summary>") < unopened.index(
+        "<summary>Valley Lot · Peru · Natural · 250 g</summary>")
     assert empty == ""
 
 
@@ -158,8 +160,8 @@ def test_a_bag_missing_optional_details_still_lists_under_strict_templates():
     bare = [{"id": "a", "name": "Bare", "status": "unopened"}, {"id": "b", "name": "Open Bare", "status": "open"}]
     attrs = {"sensor.xbloom_studio_coffee_bags": {"bags": bare}, "select.xbloom_studio_coffee_bag": {"id": None}}
     out = [_render(c["content"], {}, attrs) for c in cards]
-    assert "- **Open Bare** · not tracked" in out[0]
-    assert "- **Bare** · not tracked" in out[1]
+    assert "- Open Bare · not tracked" in out[0]
+    assert "- Bare · not tracked" in out[1]
 
 
 def test_nothing_left_is_said_as_such():
@@ -185,4 +187,32 @@ def test_a_picked_unopened_bag_says_it_is_in_use():
     view = build.bags_view(build.TEXT["en"])
     cards = [c for c in _cards(view) if c.get("type") == "markdown" and "sensor.xbloom_studio_coffee_bags" in str(c.get("content"))]
     attrs = {"sensor.xbloom_studio_coffee_bags": {"bags": BAGS}, "select.xbloom_studio_coffee_bag": {"id": "u1"}}
-    assert "- **Valley Lot** (in use) · Peru · Natural · 250 g" in _render(cards[1]["content"], {}, attrs)
+    assert "<summary>Valley Lot (in use) · Peru · Natural · 250 g</summary>" in _render(cards[1]["content"], {}, attrs)
+
+
+def test_a_bag_opens_to_where_and_how_its_coffee_was_made():
+    build = _build()
+    view = build.bags_view(build.TEXT["en"])
+    cards = [c for c in _cards(view) if c.get("type") == "markdown" and "sensor.xbloom_studio_coffee_bags" in str(c.get("content"))]
+    full = {"id": "f", "name": "Summit <Lot>", "status": "unopened", "kind": "coffee", "bag_size_g": 250,
+            "roaster": "Hill Roasters", "region": "Nyeri", "producer": "A Co-op", "varietal": "SL28",
+            "roast": "Light Roast", "roast_date": "2026-09-10", "altitude_m": 1700, "altitude_max_m": 1900,
+            "roaster_notes": "Blackcurrant, *tomato*"}
+    attrs = {"sensor.xbloom_studio_coffee_bags": {"bags": [full]}, "select.xbloom_studio_coffee_bag": {"id": None}}
+    out = _render(cards[1]["content"], {}, attrs)
+    assert "<summary>Summit &lt;Lot&gt; · 250 g</summary>" in out
+    for line in ("- **Roaster:** Hill Roasters", "- **Region:** Nyeri", "- **Producer:** A Co-op",
+                 "- **Variety:** SL28", "- **Roast:** Light Roast", "- **Roasted:** 2026-09-10",
+                 "- **Altitude:** 1700–1900 m", "- **Tasting notes:** Blackcurrant, \\*tomato\\*"):
+        assert line in out, line
+
+
+def test_a_plain_bag_after_one_with_details_starts_a_new_markdown_block():
+    build = _build()
+    view = build.bags_view(build.TEXT["en"])
+    cards = [c for c in _cards(view) if c.get("type") == "markdown" and "sensor.xbloom_studio_coffee_bags" in str(c.get("content"))]
+    bags = [{"id": "d", "name": "Dated", "status": "unopened", "bag_size_g": 250, "roast_date": "2026-09-01"},
+            {"id": "p", "name": "Plain", "status": "unopened", "bag_size_g": 250}]
+    out = _render(cards[1]["content"], {}, {"sensor.xbloom_studio_coffee_bags": {"bags": bags},
+                                           "select.xbloom_studio_coffee_bag": {"id": None}})
+    assert "</details>\n\n- Plain · 250 g" in out

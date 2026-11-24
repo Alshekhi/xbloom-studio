@@ -1505,18 +1505,20 @@ views:
     - type: markdown
       text_only: true
       show_empty: false
-      content: '{% set current = [state_attr(''select.xbloom_studio_coffee_bag'',''id''), state_attr(''select.xbloom_studio_xpod_box'',''id''),
-        state_attr(''select.xbloom_studio_tea'',''id'')] %}{% set all = state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'')
-        or [] %}{% set opened = all | rejectattr(''status'', ''eq'', ''unopened'') | list %}{% set in_use
-        = opened | selectattr(''id'', ''in'', current) | list %}{% set rest = opened | rejectattr(''id'',
-        ''in'', current) | list %}{% set counted = rest | selectattr(''remaining_g'', ''defined'') | rejectattr(''remaining_g'',
-        ''none'') | sort(attribute=''remaining_g'') | list %}{% set ordered = in_use + counted + (rest
-        | reject(''in'', counted) | list) %}{% if ordered %}## الأكياس المفتوحة
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set current = [state_attr(''select.xbloom_studio_coffee_bag'',''id''),
+        state_attr(''select.xbloom_studio_xpod_box'',''id''), state_attr(''select.xbloom_studio_tea'',''id'')]
+        %}{% set all = state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'') or [] %}{% set opened
+        = all | rejectattr(''status'', ''eq'', ''unopened'') | list %}{% set in_use = opened | selectattr(''id'',
+        ''in'', current) | list %}{% set rest = opened | rejectattr(''id'', ''in'', current) | list %}{%
+        set counted = rest | selectattr(''remaining_g'', ''defined'') | rejectattr(''remaining_g'', ''none'')
+        | sort(attribute=''remaining_g'') | list %}{% set ordered = in_use + counted + (rest | reject(''in'',
+        counted) | list) %}{% if ordered %}## الأكياس المفتوحة
 
 
-        {% for b in ordered %}- **⁨{{ b.name }}⁩**{% if b.get(''kind'') == ''xpod'' %} (علبة xPod){% elif
-        b.get(''kind'') == ''tea'' %} (شاي){% endif %}{{ '' (قيد الاستخدام)'' if b.id in current }}{%
-        for x in [b.get(''country''), b.get(''process'')] if x and x != ''Other'' %}، {{ x }}{% endfor
+        {% for b in ordered %}{% set line %}⁨{{ b.name }}⁩{% if b.get(''kind'') == ''xpod'' %} (علبة xPod){%
+        elif b.get(''kind'') == ''tea'' %} (شاي){% endif %}{{ '' (قيد الاستخدام)'' if b.id in current
+        }}{% for x in [b.get(''country''), b.get(''process'')] if x and x != ''Other'' %}، {{ x }}{% endfor
         %}، {% if b.get(''kind'') == ''xpod'' %}{{ (''الكبسولات المتبقية: '' ~ b.get(''pods_left'') ~
         '''') if b.get(''pods_left'') is not none else ''غير متتبع'' }}{% elif b.get(''remaining_g'')
         is none %}غير متتبع{% elif b.get(''bag_size_g'') %}{{ ''متبقٍ '' ~ (b.get(''remaining_g'') | round(0)
@@ -1524,29 +1526,84 @@ views:
         | round(0) | int }} غ متبقية{% endif %}{% if b.get(''opened_on'') %}{% set days = (now().date()
         - as_datetime(b.get(''opened_on'')).date()).days %}، {% if days == 0 %}فُتح اليوم{% elif days
         == 1 %}فُتح أمس{% elif days == 2 %}فُتح قبل يومين{% elif days <= 10 %}فُتح قبل {{ days }} أيام{%
-        else %}فُتح قبل {{ days }} يومًا{% endif %}{% endif %}
+        else %}فُتح قبل {{ days }} يومًا{% endif %}{% endif %}{% endset %}{% set more %}{% if b.get(''roaster'')
+        %}- **المحمصة:** {{ e(b.get(''roaster'')) }}
 
-        {% endfor %}{% endif %}'
+        {% endif %}{% if b.get(''region'') %}- **المنطقة:** {{ e(b.get(''region'')) }}
+
+        {% endif %}{% if b.get(''producer'') %}- **المُنتِج:** {{ e(b.get(''producer'')) }}
+
+        {% endif %}{% if b.get(''varietal'') %}- **الصنف:** {{ e(b.get(''varietal'')) }}
+
+        {% endif %}{% if b.get(''roast'') %}- **درجة التحميص:** {{ e(b.get(''roast'')) }}
+
+        {% endif %}{% if b.get(''roast_date'') %}- **تاريخ التحميص:** {{ e(b.get(''roast_date'')) }}
+
+        {% endif %}{% set lo = b.get(''altitude_m'') %}{% set hi = b.get(''altitude_max_m'') %}{% if lo
+        %}- **الارتفاع:** {{ lo | round(0) | int }}{% if hi and hi != lo %}–{{ hi | round(0) | int }}{%
+        endif %} م
+
+        {% endif %}{% if b.get(''roaster_notes'') %}- **النكهات:** {{ e(b.get(''roaster_notes'')) }}
+
+        {% endif %}{% endset %}{% if more | trim %}<details><summary>{{ line | escape }}</summary>
+
+
+        {{ more }}
+
+        </details>
+
+
+        {% else %}- {{ e(line) }}
+
+        {% endif %}{% endfor %}{% endif %}'
     - type: markdown
       text_only: true
       show_empty: false
-      content: '{% set current = [state_attr(''select.xbloom_studio_coffee_bag'',''id''), state_attr(''select.xbloom_studio_xpod_box'',''id''),
-        state_attr(''select.xbloom_studio_tea'',''id'')] %}{% set all = state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'')
-        or [] %}{% set sealed = all | selectattr(''status'', ''eq'', ''unopened'') | list %}{% set dated
-        = sealed | selectattr(''roast_date'', ''defined'') | selectattr(''roast_date'') | sort(attribute=''roast_date'')
-        | list %}{% set ordered = dated + (sealed | reject(''in'', dated) | list) %}{% if ordered %}##
-        الأكياس غير المفتوحة
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set current = [state_attr(''select.xbloom_studio_coffee_bag'',''id''),
+        state_attr(''select.xbloom_studio_xpod_box'',''id''), state_attr(''select.xbloom_studio_tea'',''id'')]
+        %}{% set all = state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'') or [] %}{% set sealed
+        = all | selectattr(''status'', ''eq'', ''unopened'') | list %}{% set dated = sealed | selectattr(''roast_date'',
+        ''defined'') | selectattr(''roast_date'') | sort(attribute=''roast_date'') | list %}{% set ordered
+        = dated + (sealed | reject(''in'', dated) | list) %}{% if ordered %}## الأكياس غير المفتوحة
 
 
-        {% for b in ordered %}- **⁨{{ b.name }}⁩**{% if b.get(''kind'') == ''xpod'' %} (علبة xPod){% elif
-        b.get(''kind'') == ''tea'' %} (شاي){% endif %}{{ '' (قيد الاستخدام)'' if b.id in current }}{%
-        for x in [b.get(''country''), b.get(''process'')] if x and x != ''Other'' %}، {{ x }}{% endfor
+        {% for b in ordered %}{% set line %}⁨{{ b.name }}⁩{% if b.get(''kind'') == ''xpod'' %} (علبة xPod){%
+        elif b.get(''kind'') == ''tea'' %} (شاي){% endif %}{{ '' (قيد الاستخدام)'' if b.id in current
+        }}{% for x in [b.get(''country''), b.get(''process'')] if x and x != ''Other'' %}، {{ x }}{% endfor
         %}، {% if b.get(''kind'') == ''xpod'' and b.get(''pods_left'') is not none %}{{ ''الكبسولات المتبقية:
         '' ~ b.get(''pods_left'') ~ '''' }}{% elif b.get(''remaining_g'') is not none %}{{ b.get(''remaining_g'')
         | round(0) | int }} غ متبقية{% elif b.get(''bag_size_g'') %}{{ '''' ~ (b.get(''bag_size_g'') |
-        round(0) | int) ~ '' غ'' }}{% else %}غير متتبع{% endif %}
+        round(0) | int) ~ '' غ'' }}{% else %}غير متتبع{% endif %}{% endset %}{% set more %}{% if b.get(''roaster'')
+        %}- **المحمصة:** {{ e(b.get(''roaster'')) }}
 
-        {% endfor %}{% endif %}'
+        {% endif %}{% if b.get(''region'') %}- **المنطقة:** {{ e(b.get(''region'')) }}
+
+        {% endif %}{% if b.get(''producer'') %}- **المُنتِج:** {{ e(b.get(''producer'')) }}
+
+        {% endif %}{% if b.get(''varietal'') %}- **الصنف:** {{ e(b.get(''varietal'')) }}
+
+        {% endif %}{% if b.get(''roast'') %}- **درجة التحميص:** {{ e(b.get(''roast'')) }}
+
+        {% endif %}{% if b.get(''roast_date'') %}- **تاريخ التحميص:** {{ e(b.get(''roast_date'')) }}
+
+        {% endif %}{% set lo = b.get(''altitude_m'') %}{% set hi = b.get(''altitude_max_m'') %}{% if lo
+        %}- **الارتفاع:** {{ lo | round(0) | int }}{% if hi and hi != lo %}–{{ hi | round(0) | int }}{%
+        endif %} م
+
+        {% endif %}{% if b.get(''roaster_notes'') %}- **النكهات:** {{ e(b.get(''roaster_notes'')) }}
+
+        {% endif %}{% endset %}{% if more | trim %}<details><summary>{{ line | escape }}</summary>
+
+
+        {{ more }}
+
+        </details>
+
+
+        {% else %}- {{ e(line) }}
+
+        {% endif %}{% endfor %}{% endif %}'
     - type: markdown
       text_only: true
       content: '{% if not (state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'') or []) %}لا توجد

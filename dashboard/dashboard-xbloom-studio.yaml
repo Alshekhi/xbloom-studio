@@ -1487,47 +1487,106 @@ views:
     - type: markdown
       text_only: true
       show_empty: false
-      content: '{% set current = [state_attr(''select.xbloom_studio_coffee_bag'',''id''), state_attr(''select.xbloom_studio_xpod_box'',''id''),
-        state_attr(''select.xbloom_studio_tea'',''id'')] %}{% set all = state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'')
-        or [] %}{% set opened = all | rejectattr(''status'', ''eq'', ''unopened'') | list %}{% set in_use
-        = opened | selectattr(''id'', ''in'', current) | list %}{% set rest = opened | rejectattr(''id'',
-        ''in'', current) | list %}{% set counted = rest | selectattr(''remaining_g'', ''defined'') | rejectattr(''remaining_g'',
-        ''none'') | sort(attribute=''remaining_g'') | list %}{% set ordered = in_use + counted + (rest
-        | reject(''in'', counted) | list) %}{% if ordered %}## Open bags
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set current = [state_attr(''select.xbloom_studio_coffee_bag'',''id''),
+        state_attr(''select.xbloom_studio_xpod_box'',''id''), state_attr(''select.xbloom_studio_tea'',''id'')]
+        %}{% set all = state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'') or [] %}{% set opened
+        = all | rejectattr(''status'', ''eq'', ''unopened'') | list %}{% set in_use = opened | selectattr(''id'',
+        ''in'', current) | list %}{% set rest = opened | rejectattr(''id'', ''in'', current) | list %}{%
+        set counted = rest | selectattr(''remaining_g'', ''defined'') | rejectattr(''remaining_g'', ''none'')
+        | sort(attribute=''remaining_g'') | list %}{% set ordered = in_use + counted + (rest | reject(''in'',
+        counted) | list) %}{% if ordered %}## Open bags
 
 
-        {% for b in ordered %}- **⁨{{ b.name }}⁩**{% if b.get(''kind'') == ''xpod'' %} (xPod box){% elif
-        b.get(''kind'') == ''tea'' %} (tea){% endif %}{{ '' (in use)'' if b.id in current }}{% for x in
-        [b.get(''country''), b.get(''process'')] if x and x != ''Other'' %}, {{ x }}{% endfor %}, {% if
-        b.get(''kind'') == ''xpod'' %}{{ (''Pods left: '' ~ b.get(''pods_left'') ~ '''') if b.get(''pods_left'')
+        {% for b in ordered %}{% set line %}⁨{{ b.name }}⁩{% if b.get(''kind'') == ''xpod'' %} (xPod box){%
+        elif b.get(''kind'') == ''tea'' %} (tea){% endif %}{{ '' (in use)'' if b.id in current }}{% for
+        x in [b.get(''country''), b.get(''process'')] if x and x != ''Other'' %}, {{ x }}{% endfor %},
+        {% if b.get(''kind'') == ''xpod'' %}{{ (''Pods left: '' ~ b.get(''pods_left'') ~ '''') if b.get(''pods_left'')
         is not none else ''not tracked'' }}{% elif b.get(''remaining_g'') is none %}not tracked{% elif
         b.get(''bag_size_g'') %}{{ '''' ~ (b.get(''remaining_g'') | round(0) | int) ~ '' of '' ~ (b.get(''bag_size_g'')
         | round(0) | int) ~ '' g left'' }}{% else %}{{ b.get(''remaining_g'') | round(0) | int }} g left{%
         endif %}{% if b.get(''opened_on'') %}{% set days = (now().date() - as_datetime(b.get(''opened_on'')).date()).days
         %}, {% if days == 0 %}opened today{% elif days == 1 %}opened yesterday{% else %}opened {{ days
-        }} days ago{% endif %}{% endif %}
+        }} days ago{% endif %}{% endif %}{% endset %}{% set more %}{% if b.get(''roaster'') %}- **Roaster:**
+        {{ e(b.get(''roaster'')) }}
 
-        {% endfor %}{% endif %}'
+        {% endif %}{% if b.get(''region'') %}- **Region:** {{ e(b.get(''region'')) }}
+
+        {% endif %}{% if b.get(''producer'') %}- **Producer:** {{ e(b.get(''producer'')) }}
+
+        {% endif %}{% if b.get(''varietal'') %}- **Variety:** {{ e(b.get(''varietal'')) }}
+
+        {% endif %}{% if b.get(''roast'') %}- **Roast:** {{ e(b.get(''roast'')) }}
+
+        {% endif %}{% if b.get(''roast_date'') %}- **Roasted:** {{ e(b.get(''roast_date'')) }}
+
+        {% endif %}{% set lo = b.get(''altitude_m'') %}{% set hi = b.get(''altitude_max_m'') %}{% if lo
+        %}- **Altitude:** {{ lo | round(0) | int }}{% if hi and hi != lo %}–{{ hi | round(0) | int }}{%
+        endif %} m
+
+        {% endif %}{% if b.get(''roaster_notes'') %}- **Tasting notes:** {{ e(b.get(''roaster_notes''))
+        }}
+
+        {% endif %}{% endset %}{% if more | trim %}<details><summary>{{ line | escape }}</summary>
+
+
+        {{ more }}
+
+        </details>
+
+
+        {% else %}- {{ e(line) }}
+
+        {% endif %}{% endfor %}{% endif %}'
     - type: markdown
       text_only: true
       show_empty: false
-      content: '{% set current = [state_attr(''select.xbloom_studio_coffee_bag'',''id''), state_attr(''select.xbloom_studio_xpod_box'',''id''),
-        state_attr(''select.xbloom_studio_tea'',''id'')] %}{% set all = state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'')
-        or [] %}{% set sealed = all | selectattr(''status'', ''eq'', ''unopened'') | list %}{% set dated
-        = sealed | selectattr(''roast_date'', ''defined'') | selectattr(''roast_date'') | sort(attribute=''roast_date'')
-        | list %}{% set ordered = dated + (sealed | reject(''in'', dated) | list) %}{% if ordered %}##
-        Unopened bags
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set current = [state_attr(''select.xbloom_studio_coffee_bag'',''id''),
+        state_attr(''select.xbloom_studio_xpod_box'',''id''), state_attr(''select.xbloom_studio_tea'',''id'')]
+        %}{% set all = state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'') or [] %}{% set sealed
+        = all | selectattr(''status'', ''eq'', ''unopened'') | list %}{% set dated = sealed | selectattr(''roast_date'',
+        ''defined'') | selectattr(''roast_date'') | sort(attribute=''roast_date'') | list %}{% set ordered
+        = dated + (sealed | reject(''in'', dated) | list) %}{% if ordered %}## Unopened bags
 
 
-        {% for b in ordered %}- **⁨{{ b.name }}⁩**{% if b.get(''kind'') == ''xpod'' %} (xPod box){% elif
-        b.get(''kind'') == ''tea'' %} (tea){% endif %}{{ '' (in use)'' if b.id in current }}{% for x in
-        [b.get(''country''), b.get(''process'')] if x and x != ''Other'' %}, {{ x }}{% endfor %}, {% if
-        b.get(''kind'') == ''xpod'' and b.get(''pods_left'') is not none %}{{ ''Pods left: '' ~ b.get(''pods_left'')
-        ~ '''' }}{% elif b.get(''remaining_g'') is not none %}{{ b.get(''remaining_g'') | round(0) | int
-        }} g left{% elif b.get(''bag_size_g'') %}{{ '''' ~ (b.get(''bag_size_g'') | round(0) | int) ~
-        '' g'' }}{% else %}not tracked{% endif %}
+        {% for b in ordered %}{% set line %}⁨{{ b.name }}⁩{% if b.get(''kind'') == ''xpod'' %} (xPod box){%
+        elif b.get(''kind'') == ''tea'' %} (tea){% endif %}{{ '' (in use)'' if b.id in current }}{% for
+        x in [b.get(''country''), b.get(''process'')] if x and x != ''Other'' %}, {{ x }}{% endfor %},
+        {% if b.get(''kind'') == ''xpod'' and b.get(''pods_left'') is not none %}{{ ''Pods left: '' ~
+        b.get(''pods_left'') ~ '''' }}{% elif b.get(''remaining_g'') is not none %}{{ b.get(''remaining_g'')
+        | round(0) | int }} g left{% elif b.get(''bag_size_g'') %}{{ '''' ~ (b.get(''bag_size_g'') | round(0)
+        | int) ~ '' g'' }}{% else %}not tracked{% endif %}{% endset %}{% set more %}{% if b.get(''roaster'')
+        %}- **Roaster:** {{ e(b.get(''roaster'')) }}
 
-        {% endfor %}{% endif %}'
+        {% endif %}{% if b.get(''region'') %}- **Region:** {{ e(b.get(''region'')) }}
+
+        {% endif %}{% if b.get(''producer'') %}- **Producer:** {{ e(b.get(''producer'')) }}
+
+        {% endif %}{% if b.get(''varietal'') %}- **Variety:** {{ e(b.get(''varietal'')) }}
+
+        {% endif %}{% if b.get(''roast'') %}- **Roast:** {{ e(b.get(''roast'')) }}
+
+        {% endif %}{% if b.get(''roast_date'') %}- **Roasted:** {{ e(b.get(''roast_date'')) }}
+
+        {% endif %}{% set lo = b.get(''altitude_m'') %}{% set hi = b.get(''altitude_max_m'') %}{% if lo
+        %}- **Altitude:** {{ lo | round(0) | int }}{% if hi and hi != lo %}–{{ hi | round(0) | int }}{%
+        endif %} m
+
+        {% endif %}{% if b.get(''roaster_notes'') %}- **Tasting notes:** {{ e(b.get(''roaster_notes''))
+        }}
+
+        {% endif %}{% endset %}{% if more | trim %}<details><summary>{{ line | escape }}</summary>
+
+
+        {{ more }}
+
+        </details>
+
+
+        {% else %}- {{ e(line) }}
+
+        {% endif %}{% endfor %}{% endif %}'
     - type: markdown
       text_only: true
       content: '{% if not (state_attr(''sensor.xbloom_studio_coffee_bags'',''bags'') or []) %}No open

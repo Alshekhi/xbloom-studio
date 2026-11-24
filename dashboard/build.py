@@ -27,6 +27,9 @@ TEXT = {
         "u_bags": ("{n} bag", "{n} bags"), "u_packs": ("{n} pack", "{n} packs"),
         "u_pods": ("{n} pod", "{n} pods"), "u_boxes": ("{n} box", "{n} boxes"), "u_grams": "{n} g",
         "h_open_bags": "Open bags", "h_unopened_bags": "Unopened bags", "g_size": "{n} g",
+        "d_roaster": "Roaster", "d_region": "Region", "d_producer": "Producer", "d_varietal": "Variety",
+        "d_roast": "Roast", "d_roast_date": "Roasted", "d_altitude": "Altitude", "d_notes": "Tasting notes",
+        "d_m": "{n} m",
         "stock_not_yet": "Not enough brews yet to tell how long the {kind} will last.",
         "stock_weigh": "Weigh the bags not counted yet to complete it.",
         "kind_coffee": "coffee", "kind_tea": "tea", "kind_xpod": "xPods",
@@ -130,6 +133,9 @@ TEXT = {
         "u_pods": ("كبسولة واحدة", "كبسولتان", "{n} كبسولات", "{n} كبسولة"),
         "u_boxes": ("علبة واحدة", "علبتان", "{n} علب", "{n} علبة"), "u_grams": "{n} غ",
         "h_open_bags": "الأكياس المفتوحة", "h_unopened_bags": "الأكياس غير المفتوحة", "g_size": "{n} غ",
+        "d_roaster": "المحمصة", "d_region": "المنطقة", "d_producer": "المُنتِج", "d_varietal": "الصنف",
+        "d_roast": "درجة التحميص", "d_roast_date": "تاريخ التحميص", "d_altitude": "الارتفاع",
+        "d_notes": "النكهات", "d_m": "{n} م",
         "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
         "stock_weigh": "زن الأكياس التي لم تُحسب بعد لاكتماله.",
         "kind_coffee": "البن", "kind_tea": "الشاي", "kind_xpod": "كبسولات xPod",
@@ -826,7 +832,8 @@ def stock_low_card(t: dict, kind: str, **extra) -> dict:
 
 def bags_view(t: dict) -> dict:
     """What is on hand: the open bags, how much is left and how long each has
-    been open, then the unopened ones, each with its size.
+    been open, then the unopened ones, each with its size. Each bag opens to
+    where and how its coffee was made, as far as the bag says.
 
     Choosing the bag to brew with is the Brew tab's; this tab only lists.
     """
@@ -835,38 +842,63 @@ def bags_view(t: dict) -> dict:
     left = t["g_of"].replace("{left}", "' ~ (b.get('remaining_g') | round(0) | int) ~ '").replace("{size}", "' ~ (b.get('bag_size_g') | round(0) | int) ~ '")
     pods = t["pods_left"].replace("{n}", "' ~ b.get('pods_left') ~ '")
     size = t["g_size"].replace("{n}", "' ~ (b.get('bag_size_g') | round(0) | int) ~ '")
-    def name(in_use: str = "") -> str:
-        return (
-            "- **" + ISO + "{{ b.name }}" + PDI + "**"
-            f"{{% if b.get('kind') == 'xpod' %}} ({t['k_xpod']}){{% elif b.get('kind') == 'tea' %}} ({t['k_tea']}){{% endif %}}"
-            + in_use
-            # Where it is from; "Other" says nothing about the process.
-            + "{% for x in [b.get('country'), b.get('process')] if x and x != 'Other' %} · {{ x }}{% endfor %}"
-        )
+    in_use = f"{{{{ ' ({t['in_use']})' if b.id in current }}}}"
+    name = (
+        ISO + "{{ b.name }}" + PDI
+        + f"{{% if b.get('kind') == 'xpod' %}} ({t['k_xpod']}){{% elif b.get('kind') == 'tea' %}} ({t['k_tea']}){{% endif %}}"
+        + in_use
+        # Where it is from; "Other" says nothing about the process.
+        + "{% for x in [b.get('country'), b.get('process')] if x and x != 'Other' %} · {{ x }}{% endfor %}"
+    )
     amount = (
         " · {% if b.get('kind') == 'xpod' %}{{ ('" + pods + "') if b.get('pods_left') is not none else '" + t["not_tracked"] + "' }}"
         "{% elif b.get('remaining_g') is none %}" + t["not_tracked"]
         + "{% elif b.get('bag_size_g') %}{{ '" + left + "' }}"
         + "{% else %}{{ b.get('remaining_g') | round(0) | int }} " + t["g_left"] + "{% endif %}"
     )
-    open_line = (
-        name(f"{{{{ ' ({t['in_use']})' if b.id in current }}}}") + amount
+    open_text = (
+        name + amount
         + "{% if b.get('opened_on') %}{% set days = (now().date() - as_datetime(b.get('opened_on')).date()).days %} · "
-        + opened_ago(t) + "{% endif %}\n"
+        + opened_ago(t) + "{% endif %}"
     )
     # An unopened bag holds what it was sold as, unless it was weighed.
-    unopened_line = (
-        name(f"{{{{ ' ({t['in_use']})' if b.id in current }}}}") + " · {% if b.get('kind') == 'xpod' and b.get('pods_left') is not none %}{{ '" + pods + "' }}"
+    unopened_text = (
+        name + " · {% if b.get('kind') == 'xpod' and b.get('pods_left') is not none %}{{ '" + pods + "' }}"
         "{% elif b.get('remaining_g') is not none %}{{ b.get('remaining_g') | round(0) | int }} " + t["g_left"]
         + "{% elif b.get('bag_size_g') %}{{ '" + size + "' }}"
-        + "{% else %}" + t["not_tracked"] + "{% endif %}\n"
+        + "{% else %}" + t["not_tracked"] + "{% endif %}"
     )
+    altitude = (
+        "{% set lo = b.get('altitude_m') %}{% set hi = b.get('altitude_max_m') %}"
+        "{% if lo %}- **" + t["d_altitude"] + ":** "
+        + t["d_m"].replace("{n}", "{{ lo | round(0) | int }}{% if hi and hi != lo %}–{{ hi | round(0) | int }}{% endif %}")
+        + "\n{% endif %}"
+    )
+    details = "".join(
+        f"{{% if b.get('{key}') %}}- **{t['d_' + key]}:** {{{{ e(b.get('{key}')) }}}}\n{{% endif %}}"
+        for key in ("roaster", "region", "producer", "varietal", "roast", "roast_date")
+    ) + altitude + f"{{% if b.get('roaster_notes') %}}- **{t['d_notes']}:** {{{{ e(b.get('roaster_notes')) }}}}\n{{% endif %}}"
+
+    def entry(text: str) -> str:
+        """A bag's line that opens to its details; a plain line when it has none.
+
+        Inside the summary's HTML markdown is not read, so the line is
+        escaped as HTML there and as markdown in the plain line.
+        """
+        return (
+            "{% set line %}" + text + "{% endset %}{% set more %}" + details + "{% endset %}"
+            # The blank line after </details> ends the HTML block, so a plain
+            # line after it is read as markdown again.
+            "{% if more | trim %}<details><summary>{{ line | escape }}</summary>\n\n{{ more }}\n</details>\n\n"
+            "{% else %}- {{ e(line) }}\n{% endif %}"
+        )
+    open_line, unopened_line = entry(open_text), entry(unopened_text)
     setup = (
         f"{{% set current = [state_attr('{bag}','id'), state_attr('select.{E}_xpod_box','id'), state_attr('select.{E}_tea','id')] %}}"
         f"{{% set all = state_attr('{bags}','bags') or [] %}}"
     )
     open_card = (
-        setup
+        ESCAPE + setup
         + "{% set opened = all | rejectattr('status', 'eq', 'unopened') | list %}"
         # The bag in use first, then the rest from least left; untracked last.
         "{% set in_use = opened | selectattr('id', 'in', current) | list %}"
@@ -877,7 +909,7 @@ def bags_view(t: dict) -> dict:
         f"{{% if ordered %}}## {t['h_open_bags']}\n\n{{% for b in ordered %}}" + open_line + "{% endfor %}{% endif %}"
     )
     unopened_card = (
-        setup
+        ESCAPE + setup
         # Oldest roast first: the one to open next.
         + "{% set sealed = all | selectattr('status', 'eq', 'unopened') | list %}"
         "{% set dated = sealed | selectattr('roast_date', 'defined') | selectattr('roast_date') | sort(attribute='roast_date') | list %}"
