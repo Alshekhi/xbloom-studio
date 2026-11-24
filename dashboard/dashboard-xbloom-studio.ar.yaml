@@ -9,6 +9,65 @@ views:
   - type: grid
     cards:
     - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = {''bag'': state_attr(''sensor.xbloom_studio_todays_cup'',
+        ''bag''), ''recipe'': state_attr(''sensor.xbloom_studio_todays_cup'', ''recipe''), ''dose_g'':
+        state_attr(''sensor.xbloom_studio_todays_cup'', ''dose_g''), ''reasons'': state_attr(''sensor.xbloom_studio_todays_cup'',
+        ''reasons'')} %}{% set cup = [(''⁨'' ~ e(a.get(''bag'')) ~ ''⁩''), (''⁨'' ~ e(a.get(''recipe''))
+        ~ ''⁩'') if a.get(''recipe'') else '''', (((a.get(''dose_g'') or 0) | float | round(1) | string
+        | replace(''.0'', '''')) ~ '' غ'') if a.get(''recipe'') else ''''] | select | join(''، '') %}{%
+        set words = {''liked'': "أعجبتك", ''not_yesterday'': "ليست آخر قهوة حضّرتها", ''use_soon'': "يحسن
+        استخدامها قريبًا", ''past_best'': "تجاوزت أفضل وقتها", ''open_next'': "حان وقت فتحها", ''rated_again'':
+        "قيّمت الوصفة معها بـ أعتمدها كما هي", ''brewed_with_bag'': "حضّرتها معها من قبل", ''like_this_coffee'':
+        "حضّرتها مع قهوة مشابهة", ''community'': "وصفة من المجتمع"} %}{% set ns = namespace(said=[]) %}{%
+        for r in a.get(''reasons'') or [] %}{% if r in words %}{% set ns.said = ns.said + [words[r]] %}{%
+        endif %}{% endfor %}{% set why = ns.said | join(''، '') %}**كوب اليوم:** {{ cup }}{% if why %}
+
+
+        {{ why[:1] | upper }}{{ why[1:] }}.{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_use_todays_cup
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_use_todays_cup
+    - type: tile
+      entity: button.xbloom_studio_another_cup
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_another_cup
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_todays_cup
+      state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_todays_cup
+      state_not: unknown
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: grinding
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: brewing
+    - condition: state
+      entity: select.xbloom_studio_recipe
+      state: unknown
+  - type: grid
+    cards:
+    - type: markdown
       text_only: true
       content: '## الآن'
     - type: tile

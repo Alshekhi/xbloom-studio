@@ -57,6 +57,14 @@ ACTIONS: dict[str, Spec] = {
         "on all its cups. Mention open questions at most once, and only while "
         "already talking about coffee",
     ),
+    "todays_cup": Spec(
+        actions.todays_cup,
+        "the cup to brew next: an open bag, a recipe for it and the dose, with reasons — "
+        "liked, not_yesterday, use_soon, past_best, open_next; rated_again, "
+        "brewed_with_bag, like_this_coffee, community. Offer it when the person asks "
+        "what to brew; never brew it unasked. To brew it, prepare_brew with that bag, "
+        "recipe and dose (a community recipe saved first with save_shared_recipe)",
+    ),
     "stats": Spec(
         actions.stats,
         "brews, coffee, water and brews per brewer over a period, with the period "

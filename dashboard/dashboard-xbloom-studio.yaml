@@ -9,6 +9,66 @@ views:
   - type: grid
     cards:
     - type: markdown
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set a = {''bag'': state_attr(''sensor.xbloom_studio_todays_cup'',
+        ''bag''), ''recipe'': state_attr(''sensor.xbloom_studio_todays_cup'', ''recipe''), ''dose_g'':
+        state_attr(''sensor.xbloom_studio_todays_cup'', ''dose_g''), ''reasons'': state_attr(''sensor.xbloom_studio_todays_cup'',
+        ''reasons'')} %}{% set cup = [(''⁨'' ~ e(a.get(''bag'')) ~ ''⁩''), (''⁨'' ~ e(a.get(''recipe''))
+        ~ ''⁩'') if a.get(''recipe'') else '''', (((a.get(''dose_g'') or 0) | float | round(1) | string
+        | replace(''.0'', '''')) ~ '' g'') if a.get(''recipe'') else ''''] | select | join('', '') %}{%
+        set words = {''liked'': "you liked it", ''not_yesterday'': "not the coffee you had last", ''use_soon'':
+        "best used soon", ''past_best'': "past its best", ''open_next'': "time to open it", ''rated_again'':
+        "rated Keep it like this with it", ''brewed_with_bag'': "brewed with it before", ''like_this_coffee'':
+        "brewed with coffee like it", ''community'': "a community recipe"} %}{% set ns = namespace(said=[])
+        %}{% for r in a.get(''reasons'') or [] %}{% if r in words %}{% set ns.said = ns.said + [words[r]]
+        %}{% endif %}{% endfor %}{% set why = ns.said | join('', '') %}**Today''s cup:** {{ cup }}{% if
+        why %}
+
+
+        {{ why[:1] | upper }}{{ why[1:] }}.{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_use_todays_cup
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_use_todays_cup
+    - type: tile
+      entity: button.xbloom_studio_another_cup
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_another_cup
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_todays_cup
+      state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_todays_cup
+      state_not: unknown
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: grinding
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: brewing
+    - condition: state
+      entity: select.xbloom_studio_recipe
+      state: unknown
+  - type: grid
+    cards:
+    - type: markdown
       text_only: true
       content: '## Right now'
     - type: tile

@@ -271,6 +271,18 @@ def _totals_facts(totals: Totals) -> dict[str, Any]:
     }
 
 
+async def todays_cup(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
+    """The cup to brew next — bag, recipe, dose — and the reasons it was chosen."""
+    cup = getattr(lab, "todays_cup", None)
+    pick = cup.pick if cup is not None else None
+    if pick is None:
+        return {"todays_cup": None}
+    facts = {"bag": pick.bag, "bag_id": pick.bag_id, "recipe": pick.recipe,
+             "source": pick.recipe_source, "hub_id": pick.hub_id, "drink": pick.drink,
+             "dose_g": pick.dose_g, "reasons": list(pick.reasons)}
+    return {"todays_cup": {k: v for k, v in facts.items() if v is not None}}
+
+
 async def stats(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     period = args.get("period") or DEFAULT_STATS_PERIOD
     if period not in PERIODS:

@@ -426,3 +426,18 @@ async def test_a_link_the_dashboard_could_not_show_is_refused():
     for bad in ("https://shop.example/p_(1)", "HTTPS://shop.example/p", "https://shop example"):
         with pytest.raises(ServiceValidationError):
             await actions.add_bean(lab, {"name": "Kenya", "product_url": bad})
+
+
+async def test_todays_cup_is_offered_to_agents():
+    from types import SimpleNamespace
+    from custom_components.xbloom import tool_coffee_lab
+    from custom_components.xbloom.coffee_lab.todays_cup import Pick
+    lab = await _lab()
+    assert (await tool_coffee_lab.run(lab, "todays_cup", {})) == {"todays_cup": None}
+    pick = Pick("b1", "Hill Farm", "Daily", "own", None, "hot", 17.0, ("liked", "rated_again"))
+    lab.todays_cup = SimpleNamespace(pick=pick)
+    got = (await tool_coffee_lab.run(lab, "todays_cup", {}))["todays_cup"]
+    assert got == {"bag": "Hill Farm", "bag_id": "b1", "recipe": "Daily", "source": "own",
+                   "drink": "hot", "dose_g": 17.0, "reasons": ["liked", "rated_again"]}
+    described = tool_coffee_lab.describe([])
+    assert "todays_cup" in described and "offer it" in described.lower()
