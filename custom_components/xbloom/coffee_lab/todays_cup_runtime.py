@@ -19,7 +19,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Any
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
@@ -73,28 +73,43 @@ class TodaysCup:
         self._refreshing = asyncio.Lock()
         self._pending: Callable[[], None] | None = None
         self._last_refresh: float | None = None
+        self._due: float | None = None
+        # Whether the refresh waiting was asked for by a brew, the drink or
+        # the day: it starts again from the best cup.
+        self._reset = False
 
+    @callback
     def schedule(self, *_: Any) -> None:
         """Refresh after a routine change: at most every MIN_INTERVAL_S."""
         self._schedule(force=False)
 
+    @callback
     def schedule_now(self, *_: Any) -> None:
         """Refresh after a brew ends, the drink changes or the day turns."""
         self._schedule(force=True)
 
+    @callback
     def _schedule(self, force: bool) -> None:
+        now = time.monotonic()
+        due = now + refresh_delay(self._last_refresh, now, force)
+        # A sooner refresh already waiting stays: a routine change never
+        # pushes back the one after a brew.
+        if self._pending is not None and self._due is not None and self._due <= due:
+            self._reset = self._reset or force
+            return
         if self._pending is not None:
             self._pending()
-        delay = refresh_delay(self._last_refresh, time.monotonic(), force)
-        self._pending = async_call_later(self.hass, delay, self._run)
+        self._due, self._reset = due, self._reset or force
+        self._pending = async_call_later(self.hass, due - now, self._run)
 
     async def _run(self, _now: Any) -> None:
-        self._pending = None
+        reset, self._pending, self._due, self._reset = self._reset, None, None, False
         try:
-            await self.async_refresh()
+            await self.async_refresh(reset=reset)
         except Exception:  # noqa: BLE001 — a failed pick must not stop anything else
             _LOGGER.exception("Coffee Lab: today's cup could not be worked out")
 
+    @callback
     def stop(self) -> None:
         if self._pending is not None:
             self._pending()
@@ -111,7 +126,13 @@ class TodaysCup:
     def _changed(self) -> None:
         async_dispatcher_send(self.hass, SIGNAL_TODAYS_CUP)
 
-    async def async_refresh(self) -> None:
+    async def async_refresh(self, reset: bool = False) -> None:
+        """Work today's cup out again.
+
+        A cup chosen with Another is kept while it is still on offer, unless
+        `reset`: after a brew, a change of drink or a new day the best cup is
+        offered again.
+        """
         if self.busy():
             self.waiting = True
             return
@@ -147,9 +168,8 @@ class TodaysCup:
                 if hub:
                     picks = candidates(beans, brews, own, {bag.id: hub}, drink, now, rules,
                                        dose or 15.0, daily_g)
-            chosen = self.pick
+            chosen = self.pick if self.index > 0 and not reset else None
             self.picks = [self._fit_dose(p, dose) for p in picks]
-            # A cup chosen with Another stays while it is still on offer.
             self.index = next((i for i, p in enumerate(self.picks) if chosen is not None
                                and (p.bag_id, p.recipe) == (chosen.bag_id, chosen.recipe)), 0)
             self._last_refresh = time.monotonic()
@@ -203,6 +223,16 @@ class TodaysCup:
             if state is not None and state.state == pick.recipe:
                 break
             await asyncio.sleep(0.1)
+        # Within what the slider takes now: a community recipe's cup was not
+        # known until it was added.
+        dose = pick.dose_g
+        slider = self.hass.states.get(DOSE_NUMBER)
+        if slider is not None:
+            try:
+                low, high = float(slider.attributes["min"]), float(slider.attributes["max"])
+                dose = min(max(dose, low), high)
+            except (KeyError, TypeError, ValueError):
+                pass
         await self.hass.services.async_call(
-            "number", "set_value", {"entity_id": DOSE_NUMBER, "value": pick.dose_g}, blocking=True,
+            "number", "set_value", {"entity_id": DOSE_NUMBER, "value": dose}, blocking=True,
         )

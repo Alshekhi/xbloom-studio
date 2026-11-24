@@ -193,3 +193,67 @@ async def test_a_skip_is_counted_through_the_lab():
     await lab.async_count_skip("b1", "Daily")
     await lab.async_count_skip("b1", "Daily")
     assert lab.todays_cup_skips == {"b1|Daily": 2}
+
+
+async def test_the_pick_moves_on_after_a_brew():
+    home = _Home()
+    cup, lab, bag, _ = await _cup(home)
+    other = await lab.store.async_add_bean(name="Valley Lot", status="open", tracked=True,
+                                           remaining_g=200.0, bag_size_g=250.0, opened_on=TODAY)
+    await cup.async_refresh()
+    first = cup.pick
+    brewed = first.bag_id
+    await lab.async_consume(bean_id=brewed, grams=17, run_id="r2", recipe="Daily",
+                            brewed_at=datetime.now(timezone.utc).isoformat())
+    await cup.async_refresh(reset=True)
+    assert cup.pick.bag_id != brewed
+
+
+async def test_a_cup_shown_first_is_not_held_by_a_routine_refresh():
+    home = _Home()
+    cup, lab, bag, _ = await _cup(home)
+    await lab.store.async_add_bean(name="Valley Lot", status="open", tracked=True,
+                                   remaining_g=200.0, bag_size_g=250.0, opened_on=TODAY)
+    await cup.async_refresh()
+    brewed = cup.pick.bag_id
+    await lab.async_consume(bean_id=brewed, grams=17, run_id="r2", recipe="Daily",
+                            brewed_at=datetime.now(timezone.utc).isoformat())
+    await cup.async_refresh()
+    assert cup.pick.bag_id != brewed
+
+
+def test_a_routine_request_does_not_push_back_a_sooner_refresh(monkeypatch):
+    from custom_components.xbloom.coffee_lab import todays_cup_runtime as rt
+    home = _Home()
+    cup = rt.TodaysCup(home.hass, MagicMock(), MagicMock(), lambda: [])
+    scheduled = []
+    monkeypatch.setattr(rt, "async_call_later",
+                        lambda hass, delay, action: (scheduled.append(delay), lambda: scheduled.append("cancelled"))[1])
+    cup._last_refresh = rt.time.monotonic()
+    cup.schedule_now()
+    cup.schedule()
+    assert scheduled == [rt.SETTLE_S]
+
+
+def test_the_schedulers_run_on_the_event_loop():
+    # Dispatcher and time-change targets that are not marked as callbacks are
+    # run in a worker thread, where timers are not safe to start or cancel.
+    # (The test stubs replace the decorator, so its use is read from the source.)
+    import inspect
+    from custom_components.xbloom.coffee_lab import todays_cup_runtime as rt
+    source = inspect.getsource(rt.TodaysCup)
+    for name in ("schedule", "schedule_now", "_schedule", "stop"):
+        assert f"@callback\n    def {name}(" in source, name
+
+
+async def test_use_keeps_the_dose_within_what_the_slider_takes():
+    home = _Home()
+    cup, *_ = await _cup(home, hub={"id": 42, "name": "Shared"}, library=[])
+    await cup.async_refresh()
+    import dataclasses
+    cup.picks[0] = dataclasses.replace(cup.picks[0], dose_g=30.0)
+    real_get = home.get
+    home.hass.states.get = lambda eid: (SimpleNamespace(state="18", attributes={"min": 5, "max": 18})
+                                        if eid == "number.xbloom_studio_brew_dose" else real_get(eid))
+    await cup.async_use()
+    assert home.calls[-1][1]["value"] == 18

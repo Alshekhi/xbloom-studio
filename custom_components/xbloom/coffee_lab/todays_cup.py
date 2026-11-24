@@ -56,11 +56,11 @@ def _last_brewed(brews: list[Brew], now: datetime) -> dict[str, datetime]:
 def _rotated(bag: Bean, recipes: list[OwnRecipe], brews: list[Brew]) -> list[OwnRecipe]:
     """Rated-again recipes, the one used last with this bag at the end; then the rest."""
     again = [r for r in recipes if r.rated_again]
-    used = {r.recipe: (r.brewed_at or r.recorded_at) for r in sorted(
+    used = {r.recipe.casefold(): (r.brewed_at or r.recorded_at) for r in sorted(
         (b for b in brews if b.bean_id == bag.id and b.recipe),
         key=lambda b: b.brewed_at or b.recorded_at)}
     if len(again) > 1:
-        again.sort(key=lambda r: used.get(r.name, ""))
+        again.sort(key=lambda r: used.get(r.name.casefold(), ""))
     return again + [r for r in recipes if not r.rated_again]
 
 

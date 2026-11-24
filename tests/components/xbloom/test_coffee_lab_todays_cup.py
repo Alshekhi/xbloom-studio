@@ -153,3 +153,9 @@ def test_use_soon_follows_the_grams_brewed_a_day():
     assert picks[0].bag_id == "b"
     one_cup = candidates(beans, brews, {"a": own("R1"), "b": own("R1")}, {}, "hot", NOW, RULES, DOSE)
     assert one_cup[0].bag_id == "a"
+
+
+def test_rotation_reads_recipe_names_however_they_were_written():
+    brews = [brew("a", "daily", days_ago=1), brew("a", "R2", days_ago=3)]
+    first = pick([opened("a")], brews, {"a": own("Daily", "R2")})[0]
+    assert first.recipe == "R2"
