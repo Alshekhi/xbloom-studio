@@ -812,6 +812,7 @@ announce:
             - alexa
             - tts
             - notify
+            - script
     targets:
       required: false
       selector:
@@ -827,6 +828,23 @@ announce:
       required: false
       selector:
         text:
+    script:
+      required: false
+      selector:
+        entity:
+          domain: script
+    language:
+      required: false
+      selector:
+        select:
+          options:
+            - en
+            - ar
+    problem:
+      required: false
+      default: false
+      selector:
+        boolean:
     alexa_type:
       required: false
       default: tts

@@ -41,6 +41,7 @@ blueprint:
                 - { value: alexa, label: Alexa }
                 - { value: tts, label: Speaker (TTS) }
                 - { value: notify, label: Notification }
+                - { value: script, label: Script }
         speakers:
           name: Speakers for the whole home
           description: >
@@ -77,6 +78,19 @@ blueprint:
           default: ""
           selector:
             text:
+        speak_script:
+          name: Script
+          description: >
+            For Script only: a script of your own that speaks for the home,
+            started with message, targets, language, alexa_type, kind and
+            problem; the speakers above may be left empty for it to choose.
+            Its turn still comes after any xBloom announcement before it. Give
+            the script mode queued or parallel, or a message that arrives while
+            it is still speaking is dropped.
+          default: ""
+          selector:
+            entity:
+              domain: script
         focus_notify_service:
           name: Phone for what to notice
           description: >
@@ -168,6 +182,7 @@ variables:
   paused_entity_id: !input paused_entity
   machine_status_id: !input machine_status_entity
   method: !input delivery_method
+  speak_script: !input speak_script
   notify_service: !input notify_service
   # Carried as a variable, not used as `!input` directly in `target:`. Home
   # Assistant validates every `choose` branch at config load, including ones
@@ -461,7 +476,7 @@ action:
             - condition: template
               value_template: >-
                 {{ text | trim != '' and (
-                     (method == 'notify' and repeat.item == 'first')
+                     (method in ['notify', 'script'] and repeat.item == 'first')
                      or (method != 'notify' and to | length > 0)) }}
           then:
             # Through the integration's one queue: a message waits until the
@@ -475,6 +490,10 @@ action:
                 # another method is not checked, and cannot stop the message.
                 tts_engine: "{{ tts_engine if method == 'tts' else '' }}"
                 notify_service: "{{ notify_service if method == 'notify' else '' }}"
+                script: "{{ speak_script if method == 'script' else '' }}"
+                # For a script: the message's language, and whether it is a problem.
+                language: "{{ lang }}"
+                problem: "{{ trigger.id in ['failed', 'timeout'] and repeat.item == 'first' }}"
                 alexa_type: "{{ alexa_type }}"
                 kind: announcement
   # The phone for what to notice: only when there is something, never twice
@@ -496,6 +515,7 @@ action:
           targets: []
           tts_engine: ""
           notify_service: "{{ focus_notify }}"
+          script: ""
           kind: announcement
 
 mode: queued

@@ -5,7 +5,9 @@ cuts the first off. So the blueprints hand their messages to this queue
 (`xbloom.announce`) instead of calling Alexa, a TTS engine or a notify service
 themselves, and it speaks them one after another. Alexa reports nothing when
 it finishes speaking, so the next message waits for the time the last one
-takes to say, estimated from its length.
+takes to say, estimated from its length. A home that speaks through a script
+of its own (house rules for which speakers, and when) has the queue start that
+script instead, with what to say and where; it is still given its turn.
 
 Brew, fault and live-session messages go first; a brew story part waits
 behind them, only the newest one waits at all, and one that waited past its
@@ -34,8 +36,10 @@ STORY_STALE_S = 30.0
 STORY = "story"
 
 # What the action accepts: a message reaches only a notify service, a TTS
-# engine or media players, never another action under the integration's name.
+# engine, media players or a script chosen to speak, never another action
+# under the integration's name.
 _NOTIFY = re.compile(r"^notify\.[a-z0-9_]+$")
+_SCRIPT = re.compile(r"^script\.[a-z0-9_]+$")
 _TTS = re.compile(r"^tts\.[a-z0-9_]+$")
 _MEDIA_PLAYER = re.compile(r"^media_player\.[a-z0-9_]+$")
 
@@ -44,6 +48,13 @@ def notify_service(value: Any) -> str:
     value = str(value or "").strip()
     if value and not _NOTIFY.match(value):
         raise ValueError(f"not a notify service: {value}")
+    return value
+
+
+def script_entity(value: Any) -> str:
+    value = str(value or "").strip()
+    if value and not _SCRIPT.match(value):
+        raise ValueError(f"not a script: {value}")
     return value
 
 
@@ -141,9 +152,20 @@ class AnnouncementQueue:
             elif method == "notify" and _NOTIFY.match(item.get("notify_service") or ""):
                 await self._call("notify", item["notify_service"].split(".", 1)[1],
                                  {"message": message}, blocking=True, context=context)
+            elif method == "script" and _SCRIPT.match(item.get("script") or ""):
+                # Started, not awaited: a script may wait for the house to be
+                # quiet, and the queue still gives the next message its turn.
+                await self._call("script", "turn_on", {
+                    "entity_id": item["script"], "variables": {
+                        "message": message, "targets": targets,
+                        "language": item.get("language") or "",
+                        "alexa_type": item.get("alexa_type") or "tts",
+                        "kind": item.get("kind") or "announcement",
+                        "problem": bool(item.get("problem")),
+                    }}, blocking=True, context=context)
             else:
                 _LOGGER.debug("xbloom: an announcement by %s had nowhere to go "
-                              "(no speakers, TTS engine or notify service)", method)
+                              "(no speakers, TTS engine, notify service or script)", method)
                 return False
         except Exception as err:  # noqa: BLE001 — one speaker failing must not stop the rest
             _LOGGER.warning("xbloom: an announcement was not delivered (%s: %s)",

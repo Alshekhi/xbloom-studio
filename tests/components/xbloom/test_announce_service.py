@@ -55,3 +55,12 @@ async def test_announce_carries_the_callers_context(mock_config_entry):
     call = MagicMock(data={"message": "x"})
     await handlers["announce"](call)
     assert queue.add.call_args.args[0]["context"] is call.context
+
+
+def test_only_a_script_is_accepted_to_speak_through():
+    import pytest
+    from custom_components.xbloom.announce import script_entity
+    for bad in ("lock.unlock", "script", "script.a; b", "automation.x"):
+        with pytest.raises(ValueError):
+            script_entity(bad)
+    assert script_entity("script.speak") == "script.speak" and script_entity("") == ""

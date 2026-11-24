@@ -42,7 +42,7 @@ def test_each_speaking_blueprint_announces_through_the_queue(name):
     announces = [a for a in _actions(_load(name)["action"]) if a["action"] == "xbloom.announce"]
     assert announces, name
     for a in announces:
-        assert {"message", "method", "targets", "tts_engine", "notify_service", "kind"} <= set(a["data"])
+        assert {"message", "method", "targets", "tts_engine", "notify_service", "script", "kind"} <= set(a["data"])
 
 
 def test_story_parts_are_the_story_kind_and_the_rest_are_announcements():
@@ -65,10 +65,26 @@ def test_a_delivery_field_for_another_method_is_sent_empty(name):
         # is checked for that method alone.
         fixed = a["data"]["method"]
         methods = (fixed,) if "{{" not in str(fixed) else ("alexa", "tts", "notify")
-        for field, own in (("notify_service", "notify"), ("tts_engine", "tts")):
+        methods = methods if "{{" not in str(fixed) else (*methods, "script")
+        for field, own in (("notify_service", "notify"), ("tts_engine", "tts"), ("script", "script")):
             template = a["data"][field]
             for method in methods:
                 rendered = env.from_string(template).render(
                     method=method, notify_service="mobile_app_typed_without_prefix", tts_engine="tts.piper",
-                    focus_notify="notify.mobile_app_test")
+                    focus_notify="notify.mobile_app_test", speak_script="script.speak")
                 assert (rendered != "") == (method == own), (name, field, method, rendered)
+
+
+@pytest.mark.parametrize("name, problem", [
+    ("brew_announce.yaml", "{{ trigger.id in ['failed', 'timeout'] and repeat.item == 'first' }}"),
+    ("machine_fault_announce.yaml", "{{ ev != 'water_refilled' }}"),
+    ("live_control_announce.yaml", "false"),
+    ("story_announce.yaml", "false"),
+])
+def test_a_script_is_told_whether_the_message_is_a_problem(name, problem):
+    blueprint = _load(name)
+    assert "script" in [o["value"] for o in
+                        blueprint["blueprint"]["input"]["delivery"]["input"]["delivery_method"]["selector"]["select"]["options"]]
+    [call] = [a for a in _actions(blueprint["action"])
+              if a["action"] == "xbloom.announce" and a["data"]["method"] != "notify"]
+    assert call["data"]["problem"] == problem

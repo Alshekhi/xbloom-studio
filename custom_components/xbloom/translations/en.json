@@ -1864,7 +1864,7 @@
         },
         "method": {
           "name": "Announce with",
-          "description": "Alexa (Alexa Media Player), a speaker through a TTS engine, or a notify service."
+          "description": "Alexa (Alexa Media Player), a speaker through a TTS engine, a notify service, or a script that speaks for the home."
         },
         "targets": {
           "name": "Speakers",
@@ -1877,6 +1877,18 @@
         "notify_service": {
           "name": "Notify service",
           "description": "For a notify service only, for example notify.mobile_app_my_phone."
+        },
+        "script": {
+          "name": "Script",
+          "description": "For a script only. It is started with message, targets, language, alexa_type, kind and problem."
+        },
+        "language": {
+          "name": "Language",
+          "description": "For a script: the language the message is in."
+        },
+        "problem": {
+          "name": "Problem",
+          "description": "For a script: the message is a problem, such as a brew that could not start or a machine fault."
         },
         "alexa_type": {
           "name": "Alexa type",

@@ -2591,6 +2591,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
     from .announce import AnnouncementQueue
     from .announce import media_players as announce_media_players
     from .announce import notify_service as announce_notify_service
+    from .announce import script_entity as announce_script
     from .announce import tts_engine as announce_tts_engine
     entry.runtime_data.announcements = AnnouncementQueue(
         hass.services.async_call,
@@ -2605,6 +2606,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
             "targets": announce_media_players(call.data.get("targets")),
             "tts_engine": announce_tts_engine(call.data.get("tts_engine")),
             "notify_service": announce_notify_service(call.data.get("notify_service")),
+            "script": announce_script(call.data.get("script")),
+            "language": call.data.get("language") or "",
+            "problem": call.data.get("problem", False),
             "alexa_type": call.data.get("alexa_type") or "tts",
             "kind": call.data.get("kind") or "announcement",
             "context": call.context,
@@ -2619,10 +2623,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         schema=vol.Schema({
             # A message rendered from a template may arrive as a number.
             vol.Required("message"): vol.Coerce(str),
-            vol.Optional("method", default="alexa"): vol.In(["alexa", "tts", "notify"]),
+            vol.Optional("method", default="alexa"): vol.In(["alexa", "tts", "notify", "script"]),
             vol.Optional("targets"): announce_media_players,
             vol.Optional("tts_engine"): announce_tts_engine,
             vol.Optional("notify_service"): announce_notify_service,
+            vol.Optional("script"): announce_script,
+            # For a script: the message's language, and whether it is a
+            # problem (a brew that failed, a machine fault) rather than news.
+            vol.Optional("language", default=""): vol.Any("", "en", "ar"),
+            # A blueprint renders it from a template, as text.
+            vol.Optional("problem", default=False): vol.All(
+                vol.Coerce(str), vol.Lower, vol.In(["true", "false"]), lambda v: v == "true"),
             vol.Optional("alexa_type", default="tts"): vol.In(["tts", "announce"]),
             vol.Optional("kind", default="announcement"): vol.In(["announcement", "story"]),
         }),

@@ -37,11 +37,21 @@ example to try a blueprint elsewhere. The files are in
 [`custom_components/xbloom/blueprints/`](../custom_components/xbloom/blueprints/).
 
 **The announcement blueprints speak through whatever you have.** Under **How to
-announce**, **Announce with** offers three choices:
+announce**, **Announce with** offers four choices:
 
 - **Alexa** — via the [Alexa Media Player](https://github.com/alandtse/alexa_media_player) custom integration.
 - **Speaker (TTS)** — any TTS engine (Piper, Google Translate, Cloud) on any media player.
 - **Notification** — any `notify.*` service, so the text arrives as a phone notification instead of speech.
+- **Script** — a script of your own that already decides how your home speaks
+  (which speakers, when to stay quiet), so the blueprints follow the same rules
+  as everything else. It is started with `message`, `targets` (the speakers
+  chosen in the blueprint), `language` (`en` or `ar`, empty for a story part),
+  `alexa_type` (`tts`, or `announce` for a chime first), `kind` (`announcement`
+  or `story`) and `problem` (`true` for a brew that could not start or finish,
+  or a machine fault). The speakers may be left empty for the script to choose.
+  Its turn still comes after the message before it; give the script mode
+  `queued` or `parallel`, since one in the default `single` mode drops a message
+  that arrives while it is still speaking.
 
 **They never talk over each other.** Every one of them speaks through
 `xbloom.announce`, one message at a time: each waits until the one before it,

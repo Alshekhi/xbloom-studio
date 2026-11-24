@@ -165,3 +165,38 @@ async def test_the_callers_context_goes_with_the_message():
     await _settle()
     assert calls == [marker]
     queue.stop()
+
+
+async def test_a_script_is_started_with_what_to_say_and_still_waits_its_turn():
+    calls = []
+
+    async def call(domain, service, data, **kw):
+        calls.append((domain, service, data))
+
+    gates = []
+
+    async def sleep(seconds):
+        gate = asyncio.Event()
+        gates.append(gate)
+        await gate.wait()
+
+    queue = AnnouncementQueue(AsyncMock(side_effect=call), sleep=sleep, clock=_Clock())
+    queue.add({**_say("The coffee is ready"), "method": "script", "script": "script.speak",
+               "language": "en", "problem": True})
+    queue.add(_say("Pour 2 of 5"))
+    await _settle()
+    assert calls == [("script", "turn_on", {"entity_id": "script.speak", "variables": {
+        "message": "The coffee is ready", "targets": ["media_player.kitchen"], "language": "en",
+        "alexa_type": "tts", "kind": "announcement", "problem": True}})]
+    gates[0].set()
+    await _settle()
+    assert calls[1][2]["message"] == "Pour 2 of 5"
+
+
+async def test_a_script_method_without_a_script_goes_nowhere():
+    calls = []
+    queue = AnnouncementQueue(AsyncMock(side_effect=lambda *a, **k: calls.append(a)),
+                              sleep=AsyncMock(), clock=_Clock())
+    queue.add({**_say("Hello"), "method": "script", "script": ""})
+    await _settle()
+    assert calls == []

@@ -1864,7 +1864,7 @@
         },
         "method": {
           "name": "الإعلان عبر",
-          "description": "أليكسا (Alexa Media Player)، أو سماعة عبر محرك تحويل النص إلى كلام، أو خدمة إشعارات."
+          "description": "أليكسا (Alexa Media Player)، أو سماعة عبر محرك تحويل النص إلى كلام، أو خدمة إشعارات، أو سكربت يتولى الإعلان في المنزل."
         },
         "targets": {
           "name": "السماعات",
@@ -1877,6 +1877,18 @@
         "notify_service": {
           "name": "خدمة الإشعارات",
           "description": "لخدمة الإشعارات فقط، مثل notify.mobile_app_my_phone."
+        },
+        "script": {
+          "name": "السكربت",
+          "description": "للسكربت فقط. يُشغَّل ومعه message وtargets وlanguage وalexa_type وkind وproblem."
+        },
+        "language": {
+          "name": "اللغة",
+          "description": "للسكربت: لغة الرسالة."
+        },
+        "problem": {
+          "name": "مشكلة",
+          "description": "للسكربت: الرسالة عن مشكلة، مثل تحضير تعذر بدؤه أو عطل في الآلة."
         },
         "alexa_type": {
           "name": "نوع أليكسا",

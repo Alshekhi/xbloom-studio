@@ -29,6 +29,7 @@ blueprint:
                 - { value: alexa, label: Alexa }
                 - { value: tts, label: Speaker (TTS) }
                 - { value: notify, label: Notification }
+                - { value: script, label: Script }
         speakers:
           name: Speakers
           description: Where the faults are spoken.
@@ -51,6 +52,19 @@ blueprint:
           default: ""
           selector:
             text:
+        speak_script:
+          name: Script
+          description: >
+            For Script only: a script of your own that speaks for the home,
+            started with message, targets, language, alexa_type, kind and
+            problem; the speakers above may be left empty for it to choose.
+            Its turn still comes after any xBloom announcement before it. Give
+            the script mode queued or parallel, or a message that arrives while
+            it is still speaking is dropped.
+          default: ""
+          selector:
+            entity:
+              domain: script
     content:
       name: What to announce
       icon: mdi:text-box-outline
@@ -80,6 +94,7 @@ variables:
   ev: "{{ trigger.to_state.attributes.get('event_type') }}"
   lang: !input language
   method: !input delivery_method
+  speak_script: !input speak_script
   notify_service: !input notify_service
   # Carried as a variable, not used as `!input` directly in `target:`. Home
   # Assistant validates every `choose` branch at config load, including ones
@@ -165,6 +180,10 @@ action:
       # another method is not checked, and cannot stop the message.
       tts_engine: "{{ tts_engine if method == 'tts' else '' }}"
       notify_service: "{{ notify_service if method == 'notify' else '' }}"
+      script: "{{ speak_script if method == 'script' else '' }}"
+      # For a script: the message's language, and whether it is a problem.
+      language: "{{ lang }}"
+      problem: "{{ ev != 'water_refilled' }}"
       alexa_type: announce
       kind: announcement
 

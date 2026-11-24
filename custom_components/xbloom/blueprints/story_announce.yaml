@@ -30,6 +30,7 @@ blueprint:
                 - { value: alexa, label: Alexa }
                 - { value: tts, label: Speaker (TTS) }
                 - { value: notify, label: Notification }
+                - { value: script, label: Script }
         speakers:
           name: Speakers
           description: Where the story parts are spoken, for Alexa or Speaker (TTS).
@@ -52,6 +53,19 @@ blueprint:
           default: ""
           selector:
             text:
+        speak_script:
+          name: Script
+          description: >
+            For Script only: a script of your own that speaks for the home,
+            started with message, targets, language, alexa_type, kind and
+            problem; the speakers above may be left empty for it to choose.
+            Its turn still comes after any xBloom announcement before it. Give
+            the script mode queued or parallel, or a message that arrives while
+            it is still speaking is dropped.
+          default: ""
+          selector:
+            entity:
+              domain: script
     entities:
       name: xBloom entities
       icon: mdi:coffee-maker-outline
@@ -73,6 +87,7 @@ blueprint:
 
 variables:
   method: !input delivery_method
+  speak_script: !input speak_script
   notify_service: !input notify_service
   # A template, not `!input` in `target:`: an unused engine's empty default
   # would fail the validation Home Assistant runs on every `choose` branch.
@@ -112,7 +127,7 @@ trigger:
 condition:
   - condition: template
     value_template: >-
-      {{ message != '' and (method == 'notify' or speakers | length > 0) }}
+      {{ message != '' and (method in ['notify', 'script'] or speakers | length > 0) }}
 
 action:
   # Through the integration's one queue: behind any brew, fault or
@@ -126,6 +141,10 @@ action:
       # another method is not checked, and cannot stop the message.
       tts_engine: "{{ tts_engine if method == 'tts' else '' }}"
       notify_service: "{{ notify_service if method == 'notify' else '' }}"
+      script: "{{ speak_script if method == 'script' else '' }}"
+      # For a script: the message's language, and whether it is a problem.
+      language: ""
+      problem: "false"
       alexa_type: tts
       kind: story
 
