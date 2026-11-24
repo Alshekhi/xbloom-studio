@@ -176,8 +176,8 @@ action:
                   {{ 'How was ' ~ ws[0] ~ '?' if ws | count == 1
                      else 'How were your coffees? ' ~ ws | join(', and ') ~ '.' }}
                 {%- endif -%}
-                {#- One coffee: what was to be noticed in it, as a reminder. -#}
-                {{- (' ' ~ coffees[0].focus) if coffees | count == 1 and coffees[0].focus else '' }}
+                {#- Never what was to be noticed: it may be a story agent's
+                    text, and this conversation's agent can act. -#}
               # Only ids, in the order the question named the coffees: no
               # name reaches the agent's instructions.
               extra_system_prompt: >-
