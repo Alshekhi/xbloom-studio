@@ -154,3 +154,42 @@ async def test_the_sensor_and_buttons_follow_the_pick():
     cup.async_another = AsyncMock()
     await AnotherCupButton(lab).async_press()
     cup.async_another.assert_awaited_once()
+
+
+async def test_the_entities_have_ids_the_dashboard_can_name():
+    from custom_components.xbloom.coffee_lab.entities import (
+        AnotherCupButton, TodaysCupSensor, UseTodaysCupButton,
+    )
+    home = _Home()
+    cup, lab, *_ = await _cup(home)
+    assert TodaysCupSensor(lab).entity_id == "sensor.xbloom_studio_todays_cup"
+    assert UseTodaysCupButton(lab).entity_id == "button.xbloom_studio_use_todays_cup"
+    assert AnotherCupButton(lab).entity_id == "button.xbloom_studio_another_cup"
+
+
+async def test_a_cup_chosen_with_another_stays_through_a_refresh():
+    home = _Home()
+    cup, lab, *_ = await _cup(home)
+    await lab.store.async_add_bean(name="Valley Lot", status="open", tracked=True,
+                                   remaining_g=200.0, bag_size_g=250.0, opened_on=TODAY)
+    await cup.async_refresh()
+    await cup.async_another()
+    chosen = cup.pick
+    await cup.async_refresh()
+    assert (cup.pick.bag_id, cup.pick.recipe) == (chosen.bag_id, chosen.recipe)
+
+
+def test_routine_refreshes_wait_their_turn_and_real_events_do_not():
+    from custom_components.xbloom.coffee_lab import todays_cup_runtime as rt
+    wait = rt.refresh_delay
+    assert wait(None, 1000.0, force=False) == rt.SETTLE_S
+    assert wait(1000.0, 1060.0, force=False) == rt.MIN_INTERVAL_S - 60
+    assert wait(1000.0, 1000.0 + rt.MIN_INTERVAL_S + 1, force=False) == rt.SETTLE_S
+    assert wait(1000.0, 1060.0, force=True) == rt.SETTLE_S
+
+
+async def test_a_skip_is_counted_through_the_lab():
+    lab = await _lab()
+    await lab.async_count_skip("b1", "Daily")
+    await lab.async_count_skip("b1", "Daily")
+    assert lab.todays_cup_skips == {"b1|Daily": 2}

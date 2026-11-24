@@ -8,7 +8,7 @@ OTHER = Bean(id="x", name="Valley Lot", status="open", roaster="South")
 
 
 def rated(bean: str, recipe: str, rating: int, n: int = 0) -> Brew:
-    return Brew(id=f"{bean}{recipe}{n}", brewed_at=f"2026-09-0{n + 1}T08:00:00+03:00",
+    return Brew(id=f"{bean}{recipe}{n}", brewed_at=f"2026-09-0{n + 1}T08:00:00+00:00",
                 recorded_at="", dose_g=17.0, bean_id=bean, recipe=recipe, rating=rating)
 
 

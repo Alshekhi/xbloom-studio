@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timedelta
@@ -43,6 +44,19 @@ BUSY = ("grinding", "brewing")
 SEED_WAIT_S = 2.0
 # A refresh waits this long for a burst of changes to settle.
 SETTLE_S = 5
+# Routine refreshes no closer together than this.
+MIN_INTERVAL_S = 600
+
+
+def refresh_delay(last: float | None, now: float, force: bool) -> float:
+    """Seconds until the next refresh: a routine one waits its turn.
+
+    Every Coffee Lab change asks for a refresh — and with Notion so does the
+    re-read every few minutes — while each refresh reads a year of brews.
+    """
+    if force or last is None or now - last >= MIN_INTERVAL_S:
+        return SETTLE_S
+    return MIN_INTERVAL_S - (now - last)
 
 
 class TodaysCup:
@@ -58,12 +72,21 @@ class TodaysCup:
         self.waiting = False
         self._refreshing = asyncio.Lock()
         self._pending: Callable[[], None] | None = None
+        self._last_refresh: float | None = None
 
     def schedule(self, *_: Any) -> None:
-        """Refresh shortly: changes come in bursts, a brew counted then its bag re-read."""
+        """Refresh after a routine change: at most every MIN_INTERVAL_S."""
+        self._schedule(force=False)
+
+    def schedule_now(self, *_: Any) -> None:
+        """Refresh after a brew ends, the drink changes or the day turns."""
+        self._schedule(force=True)
+
+    def _schedule(self, force: bool) -> None:
         if self._pending is not None:
             self._pending()
-        self._pending = async_call_later(self.hass, SETTLE_S, self._run)
+        delay = refresh_delay(self._last_refresh, time.monotonic(), force)
+        self._pending = async_call_later(self.hass, delay, self._run)
 
     async def _run(self, _now: Any) -> None:
         self._pending = None
@@ -110,7 +133,9 @@ class TodaysCup:
             }
             dose = self._dose(drink, brews, now)
             rules = self.lab.opening
-            picks = candidates(beans, brews, own, {}, drink, now, rules, dose or 15.0)
+            per_day = habits(brews, beans, now - timedelta(days=USUAL_DAYS), now)["cups_per_brewing_day"]
+            daily_g = (dose or 15.0) * (per_day or 1.0)
+            picks = candidates(beans, brews, own, {}, drink, now, rules, dose or 15.0, daily_g)
             first = picks[0] if picks else None
             if first is not None and first.recipe is None:
                 bag = next(b for b in beans if b.id == first.bag_id)
@@ -120,9 +145,14 @@ class TodaysCup:
                     _LOGGER.info("Coffee Lab: no community recipe for today's cup: %s", err)
                     hub = None
                 if hub:
-                    picks = candidates(beans, brews, own, {bag.id: hub}, drink, now, rules, dose or 15.0)
+                    picks = candidates(beans, brews, own, {bag.id: hub}, drink, now, rules,
+                                       dose or 15.0, daily_g)
+            chosen = self.pick
             self.picks = [self._fit_dose(p, dose) for p in picks]
-            self.index = 0
+            # A cup chosen with Another stays while it is still on offer.
+            self.index = next((i for i, p in enumerate(self.picks) if chosen is not None
+                               and (p.bag_id, p.recipe) == (chosen.bag_id, chosen.recipe)), 0)
+            self._last_refresh = time.monotonic()
             self._changed()
 
     def _dose(self, drink: str, brews: list, now: datetime) -> float | None:
@@ -148,11 +178,7 @@ class TodaysCup:
         """The next cup on offer; the one passed over is counted for later."""
         if not self.picks:
             return
-        passed = self.pick
-        skips = dict(self.lab._state.get("todays_cup_skips") or {})
-        key = f"{passed.bag_id}|{passed.recipe or ''}"
-        skips[key] = skips.get(key, 0) + 1
-        await self.lab._async_set_state(quiet=True, todays_cup_skips=skips)
+        await self.lab.async_count_skip(self.pick.bag_id, self.pick.recipe)
         self.index = (self.index + 1) % len(self.picks)
         self._changed()
 

@@ -73,13 +73,19 @@ def _recipe_reason(recipe: OwnRecipe) -> str:
 def candidates(
     beans: list[Bean], brews: list[Brew], own: dict[str, list[OwnRecipe]],
     community: dict[str, dict[str, Any]], drink: str, now: datetime, opening: Opening, dose: float,
+    daily_g: float | None = None,
 ) -> list[Pick]:
-    """Every cup on offer, best first: the first is today's cup."""
+    """Every cup on offer, best first: the first is today's cup.
+
+    `daily_g` is the coffee usually brewed in a day; one dose when not given.
+    """
     coffee = [b for b in beans if b.kind == "coffee"]
     usable = [b for b in coffee if b.status == "open" and holds_a_dose(b, dose)]
     fresh = [b for b in usable if not fading(b, now, opening)]
     past = [b for b in usable if fading(b, now, opening)]
-    last = _last_brewed(brews, now)
+    # Variety is between coffees: a tea or xPod brewed since does not count.
+    coffee_ids = {b.id for b in coffee}
+    last = _last_brewed([r for r in brews if r.bean_id in coffee_ids], now)
     newest = max(last, key=last.get) if last else None
     liked = {b.id: liking(b, beans, brews) for b in usable}
     sharing = max(1, sum(1 for b in fresh if liked[b.id] == LIKED))
@@ -89,10 +95,13 @@ def candidates(
         if opened is None or not b.tracked or b.remaining_g is None or dose <= 0:
             return False
         days_left = opening.fade_days - (now.date() - opened).days
-        return b.remaining_g / (dose / sharing) > days_left
+        # At the pace of taking turns: the day's coffee shared across the liked bags.
+        return b.remaining_g / ((daily_g or dose) / sharing) > days_left
 
-    ranked = sorted(fresh, key=lambda b: (
-        -liked[b.id], not use_soon(b), b.id == newest, b.opened_on or "9999"))
+    def rank_key(b: Bean) -> tuple:
+        return (-liked[b.id], not use_soon(b), b.id == newest, b.opened_on or "9999")
+
+    ranked = sorted(fresh, key=rank_key)
 
     def bag_reason(i: int, b: Bean) -> tuple[str, ...]:
         if i > 0:
@@ -107,7 +116,8 @@ def candidates(
         return ("liked",) if liked[b.id] == LIKED else ()
 
     bags: list[tuple[Bean, tuple[str, ...]]] = [(b, bag_reason(i, b)) for i, b in enumerate(ranked)]
-    bags += [(b, ("past_best",)) for b in past]
+    # Past their best: offered after the others, but ranked the same way.
+    bags += [(b, ("past_best",)) for b in sorted(past, key=rank_key)]
     if not usable and (nxt := open_next(beans, dose, now, opening)) is not None:
         bags.append((nxt, ("open_next",)))
 

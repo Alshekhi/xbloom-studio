@@ -736,6 +736,19 @@ class CoffeeLab:
         await self._async_set_state(stock_levels=levels)
 
     @property
+    def todays_cup_skips(self) -> dict[str, int]:
+        """How often each cup was passed over with Another, by bag and recipe."""
+        return dict(self._state.get("todays_cup_skips") or {})
+
+    async def async_count_skip(self, bag_id: str, recipe: str | None) -> None:
+        skips = self.todays_cup_skips
+        key = f"{bag_id}|{recipe or ''}"
+        skips[key] = skips.get(key, 0) + 1
+        # Quiet: nothing shown depends on it, and today's cup must not be
+        # worked out again because of it.
+        await self._async_set_state(quiet=True, todays_cup_skips=skips)
+
+    @property
     def opening(self) -> Opening:
         """How many bags may be open, how long one rests, when an open one fades."""
         return Opening(**{**asdict(Opening()), **(self._state.get("opening") or {})})

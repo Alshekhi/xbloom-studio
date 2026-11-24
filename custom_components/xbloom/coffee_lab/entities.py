@@ -637,6 +637,8 @@ class TodaysCupSensor(CoffeeLabEntity, SensorEntity):
 
     def __init__(self, lab: CoffeeLab) -> None:
         super().__init__(lab, "todays_cup")
+        # Named here: "Today's" would otherwise give "today_s".
+        self.entity_id = "sensor.xbloom_studio_todays_cup"
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -668,6 +670,8 @@ class UseTodaysCupButton(_TodaysCupButton):
 
     def __init__(self, lab: CoffeeLab) -> None:
         super().__init__(lab, "use_todays_cup")
+        # Named here: "Today's" would otherwise give "today_s".
+        self.entity_id = "button.xbloom_studio_use_todays_cup"
 
     async def async_press(self) -> None:
         await self._cup().async_use()
@@ -680,6 +684,8 @@ class AnotherCupButton(_TodaysCupButton):
 
     def __init__(self, lab: CoffeeLab) -> None:
         super().__init__(lab, "another_cup")
+        # Named here: "Today's" would otherwise give "today_s".
+        self.entity_id = "button.xbloom_studio_another_cup"
 
     async def async_press(self) -> None:
         await self._cup().async_another()

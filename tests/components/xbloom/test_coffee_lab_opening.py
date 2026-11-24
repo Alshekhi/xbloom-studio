@@ -7,7 +7,7 @@ from custom_components.xbloom.coffee_lab.opening import (
     Opening, fading, holds_a_dose, open_next, usual_dose,
 )
 
-ZONE = ZoneInfo("Asia/Riyadh")
+ZONE = ZoneInfo("UTC")
 NOW = datetime(2026, 9, 30, 10, 0, tzinfo=ZONE)
 RULES = Opening()
 

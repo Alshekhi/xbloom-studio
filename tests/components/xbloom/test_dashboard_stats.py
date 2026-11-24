@@ -18,11 +18,11 @@ HABITS = {
     "bags_opened": ["Hill Farm", "Valley Lot"],
 }
 BREWS = [
-    {"brewed_at": "2026-09-24T12:24+03:00", "recipe": "Daily | Hot", "bag": "Hill Farm",
+    {"brewed_at": "2026-09-24T12:24+00:00", "recipe": "Daily | Hot", "bag": "Hill Farm",
      "dose_g": 17.0, "ratio": 15.0, "water_ml": 255.0, "grind": "50.0", "temperature_c": 89.0,
      "flow_rate": 3.5, "duration_s": 195.6, "brewer": "xBloom Studio", "verdict": "again",
      "tasting": {"body": "full", "finish": "toffee"}, "next_change": "grind 52", "id": "1"},
-    {"brewed_at": "2026-09-23T08:00+03:00", "bag": "Valley Lot", "dose_g": 28.0,
+    {"brewed_at": "2026-09-23T08:00+00:00", "bag": "Valley Lot", "dose_g": 28.0,
      "brewer": "Pour-over", "id": "2"},
 ]
 

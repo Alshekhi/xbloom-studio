@@ -573,20 +573,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         def _drink_maybe_changed() -> None:
             if browser.drink != last_drink[0]:
                 last_drink[0] = browser.drink
-                cup.schedule()
+                cup.schedule_now()
 
         @callback
         def _brew_status(event) -> None:
             old, new = event.data.get("old_state"), event.data.get("new_state")
             if old is not None and old.state in BUSY and (new is None or new.state not in BUSY):
-                cup.schedule()
+                cup.schedule_now()
 
         entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_COFFEE_LAB_UPDATED, cup.schedule))
         entry.async_on_unload(async_dispatcher_connect(hass, browser.signal, _drink_maybe_changed))
         entry.async_on_unload(async_track_state_change_event(hass, [BREW_STATUS], _brew_status))
-        entry.async_on_unload(async_track_time_change(hass, cup.schedule, hour=0, minute=0, second=5))
+        entry.async_on_unload(async_track_time_change(hass, cup.schedule_now, hour=0, minute=0, second=5))
         entry.async_on_unload(cup.stop)
-        cup.schedule()
+        cup.schedule_now()
         entry.async_on_unload(async_count_completed_brews(hass, lab))
         # Brews that could not reach the store wait in Home Assistant and are
         # retried here, at startup and every few minutes (coffee_lab/pending.py).

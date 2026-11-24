@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from custom_components.xbloom.coffee_lab.habits import habits
 from custom_components.xbloom.coffee_lab.models import Bean, Brew, Review
 
-ZONE = ZoneInfo("Asia/Riyadh")
+ZONE = ZoneInfo("UTC")
 START = datetime(2026, 9, 1, tzinfo=ZONE)
 NOW = datetime(2026, 9, 10, 20, 0, tzinfo=ZONE)
 
@@ -20,7 +20,7 @@ def brew(day, hour=8, dose=17.0, ratio=15.0, bean="b1", recipe="Daily Hot",
          rating=None, dripper="Omni dripper", review=None, brewer="xBloom Studio"):
     settings = {"ratio": ratio} if ratio is not None else {}
     return Brew(
-        id=f"{day}-{hour}", brewed_at=f"2026-09-{day:02d}T{hour:02d}:00:00+03:00",
+        id=f"{day}-{hour}", brewed_at=f"2026-09-{day:02d}T{hour:02d}:00:00+00:00",
         recorded_at="", dose_g=dose, bean_id=bean, recipe=recipe, settings=settings,
         rating=rating, dripper=dripper, review=review, brewer=brewer,
     )
@@ -98,7 +98,7 @@ def test_bags_opened_in_the_period():
 def test_a_stopped_brew_is_not_a_cup_and_outside_brews_do_not_count():
     stopped = Review("stopped_after_grinding")
     records = [brew(1), brew(2, review=stopped)]
-    records.append(Brew(id="old", brewed_at="2026-08-31T08:00:00+03:00", recorded_at="", dose_g=17.0))
+    records.append(Brew(id="old", brewed_at="2026-08-31T08:00:00+00:00", recorded_at="", dose_g=17.0))
     h = habits(records, BEANS, START, NOW)
     assert h["days_brewed"] == 1 and h["cups_per_brewing_day"] == 1.0
 

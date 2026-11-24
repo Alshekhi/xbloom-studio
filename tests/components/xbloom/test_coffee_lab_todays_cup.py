@@ -6,7 +6,7 @@ from custom_components.xbloom.coffee_lab.models import Bean, Brew
 from custom_components.xbloom.coffee_lab.opening import Opening
 from custom_components.xbloom.coffee_lab.todays_cup import OwnRecipe, candidates
 
-ZONE = ZoneInfo("Asia/Riyadh")
+ZONE = ZoneInfo("UTC")
 NOW = datetime(2026, 9, 30, 10, 0, tzinfo=ZONE)
 RULES = Opening()
 DOSE = 17.0
@@ -124,3 +124,32 @@ def test_every_candidate_carries_the_dose_and_drink_given():
 def test_no_coffee_bag_no_pick():
     tea = Bean(id="t", name="Tea", status="open", kind="tea")
     assert pick([tea], [], {}) == []
+
+
+def test_bags_past_their_best_are_ranked_like_the_others():
+    # Every open bag past its best: still the liked one first, and not the one brewed last.
+    beans = [opened("plain", days_open=40), opened("a", days_open=45), opened("b", days_open=50)]
+    brews = [brew("a", rating=3, days_ago=5), brew("b", rating=3, days_ago=4), brew("a", days_ago=1)]
+    picks = pick(beans, brews, {"a": own("R1"), "b": own("R1"), "plain": own("R2", again=False)})
+    assert [p.bag_id for p in picks] == ["b", "a", "plain"]
+    assert picks[0].reasons[0] == "past_best"
+
+
+def test_a_tea_brewed_since_does_not_break_the_alternation():
+    tea = Bean(id="t", name="Tea", status="open", kind="tea")
+    beans = [opened("a"), opened("b"), tea]
+    brews = [brew("a", rating=3, days_ago=4), brew("b", rating=3, days_ago=3),
+             brew("a", days_ago=2), brew("t", days_ago=1)]
+    assert pick(beans, brews, {"a": own("R1"), "b": own("R1")})[0].bag_id == "b"
+
+
+def test_use_soon_follows_the_grams_brewed_a_day():
+    # Two cups a day across two liked bags: a 150 g bag opened 15 days ago
+    # finishes in 10 days at 15 g a day, inside the 13 it has left.
+    beans = [opened("a", left=150, days_open=15), opened("b")]
+    brews = [brew("a", rating=3, days_ago=4), brew("b", rating=3, days_ago=3), brew("a", days_ago=1)]
+    picks = candidates(beans, brews, {"a": own("R1"), "b": own("R1")}, {}, "hot", NOW, RULES, DOSE,
+                       daily_g=30.0)
+    assert picks[0].bag_id == "b"
+    one_cup = candidates(beans, brews, {"a": own("R1"), "b": own("R1")}, {}, "hot", NOW, RULES, DOSE)
+    assert one_cup[0].bag_id == "a"
