@@ -471,13 +471,13 @@
         }
       },
       "coffee_lab_coffee_stock_low": {
-        "name": "Coffee running low"
+        "name": "Coffee stock low"
       },
       "coffee_lab_tea_stock_low": {
-        "name": "Tea running low"
+        "name": "Tea stock low"
       },
       "coffee_lab_xpod_stock_low": {
-        "name": "xPods running low"
+        "name": "xPod stock low"
       }
     },
     "select": {
@@ -672,7 +672,7 @@
         }
       },
       "coffee_lab_xpod_stock_measure": {
-        "name": "xPods stock measure",
+        "name": "xPod stock measure",
         "state": {
           "days": "Days",
           "pods": "Pods",
@@ -809,7 +809,7 @@
         "name": "Tea stock"
       },
       "coffee_lab_xpod_stock": {
-        "name": "xPods stock"
+        "name": "xPod stock"
       }
     },
     "switch": {
@@ -866,7 +866,7 @@
         "name": "Tea stock level"
       },
       "coffee_lab_xpod_stock_level": {
-        "name": "xPods stock level"
+        "name": "xPod stock level"
       }
     },
     "button": {

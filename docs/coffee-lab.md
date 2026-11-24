@@ -184,6 +184,34 @@ when another bag is chosen.
 When a bag is finished, **Finished bag** names it for a week, and **Buy
 again** keeps whether you would buy it again — yes, maybe or no.
 
+## Running low
+
+Coffee Lab keeps a **stock** figure for each kind the home has had — coffee,
+xPod boxes, tea — counted over every item on hand: a counted item by what is
+left, an unopened one not yet counted by its size. Choose what it is counted
+in with **Stock measure** — days, grams, cups or bags; for xPods days, pods or
+boxes — and below which it is running low with **Stock level** (0 turns it
+off). Days and cups come from the last 30 days of brews of that kind, and need
+at least five of them.
+
+An item whose amount is not known — opened before it was counted — is left
+out, and the figure becomes "at least" what is counted: it never turns low on
+that alone, since the item left out is usually not empty. Weigh it with
+`start_tracking` and the figure is whole again. Bags are always counted.
+
+When a kind falls below its level, `xbloom_stock_low` fires and, when they are
+set under **Configure → Coffee Lab**, the kind goes on the **Shopping list**
+(unless an open item of that name is already there) and the **Phone** is told
+once. When it rises back — a new bag — `xbloom_stock_restored` fires and the
+item Coffee Lab added is ticked off; an item someone wrote is never changed.
+A finished bag answered **buy again: yes**, with no other bag of that coffee on
+hand, goes on the list by name and fires `xbloom_buy_again`. The first look
+after this is installed only records where things stand.
+
+The Brew tab shows what is left of what the picked recipe draws from, and the
+AI tools see it too, mentioning a low stock once while already talking about
+coffee.
+
 ## Entities and actions
 
 **Coffee bag** (the bag in use), **Coffee left**, **Coffee bags** (with every
