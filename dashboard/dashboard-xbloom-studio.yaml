@@ -9,6 +9,9 @@ views:
   - type: grid
     cards:
     - type: markdown
+      text_only: true
+      content: '## Today''s cup'
+    - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = {''bag'': state_attr(''sensor.xbloom_studio_todays_cup'',
         ''bag''), ''recipe'': state_attr(''sensor.xbloom_studio_todays_cup'', ''recipe''), ''dose_g'':
@@ -21,8 +24,7 @@ views:
         "rated Keep it like this with it", ''brewed_with_bag'': "brewed with it before", ''like_this_coffee'':
         "brewed with coffee like it", ''community'': "a community recipe"} %}{% set ns = namespace(said=[])
         %}{% for r in a.get(''reasons'') or [] %}{% if r in words %}{% set ns.said = ns.said + [words[r]]
-        %}{% endif %}{% endfor %}{% set why = ns.said | join('', '') %}**Today''s cup:** {{ cup }}{% if
-        why %}
+        %}{% endif %}{% endfor %}{% set why = ns.said | join('', '') %}{{ cup }}{% if why %}
 
 
         {{ why[:1] | upper }}{{ why[1:] }}.{% endif %}'

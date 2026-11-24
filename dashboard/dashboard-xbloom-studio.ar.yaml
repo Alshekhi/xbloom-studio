@@ -9,6 +9,9 @@ views:
   - type: grid
     cards:
     - type: markdown
+      text_only: true
+      content: '## كوب اليوم'
+    - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set a = {''bag'': state_attr(''sensor.xbloom_studio_todays_cup'',
         ''bag''), ''recipe'': state_attr(''sensor.xbloom_studio_todays_cup'', ''recipe''), ''dose_g'':
@@ -21,7 +24,7 @@ views:
         "قيّمت الوصفة معها بـ أعتمدها كما هي", ''brewed_with_bag'': "حضّرتها معها من قبل", ''like_this_coffee'':
         "حضّرتها مع قهوة مشابهة", ''community'': "وصفة من المجتمع"} %}{% set ns = namespace(said=[]) %}{%
         for r in a.get(''reasons'') or [] %}{% if r in words %}{% set ns.said = ns.said + [words[r]] %}{%
-        endif %}{% endfor %}{% set why = ns.said | join(''، '') %}**كوب اليوم:** {{ cup }}{% if why %}
+        endif %}{% endfor %}{% set why = ns.said | join(''، '') %}{{ cup }}{% if why %}
 
 
         {{ why[:1] | upper }}{{ why[1:] }}.{% endif %}'

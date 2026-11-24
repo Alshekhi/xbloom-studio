@@ -20,7 +20,7 @@ def test_it_names_the_bag_the_recipe_and_the_dose_and_why():
     build = _build()
     attrs = {"bag": "Hill Farm", "recipe": "Daily", "dose_g": 17.0, "reasons": ["not_yesterday", "rated_again"]}
     assert _say(build, attrs) == (
-        "**Today's cup:** Hill Farm · Daily · 17 g\n\n"
+        "Hill Farm · Daily · 17 g\n\n"
         "Not the coffee you had last, rated Keep it like this with it.")
 
 
@@ -33,14 +33,14 @@ def test_a_recipe_reason_alone_starts_the_sentence():
 def test_the_bag_alone_with_no_recipe():
     build = _build()
     attrs = {"bag": "Hill Farm", "recipe": None, "dose_g": 17.0, "reasons": ["open_next"]}
-    assert _say(build, attrs) == "**Today's cup:** Hill Farm\n\nTime to open it."
+    assert _say(build, attrs) == "Hill Farm\n\nTime to open it."
 
 
 def test_arabic_reads_its_own_words():
     build = _build()
     attrs = {"bag": "Hill Farm", "recipe": "Daily", "dose_g": 17.0, "reasons": ["liked", "community"]}
     out = _say(build, attrs, "ar")
-    assert "كوب اليوم" in out and "أعجبتك، وصفة من المجتمع." in out
+    assert "أعجبتك، وصفة من المجتمع." in out
 
 
 def test_it_shows_only_when_idle_with_nothing_picked_and_a_cup_to_offer():
@@ -51,3 +51,10 @@ def test_it_shows_only_when_idle_with_nothing_picked_and_a_cup_to_offer():
     assert "sensor.xbloom_studio_brew_status" in conditions
     entities = {c.get("entity") for c in _cards(section)}
     assert {"button.xbloom_studio_use_todays_cup", "button.xbloom_studio_another_cup"} <= entities
+
+
+def test_the_section_has_a_real_heading():
+    build = _build()
+    for lang in ("en", "ar"):
+        section = _section(build, lang)
+        assert section["cards"][0]["content"] == "## " + build.TEXT[lang]["h_todays_cup"]

@@ -31,7 +31,7 @@ TEXT = {
         "d_roast": "Roast", "d_roast_date": "Roasted", "d_altitude": "Altitude", "d_notes": "Tasting notes",
         "d_m": "{n} m", "d_link": "Shop page",
         "open_next": "Open next: {bag}", "past_best": "past its best", "h_opening": "Opening bags",
-        "h_todays_cup": "Today's cup", "tc_line": "**Today's cup:** {cup}", "tc_sep": ", ", "tc_end": ".",
+        "h_todays_cup": "Today's cup", "tc_line": "{cup}", "tc_sep": ", ", "tc_end": ".",
         "r_liked": "you liked it", "r_not_yesterday": "not the coffee you had last",
         "r_use_soon": "best used soon", "r_past_best": "past its best", "r_open_next": "time to open it",
         "r_rated_again": "rated Keep it like this with it", "r_brewed_with_bag": "brewed with it before",
@@ -143,7 +143,7 @@ TEXT = {
         "d_roast": "درجة التحميص", "d_roast_date": "تاريخ التحميص", "d_altitude": "الارتفاع",
         "d_notes": "النكهات", "d_m": "{n} م", "d_link": "صفحة المتجر",
         "open_next": "افتح بعده: {bag}", "past_best": "تجاوز أفضل وقته", "h_opening": "فتح الأكياس",
-        "h_todays_cup": "كوب اليوم", "tc_line": "**كوب اليوم:** {cup}", "tc_sep": "، ", "tc_end": ".",
+        "h_todays_cup": "كوب اليوم", "tc_line": "{cup}", "tc_sep": "، ", "tc_end": ".",
         "r_liked": "أعجبتك", "r_not_yesterday": "ليست آخر قهوة حضّرتها",
         "r_use_soon": "يحسن استخدامها قريبًا", "r_past_best": "تجاوزت أفضل وقتها", "r_open_next": "حان وقت فتحها",
         "r_rated_again": "قيّمت الوصفة معها بـ أعتمدها كما هي", "r_brewed_with_bag": "حضّرتها معها من قبل",
@@ -389,6 +389,7 @@ def brew_view(t: dict) -> dict:
         # Today's cup: while the machine is idle, nothing is picked yet, and
         # there is a cup to offer.
         {"type": "grid", "cards": [
+            heading(t["h_todays_cup"]),
             {"type": "markdown", "content": todays_cup_card(t)},
             press(f"button.{E}_use_todays_cup"),
             press(f"button.{E}_another_cup"),
