@@ -159,3 +159,76 @@ def test_rotation_reads_recipe_names_however_they_were_written():
     brews = [brew("a", "daily", days_ago=1), brew("a", "R2", days_ago=3)]
     first = pick([opened("a")], brews, {"a": own("Daily", "R2")})[0]
     assert first.recipe == "R2"
+
+
+# When the card is due: once a day, from the usual first-cup time when there is one.
+
+from custom_components.xbloom.coffee_lab.todays_cup import due, shows_from  # noqa: E402
+
+
+def first_cups(hours: list[int]) -> list[Brew]:
+    out = []
+    for i, h in enumerate(hours):
+        day_ = (NOW - timedelta(days=i + 1)).replace(hour=h, minute=15)
+        out.append(Brew(id=f"f{i}", brewed_at=day_.isoformat(), recorded_at="", dose_g=DOSE, bean_id="a"))
+    return out
+
+
+def test_a_clear_first_cup_habit_sets_the_time():
+    start = shows_from(first_cups([7, 8, 7, 9, 8, 7, 8, 7, 9, 8, 8]), NOW)
+    assert (start.hour, start.minute) == (6, 15)
+
+
+def test_first_cups_spread_out_set_no_time():
+    assert shows_from(first_cups([1, 13, 7, 22, 4, 18, 9, 16, 0, 12, 20]), NOW) is None
+
+
+def test_too_few_days_set_no_time():
+    assert shows_from(first_cups([7, 8, 7]), NOW) is None
+
+
+def test_the_card_waits_for_the_usual_time_then_goes_once_brewed():
+    habit = first_cups([7, 8, 7, 9, 8, 7, 8, 7, 9, 8, 8])
+    early = NOW.replace(hour=5)
+    assert not due(habit, early)
+    morning = NOW.replace(hour=6, minute=30)
+    assert due(habit, morning)
+    brewed = habit + [Brew(id="today", brewed_at=morning.replace(minute=10).isoformat(),
+                           recorded_at="", dose_g=DOSE, bean_id="a")]
+    assert not due(brewed, morning)
+
+
+def test_without_a_habit_the_card_is_due_from_midnight_until_the_first_cup():
+    assert due([], NOW.replace(hour=0, minute=5))
+    today = Brew(id="t", brewed_at=NOW.replace(hour=1).isoformat(), recorded_at="", dose_g=DOSE, bean_id="a")
+    assert not due([today], NOW)
+
+
+def test_tea_or_a_stopped_brew_does_not_count_as_the_days_coffee():
+    from custom_components.xbloom.coffee_lab.models import Review
+    tea = Brew(id="t", brewed_at=NOW.replace(hour=1).isoformat(), recorded_at="", dose_g=4, dripper="Tea")
+    stopped = Brew(id="s", brewed_at=NOW.replace(hour=2).isoformat(), recorded_at="", dose_g=DOSE,
+                   review=Review("stopped_after_grinding"))
+    assert due([tea, stopped], NOW)
+
+
+def test_the_habit_is_the_middle_sixty_percent_and_shows_an_hour_before():
+    # Ten days: 20th to 80th percentile by the same rounding at both ends.
+    start = shows_from(first_cups([7, 7, 7, 8, 8, 8, 8, 9, 13, 14]), NOW)
+    assert start is not None and (start.hour, start.minute) == (6, 15)
+
+
+def test_the_card_shows_an_hour_before_not_up_to_two():
+    cups = []
+    for i in range(11):
+        when = (NOW - timedelta(days=i + 1)).replace(hour=7, minute=54)
+        cups.append(Brew(id=f"g{i}", brewed_at=when.isoformat(), recorded_at="", dose_g=DOSE, bean_id="a"))
+    start = shows_from(cups, NOW)
+    assert (start.hour, start.minute) == (6, 54)
+
+
+def test_a_brew_with_a_date_but_no_time_says_nothing_about_the_hour():
+    cups = first_cups([7, 8, 7, 9, 8, 7, 8, 7, 9, 8, 8])
+    cups += [Brew(id=f"d{i}", brewed_at=(NOW - timedelta(days=i + 12)).date().isoformat(),
+                  recorded_at="", dose_g=DOSE, bean_id="a") for i in range(5)]
+    assert shows_from(cups, NOW) is not None

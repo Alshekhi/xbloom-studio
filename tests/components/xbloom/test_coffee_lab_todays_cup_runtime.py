@@ -291,3 +291,34 @@ async def test_a_brew_started_during_the_read_keeps_the_pick():
     lab.store.async_list_brews = brew_starts
     await cup.async_refresh(reset=True)
     assert cup.pick == first and cup.waiting
+
+
+async def test_the_card_goes_once_the_days_coffee_is_brewed():
+    from custom_components.xbloom.coffee_lab.entities import TodaysCupSensor
+    home = _Home()
+    cup, lab, bag, _ = await _cup(home)
+    lab.todays_cup = cup
+    await cup.async_refresh()
+    sensor = TodaysCupSensor(lab)
+    await sensor.async_read()
+    assert sensor._attr_native_value == "Hill Farm"
+    assert sensor._attr_extra_state_attributes["due"] is True
+    await lab.async_consume(bean_id=bag.id, grams=17, run_id="r9", recipe="Daily",
+                            brewed_at=datetime.now(timezone.utc).isoformat())
+    await cup.async_refresh(reset=True)
+    await sensor.async_read()
+    # Not offered again today; the pick is still there for an agent to ask.
+    assert sensor._attr_native_value is None
+    attrs = sensor._attr_extra_state_attributes
+    assert attrs["due"] is False and attrs["bag"] == "Hill Farm"
+
+
+async def test_a_brew_recorded_hides_the_card_before_any_refresh():
+    from custom_components.xbloom.coffee_lab.models import Brew
+    home = _Home()
+    cup, lab, bag, _ = await _cup(home)
+    await cup.async_refresh()
+    assert cup.due()
+    cup.brew_recorded(Brew(id="x", brewed_at=datetime.now(timezone.utc).isoformat(),
+                           recorded_at="", dose_g=17.0, bean_id=bag.id))
+    assert not cup.due()

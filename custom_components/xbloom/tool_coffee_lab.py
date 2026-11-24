@@ -61,7 +61,8 @@ ACTIONS: dict[str, Spec] = {
         actions.todays_cup,
         "the cup to brew next: an open bag, a recipe for it and the dose, with reasons — "
         "liked, not_yesterday, use_soon, past_best, open_next; rated_again, "
-        "brewed_with_bag, like_this_coffee, community. Offer it when the person asks "
+        "brewed_with_bag, like_this_coffee, community; due: whether the dashboard offers "
+        "it now (once a day, until the day's first coffee). Offer it when the person asks "
         "what to brew; never brew it unasked. To brew it, prepare_brew with that bag, "
         "recipe and dose (a community recipe saved first with save_shared_recipe)",
     ),

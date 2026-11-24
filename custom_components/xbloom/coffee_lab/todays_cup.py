@@ -16,13 +16,13 @@ Pure: the runtime reads the store and the hub and hands everything in.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from .liking import LIKED, liking
 from .models import Bean, Brew
 from .opening import Opening, _day, fading, holds_a_dose, open_next
-from .stats import moment
+from .stats import TEA, made_coffee, moment
 
 
 @dataclass(frozen=True)
@@ -133,3 +133,55 @@ def candidates(
         else:
             picks.append(cup(None, None, None, ()))
     return picks
+
+
+# When the card is offered: once a day, until the day's first coffee, and —
+# when the first cup of the day has a habit — from shortly before it.
+HABIT_DAYS = 30
+HABIT_MIN_DAYS = 10
+# Most first cups (the middle 60 %) within this many hours of each other is a habit.
+HABIT_SPREAD_H = 4
+SHOW_BEFORE_H = 1
+
+
+def _coffee_cups(brews: list[Brew], zone, *, timed: bool = False) -> list[datetime]:
+    """When each coffee was brewed; `timed` leaves out a brew given a date alone,
+    which says the day but not the hour."""
+    return [
+        when for r in brews
+        if made_coffee(r) and r.dripper != TEA and r.dose_g
+        and not (timed and len((r.brewed_at or r.recorded_at).strip()) <= 10)
+        and (when := moment(r.brewed_at or r.recorded_at, zone)) is not None
+    ]
+
+
+def shows_from(brews: list[Brew], now: datetime) -> datetime | None:
+    """When today's card appears, from the usual first cup of the day; None
+    while there is no such habit (too few days, or first cups spread out)."""
+    first: dict = {}
+    since = (now - timedelta(days=HABIT_DAYS)).date()
+    for when in _coffee_cups(brews, now.tzinfo, timed=True):
+        day = when.date()
+        if since <= day < now.date() and (day not in first or when < first[day]):
+            first[day] = when
+    if len(first) < HABIT_MIN_DAYS:
+        return None
+    hours = sorted(w.hour + w.minute / 60 for w in first.values())
+    # The middle 60 %: the 20th and 80th percentiles, rounded alike.
+    low = hours[round(0.2 * (len(hours) - 1))]
+    high = hours[round(0.8 * (len(hours) - 1))]
+    if high - low > HABIT_SPREAD_H:
+        return None
+    minutes = max(0, round((low - SHOW_BEFORE_H) * 60))
+    return now.replace(hour=minutes // 60, minute=minutes % 60, second=0, microsecond=0)
+
+
+def due(brews: list[Brew], now: datetime, last_coffee: datetime | None = None) -> bool:
+    """Whether today's cup is offered now: not yet brewed today, and past the
+    usual time when there is one. `last_coffee` is a coffee recorded since the
+    brews were read."""
+    start = shows_from(brews, now) or now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if now < start:
+        return False
+    cups = _coffee_cups(brews, now.tzinfo) + ([last_coffee.astimezone(now.tzinfo)] if last_coffee else [])
+    return not any(when.date() == now.date() and when <= now for when in cups)

@@ -43,7 +43,7 @@ repair appears if one has waited more than an hour.
 
 ## The views
 
-- **Brew** — while nothing is picked, today's cup: a bag, a recipe and the dose,
+- **Brew** — once a day, until the day's first coffee and while nothing is picked, today's cup: a bag, a recipe and the dose,
   with why, to use or pass over; what is happening now, the water poured so far, the water left
   and how much is missing while a brew runs low, the bag in use, a recipe for that bag,
   brewing a recipe, one-off adjustments, saving a new recipe, and manual brews.

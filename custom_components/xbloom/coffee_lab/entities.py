@@ -631,7 +631,8 @@ class StockLevelNumber(StockEntity, NumberEntity):
 
 
 class TodaysCupSensor(CoffeeLabEntity, SensorEntity):
-    """Today's cup: the bag as state; the recipe, dose and reasons as attributes."""
+    """Today's cup: the bag as state while it is offered (once a day, from the
+    usual time); the pick, whether it is due and from when, as attributes."""
 
     _attr_icon = "mdi:coffee-outline"
 
@@ -643,15 +644,26 @@ class TodaysCupSensor(CoffeeLabEntity, SensorEntity):
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_TODAYS_CUP, self._changed))
+        # Whether it is due turns with the clock: at the usual time, and at midnight.
+        self.async_on_remove(async_track_time_interval(self.hass, self._tick, QUESTION_TICK))
+
+    @callback
+    def _tick(self, _now) -> None:
+        self._changed()
 
     async def async_read(self) -> None:
+        """The bag while the card is due; empty otherwise. The pick stays in the
+        attributes either way, for an agent asked for another cup."""
         cup = getattr(self.lab, "todays_cup", None)
         pick = cup.pick if cup is not None else None
-        self._attr_native_value = pick.bag if pick else None
+        is_due = bool(cup is not None and cup.due())
+        start = cup.shows_from() if cup is not None else None
+        self._attr_native_value = pick.bag if pick and is_due else None
         self._attr_extra_state_attributes = {
             "bag_id": pick.bag_id, "bag": pick.bag, "recipe": pick.recipe,
             "source": pick.recipe_source, "hub_id": pick.hub_id, "drink": pick.drink,
-            "dose_g": pick.dose_g, "reasons": list(pick.reasons),
+            "dose_g": pick.dose_g, "reasons": list(pick.reasons), "due": is_due,
+            "shows_from": start.isoformat() if start else None,
         } if pick else {}
 
 

@@ -254,12 +254,21 @@ not while one runs.
 - **The dose**: the usual dose for the drink, within what the recipe's cup
   takes; for iced with no usual iced dose, the recipe's own.
 
+It is offered once a day: on the Brew tab until the day's first coffee is
+brewed, then not again until the next day. When the first cup of the day has
+a habit — at least ten of the last 30 days, the middle 60 % of them within
+four hours of each other — it appears an hour before the early end of that
+range rather than at midnight. A brew given a date but no time says nothing
+about the hour and is left out of it.
+Asked for, an AI assistant offers it at any time, for a second cup.
+
 **Use today's cup** picks the bag, the recipe — adding a community one to the
 library first — and the dose on the Brew tab, which prepares the machine; the
 brew is started as any other. **Another cup** offers the next one.
 
 **Today's cup** carries `bag`, `bag_id`, `recipe`, `source` (`own` or
-`community`), `hub_id`, `drink`, `dose_g` and `reasons`: for the bag `liked`,
+`community`), `hub_id`, `drink`, `dose_g`, `due` (offered now), `shows_from`
+(the usual time, when there is one) and `reasons`: for the bag `liked`,
 `not_yesterday`, `use_soon`, `past_best` or `open_next`; for the recipe
 `rated_again`, `brewed_with_bag`, `like_this_coffee` or `community`.
 

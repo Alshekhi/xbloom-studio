@@ -567,6 +567,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         from .coffee_lab.todays_cup_runtime import BREW_STATUS, BUSY, TodaysCup
         cup = TodaysCup(hass, lab, browser, lambda: coordinator.data or [])
         lab.todays_cup = cup
+        lab.on_brew_recorded = cup.brew_recorded
         last_drink = [browser.drink]
 
         @callback

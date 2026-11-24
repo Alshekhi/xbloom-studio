@@ -279,7 +279,10 @@ async def todays_cup(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
         return {"todays_cup": None}
     facts = {"bag": pick.bag, "bag_id": pick.bag_id, "recipe": pick.recipe,
              "source": pick.recipe_source, "hub_id": pick.hub_id, "drink": pick.drink,
-             "dose_g": pick.dose_g, "reasons": list(pick.reasons)}
+             "dose_g": pick.dose_g, "reasons": list(pick.reasons),
+             # Whether the dashboard offers it now: not once the day's coffee
+             # is brewed, nor before the usual time. Asked for, it is answered anyway.
+             "due": cup.due() if callable(getattr(cup, "due", None)) else None}
     return {"todays_cup": {k: v for k, v in facts.items() if v is not None}}
 
 

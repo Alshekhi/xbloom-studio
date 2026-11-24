@@ -32,7 +32,8 @@ from .habits import habits
 from .lab import STORE_UNREACHABLE, CoffeeLab
 from .opening import USUAL_DAYS, usual_dose
 from .stock import pace
-from .todays_cup import OwnRecipe, Pick, candidates
+from .stats import TEA, made_coffee, moment
+from .todays_cup import OwnRecipe, Pick, candidates, due, shows_from
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -73,6 +74,9 @@ class TodaysCup:
         self.waiting = False
         # The coffee used a day, last worked out.
         self.daily_g: float | None = None
+        self._brews: list = []
+        # A coffee recorded since the brews were last read.
+        self._last_coffee: datetime | None = None
         self._refreshing = asyncio.Lock()
         self._pending: Callable[[], None] | None = None
         self._last_refresh: float | None = None
@@ -94,16 +98,16 @@ class TodaysCup:
     @callback
     def _schedule(self, force: bool) -> None:
         now = time.monotonic()
-        due = now + refresh_delay(self._last_refresh, now, force)
+        due_at = now + refresh_delay(self._last_refresh, now, force)
         # A sooner refresh already waiting stays: a routine change never
         # pushes back the one after a brew.
-        if self._pending is not None and self._due is not None and self._due <= due:
+        if self._pending is not None and self._due is not None and self._due <= due_at:
             self._reset = self._reset or force
             return
         if self._pending is not None:
             self._pending()
-        self._due, self._reset = due, self._reset or force
-        self._pending = async_call_later(self.hass, due - now, self._run)
+        self._due, self._reset = due_at, self._reset or force
+        self._pending = async_call_later(self.hass, due_at - now, self._run)
 
     async def _run(self, _now: Any) -> None:
         reset, self._pending, self._due, self._reset = self._reset, None, None, False
@@ -117,6 +121,24 @@ class TodaysCup:
         if self._pending is not None:
             self._pending()
             self._pending = None
+
+    def due(self) -> bool:
+        """Whether the card is offered now: once a day, from the usual time."""
+        return self.pick is not None and due(self._brews, dt_util.now(), self._last_coffee)
+
+    @callback
+    def brew_recorded(self, brew: Any) -> None:
+        """A brew was just written: a coffee hides the card at once, and the
+        next cup is worked out as after a brew — not when the throttle allows."""
+        if made_coffee(brew) and brew.dripper != TEA and brew.dose_g:
+            when = moment(brew.brewed_at or brew.recorded_at, dt_util.now().tzinfo)
+            if when is not None and (self._last_coffee is None or when > self._last_coffee):
+                self._last_coffee = when
+            self._changed()
+            self.schedule_now()
+
+    def shows_from(self) -> datetime | None:
+        return shows_from(self._brews, dt_util.now())
 
     @property
     def pick(self) -> Pick | None:
@@ -178,6 +200,9 @@ class TodaysCup:
                 if hub:
                     picks = candidates(beans, brews, own, {bag.id: hub}, drink, now, rules,
                                        dose or 15.0, daily_g)
+            # Kept for when the card is due: it changes with the clock, not the store.
+            self._brews = brews
+            self._last_coffee = None
             chosen = self.pick if self.index > 0 and not reset else None
             self.picks = [self._fit_dose(p, dose) for p in picks]
             self.index = next((i for i, p in enumerate(self.picks) if chosen is not None

@@ -333,3 +333,15 @@ async def test_a_sealed_bag_is_counted_from_its_size_once_brewed():
     assert (result.result, result.remaining_g, result.opened) == ("counted", 233.0, True)
     after = await lab.store.async_get_bean(bag.id)
     assert (after.tracked, after.remaining_g, after.status, after.opened_on) == (True, 233.0, "open", "2026-09-25")
+
+
+async def test_every_brew_written_is_told_at_once():
+    lab = await _lab()
+    bag = await _bag(lab)
+    told = []
+    lab.on_brew_recorded = told.append
+    await lab.async_consume(bean_id=bag.id, grams=18, run_id="r1", recipe="K")
+    untracked = await _bag(lab, name="Other", tracked=False, remaining_g=None, status="open")
+    await lab.async_consume(bean_id=untracked.id, grams=18, run_id="r2")
+    await lab.async_consume(bean_id=None, grams=18, run_id="r3")
+    assert len(told) == 3 and all(b.dose_g == 18 for b in told)
