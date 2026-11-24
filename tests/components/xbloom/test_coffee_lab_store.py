@@ -140,3 +140,15 @@ async def test_brews_of_one_bag():
         await store.async_create_brew(Brew(id="", brewed_at="2026-09-25T10:00:00Z", recorded_at="",
                                            dose_g=15.0, bean_id=bean_id))
     assert [b.bean_id for b in await store.async_list_brews(bean_id="bag-a")] == ["bag-a", "bag-a"]
+
+
+async def test_brews_until_a_time_are_cut_before_the_limit():
+    from datetime import datetime, timezone
+    store = LocalStore(FakeStorage())
+    await store.async_load()
+    for day in (1, 2, 3, 20, 21):
+        await store.async_create_brew(Brew(id="", brewed_at=f"2026-09-{day:02d}T09:00:00+00:00",
+                                           recorded_at="", dose_g=17.0))
+    got = await store.async_list_brews(since=datetime(2026, 9, 1, tzinfo=timezone.utc),
+                                       until=datetime(2026, 9, 10, tzinfo=timezone.utc), limit=2)
+    assert [b.brewed_at[:10] for b in got] == ["2026-09-03", "2026-09-02"]

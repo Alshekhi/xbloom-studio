@@ -119,3 +119,32 @@ def test_the_coffee_total_leaves_out_tea_and_keeps_xpods():
     pod = Brew(id="p", brewed_at="2026-09-11T08:00:00+05:00", recorded_at="", dose_g=15.0, dripper="xPod")
     t = totals([tea, pod, brew("2026-09-12T08:00:00+05:00", 16)], *SEPTEMBER)
     assert (t.brews, t.coffee_g) == (3, 31.0)
+
+
+def test_the_history_by_month_and_by_week_newest_first():
+    from custom_components.xbloom.coffee_lab.stats import by_month, by_week
+    records = [brew("2026-09-25T09:00:00+05:00", 16, 256), brew("2026-09-21T09:00:00+05:00", 18, 270),
+               brew("2026-08-10T09:00:00+05:00", 20, 300)]
+    months = by_month(records, NOW, 3)
+    assert months == [
+        {"start": "2026-09-01", "brews": 2, "coffee_g": 34.0, "water_ml": 526.0},
+        {"start": "2026-08-01", "brews": 1, "coffee_g": 20.0, "water_ml": 300.0},
+    ]
+    weeks = by_week(records, NOW, 2)
+    # Weeks start on Monday: 21 and 25 September fall in the week of the 21st.
+    assert weeks == [
+        {"start": "2026-09-21", "brews": 2, "coffee_g": 34.0, "water_ml": 526.0},
+        {"start": "2026-09-14", "brews": 0, "coffee_g": 0.0, "water_ml": 0.0},
+    ]
+
+
+def test_months_before_the_first_brew_are_left_out():
+    from custom_components.xbloom.coffee_lab.stats import by_month
+    months = by_month([brew("2026-08-10T09:00:00+05:00", 20, 300)], NOW, 12)
+    assert [m["start"] for m in months] == ["2026-09-01", "2026-08-01"]
+    assert by_month([], NOW, 12) == []
+
+
+def test_no_brews_no_weeks_either():
+    from custom_components.xbloom.coffee_lab.stats import by_week
+    assert by_week([], NOW, 8) == []

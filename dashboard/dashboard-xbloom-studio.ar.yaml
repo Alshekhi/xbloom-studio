@@ -1345,13 +1345,21 @@ views:
       icon_tap_action:
         action: none
     - type: markdown
-      content: '{% set a = states[''sensor.xbloom_studio_brews''].attributes if states[''sensor.xbloom_studio_brews'']
-        else {} %}- **القهوة المستخدمة:** {{ a.get(''coffee_g'', 0) | round(0) | int }} غ
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}- **القهوة المستخدمة:** {{ (state_attr(''sensor.xbloom_studio_brews'',
+        ''coffee_g'') or 0) | round(0) | int }} غ
 
-        {% if a.get(''water_ml'') %}- **الماء المستخدم:** {{ a.get(''water_ml'') | round(0) | int }} مل
+        {% if state_attr(''sensor.xbloom_studio_brews'', ''water_ml'') %}- **الماء المستخدم:** {{ state_attr(''sensor.xbloom_studio_brews'',
+        ''water_ml'') | round(0) | int }} مل
 
-        {% endif %}- **التحضيرات في الفترة السابقة:** {{ (a.get(''previous_period'') or {}).get(''brews'',
-        0) }}'
+        {% endif %}- **التحضيرات في الفترة السابقة:** {{ (state_attr(''sensor.xbloom_studio_brews'', ''previous_period'')
+        or {}).get(''brews'', 0) }}
+
+        {% set brewers = state_attr(''sensor.xbloom_studio_brews'', ''by_brewer'') or {} %}{% if brewers
+        %}- **أدوات التحضير:** {% for name, n in brewers.items() %}⁨{{ "أخرى" if name == ''other'' else
+        e(name) }}⁩ ({{ n }}){% if not loop.last %}، {% endif %}{% endfor %}
+
+        {% endif %}'
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_brews
@@ -1363,8 +1371,7 @@ views:
       show_empty: false
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set h = state_attr(''sensor.xbloom_studio_brews'', ''habits'')
-        or {} %}{% if h %}{% set u = h.get(''usual'') or {} %}{% set v = h.get(''verdicts'') or {} %}##
-        الملخص
+        or {} %}{% if h %}{% set u = h.get(''usual'') or {} %}## الملخص
 
 
         - **أيام التحضير:** {{ h.get(''days_brewed'', 0) }} من {{ h.get(''days_in_period'', 0) }}
@@ -1383,20 +1390,9 @@ views:
         | round(1) | string | replace(''.0'', '''')) }} غ بنسبة 1:{{ ((u[''iced''].ratio | float) | round(1)
         | string | replace(''.0'', '''')) }}
 
-        {% endif %}{% if h.get(''top_coffee'') %}- **أكثر بن حضّرته:** ⁨{{ e(h.top_coffee.name) }}⁩ ({{
-        h.top_coffee.brews }})
-
-        {% endif %}{% if h.get(''top_recipe'') %}- **أكثر وصفة حضّرتها:** ⁨{{ e(h.top_recipe.name) }}⁩
-        ({{ h.top_recipe.brews }})
-
         {% endif %}{% if h.get(''time_of_day'') %}- **تحضّر عادةً:** {% if h.time_of_day == ''morning''
         %}في الصباح{% elif h.time_of_day == ''afternoon'' %}بعد الظهر{% elif h.time_of_day == ''evening''
         %}في المساء{% elif h.time_of_day == ''night'' %}في الليل{% endif %}
-
-        {% endif %}{% if v %}- **التقييمات:** {{ [("أعتمدها كما هي" ~ '' ('' ~ v.get(''again'') ~ '')'')
-        if v.get(''again'') else '''', ("قريبة، تحتاج تعديل" ~ '' ('' ~ v.get(''fine'') ~ '')'') if v.get(''fine'')
-        else '''', ("لا تناسب هذا البن" ~ '' ('' ~ v.get(''not_again'') ~ '')'') if v.get(''not_again'')
-        else ''''] | select | join(''، '') }}
 
         {% endif %}{% if h.get(''bags_opened'') %}- **أكياس فُتحت:** {% for b in h.bags_opened %}⁨{{ e(b)
         }}⁩{% if not loop.last %}، {% endif %}{% endfor %}{% endif %}{% endif %}'
@@ -1408,7 +1404,54 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## آخر التحضيرات'
+      show_empty: false
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set rows = (state_attr(''sensor.xbloom_studio_brews'', ''habits'')
+        or {}).get(''by_coffee'') or [] %}{% if rows %}## حسب البن
+
+
+        | البن | الأكواب | الغرامات |
+
+        |---|---|---|
+
+        {% for r in rows %}| ⁨{{ e(r.get(''name'')) }}⁩ | {{ r.get(''brews'', 0) }} | {{ (r.get(''coffee_g'')
+        or 0) | round(0) | int }} |
+
+        {% endfor %}{% endif %}'
+    visibility:
+    - condition: numeric_state
+      entity: sensor.xbloom_studio_brews
+      above: 0
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      show_empty: false
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set rows = (state_attr(''sensor.xbloom_studio_brews'', ''habits'')
+        or {}).get(''by_recipe'') or [] %}{% if rows %}## حسب الوصفة
+
+
+        | الوصفة | الأكواب | التقييمات |
+
+        |---|---|---|
+
+        {% for r in rows %}{% set v = r.get(''verdicts'') or {} %}| ⁨{{ e(r.get(''name'')) }}⁩ | {{ r.get(''brews'',
+        0) }} | {{ [("أعتمدها كما هي" ~ '' ('' ~ v.get(''again'') ~ '')'') if v.get(''again'') else '''',
+        ("قريبة، تحتاج تعديل" ~ '' ('' ~ v.get(''fine'') ~ '')'') if v.get(''fine'') else '''', ("لا تناسب
+        هذا البن" ~ '' ('' ~ v.get(''not_again'') ~ '')'') if v.get(''not_again'') else ''''] | select
+        | join(''، '') }} |
+
+        {% endfor %}{% endif %}'
+    visibility:
+    - condition: numeric_state
+      entity: sensor.xbloom_studio_brews
+      above: 0
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## تحضيرات هذه الفترة'
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% for b in state_attr(''sensor.xbloom_studio_recent_brews'', ''brews'')
@@ -1493,21 +1536,38 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## حسب أداة التحضير'
-    - type: markdown
-      content: '{% for name, n in (state_attr(''sensor.xbloom_studio_brews'',''by_brewer'') or {}).items()
-        %}- **{{ ''أخرى'' if name == ''other'' else name }}**: {{ n }}
-
-        {% endfor %}'
-    visibility:
-    - condition: numeric_state
-      entity: sensor.xbloom_studio_brews
-      above: 0
-  - type: grid
-    cards:
-    - type: markdown
-      text_only: true
       content: '## سجل التحضير'
+    - type: markdown
+      content: '{% set names = [''يناير'', ''فبراير'', ''مارس'', ''أبريل'', ''مايو'', ''يونيو'', ''يوليو'',
+        ''أغسطس'', ''سبتمبر'', ''أكتوبر'', ''نوفمبر'', ''ديسمبر''] %}{% set this_year = ((state_attr(''sensor.xbloom_studio_brew_history'',
+        ''by_month'') or [{}])[0].get(''start'') or '''')[:4] %}{% if state_attr(''sensor.xbloom_studio_brew_history'',
+        ''by_month'') or state_attr(''sensor.xbloom_studio_brew_history'', ''by_week'') %}### حسب الشهر
+
+
+        | الشهر | التحضيرات | القهوة | الماء |
+
+        |---|---|---|---|
+
+        {% for r in state_attr(''sensor.xbloom_studio_brew_history'', ''by_month'') or [] %}{% set d =
+        r.get(''start'') or ''0000-01'' %}| {{ names[(d[5:7] | int) - 1] }} {{ d[:4] }} | {{ r.get(''brews'',
+        0) }} | {{ (r.get(''coffee_g'') or 0) | round(0) | int }} غ | {% if r.get(''water_ml'') %}{{ r.get(''water_ml'')
+        | round(0) | int }} مل{% endif %} |
+
+        {% endfor %}
+
+        ### حسب الأسبوع
+
+
+        | أسبوع | التحضيرات | القهوة | الماء |
+
+        |---|---|---|---|
+
+        {% for r in state_attr(''sensor.xbloom_studio_brew_history'', ''by_week'') or [] %}{% set d =
+        r.get(''start'') or ''0000-00-00'' %}| {{ d[8:10] }}/{{ d[5:7] }}{% if d[:4] != this_year %}/{{
+        d[:4] }}{% endif %} | {{ r.get(''brews'', 0) }} | {{ (r.get(''coffee_g'') or 0) | round(0) | int
+        }} غ | {% if r.get(''water_ml'') %}{{ r.get(''water_ml'') | round(0) | int }} مل{% endif %} |
+
+        {% endfor %}{% endif %}'
     - type: statistics-graph
       title: التحضيرات يوميا
       chart_type: bar
@@ -1554,7 +1614,7 @@ views:
         name: الماء المستخدم
     visibility:
     - condition: state
-      entity: sensor.xbloom_studio_brews
+      entity: sensor.xbloom_studio_brew_history
       state_not: unavailable
 - title: الأكياس
   path: bags

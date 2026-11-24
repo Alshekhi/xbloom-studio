@@ -1327,13 +1327,21 @@ views:
       icon_tap_action:
         action: none
     - type: markdown
-      content: '{% set a = states[''sensor.xbloom_studio_brews''].attributes if states[''sensor.xbloom_studio_brews'']
-        else {} %}- **Coffee used:** {{ a.get(''coffee_g'', 0) | round(0) | int }} g
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}- **Coffee used:** {{ (state_attr(''sensor.xbloom_studio_brews'',
+        ''coffee_g'') or 0) | round(0) | int }} g
 
-        {% if a.get(''water_ml'') %}- **Water brewed:** {{ a.get(''water_ml'') | round(0) | int }} ml
+        {% if state_attr(''sensor.xbloom_studio_brews'', ''water_ml'') %}- **Water brewed:** {{ state_attr(''sensor.xbloom_studio_brews'',
+        ''water_ml'') | round(0) | int }} ml
 
-        {% endif %}- **Brews in the period before:** {{ (a.get(''previous_period'') or {}).get(''brews'',
-        0) }}'
+        {% endif %}- **Brews in the period before:** {{ (state_attr(''sensor.xbloom_studio_brews'', ''previous_period'')
+        or {}).get(''brews'', 0) }}
+
+        {% set brewers = state_attr(''sensor.xbloom_studio_brews'', ''by_brewer'') or {} %}{% if brewers
+        %}- **Brewers:** {% for name, n in brewers.items() %}⁨{{ "Other" if name == ''other'' else e(name)
+        }}⁩ ({{ n }}){% if not loop.last %}, {% endif %}{% endfor %}
+
+        {% endif %}'
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_brews
@@ -1345,8 +1353,7 @@ views:
       show_empty: false
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% set h = state_attr(''sensor.xbloom_studio_brews'', ''habits'')
-        or {} %}{% if h %}{% set u = h.get(''usual'') or {} %}{% set v = h.get(''verdicts'') or {} %}##
-        Summary
+        or {} %}{% if h %}{% set u = h.get(''usual'') or {} %}## Summary
 
 
         - **Days brewed:** {{ h.get(''days_brewed'', 0) }} of {{ h.get(''days_in_period'', 0) }}
@@ -1365,20 +1372,9 @@ views:
         | string | replace(''.0'', '''')) }} g at 1:{{ ((u[''iced''].ratio | float) | round(1) | string
         | replace(''.0'', '''')) }}
 
-        {% endif %}{% if h.get(''top_coffee'') %}- **Most brewed coffee:** ⁨{{ e(h.top_coffee.name) }}⁩
-        ({{ h.top_coffee.brews }})
-
-        {% endif %}{% if h.get(''top_recipe'') %}- **Most brewed recipe:** ⁨{{ e(h.top_recipe.name) }}⁩
-        ({{ h.top_recipe.brews }})
-
         {% endif %}{% if h.get(''time_of_day'') %}- **Usually brewed:** {% if h.time_of_day == ''morning''
         %}in the morning{% elif h.time_of_day == ''afternoon'' %}in the afternoon{% elif h.time_of_day
         == ''evening'' %}in the evening{% elif h.time_of_day == ''night'' %}at night{% endif %}
-
-        {% endif %}{% if v %}- **Verdicts:** {{ [("Keep it like this" ~ '' ('' ~ v.get(''again'') ~ '')'')
-        if v.get(''again'') else '''', ("Close, needs a tweak" ~ '' ('' ~ v.get(''fine'') ~ '')'') if
-        v.get(''fine'') else '''', ("Doesn''t suit this coffee" ~ '' ('' ~ v.get(''not_again'') ~ '')'')
-        if v.get(''not_again'') else ''''] | select | join('', '') }}
 
         {% endif %}{% if h.get(''bags_opened'') %}- **Bags opened:** {% for b in h.bags_opened %}⁨{{ e(b)
         }}⁩{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% endif %}'
@@ -1390,7 +1386,54 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Recent brews'
+      show_empty: false
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set rows = (state_attr(''sensor.xbloom_studio_brews'', ''habits'')
+        or {}).get(''by_coffee'') or [] %}{% if rows %}## By coffee
+
+
+        | Coffee | Cups | Grams |
+
+        |---|---|---|
+
+        {% for r in rows %}| ⁨{{ e(r.get(''name'')) }}⁩ | {{ r.get(''brews'', 0) }} | {{ (r.get(''coffee_g'')
+        or 0) | round(0) | int }} |
+
+        {% endfor %}{% endif %}'
+    visibility:
+    - condition: numeric_state
+      entity: sensor.xbloom_studio_brews
+      above: 0
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      show_empty: false
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set rows = (state_attr(''sensor.xbloom_studio_brews'', ''habits'')
+        or {}).get(''by_recipe'') or [] %}{% if rows %}## By recipe
+
+
+        | Recipe | Cups | Verdicts |
+
+        |---|---|---|
+
+        {% for r in rows %}{% set v = r.get(''verdicts'') or {} %}| ⁨{{ e(r.get(''name'')) }}⁩ | {{ r.get(''brews'',
+        0) }} | {{ [("Keep it like this" ~ '' ('' ~ v.get(''again'') ~ '')'') if v.get(''again'') else
+        '''', ("Close, needs a tweak" ~ '' ('' ~ v.get(''fine'') ~ '')'') if v.get(''fine'') else '''',
+        ("Doesn''t suit this coffee" ~ '' ('' ~ v.get(''not_again'') ~ '')'') if v.get(''not_again'')
+        else ''''] | select | join('', '') }} |
+
+        {% endfor %}{% endif %}'
+    visibility:
+    - condition: numeric_state
+      entity: sensor.xbloom_studio_brews
+      above: 0
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## Brews in this period'
     - type: markdown
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
         ''\\\\\\1'') }}{% endmacro %}{% for b in state_attr(''sensor.xbloom_studio_recent_brews'', ''brews'')
@@ -1475,21 +1518,38 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## By brewer'
-    - type: markdown
-      content: '{% for name, n in (state_attr(''sensor.xbloom_studio_brews'',''by_brewer'') or {}).items()
-        %}- **{{ ''Other'' if name == ''other'' else name }}**: {{ n }}
-
-        {% endfor %}'
-    visibility:
-    - condition: numeric_state
-      entity: sensor.xbloom_studio_brews
-      above: 0
-  - type: grid
-    cards:
-    - type: markdown
-      text_only: true
       content: '## Brew history'
+    - type: markdown
+      content: '{% set names = [''January'', ''February'', ''March'', ''April'', ''May'', ''June'', ''July'',
+        ''August'', ''September'', ''October'', ''November'', ''December''] %}{% set this_year = ((state_attr(''sensor.xbloom_studio_brew_history'',
+        ''by_month'') or [{}])[0].get(''start'') or '''')[:4] %}{% if state_attr(''sensor.xbloom_studio_brew_history'',
+        ''by_month'') or state_attr(''sensor.xbloom_studio_brew_history'', ''by_week'') %}### By month
+
+
+        | Month | Brews | Coffee | Water |
+
+        |---|---|---|---|
+
+        {% for r in state_attr(''sensor.xbloom_studio_brew_history'', ''by_month'') or [] %}{% set d =
+        r.get(''start'') or ''0000-01'' %}| {{ names[(d[5:7] | int) - 1] }} {{ d[:4] }} | {{ r.get(''brews'',
+        0) }} | {{ (r.get(''coffee_g'') or 0) | round(0) | int }} g | {% if r.get(''water_ml'') %}{{ r.get(''water_ml'')
+        | round(0) | int }} ml{% endif %} |
+
+        {% endfor %}
+
+        ### By week
+
+
+        | Week of | Brews | Coffee | Water |
+
+        |---|---|---|---|
+
+        {% for r in state_attr(''sensor.xbloom_studio_brew_history'', ''by_week'') or [] %}{% set d =
+        r.get(''start'') or ''0000-00-00'' %}| {{ d[8:10] }}/{{ d[5:7] }}{% if d[:4] != this_year %}/{{
+        d[:4] }}{% endif %} | {{ r.get(''brews'', 0) }} | {{ (r.get(''coffee_g'') or 0) | round(0) | int
+        }} g | {% if r.get(''water_ml'') %}{{ r.get(''water_ml'') | round(0) | int }} ml{% endif %} |
+
+        {% endfor %}{% endif %}'
     - type: statistics-graph
       title: Brews per day
       chart_type: bar
@@ -1536,7 +1596,7 @@ views:
         name: Water brewed
     visibility:
     - condition: state
-      entity: sensor.xbloom_studio_brews
+      entity: sensor.xbloom_studio_brew_history
       state_not: unavailable
 - title: Bags
   path: bags

@@ -14,6 +14,8 @@ it.
 """
 from __future__ import annotations
 
+from homeassistant.util import dt as dt_util
+
 import asyncio
 import re
 from dataclasses import dataclass, replace
@@ -625,37 +627,48 @@ class NotionStore(CoffeeLabStore):
 
     async def async_list_brews(
         self, *, since: datetime | None = None, limit: int | None = None,
-        bean_id: str | None = None,
+        bean_id: str | None = None, until: datetime | None = None,
     ) -> list[Brew]:
         body: dict[str, Any] = {"sorts": [{"property": "Brewed At", "direction": "descending"}]}
-        filters: list[dict[str, Any]] = []
-        if bean_id is not None:
-            filters.append({"property": "Bean", "relation": {"contains": bean_id}})
-        if since is not None:
-            # A day early: a brew near midnight in UTC can be the next local
-            # day. A row with no Brewed At is found by when it was recorded.
-            day = (since - timedelta(days=1)).date().isoformat()
-            filters.append({"or": [
-                {"property": "Brewed At", "date": {"on_or_after": day}},
-                {"and": [
-                    {"property": "Brewed At", "date": {"is_empty": True}},
-                    {"timestamp": "created_time", "created_time": {"on_or_after": day}},
-                ]},
-            ]})
-        if filters:
-            body["filter"] = filters[0] if len(filters) == 1 else {"and": filters}
+        bag = [{"property": "Bean", "relation": {"contains": bean_id}}] if bean_id is not None else []
+        if since is None and until is None:
+            if bag:
+                body["filter"] = bag[0]
+        else:
+            # A day either side: a brew near midnight in UTC can be another
+            # local day; the answer is trimmed exactly below. A row with no
+            # Brewed At is found by when it was recorded. Built as one "or" of
+            # two "and"s — Notion refuses compound filters nested deeper.
+            dated = [{"property": "Brewed At", "date": {"is_not_empty": True}}]
+            undated = [{"property": "Brewed At", "date": {"is_empty": True}}]
+            if since is not None:
+                day = (since - timedelta(days=1)).date().isoformat()
+                dated.append({"property": "Brewed At", "date": {"on_or_after": day}})
+                undated.append({"timestamp": "created_time", "created_time": {"on_or_after": day}})
+            if until is not None:
+                end = (until + timedelta(days=1)).date().isoformat()
+                dated.append({"property": "Brewed At", "date": {"before": end}})
+                undated.append({"timestamp": "created_time", "created_time": {"before": end}})
+            body["filter"] = {"or": [{"and": bag + dated}, {"and": bag + undated}]}
         try:
-            pages = await self._client.query(self._db.brews, body, limit)
+            # With an end still to come, nothing lies after it and Notion can
+            # take the limit; with one past, the limit is applied once the
+            # answer is trimmed to it — newest first, the day after would fill it.
+            ends_ahead = until is None or until >= dt_util.utcnow()
+            pages = await self._client.query(self._db.brews, body, limit if ends_ahead else None)
         except NotionError as err:
             raise fail("notion_failed", error=str(err)) from err
         brews = [brew_from_page(p) for p in pages]
-        if since is None:
+        if since is None and until is None:
             return brews
-        # The query reached a day early; the answer is exactly from `since`.
-        return [
+        # The query reached a day either side; the answer is exactly the window.
+        zone = (since or until).tzinfo
+        brews = [
             b for b in brews
-            if (m := moment(b.brewed_at or b.recorded_at, since.tzinfo)) is not None and m >= since
+            if (m := moment(b.brewed_at or b.recorded_at, zone)) is not None
+            and (since is None or m >= since) and (until is None or m < until)
         ]
+        return brews[:limit] if limit is not None else brews
 
     async def async_has_run(self, run_id: str) -> bool:
         try:

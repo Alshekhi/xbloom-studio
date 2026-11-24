@@ -279,6 +279,8 @@ class CoffeeLab:
         self.on_bag_chosen: Callable[[str | None], None] = lambda bean_id: None
         # Told when a finished bag is answered buy again: yes (StockWatch).
         self.on_buy_again: Callable[[Bean], Any] = lambda bean: None
+        # Brews, coffee and water by month and by week (history.ChartFeed).
+        self.history: dict[str, Any] = {}
         # Told of every brew written, the moment it is (today's cup).
         self.on_brew_recorded: Callable[[Brew], Any] = lambda brew: None
         # What is left of each kind, as StockWatch last worked it out.

@@ -82,9 +82,10 @@ class CoffeeLabStore(ABC):
     @abstractmethod
     async def async_list_brews(
         self, *, since: datetime | None = None, limit: int | None = None,
-        bean_id: str | None = None,
+        bean_id: str | None = None, until: datetime | None = None,
     ) -> list[Brew]:
-        """Brews, newest first, optionally from `since` on, optionally of one bag."""
+        """Brews, newest first, optionally from `since` on and before `until`,
+        optionally of one bag; the limit counts only those."""
 
     @abstractmethod
     async def async_create_brew(self, brew: Brew) -> Brew:
@@ -187,7 +188,7 @@ class LocalStore(CoffeeLabStore):
 
     async def async_list_brews(
         self, *, since: datetime | None = None, limit: int | None = None,
-        bean_id: str | None = None,
+        bean_id: str | None = None, until: datetime | None = None,
     ) -> list[Brew]:
         # Compared as instants: as text, "…Z" and "…+05:00" do not sort in time.
         zone = since.tzinfo if since is not None else timezone.utc
@@ -197,7 +198,7 @@ class LocalStore(CoffeeLabStore):
             and (bean_id is None or b.bean_id == bean_id)
         ]
         dated.sort(key=lambda pair: pair[0], reverse=True)
-        brews = [b for m, b in dated if since is None or m >= since]
+        brews = [b for m, b in dated if (since is None or m >= since) and (until is None or m < until)]
         return brews[:limit] if limit is not None else brews
 
     async def async_has_run(self, run_id: str) -> bool:

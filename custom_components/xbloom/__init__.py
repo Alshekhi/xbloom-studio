@@ -610,14 +610,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
                 lab.on_change()
 
             entry.async_on_unload(async_track_time_interval(hass, _reread, NOTION_REFRESH))
-        if "recorder" in hass.config.components:
-            # The brew record as statistics, for the dashboard's charts.
-            charts = ChartFeed(hass, lab)
-            entry.async_on_unload(
-                async_dispatcher_connect(hass, SIGNAL_COFFEE_LAB_UPDATED, charts.schedule)
-            )
-            entry.async_on_unload(charts.cancel)
-            charts.schedule()
+        # The brew record by month and by week, to be read, and — with a
+        # recorder — as statistics for the dashboard's charts.
+        charts = ChartFeed(hass, lab, charts="recorder" in hass.config.components)
+        entry.async_on_unload(
+            async_dispatcher_connect(hass, SIGNAL_COFFEE_LAB_UPDATED, charts.schedule)
+        )
+        entry.async_on_unload(charts.cancel)
+        # A new day, week or month begins with no change to the record: at
+        # midnight everything Coffee Lab shows is read again — the period's
+        # figures and brews, and the history tables with them.
+        @callback
+        def _new_day(_now) -> None:
+            lab.on_change()
+
+        entry.async_on_unload(async_track_time_change(hass, _new_day, hour=0, minute=0, second=20))
+        charts.schedule()
 
     # ------------------------------------------------------------------ #
     # Shared BLE-event dispatcher (piggyback refresh)                     #

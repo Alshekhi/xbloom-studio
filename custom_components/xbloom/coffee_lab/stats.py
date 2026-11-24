@@ -152,3 +152,37 @@ def period_report(records: list[Brew], period: str, now: datetime) -> Report:
 def earliest_needed(period: str, now: datetime) -> datetime:
     """How far back a report for `period` reads, its comparison included."""
     return window(period, now).before_start
+
+
+def _row(records: list[Brew], start: datetime, end: datetime) -> dict:
+    t = totals(records, start, end)
+    return {"start": start.date().isoformat(), "brews": t.brews,
+            "coffee_g": round(t.coffee_g, 1), "water_ml": round(t.water_ml, 1)}
+
+
+def by_month(records: list[Brew], now: datetime, months: int = 12) -> list[dict]:
+    """Brews, coffee and water for each of the last `months` months, this one
+    first: the numbers the history charts draw, to be read. Months before the
+    first brew in the record are left out."""
+    zone = now.tzinfo
+    first = min((m for r in records if (m := moment(r.brewed_at or r.recorded_at, zone)) is not None),
+                default=None)
+    if first is None:
+        return []
+    rows = []
+    for i in range(months):
+        start = _month_start(now, i)
+        if start < _month_start(first):
+            break
+        rows.append(_row(records, start, _month_start(now, i - 1) if i else now))
+    return rows
+
+
+def by_week(records: list[Brew], now: datetime, weeks: int = 8) -> list[dict]:
+    """The same for each of the last `weeks` weeks, Monday to Sunday, this one
+    first; none with no brews at all."""
+    if not records:
+        return []
+    monday = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=now.weekday())
+    return [_row(records, monday - timedelta(weeks=i), monday - timedelta(weeks=i - 1) if i else now)
+            for i in range(weeks)]

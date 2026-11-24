@@ -26,12 +26,12 @@ from homeassistant.helpers.event import async_track_state_change_event, async_tr
 from homeassistant.util import dt as dt_util
 
 from ..tool_common import refuse
-from ..const import DOMAIN, SIGNAL_COFFEE_LAB_STOCK, SIGNAL_COFFEE_LAB_UPDATED
+from ..const import DOMAIN, SIGNAL_COFFEE_LAB_HISTORY, SIGNAL_COFFEE_LAB_STOCK, SIGNAL_COFFEE_LAB_UPDATED
 from . import actions
 from .lab import CoffeeLab, focus_text
 from .inventory import kind_of_cup
 from .models import BUY_AGAIN, ISSUES, KINDS, VERDICTS, Bean
-from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
+from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER, window
 from .opening import USUAL_DAYS, fading, open_next, usual_dose
 from .todays_cup_runtime import SIGNAL_TODAYS_CUP
 from .stock import MEASURES, figure, floor
@@ -44,8 +44,8 @@ RECIPE_SELECT = "select.xbloom_studio_recipe"
 COUNT_RESULTS = ["counted", "recorded", "skipped", "flagged", "queued"]
 # How often the question's sensor looks at the clock.
 QUESTION_TICK = timedelta(minutes=1)
-# How many of the latest brews Recent brews holds.
-RECENT_BREWS = 10
+# How many of the period's brews the list holds, newest first.
+RECENT_BREWS = 50
 
 
 def bag_labels(beans: list[Bean]) -> dict[str, str]:
@@ -260,6 +260,8 @@ class StatsSensor(CoffeeLabEntity, SensorEntity):
     """Brews in the chosen period; the rest of the totals as attributes."""
 
     _attr_icon = "mdi:chart-bar"
+    # Worked out again on every read; keeping each copy would only fill the database.
+    _unrecorded_attributes = frozenset({"habits"})
 
     def __init__(self, lab: CoffeeLab) -> None:
         super().__init__(lab, "stats")
@@ -271,7 +273,8 @@ class StatsSensor(CoffeeLabEntity, SensorEntity):
 
 
 class RecentBrewsSensor(CoffeeLabEntity, SensorEntity):
-    """When the newest brew was made; the latest brews, in full, as attributes.
+    """When the newest brew of the Stats period was made; that period's brews,
+    newest first and in full, as attributes.
 
     Each brew as brew_history gives it — recipe, bag, dose, how it was brewed,
     the verdict and tasting — so a dashboard can open one without an agent.
@@ -287,7 +290,10 @@ class RecentBrewsSensor(CoffeeLabEntity, SensorEntity):
         super().__init__(lab, "recent_brews")
 
     async def async_read(self) -> None:
-        brews = (await actions.brew_history(self.lab, {"limit": RECENT_BREWS}))["brews"]
+        # The brews of the period the Stats tab is set to, newest first.
+        w = window(self.lab.stats_period, dt_util.now())
+        brews = (await actions.brew_history(
+            self.lab, {"limit": RECENT_BREWS, "since": w.start, "until": w.end}))["brews"]
         # A brew typed in without a time has none to show; the newest with one.
         newest = next((b["brewed_at"] for b in brews if b.get("brewed_at")), None)
         self._attr_native_value = dt_util.parse_datetime(newest) if newest else None
@@ -630,6 +636,28 @@ class StockLevelNumber(StockEntity, NumberEntity):
         await self.lab.async_set_stock_level(self.kind, value)
 
 
+class BrewHistorySensor(CoffeeLabEntity, SensorEntity):
+    """Every brew in the record as its state; by month and by week as attributes."""
+
+    _attr_icon = "mdi:table"
+    # Re-worked out after every change: no need to keep each copy in history.
+    _unrecorded_attributes = frozenset({"by_month", "by_week"})
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "brew_history")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_COFFEE_LAB_HISTORY, self._changed))
+
+    async def async_read(self) -> None:
+        tables = self.lab.history or {}
+        self._attr_native_value = tables.get("total")
+        self._attr_extra_state_attributes = {
+            "by_month": tables.get("by_month", []), "by_week": tables.get("by_week", []),
+        }
+
+
 class TodaysCupSensor(CoffeeLabEntity, SensorEntity):
     """Today's cup: the bag as state while it is offered (once a day, from the
     usual time); the pick, whether it is due and from when, as attributes."""
@@ -750,7 +778,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
         ],
         "sensor": [
             RemainingSensor, BagsSensor, StatsSensor, RecentBrewsSensor, LastCountSensor, WaitingBrewsSensor,
-            RatingQuestionSensor, BagQuestionSensor, RecipeKindSensor, TodaysCupSensor,
+            RatingQuestionSensor, BagQuestionSensor, RecipeKindSensor, TodaysCupSensor, BrewHistorySensor,
         ],
         "number": [ManualDoseNumber, OpenLimitNumber, RestDaysNumber, FadeDaysNumber],
         "button": [RecordManualBrewButton, UseTodaysCupButton, AnotherCupButton],

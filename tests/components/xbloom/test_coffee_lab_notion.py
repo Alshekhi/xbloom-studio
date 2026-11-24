@@ -241,8 +241,8 @@ async def test_brews_since_a_moment_are_exact_though_the_query_reaches_back_a_da
     since = datetime(2026, 9, 24, tzinfo=timezone.utc)
     brews = await NotionStore(notion, Databases("b", "r")).async_list_brews(since=since)
     assert [b.id for b in brews] == ["a"]
-    body = notion.calls[0][2]
-    assert body["filter"]["or"][0]["date"]["on_or_after"] == "2026-09-23"
+    dated = notion.calls[0][2]["filter"]["or"][0]["and"]
+    assert {"property": "Brewed At", "date": {"on_or_after": "2026-09-23"}} in dated
 
 
 async def test_brews_of_one_bag_are_asked_of_notion_by_their_bag():
@@ -251,8 +251,9 @@ async def test_brews_of_one_bag_are_asked_of_notion_by_their_bag():
     await store.async_list_brews(bean_id="bag-1")
     assert notion.calls[0][2]["filter"] == {"property": "Bean", "relation": {"contains": "bag-1"}}
     await store.async_list_brews(bean_id="bag-1", since=datetime(2026, 9, 24, tzinfo=timezone.utc))
-    bag, when = notion.calls[1][2]["filter"]["and"]
-    assert bag["relation"] == {"contains": "bag-1"} and when["or"][0]["date"]["on_or_after"] == "2026-09-23"
+    dated = notion.calls[1][2]["filter"]["or"][0]["and"]
+    assert {"property": "Bean", "relation": {"contains": "bag-1"}} in dated
+    assert {"property": "Brewed At", "date": {"on_or_after": "2026-09-23"}} in dated
 
 
 def test_why_a_brew_needs_review_and_its_run_id_reach_notion():
@@ -355,3 +356,47 @@ async def test_a_column_of_another_type_is_refused_never_changed():
 
 def test_a_cleared_shop_page_is_written_as_empty():
     assert bean_properties({"product_url": ""}) == {"Product URL": {"url": None}}
+
+
+
+def _depth(node) -> int:
+    """How deeply compound filters nest: Notion refuses more than two levels."""
+    if isinstance(node, dict) and ("and" in node or "or" in node):
+        return 1 + max((_depth(c) for c in node.get("and", node.get("or"))), default=0)
+    return 0
+
+
+async def test_every_brew_filter_stays_within_notions_two_levels():
+    notion = FakeNotion({("POST", "/databases/r/query"): {"results": []}})
+    store = NotionStore(notion, Databases("b", "r"))
+    since, until = datetime(2026, 9, 1, tzinfo=timezone.utc), datetime(2026, 10, 1, tzinfo=timezone.utc)
+    for kw in ({"since": since}, {"until": until}, {"since": since, "until": until},
+               {"since": since, "until": until, "bean_id": "bag-1"}, {"bean_id": "bag-1", "since": since}):
+        await store.async_list_brews(**kw)
+        assert _depth(notion.calls[-1][2]["filter"]) <= 2, kw
+
+
+async def test_brews_in_a_window_are_exact_and_the_limit_counts_only_them():
+    pages = [{"id": i, "properties": {"Brewed At": {"date": {"start": d}}}}
+             for i, d in (("late", "2026-10-01T05:00:00Z"), ("b", "2026-09-30T10:00:00Z"),
+                          ("c", "2026-09-20T10:00:00Z"), ("early", "2026-08-31T22:00:00Z"))]
+    notion = FakeNotion({("POST", "/databases/r/query"): {"results": pages}})
+    brews = await NotionStore(notion, Databases("b", "r")).async_list_brews(
+        since=datetime(2026, 9, 1, tzinfo=timezone.utc), until=datetime(2026, 10, 1, tzinfo=timezone.utc), limit=1)
+    assert [b.id for b in brews] == ["b"]
+
+
+async def test_a_window_ending_now_still_asks_notion_for_the_limit():
+    from datetime import timedelta
+    asked = []
+
+    class Counting(FakeNotion):
+        async def query(self, database_id, body, limit=None):
+            asked.append(limit)
+            return await super().query(database_id, body, limit)
+
+    store = NotionStore(Counting({("POST", "/databases/r/query"): {"results": []}}), Databases("b", "r"))
+    now = datetime.now(timezone.utc)
+    await store.async_list_brews(since=now - timedelta(days=30), until=now + timedelta(minutes=1), limit=50)
+    await store.async_list_brews(since=now - timedelta(days=60), until=now - timedelta(days=30), limit=50)
+    assert asked == [50, None]

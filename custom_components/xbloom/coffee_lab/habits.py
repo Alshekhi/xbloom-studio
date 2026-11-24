@@ -105,6 +105,7 @@ def habits(records: list[Brew], beans: list[Bean], start: datetime, end: datetim
     # A coffee bought again is a second bag of the same coffee: counted as
     # one, as Bean.same_coffee has it, under the name of the first bag seen.
     per_coffee: Counter = Counter()
+    grams: Counter = Counter()
     first_bag: dict[tuple[str, str], Bean] = {}
     for r, _ in cups:
         bean = by_id.get(r.bean_id or "")
@@ -112,14 +113,23 @@ def habits(records: list[Brew], beans: list[Bean], start: datetime, end: datetim
             key = (bean.name.strip().casefold(), bean.roaster.strip().casefold())
             first_bag.setdefault(key, bean)
             per_coffee[key] += 1
+            grams[key] += float(r.dose_g or 0)
     # Two roasters' coffees can share a name; the roaster tells them apart.
     shared = Counter(name for name, _ in per_coffee)
     coffees: Counter = Counter()
+    coffee_g: Counter = Counter()
     for key, n in per_coffee.items():
         bag = first_bag[key]
         label = f"{bag.name} ({bag.roaster})" if shared[key[0]] > 1 and bag.roaster else bag.name
         coffees[label] += n
+        coffee_g[label] += grams[key]
     recipes = Counter(r.recipe for r, _ in cups if r.recipe)
+    recipe_verdicts: dict[str, Counter] = {}
+    for r, _ in cups:
+        if r.recipe and r.rating in VERDICT_OF:
+            recipe_verdicts.setdefault(r.recipe, Counter())[VERDICT_OF[r.rating]] += 1
+    # Most brewed first; ties by name, so the order does not change between reads.
+    by_count = lambda counts: sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))  # noqa: E731
     verdicts = Counter(VERDICT_OF[r.rating] for r, _ in cups if r.rating in VERDICT_OF)
 
     time_of_day = None
@@ -145,4 +155,8 @@ def habits(records: list[Brew], beans: list[Bean], start: datetime, end: datetim
         "verdicts": dict(verdicts),
         "time_of_day": time_of_day,
         "bags_opened": opened,
+        "by_coffee": [{"name": name, "brews": n, "coffee_g": round(coffee_g[name], 1)}
+                      for name, n in by_count(coffees)],
+        "by_recipe": [{"name": name, "brews": n, "verdicts": dict(recipe_verdicts.get(name, {}))}
+                      for name, n in by_count(recipes)],
     }

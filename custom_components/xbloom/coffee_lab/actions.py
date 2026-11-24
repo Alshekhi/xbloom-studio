@@ -252,11 +252,11 @@ def _brew_facts(brew: Brew, names: dict[str, str]) -> dict[str, Any]:
 
 async def brew_history(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
     """What was brewed, newest first, with the bag it came from."""
-    since = None
+    since = args.get("since")
     if days := args.get("days"):
         since = dt_util.now() - timedelta(days=int(days))
     brews = await lab.store.async_list_brews(
-        since=since, limit=int(args.get("limit") or DEFAULT_BREW_HISTORY)
+        since=since, until=args.get("until"), limit=int(args.get("limit") or DEFAULT_BREW_HISTORY)
     )
     names = {b.id: b.name for b in await lab.store.async_list_beans(selectable_only=False)}
     return {"brews": [_brew_facts(b, names) for b in brews]}

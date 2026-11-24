@@ -58,3 +58,37 @@ def test_the_first_hour_is_the_earliest_brew():
     records = [_brew("2026-09-27T07:05:00+05:00"), _brew("2026-09-26T08:10:00+05:00")]
     assert first_hour(records, ZONE) == _at(8)
     assert first_hour([], ZONE) is None
+
+
+async def test_the_feed_keeps_the_history_tables_and_draws_charts_only_with_a_recorder(monkeypatch):
+    from unittest.mock import AsyncMock, MagicMock
+    from custom_components.xbloom.coffee_lab import history
+    from .test_coffee_lab_lab import _bag, _lab
+    lab = await _lab()
+    bag = await _bag(lab)
+    await lab.async_consume(bean_id=bag.id, grams=18, run_id="r1",
+                            brewed_at=datetime.now(timezone.utc).isoformat())
+    publish = AsyncMock()
+    monkeypatch.setattr(history, "async_publish", publish)
+    monkeypatch.setattr(history, "async_dispatcher_send", MagicMock())
+    feed = history.ChartFeed(MagicMock(), lab, charts=False)
+    await feed._run(None)
+    publish.assert_not_awaited()
+    # One brew, this month: no empty months before it.
+    assert lab.history["by_month"][0]["brews"] == 1 and len(lab.history["by_month"]) == 1
+    assert len(lab.history["by_week"]) == 8
+    history.async_dispatcher_send.assert_called_once()
+
+
+async def test_the_brew_history_sensor_shows_the_tables():
+    from custom_components.xbloom.coffee_lab.entities import BrewHistorySensor
+    from .test_coffee_lab_lab import _lab
+    lab = await _lab()
+    sensor = BrewHistorySensor(lab)
+    await sensor.async_read()
+    assert sensor._attr_native_value is None
+    lab.history = {"by_month": [{"start": "2026-11-01", "brews": 4, "coffee_g": 68.0, "water_ml": 1020.0}],
+                   "by_week": [], "total": 9}
+    await sensor.async_read()
+    assert sensor._attr_native_value == 9
+    assert sensor._attr_extra_state_attributes["by_month"][0]["brews"] == 4
