@@ -140,3 +140,29 @@ def test_the_pace_is_over_the_days_brewed_not_always_30():
     brews = [brew(dose=18, days_ago=d) for d in range(6)]
     s = stock_of("coffee", [bag(remaining_g=180, tracked=True)], brews, NOW)
     assert figure(s, "days") == 10.0
+
+
+# The pace leans toward recent brews: each counts half as much a week older.
+
+
+def test_a_doubled_habit_shows_within_a_week():
+    brews = [brew(dose=20, days_ago=d) for d in range(7, 30)]
+    brews += [brew(dose=40, days_ago=d) for d in range(7)]
+    s = stock_of("coffee", [bag(remaining_g=1000, tracked=True)], brews, NOW)
+    # Every day counting the same gives about 40 days (740 g over 30 days);
+    # recent days weigh more, so it is well on the way to the 25 days that
+    # 40 g a day leaves.
+    assert 25 < figure(s, "days") < 35
+
+
+def test_cups_follow_the_recent_dose():
+    brews = [brew(dose=15, days_ago=d) for d in range(15, 29)]
+    brews += [brew(dose=20, days_ago=d) for d in range(3)]
+    s = stock_of("coffee", [bag(remaining_g=170, tracked=True)], brews, NOW)
+    assert s.amount / s.cups > 16
+
+
+def test_a_new_home_is_not_read_as_brewing_less():
+    brews = [brew(dose=20, days_ago=d) for d in range(5)]
+    s = stock_of("coffee", [bag(remaining_g=200, tracked=True)], brews, NOW)
+    assert figure(s, "days") == pytest.approx(10, abs=0.5)
