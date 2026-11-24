@@ -13,6 +13,8 @@ via the integration's options flow ("Add recipe by share URL").
 """
 from __future__ import annotations
 
+import re
+
 import logging
 from typing import Any
 
@@ -41,6 +43,8 @@ from .const import (
     CONF_CALLBACK_TARGETS,
     CONF_COFFEE_LAB,
     CONF_COFFEE_LAB_STORE,
+    CONF_STOCK_LIST,
+    CONF_STOCK_NOTIFY,
     CONF_NOTION_BEANS,
     CONF_NOTION_BREWS,
     CONF_NOTION_PAGE,
@@ -430,17 +434,42 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         current = bool(entry.data.get(CONF_COFFEE_LAB))
         brewers = list(entry.data.get(CONF_BREWERS, DEFAULT_BREWERS))
         store = entry.data.get(CONF_COFFEE_LAB_STORE, "local")
+        errors: dict[str, str] = {}
+        stock_list = str(entry.data.get(CONF_STOCK_LIST) or "")
+        stock_notify = str(entry.data.get(CONF_STOCK_NOTIFY) or "")
         if user_input is not None:
+            stock_list = str(user_input.get("stock_list") or "").strip()
+            stock_notify = str(user_input.get("stock_notify") or "").strip()
+            # Where a reminder to buy is sent: a notify service, nothing else.
+            if stock_notify and not re.fullmatch(r"notify\.[a-z0-9_]+", stock_notify):
+                errors["stock_notify"] = "notify_service_invalid"
+            # Checked when chosen: one saved earlier and since gone must not
+            # stop every other Coffee Lab setting from being changed.
+            elif (stock_notify and stock_notify != entry.data.get(CONF_STOCK_NOTIFY)
+                  and not self.hass.services.has_service("notify", stock_notify[7:])):
+                errors["stock_notify"] = "notify_service_unknown"
+        if user_input is not None and not errors:
             enabled = bool(user_input.get("enable"))
             # Blank lines and repeats dropped, the order kept.
             chosen = list(dict.fromkeys(
                 b.strip() for b in user_input.get("brewers", brewers) if b.strip()
             ))
             self._coffee_lab = {CONF_COFFEE_LAB: enabled, CONF_BREWERS: chosen}
-            if enabled and user_input.get("store", store) == "notion":
+            # Both optional; one left empty is dropped rather than kept as "".
+            self._stock_choices = {
+                k: v for k, v in ((CONF_STOCK_LIST, stock_list), (CONF_STOCK_NOTIFY, stock_notify)) if v}
+            # Notion already connected, and not asked to connect again: the
+            # rest is saved as it is, without asking for the token and page.
+            connected = store == "notion" and all(
+                entry.data.get(k) for k in (CONF_NOTION_TOKEN, CONF_NOTION_PAGE,
+                                            CONF_NOTION_BEANS, CONF_NOTION_BREWS))
+            if enabled and user_input.get("store", store) == "notion" and (
+                    not connected or user_input.get("notion_reconnect")):
                 return await self.async_step_coffee_lab_notion()
+            kept = "notion" if enabled and user_input.get("store", store) == "notion" else "local"
             self.hass.config_entries.async_update_entry(
-                entry, data={**entry.data, **self._coffee_lab, CONF_COFFEE_LAB_STORE: "local"}
+                entry, data={**self._without_stock(entry.data), **self._coffee_lab,
+                             **self._stock_choices, CONF_COFFEE_LAB_STORE: kept}
             )
             # Reload so the entities and the tool follow the switch.
             self.hass.async_create_task(
@@ -460,8 +489,20 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                         options=["local", "notion"], translation_key="coffee_lab_store",
                     )
                 ),
+                vol.Optional("stock_list", description={"suggested_value": stock_list}):
+                    selector.EntitySelector(selector.EntitySelectorConfig(domain="todo")),
+                vol.Optional("stock_notify", description={"suggested_value": stock_notify}):
+                    selector.TextSelector(),
+                # Offered only once Notion is in use: the way back to its token and page.
+                **({vol.Optional("notion_reconnect", default=False): selector.BooleanSelector()}
+                   if store == "notion" else {}),
             }),
+            errors=errors,
         )
+
+    @staticmethod
+    def _without_stock(data: dict[str, Any]) -> dict[str, Any]:
+        return {k: v for k, v in data.items() if k not in (CONF_STOCK_LIST, CONF_STOCK_NOTIFY)}
 
     # ------------------------------------------------------------------ #
     # Coffee Lab bags                                                    #
@@ -624,7 +665,8 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
                     errors["base"], detail = problem.error, problem.detail
                 else:
                     self.hass.config_entries.async_update_entry(entry, data={
-                        **entry.data, **self._coffee_lab,
+                        **self._without_stock(entry.data), **self._coffee_lab,
+                        **getattr(self, "_stock_choices", {}),
                         CONF_COFFEE_LAB_STORE: "notion", CONF_NOTION_TOKEN: token,
                         CONF_NOTION_PAGE: page, CONF_NOTION_BEANS: databases.beans,
                         CONF_NOTION_BREWS: databases.brews,
@@ -703,6 +745,7 @@ class XBloomOptionsFlow(config_entries.OptionsFlow):
         """Arm/disarm the firmware Install button (off by default)."""
         entry = self.config_entry
         current = bool(entry.data.get(CONF_ENABLE_FLASHING))
+        errors: dict[str, str] = {}
         if user_input is not None:
             enabled = bool(user_input.get("enable"))
             self.hass.config_entries.async_update_entry(

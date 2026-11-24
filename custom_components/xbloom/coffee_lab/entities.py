@@ -11,6 +11,7 @@ from collections.abc import Callable
 from typing import Any
 from datetime import timedelta
 
+from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.components.button import ButtonEntity
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.components.select import SelectEntity
@@ -24,12 +25,13 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 
 from ..tool_common import refuse
-from ..const import DOMAIN, SIGNAL_COFFEE_LAB_UPDATED
+from ..const import DOMAIN, SIGNAL_COFFEE_LAB_STOCK, SIGNAL_COFFEE_LAB_UPDATED
 from . import actions
 from .lab import CoffeeLab, focus_text
 from .inventory import kind_of_cup
 from .models import BUY_AGAIN, ISSUES, KINDS, VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER
+from .stock import MEASURES, figure, floor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -475,6 +477,121 @@ class RefreshBagsButton(CoffeeLabEntity, ButtonEntity):
         self.lab.on_change()
 
 
+# ── Stock ────────────────────────────────────────────────────────────────────
+
+# The level number's range and step for each measure, and its unit.
+_LEVEL_RANGE: dict[str, tuple[float, float, str | None]] = {
+    "days": (60, 1, "d"), "grams": (2000, 10, UnitOfMass.GRAMS), "cups": (100, 1, None),
+    "bags": (10, 1, None), "pods": (100, 1, None), "boxes": (10, 1, None),
+}
+
+
+def _whole(value: float | None) -> int | None:
+    return None if value is None else round(value)
+
+
+class StockEntity(CoffeeLabEntity):
+    """One kind's stock: re-read when it is worked out again, and when its
+    level or measure changes. Unavailable while the home has never had the kind."""
+
+    def __init__(self, lab: CoffeeLab, kind: str, key: str) -> None:
+        super().__init__(lab, f"{kind}_{key}")
+        self.kind = kind
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_COFFEE_LAB_STOCK, self._changed))
+
+    def _stock(self):
+        stock = self.lab.stock.get(self.kind)
+        self._attr_available = bool(stock is not None and stock.kept)
+        return stock if self._attr_available else None
+
+
+class StockSensor(StockEntity, SensorEntity):
+    """What is left of a kind, in the measure chosen for it; every figure as attributes."""
+
+    _attr_icon = "mdi:archive-outline"
+
+    def __init__(self, lab: CoffeeLab, kind: str) -> None:
+        super().__init__(lab, kind, "stock")
+
+    async def async_read(self) -> None:
+        stock = self._stock()
+        measure = self.lab.stock_measure(self.kind)
+        self._attr_native_unit_of_measurement = _LEVEL_RANGE[measure][2]
+        if stock is None:
+            self._attr_native_value, self._attr_extra_state_attributes = None, {}
+            return
+        value = figure(stock, measure)
+        self._attr_native_value = _whole(value)
+        amount = "pods" if self.kind == "xpod" else "grams"
+        self._attr_extra_state_attributes = {
+            "measure": measure, "level": _whole(self.lab.stock_level(self.kind)),
+            "low": bool(self.lab.stock_low_state(self.kind)) and value is not None
+                   and self.lab.stock_level(self.kind) > 0,
+            # Shown when the figure is only a floor, with items not counted.
+            "at_least": _whole(floor(stock, measure)) if value is None else None,
+            "unknown": len(stock.unknown),
+            amount: _whole(stock.amount), "bags": stock.bags,
+            "cups": _whole(stock.cups), "days": _whole(stock.days),
+        }
+
+
+class StockLowBinarySensor(StockEntity, BinarySensorEntity):
+    """On while a kind is below its level; off while its figure is not known."""
+
+    _attr_icon = "mdi:basket-unfill"
+
+    def __init__(self, lab: CoffeeLab, kind: str) -> None:
+        super().__init__(lab, kind, "stock_low")
+
+    async def async_read(self) -> None:
+        stock = self._stock()
+        known = stock is not None and figure(stock, self.lab.stock_measure(self.kind)) is not None
+        self._attr_is_on = bool(
+            known and self.lab.stock_level(self.kind) > 0 and self.lab.stock_low_state(self.kind))
+
+
+class StockMeasureSelect(StockEntity, SelectEntity):
+    """What a kind's stock is counted in."""
+
+    _attr_icon = "mdi:ruler"
+
+    def __init__(self, lab: CoffeeLab, kind: str) -> None:
+        super().__init__(lab, kind, "stock_measure")
+        self._attr_options = list(MEASURES[kind])
+
+    async def async_read(self) -> None:
+        self._stock()
+        self._attr_current_option = self.lab.stock_measure(self.kind)
+
+    async def async_select_option(self, option: str) -> None:
+        await self.lab.async_set_stock_measure(self.kind, option)
+
+
+class StockLevelNumber(StockEntity, NumberEntity):
+    """Below this, a kind is running low; 0 turns the reminder off."""
+
+    _attr_icon = "mdi:basket-minus-outline"
+    _attr_mode = NumberMode.BOX
+    _attr_native_min_value = 0
+
+    def __init__(self, lab: CoffeeLab, kind: str) -> None:
+        super().__init__(lab, kind, "stock_level")
+
+    async def async_read(self) -> None:
+        self._stock()
+        top, step, unit = _LEVEL_RANGE[self.lab.stock_measure(self.kind)]
+        self._attr_native_max_value, self._attr_native_step = top, step
+        self._attr_native_unit_of_measurement = unit
+        self._attr_native_value = _whole(self.lab.stock_level(self.kind))
+
+    async def async_set_native_value(self, value: float) -> None:
+        await self.lab.async_set_stock_level(self.kind, value)
+
+
 def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
     """The Coffee Lab entities of one platform, or none when it is off."""
     if lab is None:
@@ -494,4 +611,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
     # Only a store edited elsewhere — Notion — can be out of date here.
     if lab.store.remote:
         makers["button"].append(RefreshBagsButton)
-    return [make(lab) for make in makers.get(platform, [])]
+    stock = {"sensor": StockSensor, "binary_sensor": StockLowBinarySensor,
+             "select": StockMeasureSelect, "number": StockLevelNumber}
+    per_kind = [stock[platform](lab, kind) for kind in KINDS] if platform in stock else []
+    return [make(lab) for make in makers.get(platform, [])] + per_kind

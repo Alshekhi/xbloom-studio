@@ -19,6 +19,14 @@ HERE = Path(__file__).parent
 TEXT = {
     "en": {
         "machine": "Machine", "view_brew": "Brew", "view_stats": "Stats", "view_bags": "Bags", "view_xbloom": "xBloom",
+        "stock_days": "Days of {kind} left: {n}", "stock_grams": "Grams of {kind} left: {n}",
+        "stock_cups": "Cups of {kind} left: {n}", "stock_bags": "Bags of {kind} left: {n}",
+        "stock_pods": "Pods left: {n}", "stock_boxes": "Boxes of xPods left: {n}",
+        "stock_packs": "Packs of tea left: {n}",
+        "stock_at_least": "at least {n}", "stock_low": "Running low.", "h_stock": "Stock",
+        "stock_not_yet": "Not enough brews yet to tell how long the {kind} will last.",
+        "stock_weigh": "Weigh the bags not counted yet to complete it.",
+        "kind_coffee": "coffee", "kind_tea": "tea", "kind_xpod": "xPods",
         "h_now": "Right now", "h_in_progress": "Brew in progress", "h_bag": "Current bag", "pods_left": "Pods left: {n}", "k_xpod": "xPod box", "k_tea": "tea",
         "h_brew": "Brew with the xBloom", "h_adjust": "Adjust this brew",
         "h_save": "Save as a new recipe", "h_manual": "Manual brew", "h_stats": "Coffee stats",
@@ -93,6 +101,16 @@ TEXT = {
     },
     "ar": {
         "machine": "الآلة", "view_brew": "التحضير", "view_stats": "الإحصاءات", "view_bags": "الأكياس", "view_xbloom": "xBloom",
+        "stock_days": "الأيام المتبقية من {kind}: {n}", "stock_grams": "الغرامات المتبقية من {kind}: {n}",
+        "stock_cups": "الأكواب المتبقية من {kind}: {n}", "stock_bags": "الأكياس المتبقية من {kind}: {n}",
+        "stock_pods": "الكبسولات المتبقية: {n}", "stock_boxes": "علب xPod المتبقية: {n}",
+        "stock_packs": "العبوات المتبقية من الشاي: {n}",
+        "stock_at_least": "{n} على الأقل", "stock_low": "الكمية منخفضة.", "h_stock": "المخزون",
+        "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
+        "stock_weigh": "زن الأكياس التي لم تُحسب بعد لاكتماله.",
+        "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
+        "stock_weigh": "زن الأكياس التي لم تُحسب بعد لاكتماله.",
+        "kind_coffee": "البن", "kind_tea": "الشاي", "kind_xpod": "كبسولات xPod",
         "h_now": "الآن", "h_in_progress": "تحضير جار", "h_bag": "الكيس الحالي", "pods_left": "الكبسولات المتبقية: {n}", "k_xpod": "علبة xPod", "k_tea": "شاي",
         "h_brew": "التحضير بماكينة xBloom", "h_adjust": "تعديل هذا التحضير",
         "h_save": "حفظ كوصفة جديدة", "h_manual": "تحضير يدوي", "h_stats": "إحصاءات القهوة",
@@ -290,6 +308,10 @@ def brew_view(t: dict) -> dict:
             tile(f"sensor.{E}_coffee_left", visibility=[*present(f"sensor.{E}_coffee_left"), *coffee]),
             tile(f"select.{E}_xpod_box", visibility=[is_(kind, "xpod"), *present(f"select.{E}_xpod_box")]),
             tile(f"select.{E}_tea", visibility=[is_(kind, "tea"), *present(f"select.{E}_tea")]),
+            # What is left of what the picked recipe draws from.
+            stock_card(t, "coffee", visibility=[*coffee, *available(f"sensor.{E}_coffee_stock")]),
+            stock_card(t, "tea", visibility=[is_(kind, "tea"), *available(f"sensor.{E}_tea_stock")]),
+            stock_card(t, "xpod", visibility=[is_(kind, "xpod"), *available(f"sensor.{E}_xpod_stock")]),
             # Only while a brew could not be saved; it is retried by itself.
             tile(f"sensor.{E}_waiting_brews", visibility=[
                 {"condition": "numeric_state", "entity": f"sensor.{E}_waiting_brews", "above": 0}]),
@@ -565,6 +587,34 @@ def opened_ago(t: dict) -> str:
     )
 
 
+def stock_line(t: dict, kind: str) -> str:
+    """What is left of a kind, in its chosen measure; "at least" while some
+    of it is not counted; and a word while it is running low."""
+    q = f"sensor.{E}_{kind}_stock"
+    n = ("{% if least is not none %}" + t["stock_at_least"].replace("{n}", "{{ least }}")
+         + "{% else %}{{ states('" + q + "') }}{% endif %}")
+    measures = ("days", "pods", "boxes") if kind == "xpod" else ("days", "grams", "cups", "bags")
+    lines = "".join(
+        ("{% if" if i == 0 else "{% elif") + f" m == '{m}' %}}"
+        # Tea in tins and pouches: packs, never "bags" taken for tea bags.
+        + t["stock_packs" if (kind, m) == ("tea", "bags") else f"stock_{m}"]
+        .replace("{kind}", t[f"kind_{kind}"]).replace("{n}", n)
+        for i, m in enumerate(measures)) + "{% endif %}"
+    not_yet = t["stock_not_yet"].replace("{kind}", t[f"kind_{kind}"])
+    return (ESCAPE + f"{{% set m = state_attr('{q}', 'measure') %}}"
+            f"{{% set least = state_attr('{q}', 'at_least') %}}"
+            # Too few brews for days or cups: said in words, never "unknown".
+            + f"{{% if states('{q}') in ['unknown', 'unavailable'] and least is none %}}" + not_yet
+            + "{% else %}" + lines + "{% endif %}"
+            + f"{{% if (state_attr('{q}', 'unknown') or 0) > 0 %}} " + t["stock_weigh"] + "{% endif %}"
+            + f"{{% if is_state('binary_sensor.{E}_{kind}_stock_low', 'on') %}} " + t["stock_low"]
+            + "{% endif %}")
+
+
+def stock_card(t: dict, kind: str, **extra) -> dict:
+    return {"type": "markdown", "text_only": True, "content": stock_line(t, kind), **extra}
+
+
 def bags_view(t: dict) -> dict:
     """What is on hand: each bag, how much is left and how long it has been open.
 
@@ -605,6 +655,14 @@ def bags_view(t: dict) -> dict:
             ]),
             {"type": "markdown", "text_only": True, "content": f"[{t['add_bags']}]({INTEGRATION})"},
         ], present(bags)[:1]),
+        # Per kind the home has had: what is left, what it is counted in,
+        # and the level below which it is running low.
+        *(section(t["h_stock"] + f" · {t[f'kind_{kind}']}", [
+            stock_card(t, kind),
+            select(f"select.{E}_{kind}_stock_measure"),
+            tile(f"number.{E}_{kind}_stock_level",
+                 features=[{"type": "numeric-input", "style": "buttons"}]),
+        ], available(f"sensor.{E}_{kind}_stock")) for kind in ("coffee", "tea", "xpod")),
     ]}
 
 

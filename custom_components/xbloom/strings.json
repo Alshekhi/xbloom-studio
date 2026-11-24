@@ -304,10 +304,16 @@
         "data": {
           "enable": "Track coffee bags",
           "brewers": "Brewers",
-          "store": "Where to keep it"
+          "store": "Where to keep it",
+          "stock_list": "Shopping list",
+          "stock_notify": "Phone",
+          "notion_reconnect": "Reconnect Notion"
         },
         "data_description": {
-          "brewers": "Offered when recording a brew made without the xBloom."
+          "brewers": "Offered when recording a brew made without the xBloom.",
+          "stock_list": "Where Coffee Lab adds what is running low, and a coffee to buy again.",
+          "stock_notify": "A notify service, for example notify.mobile_app_my_phone, told when something goes on the list.",
+          "notion_reconnect": "Enter the Notion token and page again. Leave off to keep the connection as it is."
         }
       },
       "brew_stories": {
@@ -435,7 +441,9 @@
       "notion_duplicate": "The page has more than one database called {detail}. Keep one.",
       "notion_half": "The page is missing {detail}. Add it, or use a page with neither.",
       "notion_fields": "These fields are missing or of the wrong type — {detail}.",
-      "altitude_range": "The top of the altitude range is below its bottom."
+      "altitude_range": "The top of the altitude range is below its bottom.",
+      "notify_service_invalid": "Enter a notify service, such as notify.mobile_app_my_phone.",
+      "notify_service_unknown": "There is no such notify service. Check its name under Developer tools, Actions."
     },
     "abort": {
       "no_recipes": "No recipes saved yet.",
@@ -464,6 +472,15 @@
           "on": "Ready",
           "off": "Not ready"
         }
+      },
+      "coffee_lab_coffee_stock_low": {
+        "name": "Coffee stock low"
+      },
+      "coffee_lab_tea_stock_low": {
+        "name": "Tea stock low"
+      },
+      "coffee_lab_xpod_stock_low": {
+        "name": "xPod stock low"
       }
     },
     "select": {
@@ -638,6 +655,32 @@
           "bag_and_teaser": "Bag story and teaser",
           "every_part": "Every part"
         }
+      },
+      "coffee_lab_coffee_stock_measure": {
+        "name": "Coffee stock measure",
+        "state": {
+          "days": "Days",
+          "grams": "Grams",
+          "cups": "Cups",
+          "bags": "Bags"
+        }
+      },
+      "coffee_lab_tea_stock_measure": {
+        "name": "Tea stock measure",
+        "state": {
+          "days": "Days",
+          "grams": "Grams",
+          "cups": "Cups",
+          "bags": "Packs"
+        }
+      },
+      "coffee_lab_xpod_stock_measure": {
+        "name": "xPod stock measure",
+        "state": {
+          "days": "Days",
+          "pods": "Pods",
+          "boxes": "Boxes"
+        }
       }
     },
     "sensor": {
@@ -761,6 +804,15 @@
       },
       "brew_story": {
         "name": "Brew Story"
+      },
+      "coffee_lab_coffee_stock": {
+        "name": "Coffee stock"
+      },
+      "coffee_lab_tea_stock": {
+        "name": "Tea stock"
+      },
+      "coffee_lab_xpod_stock": {
+        "name": "xPod stock"
       }
     },
     "switch": {
@@ -809,6 +861,15 @@
       },
       "brew_dose": {
         "name": "Brew Dose"
+      },
+      "coffee_lab_coffee_stock_level": {
+        "name": "Coffee stock level"
+      },
+      "coffee_lab_tea_stock_level": {
+        "name": "Tea stock level"
+      },
+      "coffee_lab_xpod_stock_level": {
+        "name": "xPod stock level"
       }
     },
     "button": {
@@ -1986,6 +2047,26 @@
         "bitter": "Bitter",
         "weak": "Too weak",
         "strong": "Too strong"
+      }
+    },
+    "stock_text": {
+      "options": {
+        "item_coffee": "Coffee beans",
+        "item_tea": "Tea",
+        "item_xpod": "xPods",
+        "kind_coffee": "Coffee",
+        "kind_tea": "Tea",
+        "kind_xpod": "xPods",
+        "running_low": "{kind}: running low.",
+        "left_days": "Days left: about {n}.",
+        "left_grams": "Grams left: {n}.",
+        "left_cups": "Cups left: about {n}.",
+        "left_bags": "Bags left: {n}.",
+        "left_pods": "Pods left: {n}.",
+        "left_boxes": "Boxes left: {n}.",
+        "added": "Added to {list}.",
+        "buy_again": "Time to buy {name} again.",
+        "left_packs": "Packs left: {n}."
       }
     }
   },

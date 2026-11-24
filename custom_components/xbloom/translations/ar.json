@@ -304,10 +304,16 @@
         "data": {
           "enable": "تتبع أكياس القهوة",
           "brewers": "أدوات التحضير",
-          "store": "مكان الحفظ"
+          "store": "مكان الحفظ",
+          "stock_list": "قائمة التسوق",
+          "stock_notify": "الهاتف",
+          "notion_reconnect": "إعادة ربط Notion"
         },
         "data_description": {
-          "brewers": "تعرض عند تسجيل تحضير دون آلة xBloom."
+          "brewers": "تعرض عند تسجيل تحضير دون آلة xBloom.",
+          "stock_list": "حيث يضيف Coffee Lab ما أوشك على النفاد، والبن الذي تريد شراءه مجددًا.",
+          "stock_notify": "خدمة إشعارات، مثل notify.mobile_app_my_phone، تُبلَّغ عند إضافة شيء إلى القائمة.",
+          "notion_reconnect": "أدخل رمز Notion والصفحة من جديد. اتركه مطفأ لإبقاء الربط كما هو."
         }
       },
       "brew_stories": {
@@ -435,7 +441,9 @@
       "notion_duplicate": "في الصفحة أكثر من قاعدة بيانات باسم {detail}. أبق واحدة.",
       "notion_half": "ينقص الصفحة {detail}. أضفها، أو استخدم صفحة لا تحتوي أيا منهما.",
       "notion_fields": "هذه الحقول مفقودة أو من نوع خاطئ — {detail}.",
-      "altitude_range": "أعلى مدى الارتفاع أقل من أدناه."
+      "altitude_range": "أعلى مدى الارتفاع أقل من أدناه.",
+      "notify_service_invalid": "أدخل خدمة إشعارات، مثل notify.mobile_app_my_phone.",
+      "notify_service_unknown": "لا توجد خدمة إشعارات بهذا الاسم. تحقق من اسمها في أدوات المطور، الإجراءات."
     },
     "abort": {
       "no_recipes": "لا توجد وصفات محفوظة بعد.",
@@ -464,6 +472,15 @@
           "on": "جاهزة",
           "off": "غير جاهزة"
         }
+      },
+      "coffee_lab_coffee_stock_low": {
+        "name": "البن: الكمية منخفضة"
+      },
+      "coffee_lab_tea_stock_low": {
+        "name": "الشاي: الكمية منخفضة"
+      },
+      "coffee_lab_xpod_stock_low": {
+        "name": "كبسولات xPod: الكمية منخفضة"
       }
     },
     "select": {
@@ -638,6 +655,32 @@
           "bag_and_teaser": "حكاية الكيس والتشويقة",
           "every_part": "كل الأجزاء"
         }
+      },
+      "coffee_lab_coffee_stock_measure": {
+        "name": "مقياس مخزون البن",
+        "state": {
+          "days": "الأيام",
+          "grams": "الغرامات",
+          "cups": "الأكواب",
+          "bags": "الأكياس"
+        }
+      },
+      "coffee_lab_tea_stock_measure": {
+        "name": "مقياس مخزون الشاي",
+        "state": {
+          "days": "الأيام",
+          "grams": "الغرامات",
+          "cups": "الأكواب",
+          "bags": "العبوات"
+        }
+      },
+      "coffee_lab_xpod_stock_measure": {
+        "name": "مقياس مخزون كبسولات xPod",
+        "state": {
+          "days": "الأيام",
+          "pods": "الكبسولات",
+          "boxes": "العلب"
+        }
       }
     },
     "sensor": {
@@ -761,6 +804,15 @@
       },
       "brew_story": {
         "name": "حكاية التحضير"
+      },
+      "coffee_lab_coffee_stock": {
+        "name": "مخزون البن"
+      },
+      "coffee_lab_tea_stock": {
+        "name": "مخزون الشاي"
+      },
+      "coffee_lab_xpod_stock": {
+        "name": "مخزون كبسولات xPod"
       }
     },
     "switch": {
@@ -809,6 +861,15 @@
       },
       "brew_dose": {
         "name": "جرعة التحضير"
+      },
+      "coffee_lab_coffee_stock_level": {
+        "name": "حد مخزون البن"
+      },
+      "coffee_lab_tea_stock_level": {
+        "name": "حد مخزون الشاي"
+      },
+      "coffee_lab_xpod_stock_level": {
+        "name": "حد مخزون كبسولات xPod"
       }
     },
     "button": {
@@ -1986,6 +2047,26 @@
         "bitter": "مُرّة",
         "weak": "خفيفة جدًا",
         "strong": "قوية جدًا"
+      }
+    },
+    "stock_text": {
+      "options": {
+        "item_coffee": "بن",
+        "item_tea": "شاي",
+        "item_xpod": "كبسولات xPod",
+        "kind_coffee": "البن",
+        "kind_tea": "الشاي",
+        "kind_xpod": "كبسولات xPod",
+        "running_low": "{kind}: الكمية منخفضة.",
+        "left_days": "الأيام المتبقية: نحو {n}.",
+        "left_grams": "الغرامات المتبقية: {n}.",
+        "left_cups": "الأكواب المتبقية: نحو {n}.",
+        "left_bags": "الأكياس المتبقية: {n}.",
+        "left_pods": "الكبسولات المتبقية: {n}.",
+        "left_boxes": "العلب المتبقية: {n}.",
+        "added": "أُضيف إلى {list}.",
+        "buy_again": "حان وقت شراء {name} مجددًا.",
+        "left_packs": "العبوات المتبقية: {n}."
       }
     }
   },

@@ -209,3 +209,89 @@ async def test_a_bag_finished_by_hand_or_by_a_brew_records_the_day():
     await lab.async_consume(bean_id=by_brew.id, grams=18, run_id="r")
     after = await lab.store.async_get_bean(by_brew.id)
     assert after.status == "finished" and after.finished_on
+
+
+def _options_flow(data):
+    from custom_components.xbloom.config_flow import XBloomOptionsFlow
+
+    entry = MagicMock()
+    entry.data = data
+    entry.entry_id = "e1"
+    flow = XBloomOptionsFlow(entry)
+    flow.config_entry = entry
+    flow.hass = MagicMock()
+    flow.hass.async_create_task = MagicMock(side_effect=lambda coro: coro.close())
+    flow.hass.config_entries.async_reload = AsyncMock()
+    return flow, entry
+
+
+async def test_coffee_lab_keeps_a_shopping_list_and_a_phone():
+    from custom_components.xbloom.const import CONF_STOCK_LIST, CONF_STOCK_NOTIFY
+    flow, entry = _options_flow({})
+    await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"],
+                                      "stock_list": "todo.test_list",
+                                      "stock_notify": " notify.mobile_app_test "})
+    data = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
+    assert (data[CONF_STOCK_LIST], data[CONF_STOCK_NOTIFY]) == ("todo.test_list", "notify.mobile_app_test")
+
+
+async def test_a_phone_that_is_not_a_notify_service_is_refused():
+    flow, entry = _options_flow({})
+    form = await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"],
+                                             "stock_notify": "light.kitchen"})
+    assert form["errors"] == {"stock_notify": "notify_service_invalid"}
+    flow.hass.config_entries.async_update_entry.assert_not_called()
+
+
+async def test_a_list_and_phone_left_empty_are_dropped():
+    from custom_components.xbloom.const import CONF_STOCK_LIST, CONF_STOCK_NOTIFY
+    flow, entry = _options_flow({CONF_STOCK_LIST: "todo.old", CONF_STOCK_NOTIFY: "notify.old"})
+    await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"], "stock_notify": ""})
+    data = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
+    assert CONF_STOCK_LIST not in data and CONF_STOCK_NOTIFY not in data
+
+
+
+
+async def test_a_phone_whose_notify_service_does_not_exist_is_refused():
+    flow, entry = _options_flow({})
+    flow.hass.services.has_service = lambda domain, service: service == "mobile_app_test"
+    form = await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"],
+                                             "stock_notify": "notify.mobile_app_typo"})
+    assert form["errors"] == {"stock_notify": "notify_service_unknown"}
+
+
+async def test_a_saved_phone_that_has_gone_does_not_block_the_other_settings():
+    from custom_components.xbloom.const import CONF_STOCK_NOTIFY
+    flow, entry = _options_flow({CONF_STOCK_NOTIFY: "notify.mobile_app_old"})
+    flow.hass.services.has_service = lambda domain, service: False
+    result = await flow.async_step_coffee_lab({"enable": False, "brewers": ["V60"],
+                                               "stock_notify": "notify.mobile_app_old"})
+    assert not result.get("errors")
+
+
+_NOTION = {"coffee_lab": True, "coffee_lab_store": "notion", "notion_token": "secret_x",
+           "notion_page": "p", "notion_beans_db": "b", "notion_brews_db": "r"}
+
+
+async def test_a_setting_changed_with_notion_already_connected_asks_nothing_of_notion():
+    from custom_components.xbloom.const import CONF_STOCK_NOTIFY
+    flow, entry = _options_flow(dict(_NOTION))
+    result = await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"], "store": "notion",
+                                               "stock_notify": "notify.mobile_app_test"})
+    assert result["type"] != "form"
+    data = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
+    assert data[CONF_STOCK_NOTIFY] == "notify.mobile_app_test" and data["notion_token"] == "secret_x"
+
+
+async def test_reconnect_notion_asks_for_it_again():
+    flow, entry = _options_flow(dict(_NOTION))
+    result = await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"], "store": "notion",
+                                               "notion_reconnect": True})
+    assert result["step_id"] == "coffee_lab_notion"
+
+
+async def test_switching_to_notion_asks_for_it():
+    flow, entry = _options_flow({"coffee_lab": True, "coffee_lab_store": "local"})
+    result = await flow.async_step_coffee_lab({"enable": True, "brewers": ["V60"], "store": "notion"})
+    assert result["step_id"] == "coffee_lab_notion"

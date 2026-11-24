@@ -33,6 +33,9 @@ CONF_COFFEE_LAB = "coffee_lab"
 # person edits the list. Seeded with brand names only, which read the same in
 # any language. entry.data.
 CONF_BREWERS = "coffee_lab_brewers"
+# Where Coffee Lab reminds to buy: a todo list and a notify service, both optional.
+CONF_STOCK_LIST = "coffee_lab_stock_list"
+CONF_STOCK_NOTIFY = "coffee_lab_stock_notify"
 
 # Where Coffee Lab keeps its bags and brews: "local" (Home Assistant's own
 # storage) or "notion". With Notion, the token, the page shared with it, and
@@ -56,6 +59,9 @@ CONF_CALLBACK_TARGETS = "callback_targets"
 
 # Sent when anything Coffee Lab shows has changed; its entities re-read.
 SIGNAL_COFFEE_LAB_UPDATED = f"{DOMAIN}_coffee_lab_updated"
+# Coffee Lab's stock was worked out again (coffee_lab/stock_watch.py); not a
+# Coffee Lab change, so it starts no further look.
+SIGNAL_COFFEE_LAB_STOCK = f"{DOMAIN}_coffee_lab_stock"
 
 # The Brew tab's Taste: a one-off change to the picked recipe's grind, in
 # grinder steps. A smaller number grinds finer: a finer grind draws more from

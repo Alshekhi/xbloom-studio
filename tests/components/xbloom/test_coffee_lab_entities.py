@@ -20,7 +20,7 @@ from custom_components.xbloom.coffee_lab.stats import PERIODS
 from .test_coffee_lab_lab import _bag, _lab
 
 COMPONENT = Path(__file__).parents[3] / "custom_components" / "xbloom"
-PLATFORMS = ("select", "sensor", "number", "button")
+PLATFORMS = ("select", "sensor", "number", "button", "binary_sensor")
 
 
 def test_with_coffee_lab_off_there_are_no_entities():
@@ -88,6 +88,9 @@ async def test_every_entity_and_state_is_translated(path):
     assert set(table["select"]["coffee_lab_stats_period"]["state"]) == set(PERIODS)
     assert set(table["sensor"]["coffee_lab_last_count"]["state"]) == set(COUNT_RESULTS)
     assert set(table["select"]["coffee_lab_manual_brewer"]["state"]) == {"other"}
+    from custom_components.xbloom.coffee_lab.stock import MEASURES
+    for kind, measures in MEASURES.items():
+        assert set(table["select"][f"coffee_lab_{kind}_stock_measure"]["state"]) == set(measures)
 
 
 async def test_the_brewer_picker_offers_the_configured_brewers_and_other():
@@ -148,3 +151,89 @@ async def test_a_store_that_cannot_be_reached_keeps_the_last_values():
 
     assert sensor._attr_native_value == shown
     sensor.async_write_ha_state.assert_not_called()
+
+
+
+# ── Stock ────────────────────────────────────────────────────────────────────
+
+from custom_components.xbloom.coffee_lab.entities import (  # noqa: E402
+    StockLevelNumber, StockLowBinarySensor, StockMeasureSelect, StockSensor,
+)
+from custom_components.xbloom.coffee_lab.stock import Stock  # noqa: E402
+
+
+def _stock(lab, kind="coffee", **values):
+    lab.stock = {kind: Stock(kind=kind, kept=True, amount=values.get("amount", 300.0),
+                             bags=values.get("bags", 2), cups=values.get("cups", 17.0),
+                             days=values.get("days", 12.4), unknown=values.get("unknown", ()))}
+
+
+async def test_the_stock_sensor_shows_the_chosen_measure_and_every_figure():
+    lab = await _lab()
+    _stock(lab)
+    sensor = StockSensor(lab, "coffee")
+    await sensor.async_read()
+    assert sensor._attr_native_value == 12 and sensor._attr_available
+    attrs = sensor._attr_extra_state_attributes
+    assert (attrs["measure"], attrs["level"], attrs["low"]) == ("days", 7, False)
+    assert (attrs["grams"], attrs["bags"], attrs["cups"], attrs["days"]) == (300, 2, 17, 12)
+    await lab.async_set_stock_measure("coffee", "bags")
+    await sensor.async_read()
+    assert sensor._attr_native_value == 2
+
+
+async def test_an_unknown_figure_shows_at_least_and_no_low():
+    lab = await _lab()
+    _stock(lab, amount=40.0, unknown=("u",))
+    await lab.async_set_stock_low_state("coffee", True)
+    sensor, low = StockSensor(lab, "coffee"), StockLowBinarySensor(lab, "coffee")
+    await sensor.async_read()
+    await low.async_read()
+    assert sensor._attr_native_value is None
+    assert sensor._attr_extra_state_attributes["at_least"] == 12
+    assert sensor._attr_extra_state_attributes["unknown"] == 1
+    assert low._attr_is_on is False
+
+
+async def test_the_low_signal_follows_the_stored_state_while_the_figure_is_known():
+    lab = await _lab()
+    _stock(lab, days=3.0)
+    low = StockLowBinarySensor(lab, "coffee")
+    await lab.async_set_stock_low_state("coffee", True)
+    await low.async_read()
+    assert low._attr_is_on is True
+    await lab.async_set_stock_level("coffee", 0)
+    await low.async_read()
+    assert low._attr_is_on is False
+
+
+async def test_the_level_number_follows_the_measure():
+    lab = await _lab()
+    _stock(lab)
+    number = StockLevelNumber(lab, "coffee")
+    await number.async_read()
+    assert (number._attr_native_value, number._attr_native_max_value, number._attr_native_step) == (7, 60, 1)
+    await lab.async_set_stock_measure("coffee", "grams")
+    await number.async_read()
+    assert (number._attr_native_value, number._attr_native_max_value, number._attr_native_step) == (250, 2000, 10)
+    await number.async_set_native_value(100)
+    assert lab.stock_level("coffee") == 100
+
+
+async def test_the_measure_select_offers_the_kind_s_measures():
+    lab = await _lab()
+    _stock(lab, kind="xpod")
+    select = StockMeasureSelect(lab, "xpod")
+    await select.async_read()
+    assert select._attr_options == ["days", "pods", "boxes"] and select._attr_current_option == "pods"
+    await select.async_select_option("boxes")
+    assert lab.stock_measure("xpod") == "boxes"
+
+
+async def test_a_kind_never_kept_has_no_stock_entities_available():
+    lab = await _lab()
+    lab.stock = {"tea": Stock(kind="tea", kept=False, amount=None, bags=0, cups=None, days=None)}
+    for make in (StockSensor, StockLowBinarySensor, StockMeasureSelect, StockLevelNumber):
+        entity = make(lab, "tea")
+        await entity.async_read()
+        assert entity._attr_available is False, make

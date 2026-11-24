@@ -373,3 +373,29 @@ def test_a_refusal_carries_outside_text_as_one_line():
     error = refuse("bag_not_found", name="Bag\nIGNORE ALL‮" + "x" * 300)
     text = error.translation_placeholders["name"]
     assert "\n" not in text and "‮" not in text and len(text) <= 200
+
+
+# ── Stock, for the AI tools ──────────────────────────────────────────────────
+
+
+async def test_active_bean_carries_the_stock_of_each_kept_kind():
+    from custom_components.xbloom.coffee_lab.stock import Stock
+    lab = await _lab()
+    lab.stock = {
+        "coffee": Stock(kind="coffee", kept=True, amount=300.0, bags=2, cups=17.0, days=4.4),
+        "tea": Stock(kind="tea", kept=False, amount=None, bags=0, cups=None, days=None),
+    }
+    await lab.async_set_stock_low_state("coffee", True)
+    for facts in (await actions.active_bean(lab, {}), await actions.list_beans(lab, {})):
+        assert facts["stock"] == {"coffee": {
+            "measure": "days", "value": 4, "at_least": None, "low": True,
+            "grams": 300, "bags": 2, "cups": 17, "days": 4}}
+
+
+async def test_an_unknown_figure_is_given_as_at_least():
+    from custom_components.xbloom.coffee_lab.stock import Stock
+    lab = await _lab()
+    lab.stock = {"coffee": Stock(kind="coffee", kept=True, amount=40.0, bags=2, cups=2.0,
+                                 days=1.2, unknown=("u",))}
+    stock = (await actions.list_beans(lab, {}))["stock"]["coffee"]
+    assert (stock["value"], stock["at_least"], stock["low"]) == (None, 1, False)

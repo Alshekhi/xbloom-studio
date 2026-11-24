@@ -11,6 +11,9 @@ can your own automations or a service outside Home Assistant.
 | `xbloom_brew_failed` | The brew could not start, or the machine gave up on it | `reason`, `recipe_name`, sometimes `step` / `error`; with `reason: no_water`, `water_needed_ml`, the recipe's water |
 | `xbloom_brew_stopped` | Someone stopped the brew | `by`, `recipe_name`, `ground` (whether the grinder had run), `dose_g` |
 | `xbloom_brew_timeout` | Ten minutes passed with no ending heard from the machine; time a brew spends paused for water does not count, for up to an hour | `recipe_name` |
+| `xbloom_stock_low` | With Coffee Lab on: a kind (coffee, xPod, tea) the home has had fell below the level set for it, in the measure chosen for it | `kind`, `measure`, `level`, `value`, `grams` (coffee and tea) or `pods` (xPods), counting the items whose amount is known, `bags`, `cups`, `days`, `unknown` (items left out because their amount is not known) |
+| `xbloom_stock_restored` | The same kind rose back to its level, usually a new bag | the same as `xbloom_stock_low` |
+| `xbloom_buy_again` | A finished bag was answered buy again: yes, and no other bag of that coffee is on hand | `bean_id`, `name`, `roaster` |
 | `xbloom_rating_due` | With Coffee Lab on: a quarter of an hour after the last cup of a sitting, for every brew still waiting for its verdict, whoever started it. The **Ask how the coffee was** blueprint is built on it | `brews`: each question as `brew_id`, `recipe`, `bag`, `changes`, `cups`, `focus` (the sentence of what was to be noticed in it, or empty). Answer one with the `xbloom.rate_brew` action and its `brew_id` |
 | `xbloom_machine_brew_started` | A brew started from one of the machine's own recipe slots, which Home Assistant did not send and so cannot follow | |
 

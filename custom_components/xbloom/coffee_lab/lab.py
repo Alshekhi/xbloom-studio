@@ -271,6 +271,10 @@ class CoffeeLab:
         # Told when the bag in use changes, with its id or None, so what was
         # suggested for the last one is not shown for the next.
         self.on_bag_chosen: Callable[[str | None], None] = lambda bean_id: None
+        # Told when a finished bag is answered buy again: yes (StockWatch).
+        self.on_buy_again: Callable[[Bean], Any] = lambda bean: None
+        # What is left of each kind, as StockWatch last worked it out.
+        self.stock: dict[str, Any] = {}
         # Told of each question opened, so it can be asked of whoever started
         # the brew once it is due (rating_calls.py).
         self.on_question: Callable[[dict[str, Any]], None] = lambda question: None
@@ -299,14 +303,16 @@ class CoffeeLab:
     async def async_load_state(self) -> None:
         self._state = dict(await self._state_storage.async_load() or {})
 
-    async def _async_set_state(self, **values: Any) -> None:
+    async def _async_set_state(self, *, quiet: bool = False, **values: Any) -> None:
+        """Keep `values`; `quiet` for bookkeeping no entity reads on a change."""
         chosen = (
             "active_bean_id" in values
             and values["active_bean_id"] != self._state.get("active_bean_id")
         )
         self._state = {**self._state, **values}
         await self._state_storage.async_save(self._state)
-        self.on_change()
+        if not quiet:
+            self.on_change()
         if chosen:
             self.on_bag_chosen(values["active_bean_id"])
 
@@ -684,7 +690,77 @@ class CoffeeLab:
         if question and question["bean_id"] == target:
             await self._async_set_state(bag_question=None)
         self.on_change()
+        if answer == "yes":
+            # The answer is kept whatever the reminder does.
+            try:
+                told = self.on_buy_again(bean)
+                if asyncio.iscoroutine(told):
+                    await told
+            except Exception:  # noqa: BLE001 — a reminder must never undo an answer
+                _LOGGER.exception("Coffee Lab: the reminder to buy %s again failed", bean.name)
         return bean
+
+    # ── Stock: the level set for each kind, and where it stands ──────────
+    #
+    # One level is kept per kind and measure, so a measure switched back
+    # finds its own level again; the low state and the list item Coffee Lab
+    # added are kept per kind, so a restart does not remind twice.
+
+    def stock_measure(self, kind: str) -> str:
+        from .stock import DEFAULT_MEASURE, MEASURES
+        chosen = (self._state.get("stock_measure") or {}).get(kind)
+        return chosen if chosen in MEASURES[kind] else DEFAULT_MEASURE[kind]
+
+    def stock_level(self, kind: str) -> float:
+        from .stock import default_level
+        measure = self.stock_measure(kind)
+        levels = (self._state.get("stock_levels") or {}).get(kind) or {}
+        return float(levels.get(measure, default_level(kind, measure)))
+
+    async def async_set_stock_measure(self, kind: str, measure: str) -> None:
+        from .stock import MEASURES
+        if measure not in MEASURES.get(kind, ()):
+            raise ValueError(f"{kind} is not measured in {measure}")
+        await self._async_set_state(
+            stock_measure={**(self._state.get("stock_measure") or {}), kind: measure})
+
+    async def async_set_stock_level(self, kind: str, level: float) -> None:
+        levels = dict(self._state.get("stock_levels") or {})
+        levels[kind] = {**(levels.get(kind) or {}), self.stock_measure(kind): float(level)}
+        await self._async_set_state(stock_levels=levels)
+
+    @property
+    def stock_seeded(self) -> bool:
+        """Whether stock has been looked at once: the first look only records."""
+        return bool(self._state.get("stock_seeded"))
+
+    # The stock's own bookkeeping is quiet: StockWatch tells the entities
+    # itself, and a Coffee Lab change would only start another look.
+
+    async def async_mark_stock_seeded(self) -> None:
+        await self._async_set_state(quiet=True, stock_seeded=True)
+
+    def buy_again_told(self, bean_id: str) -> bool:
+        return bean_id in (self._state.get("buy_again_told") or [])
+
+    async def async_mark_buy_again_told(self, bean_id: str) -> None:
+        told = [b for b in (self._state.get("buy_again_told") or []) if b != bean_id]
+        # The last few are enough: a bag is answered about once, when finished.
+        await self._async_set_state(quiet=True, buy_again_told=[*told, bean_id][-50:])
+
+    def stock_low_state(self, kind: str) -> bool | None:
+        return (self._state.get("stock_low") or {}).get(kind)
+
+    async def async_set_stock_low_state(self, kind: str, low: bool | None) -> None:
+        await self._async_set_state(
+            quiet=True, stock_low={**(self._state.get("stock_low") or {}), kind: low})
+
+    def stock_item(self, kind: str) -> str | None:
+        return (self._state.get("stock_items") or {}).get(kind)
+
+    async def async_set_stock_item(self, kind: str, uid: str | None) -> None:
+        await self._async_set_state(
+            quiet=True, stock_items={**(self._state.get("stock_items") or {}), kind: uid})
 
     # ── Counting ─────────────────────────────────────────────────────────
 
