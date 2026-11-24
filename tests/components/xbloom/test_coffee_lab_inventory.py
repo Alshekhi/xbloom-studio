@@ -116,3 +116,29 @@ def test_a_new_bag_is_untracked_until_someone_says_otherwise():
     # Absent means untracked: a balance nobody has established must not be
     # counted down from a default.
     assert Bean(id="b", name="n", status="unopened").tracked is False
+
+
+# A sealed bag holds what it was sold as: its size is its amount.
+
+
+def test_a_sealed_bag_of_known_size_starts_counting_on_its_first_brew():
+    d = decide_consumption(bean=bag(status="unopened", tracked=False, remaining_g=None), grams=17)
+    assert isinstance(d, Deduct)
+    assert (d.new_remaining_g, d.open_bag, d.start_tracking) == (233.0, True, True)
+
+
+def test_a_sealed_bag_with_no_size_stays_uncounted():
+    d = decide_consumption(bean=bag(status="unopened", tracked=False, remaining_g=None,
+                                    bag_size_g=None), grams=17)
+    assert isinstance(d, Skip) and d.reason == "untracked"
+
+
+def test_an_open_uncounted_bag_is_not_counted_from_its_size():
+    # Opened before counting began: some of it is gone, how much nobody knows.
+    d = decide_consumption(bean=bag(status="open", tracked=False, remaining_g=None), grams=17)
+    assert isinstance(d, Skip) and d.reason == "untracked"
+
+
+def test_a_tracked_bag_does_not_start_tracking_again():
+    d = decide_consumption(bean=bag(status="unopened", remaining_g=250.0), grams=17)
+    assert isinstance(d, Deduct) and not d.start_tracking

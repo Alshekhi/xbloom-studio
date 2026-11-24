@@ -31,6 +31,9 @@ class Deduct:
     finish: bool       # nothing usable left
     # An xPod box is counted in pods: the pods left after this brew, else None.
     new_pods: int | None = None
+    # A sealed bag of known size, not yet counted: this brew starts counting
+    # it, from that size.
+    start_tracking: bool = False
 
 
 @dataclass(frozen=True)
@@ -165,24 +168,29 @@ def decide_consumption(
     if bean.status in ("finished", "archived"):
         return Flag("bag_closed", {"bag": bean.name, "status": bean.status})
 
+    # A sealed bag holds what it was sold as: with its size known, its first
+    # brew starts counting it from there, rather than opening it uncounted.
+    sealed = not bean.tracked and bean.status == "unopened" and bool(bean.bag_size_g)
+    remaining_g = float(bean.bag_size_g) if sealed else bean.remaining_g
+
     # Untracked is a deliberate state, not a fault: record the brew against the
     # bag and leave its unknown balance unknown. Flagging it would nag forever.
-    if not bean.tracked:
+    if not bean.tracked and not sealed:
         return Skip("untracked", record_brew=True, bean_id=bean.id)
 
     # Tracked with no balance is inconsistent: something cleared it, or the bag
     # was marked tracked before it was weighed.
-    if bean.remaining_g is None:
+    if remaining_g is None:
         return Flag("tracked_without_amount", {"bag": bean.name})
 
-    new_remaining = round(bean.remaining_g - grams, 1)
+    new_remaining = round(remaining_g - grams, 1)
 
     # Real inventory drifts — manual brews, spills, a missed entry. Correcting
     # it silently would erase the evidence that it drifted.
     if new_remaining < 0:
         return Flag(
             "more_than_left",
-            {"bag": bean.name, "remaining_g": bean.remaining_g, "grams": grams},
+            {"bag": bean.name, "remaining_g": remaining_g, "grams": grams},
         )
 
     return Deduct(
@@ -191,4 +199,5 @@ def decide_consumption(
         new_remaining_g=new_remaining,
         open_bag=bean.status == "unopened",
         finish=new_remaining <= finished_below_g,
+        start_tracking=sealed,
     )

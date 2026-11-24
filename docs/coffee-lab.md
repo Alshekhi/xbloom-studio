@@ -14,7 +14,8 @@ Add and edit bags in **Configure → Add a bag / Edit a bag**, with the
 assistant. A bag given the grams in it is **tracked**: counted down with each
 brew. A bag without an amount is **untracked**: its brews are recorded, and
 nothing is subtracted. Weigh a bag and use `xbloom.start_tracking` to start
-counting it at any time.
+counting it at any time. An unopened bag given its size is counted from
+that size at its first brew, since a sealed bag holds what it was sold as.
 
 A bag is **unopened**, then **open** from its first brew, then **finished**
 once a brew leaves 5 g or less, or when you mark it with
@@ -80,7 +81,7 @@ recorded without touching a bag:
 | Brew | What happens |
 |---|---|
 | From an xPod, or `unattributed` | Recorded against no bag |
-| From an untracked bag | Recorded against the bag; nothing subtracted |
+| From an open, untracked bag | Recorded against the bag; nothing subtracted |
 | With no bag chosen | Recorded for review (`no_bag`) |
 | Larger than what the bag shows | Recorded for review (`more_than_left`); the bag is left as it is |
 | From a finished bag | Recorded for review (`bag_closed`) |

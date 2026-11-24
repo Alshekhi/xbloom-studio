@@ -109,7 +109,7 @@ class CoffeeLabStore(ABC):
 
     async def async_apply_bean_update(
         self, bean_id: str, *, remaining_g: float | None, open_bag: bool, finish: bool,
-        today: str, pods_left: int | None = None,
+        today: str, pods_left: int | None = None, start_tracking: bool = False,
     ) -> Bean:
         """What a counted brew does to its bag: the new amount, and its stage.
 
@@ -118,6 +118,8 @@ class CoffeeLabStore(ABC):
         changes: dict[str, Any] = (
             {"pods_left": pods_left} if pods_left is not None else {"remaining_g": remaining_g}
         )
+        if start_tracking:
+            changes["tracked"] = True
         if finish:
             changes["status"] = "finished"
             changes["finished_on"] = today

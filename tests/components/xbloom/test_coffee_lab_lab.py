@@ -323,3 +323,13 @@ async def test_a_rolling_period_s_habits_count_its_own_number_of_days():
     # The brew on the 19th is in the week's totals but before its seven days.
     assert report.now.brews == 3
     assert (report.habits["days_in_period"], report.habits["days_brewed"]) == (7, 2)
+
+
+async def test_a_sealed_bag_is_counted_from_its_size_once_brewed():
+    lab = await _lab()
+    bag = await _bag(lab, tracked=False, remaining_g=None, status="unopened", bag_size_g=250.0)
+    result = await lab.async_consume(bean_id=bag.id, grams=17, run_id="run-1",
+                                     brewed_at="2026-09-25T09:00:00+03:00")
+    assert (result.result, result.remaining_g, result.opened) == ("counted", 233.0, True)
+    after = await lab.store.async_get_bean(bag.id)
+    assert (after.tracked, after.remaining_g, after.status, after.opened_on) == (True, 233.0, "open", "2026-09-25")

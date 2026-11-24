@@ -1002,6 +1002,7 @@ class CoffeeLab:
             open_bag=decision.open_bag, finish=decision.finish,
             # The day it was brewed, not the day a waiting brew was saved.
             today=_brew_day(brewed_at), pods_left=decision.new_pods,
+            start_tracking=decision.start_tracking,
         )
         # Noted at once, so a retry after a failed row write does not take
         # from the bag again.
