@@ -8,7 +8,7 @@ A bag is named by its name, or by its id. A coffee bought again keeps its
 name, so several bags may share one: two physical bags of the same coffee.
 Where a name chooses the bag coffee is drawn from — picking the bag in use,
 brewing, coffee used elsewhere, finishing a bag — it means the bag in use
-(`_in_use`). Where it changes one bag's amount or details, a shared name is
+(`inventory.in_use`). Where it changes one bag's amount or details, a shared name is
 refused rather than guessed.
 """
 from __future__ import annotations
@@ -27,7 +27,7 @@ from xbloom.exceptions import XBloomAPIError
 
 from ..tool_common import refuse
 from .lab import STORE_UNREACHABLE, CoffeeLab, Consumption
-from .inventory import CUP_OF_KIND
+from .inventory import CUP_OF_KIND, in_use as _in_use
 from .models import TASTE_NOTES, TASTE_SCALES, VERDICT_OF, Bean, Brew
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER, Totals
 from .store import UnknownBean, UnknownBrew
@@ -67,30 +67,13 @@ def bean_facts(bean: Bean) -> dict[str, Any]:
     return facts
 
 
-def _in_use(beans: list[Bean]) -> list[Bean]:
-    """Of bags sharing a name, the ones it can mean when drawing coffee.
-
-    The open bag, since that is the one being drunk; with none open, the
-    unopened bag roasted first, since that is the one to open next. More than
-    one left — two open, or unopened bags no roast date tells apart — is for
-    the caller to refuse.
-    """
-    if opened := [b for b in beans if b.status == "open"]:
-        return opened
-    unopened = [b for b in beans if b.status == "unopened"]
-    if len(unopened) < 2 or not all(b.roast_date for b in unopened):
-        return unopened
-    first = min(b.roast_date for b in unopened)
-    return [b for b in unopened if b.roast_date == first]
-
-
 async def resolve_bean(
     lab: CoffeeLab, args: dict[str, Any], *, selectable_only: bool = True, in_use: bool = False,
 ) -> Bean:
     """The one bag `bean` (a name) or `bean_id` means, or a refusal.
 
     `in_use`: a name shared by several open or unopened bags means the bag in
-    use (`_in_use`), for callers that draw coffee from it.
+    use (`inventory.in_use`), for callers that draw coffee from it.
     """
     if bean_id := args.get("bean_id"):
         try:

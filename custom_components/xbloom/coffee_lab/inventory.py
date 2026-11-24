@@ -86,6 +86,23 @@ def kind_of_cup(cup_type: Any) -> str:
     return {"xpod": "xpod", "tea": "tea"}.get(label, "coffee")
 
 
+def in_use(beans: list[Bean]) -> list[Bean]:
+    """Of bags sharing a name, the ones it can mean when drawing coffee.
+
+    The open bag, since that is the one being drunk; with none open, the
+    unopened bag roasted first, since that is the one to open next. More than
+    one left — two open, or unopened bags no roast date tells apart — is for
+    the caller to refuse.
+    """
+    if opened := [b for b in beans if b.status == "open"]:
+        return opened
+    unopened = [b for b in beans if b.status == "unopened"]
+    if len(unopened) < 2 or not all(b.roast_date for b in unopened):
+        return unopened
+    first = min(b.roast_date for b in unopened)
+    return [b for b in unopened if b.roast_date == first]
+
+
 def _decide_pod(bean: Bean) -> Decision:
     """One pod from an xPod box."""
     if bean.status in ("finished", "archived"):
