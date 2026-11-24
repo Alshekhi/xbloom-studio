@@ -689,9 +689,13 @@ class CoffeeLab:
             await self._async_set_state(bag_question=None)
         self.on_change()
         if answer == "yes":
-            told = self.on_buy_again(bean)
-            if asyncio.iscoroutine(told):
-                await told
+            # The answer is kept whatever the reminder does.
+            try:
+                told = self.on_buy_again(bean)
+                if asyncio.iscoroutine(told):
+                    await told
+            except Exception:  # noqa: BLE001 — a reminder must never undo an answer
+                _LOGGER.exception("Coffee Lab: the reminder to buy %s again failed", bean.name)
         return bean
 
     # ── Stock: the level set for each kind, and where it stands ──────────
@@ -722,6 +726,14 @@ class CoffeeLab:
         levels = dict(self._state.get("stock_levels") or {})
         levels[kind] = {**(levels.get(kind) or {}), self.stock_measure(kind): float(level)}
         await self._async_set_state(stock_levels=levels)
+
+    @property
+    def stock_seeded(self) -> bool:
+        """Whether stock has been looked at once: the first look only records."""
+        return bool(self._state.get("stock_seeded"))
+
+    async def async_mark_stock_seeded(self) -> None:
+        await self._async_set_state(stock_seeded=True)
 
     def stock_low_state(self, kind: str) -> bool | None:
         return (self._state.get("stock_low") or {}).get(kind)

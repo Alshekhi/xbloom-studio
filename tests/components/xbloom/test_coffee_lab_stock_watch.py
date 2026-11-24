@@ -158,7 +158,7 @@ async def test_the_events_carry_every_figure():
     await watch.async_refresh()
     [(_, data)] = home.fired
     assert data["kind"] == "coffee" and data["measure"] == "bags" and data["level"] == 2
-    assert (data["value"], data["bags"], data["amount"], data["unknown"]) == (1, 1, 250.0, [])
+    assert (data["value"], data["bags"], data["grams"], data["unknown"]) == (1, 1, 250.0, [])
     assert {"cups", "days"} <= set(data)
 
 
@@ -183,3 +183,42 @@ async def test_buy_again_adds_the_coffee_unless_another_bag_of_it_is_on_hand():
     watch = await _watch(home, lab)
     await watch.async_buy_again(finished)
     assert home.added == home.notified == home.fired == []
+
+
+# ── After the first look ─────────────────────────────────────────────────────
+
+
+async def test_a_kind_already_low_when_first_known_reminds_after_the_first_look():
+    home, lab, watch = await _low_coffee()
+    await lab.async_set_stock_low_state("coffee", None)
+    await watch.async_refresh()                         # the first look: silent
+    assert home.fired == []
+    await _bag(lab, kind="tea", status="open", remaining_g=100.0)   # below 250 g
+    await watch.async_refresh()
+    assert [d["kind"] for _, d in home.fired] == ["tea"]
+
+
+async def test_the_events_name_grams_for_coffee_and_pods_for_xpods():
+    home, lab, watch = await _low_coffee()
+    await watch.async_refresh()
+    [(_, data)] = home.fired
+    assert data["grams"] == 250.0 and "amount" not in data and "pods" not in data
+
+
+async def test_buy_again_is_only_for_a_finished_bag():
+    home = _Home()
+    lab = await _lab()
+    open_bag = await _bag(lab, status="open")
+    watch = await _watch(home, lab)
+    await watch.async_buy_again(open_bag)
+    assert home.fired == [] and home.added == []
+
+
+async def test_an_unexpected_failure_in_a_reminder_does_not_stop_the_answer_or_the_watch():
+    home = _Home()
+    lab = await _lab()
+    finished = await _bag(lab, status="finished")
+    watch = StockWatch(home.hass, lab, todo_list="todo.test_list", notify="notify.x", texts={})
+    lab.on_buy_again = watch.async_buy_again
+    await lab.async_rate_bag("yes", finished.id)        # a missing word: logged, not raised
+    assert (await lab.store.async_get_bean(finished.id)).buy_again == "yes"

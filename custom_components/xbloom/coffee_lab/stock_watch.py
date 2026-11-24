@@ -71,7 +71,15 @@ class StockWatch:
         self._again = True
         while self._again:
             self._again = False
-            await self.async_refresh()
+            try:
+                await self.async_refresh()
+            except Exception:  # noqa: BLE001 — the next change looks again
+                _LOGGER.exception("Coffee Lab: stock could not be worked out")
+
+    @callback
+    def stop(self) -> None:
+        if self._task is not None and not self._task.done():
+            self._task.cancel()
 
     # ── Looking ─────────────────────────────────────────────────────────
 
@@ -84,13 +92,18 @@ class StockWatch:
             _LOGGER.info("Coffee Lab: stock not worked out (%s)", err)
             return
         self.lab.stock = {kind: stock_of(kind, beans, brews, now) for kind in KINDS}
+        # The very first look, after this is installed, only records where
+        # each kind stands. After it, a kind with no state yet — one the home
+        # has just begun to keep, or whose figure just became known — counts
+        # as not low, so finding it low reminds.
+        first = not self.lab.stock_seeded
         for kind, stock in self.lab.stock.items():
             if not stock.kept:
                 continue
             measure, level = self.lab.stock_measure(kind), self.lab.stock_level(kind)
             value = figure(stock, measure)
             stored = self.lab.stock_low_state(kind)
-            low, event = crossing(stored, value, level)
+            low, event = crossing(stored if stored is not None or first else False, value, level)
             # Written only when it changed: a write is a Coffee Lab change,
             # which schedules one more look, and that one finds nothing new.
             if low != stored:
@@ -101,13 +114,16 @@ class StockWatch:
             elif event == "restored":
                 self._fire(EV_RESTORED, kind, stock, measure, level, value)
                 await self._tick_off(kind)
+        if first:
+            await self.lab.async_mark_stock_seeded()
         async_dispatcher_send(self.hass, SIGNAL_COFFEE_LAB_STOCK)
 
     def _fire(self, event: str, kind: str, stock: Stock, measure: str, level: float,
               value: float | None) -> None:
         self.hass.bus.async_fire(event, {
             "kind": kind, "measure": measure, "level": level, "value": value,
-            "amount": stock.amount, "bags": stock.bags, "cups": stock.cups,
+            "pods" if kind == "xpod" else "grams": stock.amount,
+            "bags": stock.bags, "cups": stock.cups,
             "days": stock.days, "unknown": list(stock.unknown),
         })
 
@@ -185,6 +201,8 @@ class StockWatch:
 
     async def async_buy_again(self, bean: Bean) -> None:
         """A finished coffee answered buy again: yes. On the list, unless already on hand."""
+        if bean.status != "finished":
+            return
         try:
             beans = await self.lab.store.async_list_beans(selectable_only=False)
         except STORE_UNREACHABLE as err:

@@ -556,6 +556,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: XBloomConfigEntry) -> bo
         lab.on_buy_again = watch.async_buy_again
         entry.async_on_unload(
             async_dispatcher_connect(hass, SIGNAL_COFFEE_LAB_UPDATED, watch.schedule))
+        entry.async_on_unload(watch.stop)
         watch.schedule()
         entry.async_on_unload(async_count_completed_brews(hass, lab))
         # Brews that could not reach the store wait in Home Assistant and are
