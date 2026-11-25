@@ -684,6 +684,9 @@
           "pods": "Pods",
           "boxes": "Boxes"
         }
+      },
+      "coffee_lab_finish_choice": {
+        "name": "Bag to finish"
       }
     },
     "sensor": {
@@ -825,6 +828,9 @@
       },
       "coffee_lab_brew_history": {
         "name": "Brew history"
+      },
+      "coffee_lab_finish_question": {
+        "name": "Bag to finish"
       }
     },
     "switch": {
@@ -1007,6 +1013,18 @@
       },
       "coffee_lab_another_cup": {
         "name": "Another cup"
+      },
+      "coffee_lab_finish_asked": {
+        "name": "Finish bag"
+      },
+      "coffee_lab_keep_asked": {
+        "name": "Keep bag"
+      },
+      "coffee_lab_use_rest_of_bag": {
+        "name": "Use the rest of the bag"
+      },
+      "coffee_lab_finish_chosen": {
+        "name": "Finish the chosen bag"
       }
     },
     "text": {
@@ -1185,6 +1203,15 @@
     },
     "not_a_link": {
       "message": "{argument} must be a web link, starting with https://."
+    },
+    "rest_none": {
+      "message": "This bag has no last cup to use."
+    },
+    "finish_none_chosen": {
+      "message": "Choose a bag to finish first."
+    },
+    "finish_none_asked": {
+      "message": "There is no bag waiting to be finished."
     }
   },
   "services": {

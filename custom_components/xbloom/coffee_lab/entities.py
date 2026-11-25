@@ -29,11 +29,12 @@ from ..tool_common import refuse
 from ..const import DOMAIN, SIGNAL_COFFEE_LAB_HISTORY, SIGNAL_COFFEE_LAB_STOCK, SIGNAL_COFFEE_LAB_UPDATED
 from . import actions
 from .lab import CoffeeLab, focus_text
+from .store import UnknownBean
 from .inventory import kind_of_cup
 from .models import BUY_AGAIN, ISSUES, KINDS, VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER, window
 from .opening import USUAL_DAYS, fading, open_next, usual_dose
-from .todays_cup_runtime import SIGNAL_TODAYS_CUP
+from .todays_cup_runtime import BREW_STATUS, DOSE_NUMBER, RECIPE_SELECT, SIGNAL_TODAYS_CUP
 from .stock import MEASURES, figure, floor
 
 _LOGGER = logging.getLogger(__name__)
@@ -422,6 +423,149 @@ class BuyAgainSelect(CoffeeLabEntity, SelectEntity):
         await self.lab.async_rate_bag(option)
 
 
+class BagToFinishSensor(CoffeeLabEntity, SensorEntity):
+    """A bag a brew left short of another cup: its name, while it is asked about."""
+
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
+
+    _attr_icon = "mdi:sack-outline"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "finish_question")
+        self.entity_id = "sensor.xbloom_studio_bag_to_finish"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # The question lapses with the clock, not only with a change.
+        self.async_on_remove(async_track_time_interval(self.hass, self._tick, QUESTION_TICK))
+
+    @callback
+    def _tick(self, _now) -> None:
+        self._changed()
+
+    async def async_read(self) -> None:
+        question = self.lab.finish_question
+        self._attr_native_value = question["name"] if question else None
+        self._attr_extra_state_attributes = (
+            {"bean_id": question["bean_id"], "remaining_g": question["remaining_g"]} if question else {}
+        )
+
+
+class _FinishQuestionButton(CoffeeLabEntity, ButtonEntity):
+    """Answers the question; there is nothing to press while none is open."""
+
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
+
+    @property
+    def available(self) -> bool:
+        return self.lab.finish_question is not None
+
+    async def async_read(self) -> None:
+        """Nothing to read: availability follows the question."""
+
+
+class FinishAskedButton(_FinishQuestionButton):
+    """Finish the bag the question names; Buy again follows."""
+
+    _attr_icon = "mdi:check"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "finish_asked")
+        self.entity_id = "button.xbloom_studio_finish_bag"
+
+    async def async_press(self) -> None:
+        question = self.lab.finish_question
+        if question is None:
+            raise refuse("finish_none_asked")
+        # The bag as it is now, through the finish rules: it may have been
+        # weighed again since the question was asked.
+        await actions.finish_bag(self.lab, {"bean_id": question["bean_id"]})
+
+
+class KeepAskedButton(_FinishQuestionButton):
+    """Leave the bag open and stop asking."""
+
+    _attr_icon = "mdi:close"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "keep_asked")
+        self.entity_id = "button.xbloom_studio_keep_bag"
+
+    async def async_press(self) -> None:
+        await self.lab.async_keep_asked()
+
+
+class FinishChoiceSelect(CoffeeLabEntity, SelectEntity):
+    """An open bag to finish from the Bags tab: only those finishing allows.
+
+    Labelled over every coffee bag, so two bags sharing a name are told apart
+    even when only one of them is offered.
+    """
+
+    _attr_icon = "mdi:sack-outline"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "finish_choice")
+        self.entity_id = "select.xbloom_studio_bag_to_finish"
+        self._ids_by_label: dict[str, str] = {}
+        self._attr_options = []
+        self._attr_current_option = None
+
+    async def async_read(self) -> None:
+        coffee = [b for b in await self.lab.store.async_list_beans() if b.kind == "coffee"]
+        labels = bag_labels(coffee)
+        offered = [b for b in coffee if b.status == "open" and CoffeeLab.finish_refusal(b) is None]
+        self._ids_by_label = {labels[b.id]: b.id for b in offered}
+        self._attr_options = list(self._ids_by_label)
+        chosen = next((b for b in offered if b.id == self.lab.finish_choice), None)
+        self._attr_current_option = labels[chosen.id] if chosen else None
+        self._attr_extra_state_attributes = (
+            {"remaining_g": chosen.remaining_g if chosen.tracked else None, "tracked": chosen.tracked}
+            if chosen else {}
+        )
+
+    @property
+    def available(self) -> bool:
+        return bool(self._attr_options)
+
+    async def async_select_option(self, option: str) -> None:
+        await self.lab.async_choose_to_finish(self._ids_by_label[option])
+
+
+class FinishChosenButton(CoffeeLabEntity, ButtonEntity):
+    """Finish the bag chosen on the Bags tab; Buy again follows."""
+
+    _attr_icon = "mdi:check"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "finish_chosen")
+        self.entity_id = "button.xbloom_studio_finish_chosen_bag"
+        self._finishable = False
+
+    @property
+    def available(self) -> bool:
+        return self._finishable
+
+    async def async_read(self) -> None:
+        # The chosen bag may have been finished or weighed since it was chosen.
+        chosen = self.lab.finish_choice
+        bean = None
+        if chosen is not None:
+            try:
+                bean = await self.lab.store.async_get_bean(chosen)
+            except UnknownBean:
+                bean = None
+        self._finishable = (bean is not None and bean.status == "open"
+                            and CoffeeLab.finish_refusal(bean) is None)
+
+    async def async_press(self) -> None:
+        chosen = self.lab.finish_choice
+        if chosen is None:
+            raise refuse("finish_none_chosen")
+        # The action's own checks and refusals: one way to finish a bag.
+        await actions.finish_bag(self.lab, {"bean_id": chosen})
+
+
 class WaitingBrewsSensor(CoffeeLabEntity, SensorEntity):
     """How many brews wait for the store; the oldest's error as an attribute."""
 
@@ -731,6 +875,47 @@ class AnotherCupButton(_TodaysCupButton):
         await self._cup().async_another()
 
 
+class UseRestOfBagButton(CoffeeLabEntity, ButtonEntity):
+    """Set the dose to the rest of the bag in use, when that is its last cup."""
+
+    _attr_icon = "mdi:sack-percent"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "use_rest_of_bag")
+        self.entity_id = "button.xbloom_studio_use_rest_of_bag"
+        self._dose: float | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # The recipe, the dose slider's limits and the machine decide it too.
+        @callback
+        def _moved(event: Any) -> None:
+            # A dose slider step that keeps its limits changes nothing here.
+            old, new = event.data.get("old_state"), event.data.get("new_state")
+            if (event.data.get("entity_id") == DOSE_NUMBER and old is not None and new is not None
+                    and all(old.attributes.get(k) == new.attributes.get(k) for k in ("min", "max"))):
+                return
+            self._changed()
+
+        self.async_on_remove(async_track_state_change_event(
+            self.hass, [RECIPE_SELECT, DOSE_NUMBER, BREW_STATUS], _moved,
+        ))
+
+    @property
+    def available(self) -> bool:
+        return self._dose is not None
+
+    async def async_read(self) -> None:
+        cup = getattr(self.lab, "todays_cup", None)
+        self._dose = cup.rest_of_bag_dose(await self.lab.async_active_bean()) if cup is not None else None
+
+    async def async_press(self) -> None:
+        cup = getattr(self.lab, "todays_cup", None)
+        if cup is None:
+            raise refuse("rest_none")
+        await cup.async_use_rest()
+
+
 class _OpeningNumber(CoffeeLabEntity, NumberEntity):
     """One of the opening rules: a setting kept in Coffee Lab's state."""
 
@@ -775,13 +960,19 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
         "select": [
             ActiveBagSelect, ActiveXpodBoxSelect, ActiveTeaSelect, StatsPeriodSelect,
             ManualBrewerSelect, RateBrewSelect, CupIssueSelect, BuyAgainSelect,
+            FinishChoiceSelect,
         ],
         "sensor": [
             RemainingSensor, BagsSensor, StatsSensor, RecentBrewsSensor, LastCountSensor, WaitingBrewsSensor,
             RatingQuestionSensor, BagQuestionSensor, RecipeKindSensor, TodaysCupSensor, BrewHistorySensor,
+            BagToFinishSensor,
         ],
         "number": [ManualDoseNumber, OpenLimitNumber, RestDaysNumber, FadeDaysNumber],
-        "button": [RecordManualBrewButton, UseTodaysCupButton, AnotherCupButton],
+        "button": [
+            RecordManualBrewButton, UseTodaysCupButton, AnotherCupButton, FinishAskedButton, KeepAskedButton,
+            UseRestOfBagButton,
+            FinishChosenButton,
+        ],
     }
     # Only a store edited elsewhere — Notion — can be out of date here.
     if lab.store.remote:

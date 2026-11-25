@@ -684,6 +684,9 @@
           "pods": "الكبسولات",
           "boxes": "العلب"
         }
+      },
+      "coffee_lab_finish_choice": {
+        "name": "كيس للإنهاء"
       }
     },
     "sensor": {
@@ -825,6 +828,9 @@
       },
       "coffee_lab_brew_history": {
         "name": "سجل التحضير"
+      },
+      "coffee_lab_finish_question": {
+        "name": "كيس للإنهاء"
       }
     },
     "switch": {
@@ -1007,6 +1013,18 @@
       },
       "coffee_lab_another_cup": {
         "name": "كوب آخر"
+      },
+      "coffee_lab_finish_asked": {
+        "name": "إنهاء الكيس"
+      },
+      "coffee_lab_keep_asked": {
+        "name": "إبقاء الكيس"
+      },
+      "coffee_lab_use_rest_of_bag": {
+        "name": "استخدم ما تبقى في الكيس"
+      },
+      "coffee_lab_finish_chosen": {
+        "name": "إنهاء الكيس المختار"
       }
     },
     "text": {
@@ -1185,6 +1203,15 @@
     },
     "not_a_link": {
       "message": "يجب أن يكون {argument} رابط ويب يبدأ بـ https://."
+    },
+    "rest_none": {
+      "message": "لا يوجد في هذا الكيس كوب أخير."
+    },
+    "finish_none_chosen": {
+      "message": "اختر الكيس الذي تريد إنهاءه أولًا."
+    },
+    "finish_none_asked": {
+      "message": "لا يوجد كيس ينتظر الإنهاء."
     }
   },
   "services": {

@@ -271,3 +271,26 @@ async def test_an_unknown_bag_is_still_refused():
     lab, store, bag = await _lab()
     with pytest.raises(ServiceValidationError):
         await actions.consume(lab, {"bean_id": "no-such-bag", "grams": 17})
+
+
+async def test_a_retried_brew_still_asks_to_finish_the_bag_it_left_short():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=25.5)
+    store.down = {"create_brew"}
+    await lab.async_consume(bean_id=bag.id, grams=17, run_id="r1")
+    assert lab.finish_question is None
+    store.down = set()
+    await lab.async_retry_pending()
+    assert lab.finish_question["bean_id"] == bag.id and lab.finish_question["remaining_g"] == 8.5
+
+
+async def test_a_retried_brew_that_empties_a_bag_waits_for_the_last_one():
+    lab, store, bag = await _lab()
+    await store.async_add_bean(name="Kenya", status="unopened", tracked=True, remaining_g=250.0)
+    await store.async_update_bean(bag.id, remaining_g=15.0)
+    store.down = {"create_brew"}
+    await lab.async_consume(bean_id=bag.id, grams=15, run_id="r1")
+    store.down = set()
+    await lab.async_retry_pending()
+    assert (await store.async_get_bean(bag.id)).status == "finished"
+    assert lab.bag_question is None

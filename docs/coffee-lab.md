@@ -23,6 +23,23 @@ once a brew leaves 5 g or less, or when you mark it with
 tracked bag still showing 20 g or more — weigh it and start tracking again
 first. A finished bag keeps its brews.
 
+Finishing from the dashboard:
+
+- **The last cup.** A counted bag that holds one dose but not two is on its
+  last cup. Today's cup then offers all of it as the dose, and on the Brew tab
+  **Use the rest of the bag** sets the dose to it for the picked recipe —
+  offered only when what the recipe's cup takes leaves 5 g or less, so the
+  brew finishes the bag. The dose is rounded down to the slider's 0.5 g.
+- **Finish this bag?** A brew that leaves a bag with less than it just used,
+  more than 5 g and less than 20 g, asks on the Brew tab: **Finish bag** or
+  **Keep bag**. The question goes when answered, when the bag is finished or
+  weighed again, when the next brew from it is counted, and after a week.
+- **Finish a bag**, on the Bags tab: any open bag finishing allows — one
+  showing less than 20 g, or one never counted — picked by name, with what is
+  left shown before **Finish the chosen bag** asks to confirm.
+
+Each way, **Buy again** follows, as for a bag a brew finishes.
+
 Bags are named by their name, or by their id when two bags share one; a shared
 name is refused rather than guessed.
 
@@ -183,8 +200,10 @@ when another bag is chosen.
 
 ### Buy it again?
 
-When a bag is finished, **Finished bag** names it for a week, and **Buy
-again** keeps whether you would buy it again — yes, maybe or no.
+When the last bag of a coffee is finished, **Finished bag** names it for a
+week, and **Buy again** keeps whether you would buy it again — yes, maybe or
+no. While another bag of the same coffee (same name, roaster and kind) is
+open or unopened, finishing one asks nothing: the question waits for the last.
 
 ## Running low
 
@@ -243,7 +262,8 @@ not while one runs.
 - **The bag**, among the open bags holding a dose: a liked coffee first —
   liked when any recipe was rated *Keep it like this* with it or the same
   coffee before, not liked when every recipe tried was rated *Doesn't suit
-  this coffee*, and a **Buy again** answer settles it; between coffees liked
+  this coffee*, and a **Buy again** yes settles it as liked (a no or a maybe
+  says nothing about taste); between coffees liked
   alike, not the one brewed last; and a bag that would pass its best before
   it is finished at that pace is brewed more. A bag past its best only when
   nothing else qualifies; with no open bag holding a dose, the sealed bag to
@@ -252,7 +272,8 @@ not while one runs.
   then its other recipes, from the brews with it or with coffee like it; else
   a [community recipe](recipes.md#community-recipes) for it; else none.
 - **The dose**: the usual dose for the drink, within what the recipe's cup
-  takes; for iced with no usual iced dose, the recipe's own.
+  takes; for iced with no usual iced dose, the recipe's own. On a bag's last
+  cup, all of the bag, within what the cup takes.
 
 It is offered once a day: on the Brew tab until the day's first coffee is
 brewed, then not again until the next day. When the first cup of the day has
@@ -270,7 +291,8 @@ brew is started as any other. **Another cup** offers the next one.
 `community`), `hub_id`, `drink`, `dose_g`, `due` (offered now), `shows_from`
 (the usual time, when there is one) and `reasons`: for the bag `liked`,
 `not_yesterday`, `use_soon`, `past_best` or `open_next`; for the recipe
-`rated_again`, `brewed_with_bag`, `like_this_coffee` or `community`.
+`rated_again`, `brewed_with_bag`, `like_this_coffee` or `community`; and
+`last_cup` when the dose is the rest of the bag.
 
 ## How you brew
 

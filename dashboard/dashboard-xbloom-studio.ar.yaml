@@ -22,9 +22,10 @@ views:
         set words = {''liked'': "أعجبتك", ''not_yesterday'': "ليست آخر قهوة حضّرتها", ''use_soon'': "يحسن
         استخدامها قريبًا", ''past_best'': "تجاوزت أفضل وقتها", ''open_next'': "حان وقت فتحها", ''rated_again'':
         "قيّمت الوصفة معها بـ أعتمدها كما هي", ''brewed_with_bag'': "حضّرتها معها من قبل", ''like_this_coffee'':
-        "حضّرتها مع قهوة مشابهة", ''community'': "وصفة من المجتمع"} %}{% set ns = namespace(said=[]) %}{%
-        for r in a.get(''reasons'') or [] %}{% if r in words %}{% set ns.said = ns.said + [words[r]] %}{%
-        endif %}{% endfor %}{% set why = ns.said | join(''، '') %}{{ cup }}{% if why %}
+        "حضّرتها مع قهوة مشابهة", ''community'': "وصفة من المجتمع", ''last_cup'': "آخر كوب من هذا الكيس"}
+        %}{% set ns = namespace(said=[]) %}{% for r in a.get(''reasons'') or [] %}{% if r in words %}{%
+        set ns.said = ns.said + [words[r]] %}{% endif %}{% endfor %}{% set why = ns.said | join(''، '')
+        %}{{ cup }}{% if why %}
 
 
         {{ why[:1] | upper }}{{ why[1:] }}.{% endif %}'
@@ -103,6 +104,22 @@ views:
       - condition: state
         entity: sensor.xbloom_studio_recipe_kind
         state_not: tea
+    - type: tile
+      entity: button.xbloom_studio_use_rest_of_bag
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_use_rest_of_bag
+      visibility:
+      - condition: state
+        entity: button.xbloom_studio_use_rest_of_bag
+        state_not: unavailable
     - type: tile
       entity: select.xbloom_studio_xpod_box
       name:
@@ -299,7 +316,55 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## هل تشتريه مجددًا؟'
+      content: '## هل تنهي هذا الكيس؟'
+    - type: markdown
+      text_only: true
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}بقي في **⁨{{ e(states(''sensor.xbloom_studio_bag_to_finish'')) }}⁩**
+        {{ (state_attr(''sensor.xbloom_studio_bag_to_finish'', ''remaining_g'') or 0) | float | round(1)
+        | string | replace(''.0'', '''') }} غ.'
+    - type: tile
+      entity: button.xbloom_studio_finish_bag
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_finish_bag
+    - type: tile
+      entity: button.xbloom_studio_keep_bag
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_keep_bag
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_bag_to_finish
+      state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_bag_to_finish
+      state_not: unknown
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: grinding
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: brewing
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## هل تشتري هذا البن مجددًا؟'
     - type: markdown
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
@@ -1765,6 +1830,53 @@ views:
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_coffee_bags
+      state_not: unavailable
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## إنهاء كيس'
+    - type: tile
+      entity: select.xbloom_studio_bag_to_finish
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+      hide_state: true
+      tap_action:
+        action: none
+    - type: markdown
+      text_only: true
+      show_empty: false
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set p = ''select.xbloom_studio_bag_to_finish'' %}{% set chosen
+        = states(p) %}{% if chosen not in (''unknown'', ''unavailable'', '''') %}{% set bag = ''⁨'' ~
+        e(chosen) ~ ''⁩'' %}{% set g = state_attr(p, ''remaining_g'') %}{% if g is not none %}**{{ bag
+        }}**: بقي {{ g | float | round(1) | string | replace(''.0'', '''') }} غ{% else %}**{{ bag }}**:
+        الكمية غير معروفة{% endif %}{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_finish_chosen_bag
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_finish_chosen_bag
+        confirmation:
+          text: هل تنهي هذا الكيس؟
+      visibility:
+      - condition: state
+        entity: button.xbloom_studio_finish_chosen_bag
+        state_not: unavailable
+    visibility:
+    - condition: state
+      entity: select.xbloom_studio_bag_to_finish
       state_not: unavailable
   - type: grid
     cards:

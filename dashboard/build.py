@@ -31,6 +31,8 @@ TEXT = {
         "d_roast": "Roast", "d_roast_date": "Roasted", "d_altitude": "Altitude", "d_notes": "Tasting notes",
         "d_m": "{n} m", "d_link": "Shop page",
         "open_next": "Open next: {bag}", "past_best": "past its best", "h_opening": "Opening bags",
+        "h_finish_a_bag": "Finish a bag", "f_chosen": "**{bag}**: {grams} g left",
+        "f_chosen_unknown": "**{bag}**: amount not known", "f_confirm": "Finish this bag?",
         "brewers": "Brewers", "h_by_coffee": "By coffee", "h_by_recipe": "By recipe",
         "col_coffee": "Coffee", "col_cups": "Cups", "col_grams": "Grams", "col_recipe": "Recipe",
         "col_verdicts": "Verdicts", "h_by_month": "By month", "h_by_week": "By week", "col_month": "Month",
@@ -39,7 +41,7 @@ TEXT = {
                    "September", "October", "November", "December"),
         "h_todays_cup": "Today's cup", "tc_line": "{cup}", "tc_sep": ", ", "tc_end": ".",
         "r_liked": "you liked it", "r_not_yesterday": "not the coffee you had last",
-        "r_use_soon": "best used soon", "r_past_best": "past its best", "r_open_next": "time to open it",
+        "r_use_soon": "best used soon", "r_past_best": "past its best", "r_open_next": "time to open it", "r_last_cup": "the last cup of this bag",
         "r_rated_again": "rated Keep it like this with it", "r_brewed_with_bag": "brewed with it before",
         "r_like_this_coffee": "brewed with coffee like it", "r_community": "a community recipe",
         "stock_not_yet": "Not enough brews yet to tell how long the {kind} will last.",
@@ -118,6 +120,7 @@ TEXT = {
         "ts_overall_notes": "Overall", "ts_finish": "Finish",
         "sv_light": "light", "sv_medium": "medium", "sv_full": "full", "sv_low": "low", "sv_high": "high",
         "h_buy_again": "Buy it again?", "b_question": "**{bag}** is finished.",
+        "h_finish_bag": "Finish this bag?", "f_left": "**{bag}** has {grams} g left.",
         "b_answer": "Answer",
         "r_question": "**{recipe}** with {bag}{changes}.", "r_at": ", at ",
         "r_grind": "grind {value} instead of {saved}", "r_ratio": "ratio 1:{value} instead of 1:{saved}",
@@ -148,6 +151,8 @@ TEXT = {
         "d_roast": "درجة التحميص", "d_roast_date": "تاريخ التحميص", "d_altitude": "الارتفاع",
         "d_notes": "النكهات", "d_m": "{n} م", "d_link": "صفحة المتجر",
         "open_next": "افتح بعده: {bag}", "past_best": "تجاوز أفضل وقته", "h_opening": "فتح الأكياس",
+        "h_finish_a_bag": "إنهاء كيس", "f_chosen": "**{bag}**: بقي {grams} غ",
+        "f_chosen_unknown": "**{bag}**: الكمية غير معروفة", "f_confirm": "هل تنهي هذا الكيس؟",
         "brewers": "أدوات التحضير", "h_by_coffee": "حسب البن", "h_by_recipe": "حسب الوصفة",
         "col_coffee": "البن", "col_cups": "الأكواب", "col_grams": "الغرامات", "col_recipe": "الوصفة",
         "col_verdicts": "التقييمات", "h_by_month": "حسب الشهر", "h_by_week": "حسب الأسبوع", "col_month": "الشهر",
@@ -156,7 +161,7 @@ TEXT = {
                    "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"),
         "h_todays_cup": "كوب اليوم", "tc_line": "{cup}", "tc_sep": "، ", "tc_end": ".",
         "r_liked": "أعجبتك", "r_not_yesterday": "ليست آخر قهوة حضّرتها",
-        "r_use_soon": "يحسن استخدامها قريبًا", "r_past_best": "تجاوزت أفضل وقتها", "r_open_next": "حان وقت فتحها",
+        "r_use_soon": "يحسن استخدامها قريبًا", "r_past_best": "تجاوزت أفضل وقتها", "r_open_next": "حان وقت فتحها", "r_last_cup": "آخر كوب من هذا الكيس",
         "r_rated_again": "قيّمت الوصفة معها بـ أعتمدها كما هي", "r_brewed_with_bag": "حضّرتها معها من قبل",
         "r_like_this_coffee": "حضّرتها مع قهوة مشابهة", "r_community": "وصفة من المجتمع",
         "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
@@ -235,7 +240,8 @@ TEXT = {
         "ts_hot_notes": "حارة", "ts_warm_notes": "دافئة", "ts_cool_notes": "باردة",
         "ts_overall_notes": "بشكل عام", "ts_finish": "الطعم الأخير",
         "sv_light": "خفيف", "sv_medium": "متوسط", "sv_full": "كامل", "sv_low": "منخفضة", "sv_high": "عالية",
-        "h_buy_again": "هل تشتريه مجددًا؟", "b_question": "انتهى **{bag}**.",
+        "h_buy_again": "هل تشتري هذا البن مجددًا؟", "b_question": "انتهى **{bag}**.",
+        "h_finish_bag": "هل تنهي هذا الكيس؟", "f_left": "بقي في **{bag}** {grams} غ.",
         "b_answer": "الإجابة",
         "r_question": "**{recipe}** مع {bag}{changes}.", "r_at": "، ",
         "r_grind": "بدرجة طحن {value} بدل {saved}", "r_ratio": "بنسبة 1:{value} بدل 1:{saved}",
@@ -349,7 +355,7 @@ def section(title: str, cards: list[dict], visibility: list[dict] | None = None)
     return out
 
 
-TODAYS_CUP_REASONS = ('liked', 'not_yesterday', 'use_soon', 'past_best', 'open_next', 'rated_again', 'brewed_with_bag', 'like_this_coffee', 'community')
+TODAYS_CUP_REASONS = ('liked', 'not_yesterday', 'use_soon', 'past_best', 'open_next', 'rated_again', 'brewed_with_bag', 'like_this_coffee', 'community', 'last_cup')
 
 
 def todays_cup_card(t: dict) -> str:
@@ -414,6 +420,8 @@ def brew_view(t: dict) -> dict:
             tile(f"binary_sensor.{E}_in_range", name=t["machine"]),
             # What the picked recipe draws from: the bag, the xPod box or the tea.
             tile(f"sensor.{E}_coffee_left", visibility=[*present(f"sensor.{E}_coffee_left"), *coffee]),
+            # Only when it is the bag's last cup: the dose that uses all of it.
+            press(f"button.{E}_use_rest_of_bag", visibility=available(f"button.{E}_use_rest_of_bag")),
             tile(f"select.{E}_xpod_box", visibility=[is_(kind, "xpod"), *present(f"select.{E}_xpod_box")]),
             tile(f"select.{E}_tea", visibility=[is_(kind, "tea"), *present(f"select.{E}_tea")]),
             # What the picked recipe draws from, only while it is running low;
@@ -438,6 +446,14 @@ def brew_view(t: dict) -> dict:
             # Named apart from the heading above it, or it is said twice.
             select(f"select.{E}_what_was_wrong", name=t["b_answer"]),
         ], [*available(f"select.{E}_what_was_wrong"), *not_busy()]),
+        # A brew left the bag short of another cup: finish it, or keep it.
+        section(t["h_finish_bag"], [
+            {"type": "markdown", "text_only": True, "content": ESCAPE + t["f_left"].replace(
+                "{bag}", ISO + f"{{{{ e(states('sensor.{E}_bag_to_finish')) }}}}" + PDI
+            ).replace("{grams}", f"{{{{ (state_attr('sensor.{E}_bag_to_finish', 'remaining_g') or 0) | float | round(1) | string | replace('.0', '') }}}}")},
+            press(f"button.{E}_finish_bag"),
+            press(f"button.{E}_keep_bag"),
+        ], [*present(f"sensor.{E}_bag_to_finish"), *not_busy()]),
         section(t["h_buy_again"], [
             {"type": "markdown", "text_only": True, "content": ESCAPE + t["b_question"].replace(
                 "{bag}", f"{{{{ e(states('sensor.{E}_finished_bag')) }}}}")},
@@ -1056,6 +1072,20 @@ def bags_view(t: dict) -> dict:
             ]),
             {"type": "markdown", "text_only": True, "content": f"[{t['add_bags']}]({INTEGRATION})"},
         ], "visibility": present(bags)[:1]},
+        # Any open bag finishing allows: a spill, a bag given away, a leftover.
+        section(t["h_finish_a_bag"], [
+            select(f"select.{E}_bag_to_finish"),
+            {"type": "markdown", "text_only": True, "show_empty": False, "content": (
+                ESCAPE + f"{{% set p = 'select.{E}_bag_to_finish' %}}{{% set chosen = states(p) %}}"
+                "{% if chosen not in ('unknown', 'unavailable', '') %}"
+                "{% set bag = '" + ISO + "' ~ e(chosen) ~ '" + PDI + "' %}"
+                "{% set g = state_attr(p, 'remaining_g') %}"
+                "{% if g is not none %}"
+                + t["f_chosen"].replace("{bag}", "{{ bag }}").replace("{grams}", "{{ g | float | round(1) | string | replace('.0', '') }}")
+                + "{% else %}" + t["f_chosen_unknown"].replace("{bag}", "{{ bag }}") + "{% endif %}{% endif %}"
+            )},
+            press(f"button.{E}_finish_chosen_bag", t["f_confirm"], visibility=available(f"button.{E}_finish_chosen_bag")),
+        ], available(f"select.{E}_bag_to_finish")),
         section(t["h_opening"], [
             tile(f"number.{E}_{n}", features=[{"type": "numeric-input", "style": "buttons"}])
             for n in ("open_bags_at_once", "rest_after_roasting", "open_bag_fades_after")

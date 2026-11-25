@@ -396,3 +396,147 @@ async def test_what_was_to_be_noticed_rides_on_the_question():
                             settings={"grind": "50", "ratio": 16.0})
     [question] = lab._open_questions()
     assert question["focus"] == focus and len(question["brew_ids"]) == 2
+
+
+# ── Finish this bag? A brew that leaves less than another cup ────────────────
+
+
+async def _short_bag():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=25.5)
+    await _brew(lab, bag, "run-1", grams=17)
+    return lab, store, bag
+
+
+async def test_a_brew_that_leaves_less_than_a_cup_asks_to_finish_the_bag():
+    lab, store, bag = await _short_bag()
+    q = lab.finish_question
+    assert q["bean_id"] == bag.id and q["name"] == "Kenya" and q["remaining_g"] == 8.5
+
+
+async def test_enough_for_another_cup_asks_nothing():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=40.0)
+    await _brew(lab, bag, "run-1", grams=17)
+    assert lab.finish_question is None
+
+
+async def test_twenty_grams_or_more_is_never_asked():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=45.0)
+    await _brew(lab, bag, "run-1", grams=24)
+    assert lab.finish_question is None
+
+
+async def test_a_brew_to_five_grams_finishes_without_asking():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=20.0)
+    await _brew(lab, bag, "run-1", grams=15)
+    assert lab.finish_question is None and lab.bag_question["bean_id"] == bag.id
+
+
+async def test_keep_closes_the_question_and_leaves_the_bag_open():
+    lab, store, bag = await _short_bag()
+    await lab.async_keep_asked()
+    assert lab.finish_question is None
+    assert (await store.async_get_bean(bag.id)).status == "open"
+
+
+async def test_finishing_the_bag_any_other_way_closes_the_question():
+    lab, store, bag = await _short_bag()
+    await lab.async_finish(bag.id)
+    assert lab.finish_question is None
+
+
+async def test_weighing_the_bag_again_closes_the_question():
+    lab, store, bag = await _short_bag()
+    await lab.async_start_tracking(bag.id, remaining_g=30.0)
+    assert lab.finish_question is None
+
+
+async def test_a_later_brew_from_the_bag_replaces_the_question():
+    lab, store, bag = await _short_bag()
+    await store.async_update_bean(bag.id, remaining_g=60.0)
+    await _brew(lab, bag, "run-2", grams=17)
+    assert lab.finish_question is None
+
+
+async def test_a_brew_from_another_bag_leaves_the_question():
+    lab, store, bag = await _short_bag()
+    other = await store.async_add_bean(name="Brazil", status="open", tracked=True, remaining_g=200.0)
+    await _brew(lab, other, "run-2", grams=17)
+    assert lab.finish_question["bean_id"] == bag.id
+
+
+async def test_the_finish_question_lapses_with_the_bag_question():
+    lab, store, bag = await _short_bag()
+    with _at(lab, lab_module.BAG_QUESTION_LAPSE.total_seconds() / 60 + 1):
+        assert lab.finish_question is None
+
+
+def test_the_bag_to_finish_looks_at_the_clock_so_a_lapsed_question_leaves():
+    import ast, inspect
+    from custom_components.xbloom.coffee_lab.entities import BagToFinishSensor
+    tree = ast.parse(inspect.getsource(BagToFinishSensor))
+    assert "async_track_time_interval" in inspect.getsource(BagToFinishSensor)
+    tick = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_tick")
+    assert any(isinstance(d, ast.Name) and d.id == "callback" for d in tick.decorator_list)
+
+
+# ── Buy again waits for the last bag of a coffee ─────────────────────────────
+
+
+async def test_a_bag_with_another_of_its_coffee_on_hand_is_not_asked_about():
+    lab, store, bag = await _lab()
+    await store.async_add_bean(name="Kenya", status="unopened", tracked=True, remaining_g=250.0)
+    await store.async_update_bean(bag.id, remaining_g=10.0)
+    await lab.async_finish(bag.id)
+    assert lab.bag_question is None
+
+
+async def test_the_last_bag_of_a_coffee_is_asked_about():
+    lab, store, bag = await _lab()
+    second = await store.async_add_bean(name="Kenya", status="unopened", tracked=True, remaining_g=250.0)
+    await store.async_update_bean(bag.id, remaining_g=10.0)
+    await lab.async_finish(bag.id)
+    await store.async_update_bean(second.id, status="open", remaining_g=10.0)
+    await lab.async_finish(second.id)
+    assert lab.bag_question["bean_id"] == second.id
+
+
+async def test_a_brew_that_empties_a_bag_waits_for_the_last_one_too():
+    lab, store, bag = await _lab()
+    await store.async_add_bean(name="Kenya", status="unopened", tracked=True, remaining_g=250.0)
+    await store.async_update_bean(bag.id, remaining_g=15.0)
+    await _brew(lab, bag, "run-1", grams=15)
+    assert lab.bag_question is None
+
+
+async def test_another_roasters_coffee_of_the_same_name_does_not_hold_the_question():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, roaster="Roaster A", remaining_g=10.0)
+    await store.async_add_bean(name="Kenya", roaster="Roaster B", status="unopened", tracked=True, remaining_g=250.0)
+    await lab.async_finish(bag.id)
+    assert lab.bag_question["bean_id"] == bag.id
+
+
+async def test_a_finished_bag_of_the_coffee_does_not_hold_the_question():
+    lab, store, bag = await _lab()
+    old = await store.async_add_bean(name="Kenya", status="open", tracked=True, remaining_g=10.0)
+    await store.async_update_bean(old.id, status="finished")
+    await store.async_update_bean(bag.id, remaining_g=10.0)
+    await lab.async_finish(bag.id)
+    assert lab.bag_question["bean_id"] == bag.id
+
+
+async def test_with_the_other_bags_out_of_reach_the_question_is_asked(caplog):
+    import logging
+    from unittest.mock import AsyncMock
+    from homeassistant.exceptions import HomeAssistantError
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=10.0)
+    store.async_list_beans = AsyncMock(side_effect=HomeAssistantError("down"))
+    with caplog.at_level(logging.INFO):
+        await lab.async_finish(bag.id)
+    assert lab.bag_question["bean_id"] == bag.id
+    assert "other bags not checked" in caplog.text

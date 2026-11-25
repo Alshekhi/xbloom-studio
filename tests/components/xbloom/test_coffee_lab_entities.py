@@ -309,3 +309,205 @@ async def test_last_months_brews_are_not_crowded_out_by_this_months():
     finally:
         entities.RECENT_BREWS = old_limit
     assert [b["recipe"] for b in sensor._attr_extra_state_attributes["brews"]] == ["Old"]
+
+
+# ── Finish this bag? ─────────────────────────────────────────────────────────
+
+from custom_components.xbloom.coffee_lab.entities import (  # noqa: E402
+    BagToFinishSensor, FinishAskedButton, KeepAskedButton,
+)
+
+
+async def _asked():
+    lab = await _lab()
+    bag = await _bag(lab, status="open", remaining_g=25.5)
+    await lab.async_consume(bean_id=bag.id, grams=17, run_id="r1")
+    return lab, bag
+
+
+async def test_the_bag_to_finish_names_the_bag_and_what_is_left():
+    lab, bag = await _asked()
+    sensor = BagToFinishSensor(lab)
+    await sensor.async_read()
+    assert sensor._attr_native_value == "Kenya"
+    assert sensor._attr_extra_state_attributes == {"bean_id": bag.id, "remaining_g": 8.5}
+    assert sensor.entity_id == "sensor.xbloom_studio_bag_to_finish"
+
+
+async def test_with_nothing_asked_the_sensor_is_empty_and_the_buttons_unavailable():
+    lab = await _lab()
+    sensor, finish, keep = BagToFinishSensor(lab), FinishAskedButton(lab), KeepAskedButton(lab)
+    for entity in (sensor, finish, keep):
+        await entity.async_read()
+    assert sensor._attr_native_value is None
+    assert finish.available is False and keep.available is False
+
+
+async def test_the_buttons_finish_or_keep_the_bag_asked_about():
+    lab, bag = await _asked()
+    finish, keep = FinishAskedButton(lab), KeepAskedButton(lab)
+    assert (finish.entity_id, keep.entity_id) == ("button.xbloom_studio_finish_bag", "button.xbloom_studio_keep_bag")
+    await finish.async_read()
+    assert finish.available is True
+    await finish.async_press()
+    assert (await lab.store.async_get_bean(bag.id)).status == "finished"
+    assert lab.finish_question is None and lab.bag_question["bean_id"] == bag.id
+
+
+async def test_the_ai_tools_see_the_question():
+    lab, bag = await _asked()
+    facts = await actions.active_bean(lab, {})
+    assert facts["finish_question"] == {"bean_id": bag.id, "bag": "Kenya", "remaining_g": 8.5}
+
+
+# ── Use the rest of the bag ──────────────────────────────────────────────────
+
+from custom_components.xbloom.coffee_lab.entities import UseRestOfBagButton  # noqa: E402
+
+
+async def test_the_rest_button_follows_what_todays_cup_says_and_presses_through():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    lab = await _lab()
+    bag = await _bag(lab, status="open", remaining_g=25.5)
+    await lab.async_select(bag.id)
+    lab.todays_cup = SimpleNamespace(rest_of_bag_dose=lambda b: 25.0 if b and b.id == bag.id else None,
+                                     async_use_rest=AsyncMock())
+    button = UseRestOfBagButton(lab)
+    assert button.entity_id == "button.xbloom_studio_use_rest_of_bag"
+    await button.async_read()
+    assert button.available is True
+    await button.async_press()
+    lab.todays_cup.async_use_rest.assert_awaited_once()
+    lab.todays_cup.rest_of_bag_dose = lambda b: None
+    await button.async_read()
+    assert button.available is False
+
+
+async def test_without_todays_cup_the_rest_button_is_unavailable():
+    lab = await _lab()
+    button = UseRestOfBagButton(lab)
+    await button.async_read()
+    assert button.available is False
+
+
+# ── Finish a bag from the Bags tab ───────────────────────────────────────────
+
+from custom_components.xbloom.coffee_lab.entities import (  # noqa: E402
+    FinishChoiceSelect, FinishChosenButton,
+)
+
+
+async def _finishable():
+    lab = await _lab()
+    short = await _bag(lab, status="open", remaining_g=8.5, roast_date="2026-09-03")
+    full = await _bag(lab, name="Brazil", status="open", remaining_g=120.0)
+    sealed = await _bag(lab, status="unopened", remaining_g=250.0, roast_date="2026-10-20")
+    unknown = await _bag(lab, name="Gayo", status="open", tracked=False, remaining_g=None)
+    tea = await _bag(lab, name="Sencha", status="open", kind="tea", remaining_g=10.0)
+    return lab, short, full, sealed, unknown, tea
+
+
+async def test_only_bags_that_may_be_finished_are_offered():
+    lab, *_ = await _finishable()
+    select = FinishChoiceSelect(lab)
+    await select.async_read()
+    assert select.entity_id == "select.xbloom_studio_bag_to_finish"
+    assert sorted(select._attr_options) == ["Gayo", "Kenya (2026-09-03)"]
+    assert select._attr_current_option is None and select.available is True
+
+
+async def test_same_named_bags_are_told_apart_even_when_one_is_offered():
+    lab, short, *_ = await _finishable()
+    select = FinishChoiceSelect(lab)
+    await select.async_read()
+    assert "Kenya (2026-09-03)" in select._attr_options and "Kenya" not in select._attr_options
+
+
+async def test_choosing_a_bag_shows_what_is_left_and_enables_finish():
+    lab, short, full, sealed, unknown, tea = await _finishable()
+    select, button = FinishChoiceSelect(lab), FinishChosenButton(lab)
+    await select.async_read()
+    await button.async_read()
+    assert button.available is False and button.entity_id == "button.xbloom_studio_finish_chosen_bag"
+    await select.async_select_option("Gayo")
+    await select.async_read()
+    await button.async_read()
+    assert select._attr_current_option == "Gayo"
+    assert select._attr_extra_state_attributes == {"remaining_g": None, "tracked": False}
+    assert button.available is True
+
+
+async def test_finishing_the_chosen_bag_clears_the_choice():
+    lab, short, *_ = await _finishable()
+    select, button = FinishChoiceSelect(lab), FinishChosenButton(lab)
+    await select.async_read()
+    await select.async_select_option("Kenya (2026-09-03)")
+    await button.async_press()
+    assert (await lab.store.async_get_bean(short.id)).status == "finished"
+    # An unopened Kenya is still on hand: Buy again waits for it.
+    assert lab.finish_choice is None and lab.bag_question is None
+
+
+async def test_finish_with_nothing_chosen_is_refused():
+    lab, *_ = await _finishable()
+    from homeassistant.exceptions import HomeAssistantError
+    with pytest.raises(HomeAssistantError):
+        await FinishChosenButton(lab).async_press()
+
+
+async def test_with_nothing_to_finish_the_picker_is_unavailable():
+    lab = await _lab()
+    await _bag(lab, status="open", remaining_g=120.0)
+    select = FinishChoiceSelect(lab)
+    await select.async_read()
+    assert select.available is False
+
+
+async def test_finish_from_the_question_goes_through_the_finish_rules():
+    # Re-weighed elsewhere to a full amount, the bag is no longer finished from
+    # a question asked about its old amount.
+    lab, bag = await _asked()
+    await lab.store.async_update_bean(bag.id, remaining_g=150.0)
+    from homeassistant.exceptions import HomeAssistantError
+    with pytest.raises(HomeAssistantError):
+        await FinishAskedButton(lab).async_press()
+    assert (await lab.store.async_get_bean(bag.id)).status == "open"
+
+
+async def test_finish_with_the_question_gone_is_a_refusal_not_an_error():
+    lab = await _lab()
+    from homeassistant.exceptions import HomeAssistantError
+    with pytest.raises(HomeAssistantError):
+        await FinishAskedButton(lab).async_press()
+
+
+async def test_a_chosen_bag_finished_by_a_brew_leaves_nothing_to_press():
+    lab, short, *_ = await _finishable()
+    await lab.async_choose_to_finish(short.id)
+    await lab.async_consume(bean_id=short.id, grams=8.5, run_id="r1")
+    button = FinishChosenButton(lab)
+    await button.async_read()
+    assert button.available is False
+
+
+async def test_the_rest_button_skips_a_slider_step_that_keeps_its_limits():
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+    from custom_components.xbloom.coffee_lab import entities as module
+    lab = await _lab()
+    button = UseRestOfBagButton(lab)
+    button.hass = MagicMock()
+    button._changed = MagicMock()
+    module.async_track_state_change_event.reset_mock()
+    await button.async_added_to_hass()
+    moved = module.async_track_state_change_event.call_args.args[2]
+    def event(entity, old, new):
+        return SimpleNamespace(data={"entity_id": entity,
+                                     "old_state": SimpleNamespace(state=old[0], attributes={"min": 5, "max": old[1]}),
+                                     "new_state": SimpleNamespace(state=new[0], attributes={"min": 5, "max": new[1]})})
+    moved(event("number.xbloom_studio_brew_dose", ("17", 25), ("17.5", 25)))
+    button._changed.assert_not_called()
+    moved(event("number.xbloom_studio_brew_dose", ("17", 25), ("17", 18)))
+    moved(event("select.xbloom_studio_recipe", ("A", 0), ("B", 0)))
+    assert button._changed.call_count == 2

@@ -22,9 +22,10 @@ views:
         set words = {''liked'': "you liked it", ''not_yesterday'': "not the coffee you had last", ''use_soon'':
         "best used soon", ''past_best'': "past its best", ''open_next'': "time to open it", ''rated_again'':
         "rated Keep it like this with it", ''brewed_with_bag'': "brewed with it before", ''like_this_coffee'':
-        "brewed with coffee like it", ''community'': "a community recipe"} %}{% set ns = namespace(said=[])
-        %}{% for r in a.get(''reasons'') or [] %}{% if r in words %}{% set ns.said = ns.said + [words[r]]
-        %}{% endif %}{% endfor %}{% set why = ns.said | join('', '') %}{{ cup }}{% if why %}
+        "brewed with coffee like it", ''community'': "a community recipe", ''last_cup'': "the last cup
+        of this bag"} %}{% set ns = namespace(said=[]) %}{% for r in a.get(''reasons'') or [] %}{% if
+        r in words %}{% set ns.said = ns.said + [words[r]] %}{% endif %}{% endfor %}{% set why = ns.said
+        | join('', '') %}{{ cup }}{% if why %}
 
 
         {{ why[:1] | upper }}{{ why[1:] }}.{% endif %}'
@@ -103,6 +104,22 @@ views:
       - condition: state
         entity: sensor.xbloom_studio_recipe_kind
         state_not: tea
+    - type: tile
+      entity: button.xbloom_studio_use_rest_of_bag
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_use_rest_of_bag
+      visibility:
+      - condition: state
+        entity: button.xbloom_studio_use_rest_of_bag
+        state_not: unavailable
     - type: tile
       entity: select.xbloom_studio_xpod_box
       name:
@@ -275,6 +292,54 @@ views:
     - condition: state
       entity: select.xbloom_studio_what_was_wrong
       state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: grinding
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: brewing
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## Finish this bag?'
+    - type: markdown
+      text_only: true
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}**⁨{{ e(states(''sensor.xbloom_studio_bag_to_finish'')) }}⁩** has
+        {{ (state_attr(''sensor.xbloom_studio_bag_to_finish'', ''remaining_g'') or 0) | float | round(1)
+        | string | replace(''.0'', '''') }} g left.'
+    - type: tile
+      entity: button.xbloom_studio_finish_bag
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_finish_bag
+    - type: tile
+      entity: button.xbloom_studio_keep_bag
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_keep_bag
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_bag_to_finish
+      state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_bag_to_finish
+      state_not: unknown
     - condition: state
       entity: sensor.xbloom_studio_brew_status
       state_not: grinding
@@ -1748,6 +1813,53 @@ views:
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_coffee_bags
+      state_not: unavailable
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
+      content: '## Finish a bag'
+    - type: tile
+      entity: select.xbloom_studio_bag_to_finish
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+      hide_state: true
+      tap_action:
+        action: none
+    - type: markdown
+      text_only: true
+      show_empty: false
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set p = ''select.xbloom_studio_bag_to_finish'' %}{% set chosen
+        = states(p) %}{% if chosen not in (''unknown'', ''unavailable'', '''') %}{% set bag = ''⁨'' ~
+        e(chosen) ~ ''⁩'' %}{% set g = state_attr(p, ''remaining_g'') %}{% if g is not none %}**{{ bag
+        }}**: {{ g | float | round(1) | string | replace(''.0'', '''') }} g left{% else %}**{{ bag }}**:
+        amount not known{% endif %}{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_finish_chosen_bag
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_finish_chosen_bag
+        confirmation:
+          text: Finish this bag?
+      visibility:
+      - condition: state
+        entity: button.xbloom_studio_finish_chosen_bag
+        state_not: unavailable
+    visibility:
+    - condition: state
+      entity: select.xbloom_studio_bag_to_finish
       state_not: unavailable
   - type: grid
     cards:

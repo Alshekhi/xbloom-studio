@@ -58,3 +58,24 @@ def test_the_section_has_a_real_heading():
     for lang in ("en", "ar"):
         section = _section(build, lang)
         assert section["cards"][0]["content"] == "## " + build.TEXT[lang]["h_todays_cup"]
+
+
+def test_the_last_cup_of_a_bag_says_so_with_its_dose():
+    build = _build()
+    attrs = {"bag": "Hill Farm", "recipe": "Daily", "dose_g": 25.5, "reasons": ["past_best", "last_cup"]}
+    assert _say(build, attrs) == (
+        "Hill Farm · Daily · 25.5 g\n\n"
+        "Past its best, the last cup of this bag.")
+    assert "آخر كوب من هذا الكيس" in _say(build, attrs, "ar")
+
+
+def test_the_rest_of_the_bag_button_sits_by_coffee_left_and_shows_only_when_available():
+    build = _build()
+    brew = build.brew_view(build.TEXT["en"])
+    now = next(s for s in brew["sections"] if "sensor.xbloom_studio_coffee_left" in str(s))
+    entities = [c.get("entity") for c in now["cards"]]
+    left = entities.index("sensor.xbloom_studio_coffee_left")
+    assert entities[left + 1] == "button.xbloom_studio_use_rest_of_bag"
+    button = now["cards"][left + 1]
+    assert any(v.get("entity") == "button.xbloom_studio_use_rest_of_bag" and v.get("state_not") == "unavailable"
+               for v in button["visibility"])

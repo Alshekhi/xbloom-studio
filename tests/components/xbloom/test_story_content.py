@@ -69,3 +69,10 @@ def test_once_all_are_told_the_one_told_longest_ago_comes_next():
     seen = {"bloom.co2", "bloom.open"}
     assert CONTENT.pick_fact("bloom", VALUES, seen, 1, order=["bloom.open", "bloom.co2"])[0] == "bloom.open"
     assert CONTENT.pick_fact("bloom", VALUES, seen, 1, order=["bloom.co2", "bloom.open"])[0] == "bloom.co2"
+
+
+def test_the_farewell_question_names_the_coffee_it_asks_about():
+    import json
+    from pathlib import Path
+    ar = json.loads((Path(__file__).parents[3] / "custom_components/xbloom/stories/content/ar.json").read_text())
+    assert "اقتربت نهاية {name}. هل ستشتري هذا البن مرة أخرى؟" in ar["bag"]["farewell"]

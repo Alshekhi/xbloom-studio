@@ -322,3 +322,121 @@ async def test_a_brew_recorded_hides_the_card_before_any_refresh():
     cup.brew_recorded(Brew(id="x", brewed_at=datetime.now(timezone.utc).isoformat(),
                            recorded_at="", dose_g=17.0, bean_id=bag.id))
     assert not cup.due()
+
+
+# ── The last cup within what the cup takes ───────────────────────────────────
+
+
+def _last(dose):
+    from custom_components.xbloom.coffee_lab.todays_cup import Pick
+    return Pick("b", "Bag", "R", "own", None, "hot", dose, ("last_cup",))
+
+
+async def test_a_last_cup_is_fitted_to_what_the_cup_takes():
+    # The Omni dripper takes 18 g at most: the pick's own 25.5 g is clamped,
+    # not replaced by the usual dose.
+    cup, *_ = await _cup(_Home(), library=[{"name": "R", "dose_g": 17, "cup_type": 2}])
+    assert cup._fit_dose(_last(25.5), 17.0).dose_g == 18.0
+
+
+async def test_a_last_cup_within_the_cup_keeps_its_dose():
+    cup, *_ = await _cup(_Home(), library=[{"name": "R", "dose_g": 17, "cup_type": 3}])
+    assert cup._fit_dose(_last(25.0), 17.0).dose_g == 25.0
+
+
+# ── The rest of the bag, on the Brew tab ─────────────────────────────────────
+
+from custom_components.xbloom.coffee_lab.models import Bean  # noqa: E402
+
+
+def _rest_home(recipe="R", status="idle", low=5.0, high=25.0):
+    home = _Home(status)
+    if recipe:
+        home.calls.append(("recipe", recipe))
+    real = home.get
+
+    def get(entity_id):
+        if entity_id == "number.xbloom_studio_brew_dose":
+            return SimpleNamespace(state="17", attributes={"min": low, "max": high})
+        return real(entity_id)
+    home.hass.states.get = get
+    return home
+
+
+def _left(grams):
+    return Bean(id="b", name="Bag", status="open", tracked=True, remaining_g=grams, bag_size_g=250.0)
+
+
+async def _rest_cup(home, cup_type=3):
+    cup, lab, bag, _ = await _cup(home, library=[{"name": "R", "dose_g": 17, "cup_type": cup_type}])
+    return cup, lab
+
+
+async def test_the_rest_is_offered_for_a_bag_short_of_two_recipe_doses():
+    cup, _ = await _rest_cup(_rest_home())
+    assert cup.rest_of_bag_dose(_left(25.5)) == 25.0
+
+
+async def test_the_rest_is_not_offered_with_two_cups_left():
+    cup, _ = await _rest_cup(_rest_home())
+    assert cup.rest_of_bag_dose(_left(34.0)) is None
+
+
+async def test_the_rest_is_not_offered_when_the_cup_would_leave_more_than_five_grams():
+    cup, _ = await _rest_cup(_rest_home(high=18.0), cup_type=2)
+    assert cup.rest_of_bag_dose(_left(24.0)) is None
+
+
+async def test_the_rest_within_five_grams_of_the_limit_is_offered_at_the_limit():
+    cup, _ = await _rest_cup(_rest_home(high=18.0), cup_type=2)
+    assert cup.rest_of_bag_dose(_left(22.0)) == 18.0
+
+
+async def test_the_rest_is_not_offered_without_a_recipe_or_while_brewing():
+    cup, _ = await _rest_cup(_rest_home(recipe=None))
+    assert cup.rest_of_bag_dose(_left(25.5)) is None
+    cup, _ = await _rest_cup(_rest_home(status="brewing"))
+    assert cup.rest_of_bag_dose(_left(25.5)) is None
+
+
+async def test_using_the_rest_sets_the_dose_slider():
+    home = _rest_home()
+    cup, lab = await _rest_cup(home)
+    bag = await lab.store.async_add_bean(name="Last", status="open", tracked=True, remaining_g=25.5)
+    await lab.async_select(bag.id)
+    await cup.async_use_rest()
+    assert ("number.set_value", {"entity_id": "number.xbloom_studio_brew_dose", "value": 25.0}) in home.calls
+
+
+async def test_using_the_rest_with_none_to_use_is_refused():
+    home = _rest_home()
+    cup, lab = await _rest_cup(home)
+    bag = await lab.store.async_add_bean(name="Full", status="open", tracked=True, remaining_g=200.0)
+    await lab.async_select(bag.id)
+    with pytest.raises(HomeAssistantError):
+        await cup.async_use_rest()
+
+
+async def test_the_rest_is_not_offered_while_a_tea_recipe_is_picked():
+    cup, _ = await _rest_cup(_rest_home(low=1.0, high=5.0), cup_type=4)
+    cup._library = lambda: [{"name": "R", "dose_g": 4, "cup_type": 4}]
+    assert cup.rest_of_bag_dose(_left(7.2)) is None
+
+
+async def test_the_rest_measures_what_the_cup_leaves_from_the_bag_not_the_rounded_dose():
+    # 23.4 g with an 18 g limit leaves 5.4 g: the brew would not finish it.
+    cup, _ = await _rest_cup(_rest_home(high=18.0), cup_type=2)
+    assert cup.rest_of_bag_dose(_left(23.4)) is None
+
+
+async def test_a_last_cup_the_cup_cannot_finish_is_a_usual_cup():
+    # 28 g with the Omni dripper's 18 g leaves 10 g: not the bag's last cup.
+    cup, *_ = await _cup(_Home(), library=[{"name": "R", "dose_g": 15, "cup_type": 2}])
+    fitted = cup._fit_dose(_last(28.0), 15.0, left=28.0)
+    assert fitted.dose_g == 15.0 and "last_cup" not in fitted.reasons
+
+
+async def test_a_last_cup_the_cup_finishes_stays_one():
+    cup, *_ = await _cup(_Home(), library=[{"name": "R", "dose_g": 15, "cup_type": 2}])
+    fitted = cup._fit_dose(_last(22.0), 15.0, left=22.0)
+    assert fitted.dose_g == 18.0 and "last_cup" in fitted.reasons

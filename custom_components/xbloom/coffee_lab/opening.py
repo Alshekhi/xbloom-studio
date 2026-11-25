@@ -10,6 +10,7 @@ Pure, and coffee only: tea and xPod boxes keep differently.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
@@ -70,6 +71,24 @@ def holds_a_dose(bean: Bean, dose: float) -> bool:
     if not bean.tracked or bean.remaining_g is None:
         return True
     return bean.remaining_g >= dose
+
+
+# The dose slider's step: a last cup is rounded down to it, never up, since a
+# dose above what the bag shows is flagged instead of taken from the bag.
+DOSE_STEP_G = 0.5
+
+
+def last_cup_dose(bean: Bean, dose: float) -> float | None:
+    """All of an open bag that cannot make two doses but holds one; else None.
+
+    Counted coffee bags only: a bag whose amount is not known may hold more.
+    """
+    if (bean.kind != "coffee" or bean.status != "open" or not bean.tracked
+            or bean.remaining_g is None or dose <= 0):
+        return None
+    if not dose <= bean.remaining_g < 2 * dose:
+        return None
+    return math.floor(bean.remaining_g / DOSE_STEP_G) * DOSE_STEP_G
 
 
 def open_next(beans: list[Bean], dose: float, now: datetime, opening: Opening) -> Bean | None:

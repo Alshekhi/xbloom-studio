@@ -5,7 +5,8 @@ does not suit it says nothing against the coffee. So a coffee is liked when
 any recipe was rated *Keep it like this* with it, not liked when every recipe
 tried was rated *Doesn't suit this coffee*, and not known otherwise. Bags of
 the same coffee bought again count together. A finished bag's *Buy it again*
-answer is about the coffee itself, and settles it.
+yes is about the coffee itself, and settles it as liked; a no or a maybe says
+nothing about taste (the price, or wanting something new), so it is left out.
 """
 from __future__ import annotations
 
@@ -17,10 +18,8 @@ _AGAIN, _NOT_AGAIN = VERDICTS["again"], VERDICTS["not_again"]
 
 def liking(bean: Bean, beans: list[Bean], brews: list[Brew]) -> int:
     same = [b for b in beans if b.id == bean.id or b.same_coffee(bean)]
-    answered = sorted((b for b in same if b.buy_again in ("yes", "no")),
-                      key=lambda b: b.finished_on or "")
-    if answered:
-        return LIKED if answered[-1].buy_again == "yes" else NOT_LIKED
+    if any(b.buy_again == "yes" for b in same):
+        return LIKED
     ids = {b.id for b in same}
     latest: dict[str, tuple[str, int]] = {}
     for r in brews:
