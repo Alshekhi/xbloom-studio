@@ -150,6 +150,11 @@ class TodaysCup:
     def pick(self) -> Pick | None:
         return self.picks[self.index] if self.picks else None
 
+    @property
+    def usual_dose_g(self) -> float | None:
+        """The usual dose for the drink at the last refresh; None for iced with no habit."""
+        return self._usual
+
     def busy(self) -> bool:
         state = self.hass.states.get(BREW_STATUS)
         return state is not None and state.state in BUSY

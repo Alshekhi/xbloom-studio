@@ -43,6 +43,14 @@ Each way, **Buy again** follows, as for a bag a brew finishes.
 Bags are named by their name, or by their id when two bags share one; a shared
 name is refused rather than guessed.
 
+The **Coffee bag**, **xPod box** and **Tea** lists offer an item bought again
+as one choice under its name: while one of its bags is open (for coffee, while
+it still holds a usual dose), an unopened bag of the same coffee or tea (same
+name, roaster and kind) is left out, and takes the open one's place once it is
+finished. An unopened bag already chosen, by an assistant or Today's cup, stays
+listed. Bags sharing a name that are both listed are told apart by roast date,
+or numbered when the dates do not tell them apart.
+
 A bag's **country**, **process**, **variety** and **roast** are kept in the
 [community hub](recipes.md#community-recipes)'s English names — "ethiopia",
 the country's name in Arabic or Chinese, "Anaerobic", "gesha" or "light" become

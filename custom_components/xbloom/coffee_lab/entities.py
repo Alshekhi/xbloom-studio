@@ -33,7 +33,7 @@ from .store import UnknownBean
 from .inventory import kind_of_cup
 from .models import BUY_AGAIN, ISSUES, KINDS, VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER, window
-from .opening import USUAL_DAYS, fading, open_next, usual_dose
+from .opening import FALLBACK_DOSE_G, USUAL_DAYS, fading, holds_a_dose, open_next, usual_dose
 from .todays_cup_runtime import BREW_STATUS, DOSE_NUMBER, RECIPE_SELECT, SIGNAL_TODAYS_CUP
 from .stock import MEASURES, figure, floor
 
@@ -133,10 +133,21 @@ class ActiveBagSelect(CoffeeLabEntity, SelectEntity):
 
     async def async_read(self) -> None:
         beans = [b for b in await self.lab.store.async_list_beans() if b.kind == self._kind]
+        active = await self.lab.async_active_bean(self._kind)
+        # A coffee bought again is finished bag by bag: while one is open and
+        # still makes a cup, the unopened one waits out of the list, so the
+        # coffee is one choice under its own name. One already chosen
+        # elsewhere stays; coffee too low for a cup no longer holds it back.
+        cup = getattr(self.lab, "todays_cup", None)
+        dose = getattr(cup, "usual_dose_g", None) or FALLBACK_DOSE_G
+        opened = [b for b in beans if b.status == "open"
+                  and (b.kind != "coffee" or holds_a_dose(b, dose))]
+        beans = [b for b in beans if b.status != "unopened"
+                 or (active is not None and b.id == active.id)
+                 or not any(o.same_coffee(b) for o in opened)]
         labels = bag_labels(beans)
         self._ids_by_label = {label: bean_id for bean_id, label in labels.items()}
         self._attr_options = list(labels.values())
-        active = await self.lab.async_active_bean(self._kind)
         self._attr_current_option = labels.get(active.id) if active else None
         self._attr_extra_state_attributes = actions.bean_facts(active) if active else {}
 
@@ -513,7 +524,8 @@ class FinishChoiceSelect(CoffeeLabEntity, SelectEntity):
 
     async def async_read(self) -> None:
         coffee = [b for b in await self.lab.store.async_list_beans() if b.kind == "coffee"]
-        labels = bag_labels(coffee)
+        # Labelled among the open bags, as the Coffee bag list names them.
+        labels = bag_labels([b for b in coffee if b.status == "open"])
         offered = [b for b in coffee if b.status == "open" and CoffeeLab.finish_refusal(b) is None]
         self._ids_by_label = {labels[b.id]: b.id for b in offered}
         self._attr_options = list(self._ids_by_label)
