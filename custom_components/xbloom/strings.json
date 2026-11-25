@@ -1025,6 +1025,9 @@
       },
       "coffee_lab_finish_chosen": {
         "name": "Finish the chosen bag"
+      },
+      "coffee_lab_by_hand": {
+        "name": "By hand"
       }
     },
     "text": {
@@ -1212,6 +1215,9 @@
     },
     "finish_none_asked": {
       "message": "There is no bag waiting to be finished."
+    },
+    "todays_cup_none": {
+      "message": "There is no cup on offer today."
     }
   },
   "services": {

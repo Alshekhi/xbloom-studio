@@ -440,3 +440,90 @@ async def test_a_last_cup_the_cup_finishes_stays_one():
     cup, *_ = await _cup(_Home(), library=[{"name": "R", "dose_g": 15, "cup_type": 2}])
     fitted = cup._fit_dose(_last(22.0), 15.0, left=22.0)
     assert fitted.dose_g == 18.0 and "last_cup" in fitted.reasons
+
+
+# ── By hand: today's bag and grams for a hand brew ───────────────────────────
+
+
+async def test_by_hand_picks_the_bag_and_the_grams_and_leaves_the_machine_alone():
+    home = _Home()
+    cup, lab, bag, _ = await _cup(home)
+    await cup.async_refresh()
+    await cup.async_by_hand()
+    assert lab.active_bean_id == bag.id
+    assert lab.manual_dose_g == cup.pick.dose_g
+    assert not any(c[0] in ("recipe", "number.set_value") for c in home.calls)
+
+
+async def test_by_hand_on_a_last_cup_takes_all_of_the_bag_whatever_the_machine_takes():
+    home = _Home()
+    cup, lab, bag, _ = await _cup(home)        # Omni recipe: the machine takes 18 g at most
+    await lab.store.async_update_bean(bag.id, remaining_g=25.5)
+    await cup.async_refresh()
+    await cup.async_by_hand()
+    assert lab.manual_dose_g == 25.5
+
+
+async def test_by_hand_shows_the_manual_brew_controls_when_the_dashboard_has_them():
+    home = _Home()
+    real = home.get
+    home.hass.states.get = lambda e: SimpleNamespace(state="off", attributes={}) if e == "input_boolean.xbloom_show_manual_brew" else real(e)
+    cup, *_ = await _cup(home)
+    await cup.async_refresh()
+    await cup.async_by_hand()
+    assert ("input_boolean.turn_on", {"entity_id": "input_boolean.xbloom_show_manual_brew"}) in home.calls
+
+
+async def test_by_hand_without_the_dashboard_switch_turns_nothing_on():
+    home = _Home()
+    cup, *_ = await _cup(home)
+    await cup.async_refresh()
+    await cup.async_by_hand()
+    assert not any(c[0] == "input_boolean.turn_on" for c in home.calls)
+
+
+async def test_by_hand_with_no_cup_on_offer_is_refused():
+    home = _Home()
+    cup, lab, bag, _ = await _cup(home)
+    with pytest.raises(HomeAssistantError):
+        await cup.async_by_hand()
+
+
+async def test_by_hand_takes_the_usual_dose_even_above_what_the_machine_takes():
+    home = _Home()
+    cup, lab, bag, _ = await _cup(home)        # Omni recipe: the machine takes 18 g at most
+    await cup.async_refresh()
+    cup._usual = 20.0
+    await cup.async_by_hand()
+    assert lab.manual_dose_g == 20.0
+
+
+async def test_by_hand_with_no_usual_dose_takes_the_offered_dose():
+    home = _Home()
+    cup, lab, bag, _ = await _cup(home)
+    await cup.async_refresh()
+    cup._usual = None
+    await cup.async_by_hand()
+    assert lab.manual_dose_g == cup.pick.dose_g
+
+
+async def test_by_hand_on_the_bag_to_open_takes_the_usual_dose():
+    import dataclasses
+    home = _Home()
+    cup, lab, bag, _ = await _cup(home)
+    await cup.async_refresh()
+    sealed = await lab.store.async_add_bean(name="Sealed", status="unopened", tracked=True,
+                                            remaining_g=250.0, bag_size_g=250.0)
+    cup.picks = [dataclasses.replace(cup.pick, bag_id=sealed.id, bag="Sealed", reasons=("open_next",))]
+    cup.index = 0
+    cup._usual = 17.0
+    await cup.async_by_hand()
+    assert lab.active_bean_id == sealed.id and lab.manual_dose_g == 17.0
+
+
+async def test_with_no_cup_on_offer_the_refusal_says_so():
+    home = _Home()
+    cup, *_ = await _cup(home)
+    with pytest.raises(HomeAssistantError) as err:
+        await cup.async_by_hand()
+    assert err.value.translation_key == "todays_cup_none"
