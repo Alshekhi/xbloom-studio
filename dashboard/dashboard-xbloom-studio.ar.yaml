@@ -752,7 +752,7 @@ views:
         | string | replace(''.0'', '''')) ~ '''') if v.grind is not none else ''''), ((''1:'' ~ ((v.ratio
         | float) | round(1) | string | replace(''.0'', '''')) ~ '''') if v.ratio is not none else '''')]
         | select | join(''، '') }} — {% if v.verdict == ''again'' %}أعتمدها كما هي{% elif v.verdict ==
-        ''fine'' %}قريبة، تحتاج تعديل{% else %}لا تناسب هذا البن{% endif %}{% if not loop.last %}; {%
+        ''fine'' %}قريبة، تحتاج تعديلًا{% else %}لا تناسب هذا البن{% endif %}{% if not loop.last %}; {%
         endif %}{% endfor %}.{% endif %}{% elif source == ''community'' %}من المجتمع، شاركها {{ ''xBloom''
         if state_attr(''select.xbloom_studio_suggested_recipe'', ''official'') else e(state_attr(''select.xbloom_studio_suggested_recipe'',
         ''author'')) }}. استخدامها يضيفها إلى وصفاتك.{% endif %}'
@@ -1438,9 +1438,9 @@ views:
 
         {% for r in rows %}{% set v = r.get(''verdicts'') or {} %}| ⁨{{ e(r.get(''name'')) }}⁩ | {{ r.get(''brews'',
         0) }} | {{ [("أعتمدها كما هي" ~ '' ('' ~ v.get(''again'') ~ '')'') if v.get(''again'') else '''',
-        ("قريبة، تحتاج تعديل" ~ '' ('' ~ v.get(''fine'') ~ '')'') if v.get(''fine'') else '''', ("لا تناسب
-        هذا البن" ~ '' ('' ~ v.get(''not_again'') ~ '')'') if v.get(''not_again'') else ''''] | select
-        | join(''، '') }} |
+        ("قريبة، تحتاج تعديلًا" ~ '' ('' ~ v.get(''fine'') ~ '')'') if v.get(''fine'') else '''', ("لا
+        تناسب هذا البن" ~ '' ('' ~ v.get(''not_again'') ~ '')'') if v.get(''not_again'') else ''''] |
+        select | join(''، '') }} |
 
         {% endfor %}{% endif %}'
     visibility:
@@ -1457,7 +1457,7 @@ views:
         ''\\\\\\1'') }}{% endmacro %}{% for b in state_attr(''sensor.xbloom_studio_recent_brews'', ''brews'')
         or [] %}<details><summary>{% set when = as_datetime(b.get(''brewed_at'') or '''', none) %}{% set
         verdict %}{% if b.get(''verdict'') == ''again'' %}أعتمدها كما هي{% elif b.get(''verdict'') ==
-        ''fine'' %}قريبة، تحتاج تعديل{% elif b.get(''verdict'') == ''not_again'' %}لا تناسب هذا البن{%
+        ''fine'' %}قريبة، تحتاج تعديلًا{% elif b.get(''verdict'') == ''not_again'' %}لا تناسب هذا البن{%
         endif %}{% endset %}{{ [when.strftime(''%d/%m %H:%M'') if when else '''', (''⁨'' ~ b.recipe ~
         ''⁩'') if b.get(''recipe'') else '''', (''⁨'' ~ b.bag ~ ''⁩'') if b.get(''bag'') else '''', verdict]
         | select | join(''، '') | escape }}</summary>

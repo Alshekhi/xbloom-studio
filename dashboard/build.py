@@ -220,7 +220,7 @@ TEXT = {
         "v_leave": "أبقِ الوصفة كما هي",
         "v_confirm_make": "تغيير الوصفة المحفوظة إلى هذه الإعدادات؟",
         "v_versions": "النسخ مع هذا الكيس:", "k_grind": "درجة طحن {value}", "k_ratio": "1:{value}",
-        "k_dose": "{value} غ", "verdict_again": "أعتمدها كما هي", "verdict_fine": "قريبة، تحتاج تعديل",
+        "k_dose": "{value} غ", "verdict_again": "أعتمدها كما هي", "verdict_fine": "قريبة، تحتاج تعديلًا",
         "verdict_not_again": "لا تناسب هذا البن",
         "h_summary": "الملخص", "h_recent": "تحضيرات هذه الفترة",
         "y_days": "أيام التحضير", "y_of": "من", "y_streak": "أطول أيام متتالية",

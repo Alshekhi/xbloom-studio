@@ -69,7 +69,7 @@ variables:
   prefix: XBLOOM_RATE
   verdicts: [again, fine, not_again]
   labels: >-
-    {{ {'again': 'أعتمدها كما هي', 'fine': 'قريبة، تحتاج تعديل', 'not_again': 'لا تناسب هذا البن'} if lang == 'ar'
+    {{ {'again': 'أعتمدها كما هي', 'fine': 'قريبة، تحتاج تعديلًا', 'not_again': 'لا تناسب هذا البن'} if lang == 'ar'
        else {'again': 'Keep it like this', 'fine': 'Close, needs a tweak', 'not_again': "Doesn't suit this coffee"} }}
   # Each coffee in words, as the dashboard's card says it.
   coffees: >-
