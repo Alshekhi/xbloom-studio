@@ -684,6 +684,9 @@
           "pods": "الكبسولات",
           "boxes": "العلب"
         }
+      },
+      "coffee_lab_finish_choice": {
+        "name": "كيس للإنهاء"
       }
     },
     "sensor": {
@@ -1019,6 +1022,9 @@
       },
       "coffee_lab_use_rest_of_bag": {
         "name": "استخدم ما تبقى في الكيس"
+      },
+      "coffee_lab_finish_chosen": {
+        "name": "إنهاء الكيس المختار"
       }
     },
     "text": {
@@ -1200,6 +1206,9 @@
     },
     "rest_none": {
       "message": "لا يوجد في هذا الكيس كوب أخير."
+    },
+    "finish_none_chosen": {
+      "message": "اختر الكيس الذي تريد إنهاءه أولًا."
     }
   },
   "services": {

@@ -684,6 +684,9 @@
           "pods": "Pods",
           "boxes": "Boxes"
         }
+      },
+      "coffee_lab_finish_choice": {
+        "name": "Bag to finish"
       }
     },
     "sensor": {
@@ -1019,6 +1022,9 @@
       },
       "coffee_lab_use_rest_of_bag": {
         "name": "Use the rest of the bag"
+      },
+      "coffee_lab_finish_chosen": {
+        "name": "Finish the chosen bag"
       }
     },
     "text": {
@@ -1200,6 +1206,9 @@
     },
     "rest_none": {
       "message": "This bag has no last cup to use."
+    },
+    "finish_none_chosen": {
+      "message": "Choose a bag to finish first."
     }
   },
   "services": {

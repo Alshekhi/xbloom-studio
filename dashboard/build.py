@@ -31,6 +31,8 @@ TEXT = {
         "d_roast": "Roast", "d_roast_date": "Roasted", "d_altitude": "Altitude", "d_notes": "Tasting notes",
         "d_m": "{n} m", "d_link": "Shop page",
         "open_next": "Open next: {bag}", "past_best": "past its best", "h_opening": "Opening bags",
+        "h_finish_a_bag": "Finish a bag", "f_chosen": "**{bag}**: {grams} g left",
+        "f_chosen_unknown": "**{bag}**: amount not known", "f_confirm": "Finish this bag?",
         "brewers": "Brewers", "h_by_coffee": "By coffee", "h_by_recipe": "By recipe",
         "col_coffee": "Coffee", "col_cups": "Cups", "col_grams": "Grams", "col_recipe": "Recipe",
         "col_verdicts": "Verdicts", "h_by_month": "By month", "h_by_week": "By week", "col_month": "Month",
@@ -149,6 +151,8 @@ TEXT = {
         "d_roast": "درجة التحميص", "d_roast_date": "تاريخ التحميص", "d_altitude": "الارتفاع",
         "d_notes": "النكهات", "d_m": "{n} م", "d_link": "صفحة المتجر",
         "open_next": "افتح بعده: {bag}", "past_best": "تجاوز أفضل وقته", "h_opening": "فتح الأكياس",
+        "h_finish_a_bag": "إنهاء كيس", "f_chosen": "**{bag}**: بقي {grams} غ",
+        "f_chosen_unknown": "**{bag}**: الكمية غير معروفة", "f_confirm": "هل تنهي هذا الكيس؟",
         "brewers": "أدوات التحضير", "h_by_coffee": "حسب البن", "h_by_recipe": "حسب الوصفة",
         "col_coffee": "البن", "col_cups": "الأكواب", "col_grams": "الغرامات", "col_recipe": "الوصفة",
         "col_verdicts": "التقييمات", "h_by_month": "حسب الشهر", "h_by_week": "حسب الأسبوع", "col_month": "الشهر",
@@ -1068,6 +1072,20 @@ def bags_view(t: dict) -> dict:
             ]),
             {"type": "markdown", "text_only": True, "content": f"[{t['add_bags']}]({INTEGRATION})"},
         ], "visibility": present(bags)[:1]},
+        # Any open bag finishing allows: a spill, a bag given away, a leftover.
+        section(t["h_finish_a_bag"], [
+            select(f"select.{E}_bag_to_finish"),
+            {"type": "markdown", "text_only": True, "show_empty": False, "content": (
+                ESCAPE + f"{{% set p = 'select.{E}_bag_to_finish' %}}{{% set chosen = states(p) %}}"
+                "{% if chosen not in ('unknown', 'unavailable', '') %}"
+                "{% set bag = '" + ISO + "' ~ e(chosen) ~ '" + PDI + "' %}"
+                "{% set g = state_attr(p, 'remaining_g') %}"
+                "{% if g is not none %}"
+                + t["f_chosen"].replace("{bag}", "{{ bag }}").replace("{grams}", "{{ g | float | round(1) | string | replace('.0', '') }}")
+                + "{% else %}" + t["f_chosen_unknown"].replace("{bag}", "{{ bag }}") + "{% endif %}{% endif %}"
+            )},
+            press(f"button.{E}_finish_chosen_bag", t["f_confirm"], visibility=available(f"button.{E}_finish_chosen_bag")),
+        ], available(f"select.{E}_bag_to_finish")),
         section(t["h_opening"], [
             tile(f"number.{E}_{n}", features=[{"type": "numeric-input", "style": "buttons"}])
             for n in ("open_bags_at_once", "rest_after_roasting", "open_bag_fades_after")

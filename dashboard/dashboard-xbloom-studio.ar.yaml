@@ -1835,6 +1835,53 @@ views:
     cards:
     - type: markdown
       text_only: true
+      content: '## إنهاء كيس'
+    - type: tile
+      entity: select.xbloom_studio_bag_to_finish
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      features:
+      - type: select-options
+      hide_state: true
+      tap_action:
+        action: none
+    - type: markdown
+      text_only: true
+      show_empty: false
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}{% set p = ''select.xbloom_studio_bag_to_finish'' %}{% set chosen
+        = states(p) %}{% if chosen not in (''unknown'', ''unavailable'', '''') %}{% set bag = ''⁨'' ~
+        e(chosen) ~ ''⁩'' %}{% set g = state_attr(p, ''remaining_g'') %}{% if g is not none %}**{{ bag
+        }}**: بقي {{ g | float | round(1) | string | replace(''.0'', '''') }} غ{% else %}**{{ bag }}**:
+        الكمية غير معروفة{% endif %}{% endif %}'
+    - type: tile
+      entity: button.xbloom_studio_finish_chosen_bag
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_finish_chosen_bag
+        confirmation:
+          text: هل تنهي هذا الكيس؟
+      visibility:
+      - condition: state
+        entity: button.xbloom_studio_finish_chosen_bag
+        state_not: unavailable
+    visibility:
+    - condition: state
+      entity: select.xbloom_studio_bag_to_finish
+      state_not: unavailable
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
       content: '## فتح الأكياس'
     - type: tile
       entity: number.xbloom_studio_open_bags_at_once

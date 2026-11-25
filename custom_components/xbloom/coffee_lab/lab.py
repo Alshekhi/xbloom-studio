@@ -726,6 +726,15 @@ class CoffeeLab:
         """Leave the bag the question names open, and stop asking."""
         await self._async_set_state(finish_question=None)
 
+    # The bag picked on the Bags tab to finish; the Finish button acts on it.
+
+    @property
+    def finish_choice(self) -> str | None:
+        return self._state.get("finish_choice")
+
+    async def async_choose_to_finish(self, bean_id: str | None) -> None:
+        await self._async_set_state(finish_choice=bean_id)
+
     async def _async_ask_about_bag(self, bean: Bean) -> None:
         if bean.buy_again:
             return
@@ -1184,6 +1193,8 @@ class CoffeeLab:
             if self._state.get(key) == bean_id:
                 await self._async_set_state(**{key: None})
         await self._async_drop_finish_question(bean_id)
+        if self.finish_choice == bean_id:
+            await self._async_set_state(finish_choice=None)
         await self._async_ask_about_bag(bean)
         self.on_change()
         return bean

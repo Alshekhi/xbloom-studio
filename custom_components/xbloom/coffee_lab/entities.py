@@ -480,6 +480,67 @@ class KeepAskedButton(_FinishQuestionButton):
         await self.lab.async_keep_asked()
 
 
+class FinishChoiceSelect(CoffeeLabEntity, SelectEntity):
+    """An open bag to finish from the Bags tab: only those finishing allows.
+
+    Labelled over every coffee bag, so two bags sharing a name are told apart
+    even when only one of them is offered.
+    """
+
+    _attr_icon = "mdi:sack-outline"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "finish_choice")
+        self.entity_id = "select.xbloom_studio_bag_to_finish"
+        self._ids_by_label: dict[str, str] = {}
+        self._attr_options = []
+        self._attr_current_option = None
+
+    async def async_read(self) -> None:
+        coffee = [b for b in await self.lab.store.async_list_beans() if b.kind == "coffee"]
+        labels = bag_labels(coffee)
+        offered = [b for b in coffee if b.status == "open" and CoffeeLab.finish_refusal(b) is None]
+        self._ids_by_label = {labels[b.id]: b.id for b in offered}
+        self._attr_options = list(self._ids_by_label)
+        chosen = next((b for b in offered if b.id == self.lab.finish_choice), None)
+        self._attr_current_option = labels[chosen.id] if chosen else None
+        self._attr_extra_state_attributes = (
+            {"remaining_g": chosen.remaining_g if chosen.tracked else None, "tracked": chosen.tracked}
+            if chosen else {}
+        )
+
+    @property
+    def available(self) -> bool:
+        return bool(self._attr_options)
+
+    async def async_select_option(self, option: str) -> None:
+        await self.lab.async_choose_to_finish(self._ids_by_label[option])
+
+
+class FinishChosenButton(CoffeeLabEntity, ButtonEntity):
+    """Finish the bag chosen on the Bags tab; Buy again follows."""
+
+    _attr_icon = "mdi:check"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "finish_chosen")
+        self.entity_id = "button.xbloom_studio_finish_chosen_bag"
+
+    @property
+    def available(self) -> bool:
+        return self.lab.finish_choice is not None
+
+    async def async_read(self) -> None:
+        """Nothing to read: availability follows the choice."""
+
+    async def async_press(self) -> None:
+        chosen = self.lab.finish_choice
+        if chosen is None:
+            raise refuse("finish_none_chosen")
+        # The action's own checks and refusals: one way to finish a bag.
+        await actions.finish_bag(self.lab, {"bean_id": chosen})
+
+
 class WaitingBrewsSensor(CoffeeLabEntity, SensorEntity):
     """How many brews wait for the store; the oldest's error as an attribute."""
 
@@ -869,6 +930,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
         "select": [
             ActiveBagSelect, ActiveXpodBoxSelect, ActiveTeaSelect, StatsPeriodSelect,
             ManualBrewerSelect, RateBrewSelect, CupIssueSelect, BuyAgainSelect,
+            FinishChoiceSelect,
         ],
         "sensor": [
             RemainingSensor, BagsSensor, StatsSensor, RecentBrewsSensor, LastCountSensor, WaitingBrewsSensor,
@@ -879,6 +941,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
         "button": [
             RecordManualBrewButton, UseTodaysCupButton, AnotherCupButton, FinishAskedButton, KeepAskedButton,
             UseRestOfBagButton,
+            FinishChosenButton,
         ],
     }
     # Only a store edited elsewhere — Notion — can be out of date here.
