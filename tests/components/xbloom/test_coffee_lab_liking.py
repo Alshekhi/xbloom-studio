@@ -39,10 +39,16 @@ def test_the_same_coffee_bought_before_counts():
     assert liking(BAG, [BAG, EARLIER], [rated("b0", "A", 3)]) == LIKED
 
 
-def test_buy_again_settles_it():
-    no = Bean(**{**EARLIER.__dict__, "buy_again": "no"})
-    assert liking(BAG, [BAG, no], [rated("b1", "A", 3)]) == NOT_LIKED
+def test_buy_again_yes_settles_it_as_liked():
     yes = Bean(**{**EARLIER.__dict__, "buy_again": "yes"})
     assert liking(BAG, [BAG, yes], []) == LIKED
-    maybe = Bean(**{**EARLIER.__dict__, "buy_again": "maybe"})
-    assert liking(BAG, [BAG, maybe], [rated("b1", "A", 3)]) == LIKED
+    assert liking(BAG, [BAG, yes], [rated("b1", "A", 1)]) == LIKED
+
+
+def test_buy_again_no_or_maybe_says_nothing_about_taste():
+    # Not buying a coffee again can be its price or wanting something new.
+    for answer in ("no", "maybe"):
+        bag = Bean(**{**EARLIER.__dict__, "buy_again": answer})
+        assert liking(BAG, [BAG, bag], []) == NOT_KNOWN
+        assert liking(BAG, [BAG, bag], [rated("b1", "A", 3)]) == LIKED
+        assert liking(BAG, [BAG, bag], [rated("b1", "A", 1)]) == NOT_LIKED

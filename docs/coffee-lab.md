@@ -262,7 +262,8 @@ not while one runs.
 - **The bag**, among the open bags holding a dose: a liked coffee first —
   liked when any recipe was rated *Keep it like this* with it or the same
   coffee before, not liked when every recipe tried was rated *Doesn't suit
-  this coffee*, and a **Buy again** answer settles it; between coffees liked
+  this coffee*, and a **Buy again** yes settles it as liked (a no or a maybe
+  says nothing about taste); between coffees liked
   alike, not the one brewed last; and a bag that would pass its best before
   it is finished at that pace is brewed more. A bag past its best only when
   nothing else qualifies; with no open bag holding a dose, the sealed bag to

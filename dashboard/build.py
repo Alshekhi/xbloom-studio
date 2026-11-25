@@ -240,7 +240,7 @@ TEXT = {
         "ts_hot_notes": "حارة", "ts_warm_notes": "دافئة", "ts_cool_notes": "باردة",
         "ts_overall_notes": "بشكل عام", "ts_finish": "الطعم الأخير",
         "sv_light": "خفيف", "sv_medium": "متوسط", "sv_full": "كامل", "sv_low": "منخفضة", "sv_high": "عالية",
-        "h_buy_again": "هل تشتريه مجددًا؟", "b_question": "انتهى **{bag}**.",
+        "h_buy_again": "هل تشتري هذا البن مجددًا؟", "b_question": "انتهى **{bag}**.",
         "h_finish_bag": "هل تنهي هذا الكيس؟", "f_left": "بقي في **{bag}** {grams} غ.",
         "b_answer": "الإجابة",
         "r_question": "**{recipe}** مع {bag}{changes}.", "r_at": "، ",

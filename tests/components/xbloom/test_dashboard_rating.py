@@ -69,3 +69,9 @@ def test_the_finish_question_names_the_bag_and_the_grams_in_both_languages():
         line = next(c for c in _finish_section(build, lang)["cards"] if c.get("type") == "markdown" and ASKED in c.get("content", ""))
         out = _render(line["content"], {ASKED: "Kenya"}, {ASKED: {"remaining_g": 8.5}})
         assert out.replace("⁨", "").replace("⁩", "").replace("**", "") == words, lang
+
+
+def test_the_buy_again_question_names_the_coffee_it_asks_about():
+    # A bag's name has no gender of its own: the noun is said, not guessed.
+    build = _build()
+    assert build.TEXT["ar"]["h_buy_again"] == "هل تشتري هذا البن مجددًا؟"

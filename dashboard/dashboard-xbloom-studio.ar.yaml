@@ -364,7 +364,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## هل تشتريه مجددًا؟'
+      content: '## هل تشتري هذا البن مجددًا؟'
     - type: markdown
       text_only: true
       content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
