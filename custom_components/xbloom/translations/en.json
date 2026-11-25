@@ -825,6 +825,9 @@
       },
       "coffee_lab_brew_history": {
         "name": "Brew history"
+      },
+      "coffee_lab_finish_question": {
+        "name": "Bag to finish"
       }
     },
     "switch": {
@@ -1007,6 +1010,12 @@
       },
       "coffee_lab_another_cup": {
         "name": "Another cup"
+      },
+      "coffee_lab_finish_asked": {
+        "name": "Finish bag"
+      },
+      "coffee_lab_keep_asked": {
+        "name": "Keep bag"
       }
     },
     "text": {

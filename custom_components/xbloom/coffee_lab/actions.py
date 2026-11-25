@@ -171,6 +171,10 @@ async def active_bean(lab: CoffeeLab, args: dict[str, Any]) -> dict[str, Any]:
         facts["rating_questions"] = [question_facts(q) for q in questions]
     if (bag := lab.bag_question) is not None:
         facts["bag_question"] = {"bean_id": bag["bean_id"], "bag": bag["name"]}
+    if (short := lab.finish_question) is not None:
+        facts["finish_question"] = {
+            "bean_id": short["bean_id"], "bag": short["name"], "remaining_g": short["remaining_g"],
+        }
     return facts
 
 

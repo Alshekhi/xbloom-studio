@@ -118,6 +118,7 @@ TEXT = {
         "ts_overall_notes": "Overall", "ts_finish": "Finish",
         "sv_light": "light", "sv_medium": "medium", "sv_full": "full", "sv_low": "low", "sv_high": "high",
         "h_buy_again": "Buy it again?", "b_question": "**{bag}** is finished.",
+        "h_finish_bag": "Finish this bag?", "f_left": "**{bag}** has {grams} g left.",
         "b_answer": "Answer",
         "r_question": "**{recipe}** with {bag}{changes}.", "r_at": ", at ",
         "r_grind": "grind {value} instead of {saved}", "r_ratio": "ratio 1:{value} instead of 1:{saved}",
@@ -236,6 +237,7 @@ TEXT = {
         "ts_overall_notes": "بشكل عام", "ts_finish": "الطعم الأخير",
         "sv_light": "خفيف", "sv_medium": "متوسط", "sv_full": "كامل", "sv_low": "منخفضة", "sv_high": "عالية",
         "h_buy_again": "هل تشتريه مجددًا؟", "b_question": "انتهى **{bag}**.",
+        "h_finish_bag": "هل تنهي هذا الكيس؟", "f_left": "بقي في **{bag}** {grams} غ.",
         "b_answer": "الإجابة",
         "r_question": "**{recipe}** مع {bag}{changes}.", "r_at": "، ",
         "r_grind": "بدرجة طحن {value} بدل {saved}", "r_ratio": "بنسبة 1:{value} بدل 1:{saved}",
@@ -438,6 +440,14 @@ def brew_view(t: dict) -> dict:
             # Named apart from the heading above it, or it is said twice.
             select(f"select.{E}_what_was_wrong", name=t["b_answer"]),
         ], [*available(f"select.{E}_what_was_wrong"), *not_busy()]),
+        # A brew left the bag short of another cup: finish it, or keep it.
+        section(t["h_finish_bag"], [
+            {"type": "markdown", "text_only": True, "content": ESCAPE + t["f_left"].replace(
+                "{bag}", ISO + f"{{{{ e(states('sensor.{E}_bag_to_finish')) }}}}" + PDI
+            ).replace("{grams}", f"{{{{ (state_attr('sensor.{E}_bag_to_finish', 'remaining_g') or 0) | float | round(1) | string | replace('.0', '') }}}}")},
+            press(f"button.{E}_finish_bag"),
+            press(f"button.{E}_keep_bag"),
+        ], [*present(f"sensor.{E}_bag_to_finish"), *not_busy()]),
         section(t["h_buy_again"], [
             {"type": "markdown", "text_only": True, "content": ESCAPE + t["b_question"].replace(
                 "{bag}", f"{{{{ e(states('sensor.{E}_finished_bag')) }}}}")},

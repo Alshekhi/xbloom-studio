@@ -16,6 +16,9 @@ from custom_components.xbloom.button import (
 )
 from custom_components.xbloom.coffee_lab.entities import (
     BagQuestionSensor,
+    BagToFinishSensor,
+    FinishAskedButton,
+    KeepAskedButton,
     BuyAgainSelect,
     CupIssueSelect,
     RateBrewSelect,
@@ -34,6 +37,7 @@ from custom_components.xbloom.workflow_entities import WORKFLOW_ENTITIES, hide_w
 HIDDEN_CLASSES = (
     XBloomArchiveRecipeButton, XBloomDeleteSelectedRecipeButton, XBloomRestoreArchivedRecipeButton,
     BagQuestionSensor, BuyAgainSelect, CupIssueSelect, RateBrewSelect, RatingQuestionSensor,
+    BagToFinishSensor, FinishAskedButton, KeepAskedButton,
     XBloomArchivedRecipeSelect, XBloomLibraryRecipeSelect,
     KeepVersionButton, LeaveRecipeButton, NextChangeSensor, UseNextChangeButton, VersionToKeepSensor,
 )
@@ -49,6 +53,8 @@ def test_the_list_names_each_hidden_entity() -> None:
         "xbloom_coffee_lab_rating_question", "xbloom_coffee_lab_rate_brew",
         "xbloom_coffee_lab_cup_issue", "xbloom_coffee_lab_bag_question",
         "xbloom_coffee_lab_buy_again",
+        "xbloom_coffee_lab_finish_question", "xbloom_coffee_lab_finish_asked",
+        "xbloom_coffee_lab_keep_asked",
         "xbloom_next_change", "xbloom_version_to_keep", "xbloom_use_next_change",
         "xbloom_make_version_the_recipe", "xbloom_save_version_as_new",
         "xbloom_leave_recipe_unchanged",

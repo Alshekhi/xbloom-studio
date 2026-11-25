@@ -300,6 +300,54 @@ views:
     cards:
     - type: markdown
       text_only: true
+      content: '## هل تنهي هذا الكيس؟'
+    - type: markdown
+      text_only: true
+      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
+        ''\\\\\\1'') }}{% endmacro %}بقي في **⁨{{ e(states(''sensor.xbloom_studio_bag_to_finish'')) }}⁩**
+        {{ (state_attr(''sensor.xbloom_studio_bag_to_finish'', ''remaining_g'') or 0) | float | round(1)
+        | string | replace(''.0'', '''') }} غ.'
+    - type: tile
+      entity: button.xbloom_studio_finish_bag
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_finish_bag
+    - type: tile
+      entity: button.xbloom_studio_keep_bag
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_keep_bag
+    visibility:
+    - condition: state
+      entity: sensor.xbloom_studio_bag_to_finish
+      state_not: unavailable
+    - condition: state
+      entity: sensor.xbloom_studio_bag_to_finish
+      state_not: unknown
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: grinding
+    - condition: state
+      entity: sensor.xbloom_studio_brew_status
+      state_not: brewing
+  - type: grid
+    cards:
+    - type: markdown
+      text_only: true
       content: '## هل تشتريه مجددًا؟'
     - type: markdown
       text_only: true

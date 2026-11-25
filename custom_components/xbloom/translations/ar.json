@@ -825,6 +825,9 @@
       },
       "coffee_lab_brew_history": {
         "name": "سجل التحضير"
+      },
+      "coffee_lab_finish_question": {
+        "name": "كيس للإنهاء"
       }
     },
     "switch": {
@@ -1007,6 +1010,12 @@
       },
       "coffee_lab_another_cup": {
         "name": "كوب آخر"
+      },
+      "coffee_lab_finish_asked": {
+        "name": "إنهاء الكيس"
+      },
+      "coffee_lab_keep_asked": {
+        "name": "إبقاء الكيس"
       }
     },
     "text": {

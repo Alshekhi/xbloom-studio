@@ -23,7 +23,9 @@ from homeassistant.util import dt as dt_util
 from xbloom import spec
 
 from ..const import DOMAIN
-from .inventory import Deduct, Flag, Skip, decide_consumption, kind_of_cup
+from .inventory import (
+    DEFAULT_FINISHED_BELOW_G, Deduct, Flag, Skip, decide_consumption, kind_of_cup,
+)
 from .models import SELECTABLE, VERDICTS, Bean, Brew, Review
 from .pending import PendingBrews
 from .habits import habits
@@ -682,6 +684,48 @@ class CoffeeLab:
             return None
         return dict(question)
 
+    # A brew that leaves a bag short of another cup like it, yet above what a
+    # brew finishes by itself, asks whether to finish the bag. Open as long as
+    # the buy-again question, and only ever for one bag.
+
+    @property
+    def finish_question(self) -> dict[str, Any] | None:
+        question = self._state.get("finish_question")
+        if not question:
+            return None
+        expires = dt_util.parse_datetime(question["expires_at"])
+        if expires is not None and dt_util.utcnow() >= expires:
+            return None
+        return dict(question)
+
+    async def _async_note_leftover(
+        self, bean: Bean, grams: float | None, left: float | None, finished: bool,
+    ) -> None:
+        if (not finished and grams and left is not None
+                and DEFAULT_FINISHED_BELOW_G < left < min(grams, FINISH_BELOW_G)):
+            await self._async_set_state(finish_question={
+                "bean_id": bean.id, "name": bean.name, "remaining_g": left,
+                "expires_at": (dt_util.utcnow() + BAG_QUESTION_LAPSE).isoformat(),
+            })
+        else:
+            await self._async_drop_finish_question(bean.id)
+
+    async def _async_drop_finish_question(self, bean_id: str) -> None:
+        asked = self._state.get("finish_question")
+        if asked and asked.get("bean_id") == bean_id:
+            await self._async_set_state(finish_question=None)
+
+    async def async_finish_asked(self) -> Bean:
+        """Finish the bag the question names."""
+        question = self.finish_question
+        if question is None:
+            raise UnknownBean("")
+        return await self.async_finish(question["bean_id"])
+
+    async def async_keep_asked(self) -> None:
+        """Leave the bag the question names open, and stop asking."""
+        await self._async_set_state(finish_question=None)
+
     async def _async_ask_about_bag(self, bean: Bean) -> None:
         if bean.buy_again:
             return
@@ -1054,6 +1098,8 @@ class CoffeeLab:
         await self._runs.async_add(run_id)
         if decision.finish and bean is not None:
             await self._async_ask_about_bag(bean)
+        if bean is not None and bean.kind == "coffee":
+            await self._async_note_leftover(bean, decision.grams, decision.new_remaining_g, decision.finish)
         self.on_change()
         return Consumption(
             "counted", bean_id=decision.bean_id, grams=decision.grams,
@@ -1112,6 +1158,9 @@ class CoffeeLab:
         """
         amount = {"pods_left": int(pods)} if pods is not None else {"remaining_g": remaining_g}
         bean = await self.store.async_update_bean(bean_id, tracked=True, **amount)
+        # Weighed again, the bag's amount is a new fact: the question asked
+        # about the old one goes.
+        await self._async_drop_finish_question(bean_id)
         self.on_change()
         return bean
 
@@ -1134,6 +1183,7 @@ class CoffeeLab:
         for key in ACTIVE_KEYS.values():
             if self._state.get(key) == bean_id:
                 await self._async_set_state(**{key: None})
+        await self._async_drop_finish_question(bean_id)
         await self._async_ask_about_bag(bean)
         self.on_change()
         return bean

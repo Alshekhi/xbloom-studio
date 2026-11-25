@@ -396,3 +396,92 @@ async def test_what_was_to_be_noticed_rides_on_the_question():
                             settings={"grind": "50", "ratio": 16.0})
     [question] = lab._open_questions()
     assert question["focus"] == focus and len(question["brew_ids"]) == 2
+
+
+# ── Finish this bag? A brew that leaves less than another cup ────────────────
+
+
+async def _short_bag():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=25.5)
+    await _brew(lab, bag, "run-1", grams=17)
+    return lab, store, bag
+
+
+async def test_a_brew_that_leaves_less_than_a_cup_asks_to_finish_the_bag():
+    lab, store, bag = await _short_bag()
+    q = lab.finish_question
+    assert q["bean_id"] == bag.id and q["name"] == "Kenya" and q["remaining_g"] == 8.5
+
+
+async def test_enough_for_another_cup_asks_nothing():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=40.0)
+    await _brew(lab, bag, "run-1", grams=17)
+    assert lab.finish_question is None
+
+
+async def test_twenty_grams_or_more_is_never_asked():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=45.0)
+    await _brew(lab, bag, "run-1", grams=24)
+    assert lab.finish_question is None
+
+
+async def test_a_brew_to_five_grams_finishes_without_asking():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=20.0)
+    await _brew(lab, bag, "run-1", grams=15)
+    assert lab.finish_question is None and lab.bag_question["bean_id"] == bag.id
+
+
+async def test_finish_from_the_question_finishes_and_asks_buy_again():
+    lab, store, bag = await _short_bag()
+    await lab.async_finish_asked()
+    assert lab.finish_question is None and lab.bag_question["bean_id"] == bag.id
+    assert (await store.async_get_bean(bag.id)).status == "finished"
+
+
+async def test_finish_with_no_question_is_refused():
+    lab, store, bag = await _lab()
+    with pytest.raises(lab_module.UnknownBean):
+        await lab.async_finish_asked()
+
+
+async def test_keep_closes_the_question_and_leaves_the_bag_open():
+    lab, store, bag = await _short_bag()
+    await lab.async_keep_asked()
+    assert lab.finish_question is None
+    assert (await store.async_get_bean(bag.id)).status == "open"
+
+
+async def test_finishing_the_bag_any_other_way_closes_the_question():
+    lab, store, bag = await _short_bag()
+    await lab.async_finish(bag.id)
+    assert lab.finish_question is None
+
+
+async def test_weighing_the_bag_again_closes_the_question():
+    lab, store, bag = await _short_bag()
+    await lab.async_start_tracking(bag.id, remaining_g=30.0)
+    assert lab.finish_question is None
+
+
+async def test_a_later_brew_from_the_bag_replaces_the_question():
+    lab, store, bag = await _short_bag()
+    await store.async_update_bean(bag.id, remaining_g=60.0)
+    await _brew(lab, bag, "run-2", grams=17)
+    assert lab.finish_question is None
+
+
+async def test_a_brew_from_another_bag_leaves_the_question():
+    lab, store, bag = await _short_bag()
+    other = await store.async_add_bean(name="Brazil", status="open", tracked=True, remaining_g=200.0)
+    await _brew(lab, other, "run-2", grams=17)
+    assert lab.finish_question["bean_id"] == bag.id
+
+
+async def test_the_finish_question_lapses_with_the_bag_question():
+    lab, store, bag = await _short_bag()
+    with _at(lab, lab_module.BAG_QUESTION_LAPSE.total_seconds() / 60 + 1):
+        assert lab.finish_question is None

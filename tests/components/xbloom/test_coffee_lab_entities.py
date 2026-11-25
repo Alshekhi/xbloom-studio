@@ -309,3 +309,51 @@ async def test_last_months_brews_are_not_crowded_out_by_this_months():
     finally:
         entities.RECENT_BREWS = old_limit
     assert [b["recipe"] for b in sensor._attr_extra_state_attributes["brews"]] == ["Old"]
+
+
+# ── Finish this bag? ─────────────────────────────────────────────────────────
+
+from custom_components.xbloom.coffee_lab.entities import (  # noqa: E402
+    BagToFinishSensor, FinishAskedButton, KeepAskedButton,
+)
+
+
+async def _asked():
+    lab = await _lab()
+    bag = await _bag(lab, status="open", remaining_g=25.5)
+    await lab.async_consume(bean_id=bag.id, grams=17, run_id="r1")
+    return lab, bag
+
+
+async def test_the_bag_to_finish_names_the_bag_and_what_is_left():
+    lab, bag = await _asked()
+    sensor = BagToFinishSensor(lab)
+    await sensor.async_read()
+    assert sensor._attr_native_value == "Kenya"
+    assert sensor._attr_extra_state_attributes == {"bean_id": bag.id, "remaining_g": 8.5}
+    assert sensor.entity_id == "sensor.xbloom_studio_bag_to_finish"
+
+
+async def test_with_nothing_asked_the_sensor_is_empty_and_the_buttons_unavailable():
+    lab = await _lab()
+    sensor, finish, keep = BagToFinishSensor(lab), FinishAskedButton(lab), KeepAskedButton(lab)
+    for entity in (sensor, finish, keep):
+        await entity.async_read()
+    assert sensor._attr_native_value is None
+    assert finish.available is False and keep.available is False
+
+
+async def test_the_buttons_finish_or_keep_the_bag_asked_about():
+    lab, bag = await _asked()
+    finish, keep = FinishAskedButton(lab), KeepAskedButton(lab)
+    assert (finish.entity_id, keep.entity_id) == ("button.xbloom_studio_finish_bag", "button.xbloom_studio_keep_bag")
+    await finish.async_read()
+    assert finish.available is True
+    await finish.async_press()
+    assert (await lab.store.async_get_bean(bag.id)).status == "finished"
+
+
+async def test_the_ai_tools_see_the_question():
+    lab, bag = await _asked()
+    facts = await actions.active_bean(lab, {})
+    assert facts["finish_question"] == {"bean_id": bag.id, "bag": "Kenya", "remaining_g": 8.5}

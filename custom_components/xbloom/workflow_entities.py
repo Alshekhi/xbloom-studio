@@ -18,6 +18,10 @@ WORKFLOW_ENTITIES = (
     "xbloom_coffee_lab_cup_issue",
     "xbloom_coffee_lab_bag_question",
     "xbloom_coffee_lab_buy_again",
+    # Coffee Lab: a bag a brew left short of another cup.
+    "xbloom_coffee_lab_finish_question",
+    "xbloom_coffee_lab_finish_asked",
+    "xbloom_coffee_lab_keep_asked",
     # A recipe's next change and the version to keep.
     "xbloom_next_change",
     "xbloom_version_to_keep",

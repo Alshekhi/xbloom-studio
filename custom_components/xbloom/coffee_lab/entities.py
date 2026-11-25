@@ -422,6 +422,64 @@ class BuyAgainSelect(CoffeeLabEntity, SelectEntity):
         await self.lab.async_rate_bag(option)
 
 
+class BagToFinishSensor(CoffeeLabEntity, SensorEntity):
+    """A bag a brew left short of another cup: its name, while it is asked about."""
+
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
+
+    _attr_icon = "mdi:sack-outline"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "finish_question")
+        self.entity_id = "sensor.xbloom_studio_bag_to_finish"
+
+    async def async_read(self) -> None:
+        question = self.lab.finish_question
+        self._attr_native_value = question["name"] if question else None
+        self._attr_extra_state_attributes = (
+            {"bean_id": question["bean_id"], "remaining_g": question["remaining_g"]} if question else {}
+        )
+
+
+class _FinishQuestionButton(CoffeeLabEntity, ButtonEntity):
+    """Answers the question; there is nothing to press while none is open."""
+
+    _attr_entity_registry_visible_default = False  # see workflow_entities.py
+
+    @property
+    def available(self) -> bool:
+        return self.lab.finish_question is not None
+
+    async def async_read(self) -> None:
+        """Nothing to read: availability follows the question."""
+
+
+class FinishAskedButton(_FinishQuestionButton):
+    """Finish the bag the question names; Buy again follows."""
+
+    _attr_icon = "mdi:check"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "finish_asked")
+        self.entity_id = "button.xbloom_studio_finish_bag"
+
+    async def async_press(self) -> None:
+        await self.lab.async_finish_asked()
+
+
+class KeepAskedButton(_FinishQuestionButton):
+    """Leave the bag open and stop asking."""
+
+    _attr_icon = "mdi:close"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "keep_asked")
+        self.entity_id = "button.xbloom_studio_keep_bag"
+
+    async def async_press(self) -> None:
+        await self.lab.async_keep_asked()
+
+
 class WaitingBrewsSensor(CoffeeLabEntity, SensorEntity):
     """How many brews wait for the store; the oldest's error as an attribute."""
 
@@ -779,9 +837,12 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
         "sensor": [
             RemainingSensor, BagsSensor, StatsSensor, RecentBrewsSensor, LastCountSensor, WaitingBrewsSensor,
             RatingQuestionSensor, BagQuestionSensor, RecipeKindSensor, TodaysCupSensor, BrewHistorySensor,
+            BagToFinishSensor,
         ],
         "number": [ManualDoseNumber, OpenLimitNumber, RestDaysNumber, FadeDaysNumber],
-        "button": [RecordManualBrewButton, UseTodaysCupButton, AnotherCupButton],
+        "button": [
+            RecordManualBrewButton, UseTodaysCupButton, AnotherCupButton, FinishAskedButton, KeepAskedButton,
+        ],
     }
     # Only a store edited elsewhere — Notion — can be out of date here.
     if lab.store.remote:
