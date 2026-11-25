@@ -438,14 +438,15 @@ async def test_choosing_a_bag_shows_what_is_left_and_enables_finish():
     assert button.available is True
 
 
-async def test_finishing_the_chosen_bag_clears_the_choice_and_asks_buy_again():
+async def test_finishing_the_chosen_bag_clears_the_choice():
     lab, short, *_ = await _finishable()
     select, button = FinishChoiceSelect(lab), FinishChosenButton(lab)
     await select.async_read()
     await select.async_select_option("Kenya (2026-09-03)")
     await button.async_press()
     assert (await lab.store.async_get_bean(short.id)).status == "finished"
-    assert lab.finish_choice is None and lab.bag_question["bean_id"] == short.id
+    # An unopened Kenya is still on hand: Buy again waits for it.
+    assert lab.finish_choice is None and lab.bag_question is None
 
 
 async def test_finish_with_nothing_chosen_is_refused():

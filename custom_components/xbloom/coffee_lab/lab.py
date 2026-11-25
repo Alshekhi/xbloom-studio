@@ -731,6 +731,16 @@ class CoffeeLab:
     async def _async_ask_about_bag(self, bean: Bean) -> None:
         if bean.buy_again:
             return
+        # Buy it again means something only once the coffee is gone: with
+        # another bag of it open or unopened, the last one is asked about.
+        try:
+            # Open and unopened bags only: the store filters, not this loop.
+            beans = await self.store.async_list_beans()
+        except STORE_UNREACHABLE as err:
+            _LOGGER.info("Coffee Lab: other bags not checked before asking (%s)", err)
+            beans = []
+        if any(b.id != bean.id and b.same_coffee(bean) for b in beans):
+            return
         await self._async_set_state(bag_question={
             "bean_id": bean.id, "name": bean.name,
             "expires_at": (dt_util.utcnow() + BAG_QUESTION_LAPSE).isoformat(),

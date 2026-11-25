@@ -38,7 +38,7 @@ Finishing from the dashboard:
   showing less than 20 g, or one never counted — picked by name, with what is
   left shown before **Finish the chosen bag** asks to confirm.
 
-Each way, **Buy again** is asked next, as for a bag a brew finishes.
+Each way, **Buy again** follows, as for a bag a brew finishes.
 
 Bags are named by their name, or by their id when two bags share one; a shared
 name is refused rather than guessed.
@@ -200,8 +200,10 @@ when another bag is chosen.
 
 ### Buy it again?
 
-When a bag is finished, **Finished bag** names it for a week, and **Buy
-again** keeps whether you would buy it again — yes, maybe or no.
+When the last bag of a coffee is finished, **Finished bag** names it for a
+week, and **Buy again** keeps whether you would buy it again — yes, maybe or
+no. While another bag of the same coffee (same name, roaster and kind) is
+open or unopened, finishing one asks nothing: the question waits for the last.
 
 ## Running low
 

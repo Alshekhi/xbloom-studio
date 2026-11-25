@@ -481,3 +481,62 @@ def test_the_bag_to_finish_looks_at_the_clock_so_a_lapsed_question_leaves():
     assert "async_track_time_interval" in inspect.getsource(BagToFinishSensor)
     tick = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_tick")
     assert any(isinstance(d, ast.Name) and d.id == "callback" for d in tick.decorator_list)
+
+
+# ── Buy again waits for the last bag of a coffee ─────────────────────────────
+
+
+async def test_a_bag_with_another_of_its_coffee_on_hand_is_not_asked_about():
+    lab, store, bag = await _lab()
+    await store.async_add_bean(name="Kenya", status="unopened", tracked=True, remaining_g=250.0)
+    await store.async_update_bean(bag.id, remaining_g=10.0)
+    await lab.async_finish(bag.id)
+    assert lab.bag_question is None
+
+
+async def test_the_last_bag_of_a_coffee_is_asked_about():
+    lab, store, bag = await _lab()
+    second = await store.async_add_bean(name="Kenya", status="unopened", tracked=True, remaining_g=250.0)
+    await store.async_update_bean(bag.id, remaining_g=10.0)
+    await lab.async_finish(bag.id)
+    await store.async_update_bean(second.id, status="open", remaining_g=10.0)
+    await lab.async_finish(second.id)
+    assert lab.bag_question["bean_id"] == second.id
+
+
+async def test_a_brew_that_empties_a_bag_waits_for_the_last_one_too():
+    lab, store, bag = await _lab()
+    await store.async_add_bean(name="Kenya", status="unopened", tracked=True, remaining_g=250.0)
+    await store.async_update_bean(bag.id, remaining_g=15.0)
+    await _brew(lab, bag, "run-1", grams=15)
+    assert lab.bag_question is None
+
+
+async def test_another_roasters_coffee_of_the_same_name_does_not_hold_the_question():
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, roaster="Roaster A", remaining_g=10.0)
+    await store.async_add_bean(name="Kenya", roaster="Roaster B", status="unopened", tracked=True, remaining_g=250.0)
+    await lab.async_finish(bag.id)
+    assert lab.bag_question["bean_id"] == bag.id
+
+
+async def test_a_finished_bag_of_the_coffee_does_not_hold_the_question():
+    lab, store, bag = await _lab()
+    old = await store.async_add_bean(name="Kenya", status="open", tracked=True, remaining_g=10.0)
+    await store.async_update_bean(old.id, status="finished")
+    await store.async_update_bean(bag.id, remaining_g=10.0)
+    await lab.async_finish(bag.id)
+    assert lab.bag_question["bean_id"] == bag.id
+
+
+async def test_with_the_other_bags_out_of_reach_the_question_is_asked(caplog):
+    import logging
+    from unittest.mock import AsyncMock
+    from homeassistant.exceptions import HomeAssistantError
+    lab, store, bag = await _lab()
+    await store.async_update_bean(bag.id, remaining_g=10.0)
+    store.async_list_beans = AsyncMock(side_effect=HomeAssistantError("down"))
+    with caplog.at_level(logging.INFO):
+        await lab.async_finish(bag.id)
+    assert lab.bag_question["bean_id"] == bag.id
+    assert "other bags not checked" in caplog.text
