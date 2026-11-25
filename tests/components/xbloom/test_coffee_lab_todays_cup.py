@@ -232,3 +232,16 @@ def test_a_brew_with_a_date_but_no_time_says_nothing_about_the_hour():
     cups += [Brew(id=f"d{i}", brewed_at=(NOW - timedelta(days=i + 12)).date().isoformat(),
                   recorded_at="", dose_g=DOSE, bean_id="a") for i in range(5)]
     assert shows_from(cups, NOW) is not None
+
+
+# ── The last cup of a bag ────────────────────────────────────────────────────
+
+
+def test_the_last_cup_of_a_bag_offers_all_of_it():
+    first = pick([opened("a", left=25.5)], [], {"a": own("R1")})[0]
+    assert first.dose_g == 25.5 and "last_cup" in first.reasons
+
+
+def test_a_last_cup_without_a_recipe_keeps_the_usual_dose():
+    first = pick([opened("a", left=25.5)], [])[0]
+    assert first.dose_g == DOSE and "last_cup" not in first.reasons

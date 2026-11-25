@@ -58,3 +58,12 @@ def test_the_section_has_a_real_heading():
     for lang in ("en", "ar"):
         section = _section(build, lang)
         assert section["cards"][0]["content"] == "## " + build.TEXT[lang]["h_todays_cup"]
+
+
+def test_the_last_cup_of_a_bag_says_so_with_its_dose():
+    build = _build()
+    attrs = {"bag": "Hill Farm", "recipe": "Daily", "dose_g": 25.5, "reasons": ["past_best", "last_cup"]}
+    assert _say(build, attrs) == (
+        "Hill Farm · Daily · 25.5 g\n\n"
+        "Past its best, the last cup of this bag.")
+    assert "آخر كوب من هذا الكيس" in _say(build, attrs, "ar")

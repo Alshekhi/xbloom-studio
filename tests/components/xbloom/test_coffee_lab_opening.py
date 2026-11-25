@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 from custom_components.xbloom.coffee_lab.models import Bean, Brew
 from custom_components.xbloom.coffee_lab.opening import (
-    Opening, fading, holds_a_dose, open_next, usual_dose,
+    Opening, fading, holds_a_dose, last_cup_dose, open_next, usual_dose,
 )
 
 ZONE = ZoneInfo("UTC")
@@ -138,3 +138,29 @@ def test_an_open_bag_of_unknown_amount_never_reads_as_nearly_done():
     # It may hold plenty: naming a sealed bag now could open one too soon.
     beans = [opened("a", None), opened("b", 5), sealed("s", 20)]
     assert open_next(beans, 17, NOW, Opening(limit=3)) is None
+
+
+# ── The last cup: a bag short of two doses ───────────────────────────────────
+
+
+def _bag(left, kind="coffee", status="open"):
+    return Bean(id="b", name="Bag", status=status, kind=kind, tracked=left is not None,
+                remaining_g=left, bag_size_g=250.0, opened_on=day(5))
+
+
+def test_a_bag_short_of_two_doses_is_on_its_last_cup():
+    assert last_cup_dose(_bag(25.5), 17.0) == 25.5
+    assert last_cup_dose(_bag(17.0), 17.0) == 17.0
+    assert last_cup_dose(_bag(34.0), 17.0) is None
+    assert last_cup_dose(_bag(16.9), 17.0) is None
+
+
+def test_the_last_cup_rounds_down_to_the_dose_step():
+    assert last_cup_dose(_bag(17.3), 17.0) == 17.0
+    assert last_cup_dose(_bag(20.9), 17.0) == 20.5
+
+
+def test_only_a_counted_open_coffee_bag_has_a_last_cup():
+    assert last_cup_dose(_bag(None), 17.0) is None
+    assert last_cup_dose(_bag(25.0, kind="tea"), 17.0) is None
+    assert last_cup_dose(_bag(25.0, status="unopened"), 17.0) is None

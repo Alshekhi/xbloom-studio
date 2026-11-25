@@ -21,7 +21,7 @@ from typing import Any
 
 from .liking import LIKED, liking
 from .models import Bean, Brew
-from .opening import Opening, _day, fading, holds_a_dose, open_next
+from .opening import Opening, _day, fading, holds_a_dose, last_cup_dose, open_next
 from .stats import TEA, made_coffee, moment
 
 
@@ -124,6 +124,11 @@ def candidates(
     picks: list[Pick] = []
     for bag, why in bags:
         def cup(recipe: str | None, source: str | None, hub_id: int | None, more: tuple[str, ...]) -> Pick:
+            # The bag's last cup takes all of it, when there is a recipe to
+            # brew it with: the bag alone is picked with no dose.
+            rest = last_cup_dose(bag, dose) if recipe is not None else None
+            if rest is not None:
+                return Pick(bag.id, bag.name, recipe, source, hub_id, drink, rest, why + more + ("last_cup",))
             return Pick(bag.id, bag.name, recipe, source, hub_id, drink, dose, why + more)
         recipes = _rotated(bag, own.get(bag.id, []), brews)
         if recipes:

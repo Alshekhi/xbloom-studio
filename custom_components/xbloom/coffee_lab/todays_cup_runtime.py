@@ -220,7 +220,10 @@ class TodaysCup:
     def _fit_dose(self, pick: Pick, dose: float | None) -> Pick:
         """The dose within what the recipe's cup takes; a recipe's own without a usual one."""
         recipe = next((r for r in self._library() or [] if r.get("name") == pick.recipe), None)
-        value = dose if dose is not None else float((recipe or {}).get("dose_g") or 15.0)
+        if "last_cup" in pick.reasons:
+            value = pick.dose_g
+        else:
+            value = dose if dose is not None else float((recipe or {}).get("dose_g") or 15.0)
         try:
             window = spec.CUP_DOSE.get(int(recipe["cup_type"])) if recipe else None
         except (TypeError, ValueError, KeyError):

@@ -322,3 +322,23 @@ async def test_a_brew_recorded_hides_the_card_before_any_refresh():
     cup.brew_recorded(Brew(id="x", brewed_at=datetime.now(timezone.utc).isoformat(),
                            recorded_at="", dose_g=17.0, bean_id=bag.id))
     assert not cup.due()
+
+
+# ── The last cup within what the cup takes ───────────────────────────────────
+
+
+def _last(dose):
+    from custom_components.xbloom.coffee_lab.todays_cup import Pick
+    return Pick("b", "Bag", "R", "own", None, "hot", dose, ("last_cup",))
+
+
+async def test_a_last_cup_is_fitted_to_what_the_cup_takes():
+    # The Omni dripper takes 18 g at most: the pick's own 25.5 g is clamped,
+    # not replaced by the usual dose.
+    cup, *_ = await _cup(_Home(), library=[{"name": "R", "dose_g": 17, "cup_type": 2}])
+    assert cup._fit_dose(_last(25.5), 17.0).dose_g == 18.0
+
+
+async def test_a_last_cup_within_the_cup_keeps_its_dose():
+    cup, *_ = await _cup(_Home(), library=[{"name": "R", "dose_g": 17, "cup_type": 3}])
+    assert cup._fit_dose(_last(25.0), 17.0).dose_g == 25.0

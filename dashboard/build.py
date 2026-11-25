@@ -39,7 +39,7 @@ TEXT = {
                    "September", "October", "November", "December"),
         "h_todays_cup": "Today's cup", "tc_line": "{cup}", "tc_sep": ", ", "tc_end": ".",
         "r_liked": "you liked it", "r_not_yesterday": "not the coffee you had last",
-        "r_use_soon": "best used soon", "r_past_best": "past its best", "r_open_next": "time to open it",
+        "r_use_soon": "best used soon", "r_past_best": "past its best", "r_open_next": "time to open it", "r_last_cup": "the last cup of this bag",
         "r_rated_again": "rated Keep it like this with it", "r_brewed_with_bag": "brewed with it before",
         "r_like_this_coffee": "brewed with coffee like it", "r_community": "a community recipe",
         "stock_not_yet": "Not enough brews yet to tell how long the {kind} will last.",
@@ -156,7 +156,7 @@ TEXT = {
                    "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"),
         "h_todays_cup": "كوب اليوم", "tc_line": "{cup}", "tc_sep": "، ", "tc_end": ".",
         "r_liked": "أعجبتك", "r_not_yesterday": "ليست آخر قهوة حضّرتها",
-        "r_use_soon": "يحسن استخدامها قريبًا", "r_past_best": "تجاوزت أفضل وقتها", "r_open_next": "حان وقت فتحها",
+        "r_use_soon": "يحسن استخدامها قريبًا", "r_past_best": "تجاوزت أفضل وقتها", "r_open_next": "حان وقت فتحها", "r_last_cup": "آخر كوب من هذا الكيس",
         "r_rated_again": "قيّمت الوصفة معها بـ أعتمدها كما هي", "r_brewed_with_bag": "حضّرتها معها من قبل",
         "r_like_this_coffee": "حضّرتها مع قهوة مشابهة", "r_community": "وصفة من المجتمع",
         "stock_not_yet": "لا تكفي التحضيرات بعد لمعرفة كم يدوم {kind}.",
@@ -349,7 +349,7 @@ def section(title: str, cards: list[dict], visibility: list[dict] | None = None)
     return out
 
 
-TODAYS_CUP_REASONS = ('liked', 'not_yesterday', 'use_soon', 'past_best', 'open_next', 'rated_again', 'brewed_with_bag', 'like_this_coffee', 'community')
+TODAYS_CUP_REASONS = ('liked', 'not_yesterday', 'use_soon', 'past_best', 'open_next', 'rated_again', 'brewed_with_bag', 'like_this_coffee', 'community', 'last_cup')
 
 
 def todays_cup_card(t: dict) -> str:

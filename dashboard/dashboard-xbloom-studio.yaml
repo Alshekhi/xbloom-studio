@@ -22,9 +22,10 @@ views:
         set words = {''liked'': "you liked it", ''not_yesterday'': "not the coffee you had last", ''use_soon'':
         "best used soon", ''past_best'': "past its best", ''open_next'': "time to open it", ''rated_again'':
         "rated Keep it like this with it", ''brewed_with_bag'': "brewed with it before", ''like_this_coffee'':
-        "brewed with coffee like it", ''community'': "a community recipe"} %}{% set ns = namespace(said=[])
-        %}{% for r in a.get(''reasons'') or [] %}{% if r in words %}{% set ns.said = ns.said + [words[r]]
-        %}{% endif %}{% endfor %}{% set why = ns.said | join('', '') %}{{ cup }}{% if why %}
+        "brewed with coffee like it", ''community'': "a community recipe", ''last_cup'': "the last cup
+        of this bag"} %}{% set ns = namespace(said=[]) %}{% for r in a.get(''reasons'') or [] %}{% if
+        r in words %}{% set ns.said = ns.said + [words[r]] %}{% endif %}{% endfor %}{% set why = ns.said
+        | join('', '') %}{{ cup }}{% if why %}
 
 
         {{ why[:1] | upper }}{{ why[1:] }}.{% endif %}'
