@@ -357,3 +357,34 @@ async def test_the_ai_tools_see_the_question():
     lab, bag = await _asked()
     facts = await actions.active_bean(lab, {})
     assert facts["finish_question"] == {"bean_id": bag.id, "bag": "Kenya", "remaining_g": 8.5}
+
+
+# ── Use the rest of the bag ──────────────────────────────────────────────────
+
+from custom_components.xbloom.coffee_lab.entities import UseRestOfBagButton  # noqa: E402
+
+
+async def test_the_rest_button_follows_what_todays_cup_says_and_presses_through():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    lab = await _lab()
+    bag = await _bag(lab, status="open", remaining_g=25.5)
+    await lab.async_select(bag.id)
+    lab.todays_cup = SimpleNamespace(rest_of_bag_dose=lambda b: 25.0 if b and b.id == bag.id else None,
+                                     async_use_rest=AsyncMock())
+    button = UseRestOfBagButton(lab)
+    assert button.entity_id == "button.xbloom_studio_use_rest_of_bag"
+    await button.async_read()
+    assert button.available is True
+    await button.async_press()
+    lab.todays_cup.async_use_rest.assert_awaited_once()
+    lab.todays_cup.rest_of_bag_dose = lambda b: None
+    await button.async_read()
+    assert button.available is False
+
+
+async def test_without_todays_cup_the_rest_button_is_unavailable():
+    lab = await _lab()
+    button = UseRestOfBagButton(lab)
+    await button.async_read()
+    assert button.available is False

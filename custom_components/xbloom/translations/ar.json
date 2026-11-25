@@ -1016,6 +1016,9 @@
       },
       "coffee_lab_keep_asked": {
         "name": "إبقاء الكيس"
+      },
+      "coffee_lab_use_rest_of_bag": {
+        "name": "استخدم ما تبقى في الكيس"
       }
     },
     "text": {
@@ -1194,6 +1197,9 @@
     },
     "not_a_link": {
       "message": "يجب أن يكون {argument} رابط ويب يبدأ بـ https://."
+    },
+    "rest_none": {
+      "message": "لا يوجد في هذا الكيس كوب أخير."
     }
   },
   "services": {

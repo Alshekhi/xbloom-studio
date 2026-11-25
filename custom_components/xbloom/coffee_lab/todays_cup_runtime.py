@@ -30,7 +30,9 @@ from ..suggestions import HISTORY_DAYS, rank
 from ..tool_common import fail
 from .habits import habits
 from .lab import STORE_UNREACHABLE, CoffeeLab
-from .opening import USUAL_DAYS, usual_dose
+from .inventory import DEFAULT_FINISHED_BELOW_G
+from .models import Bean
+from .opening import USUAL_DAYS, last_cup_dose, usual_dose
 from .stock import pace
 from .stats import TEA, made_coffee, moment
 from .todays_cup import OwnRecipe, Pick, candidates, due, shows_from
@@ -239,6 +241,42 @@ class TodaysCup:
         await self.lab.async_count_skip(self.pick.bag_id, self.pick.recipe)
         self.index = (self.index + 1) % len(self.picks)
         self._changed()
+
+    def rest_of_bag_dose(self, bean: Bean | None) -> float | None:
+        """The dose that uses the rest of `bean` with the picked recipe; else None.
+
+        Offered for a bag short of two of the recipe's own doses, and only when
+        what the cup takes leaves no more than a brew finishes by itself.
+        """
+        if bean is None or self.busy():
+            return None
+        picked = self.hass.states.get(RECIPE_SELECT)
+        recipe = next((r for r in self._library() or []
+                       if picked is not None and r.get("name") == picked.state), None)
+        if not recipe or not recipe.get("dose_g"):
+            return None
+        rest = last_cup_dose(bean, float(recipe["dose_g"]))
+        slider = self.hass.states.get(DOSE_NUMBER)
+        if rest is None or slider is None:
+            return None
+        try:
+            low, high = float(slider.attributes["min"]), float(slider.attributes["max"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if rest - high > DEFAULT_FINISHED_BELOW_G:
+            return None
+        return min(max(rest, low), high)
+
+    async def async_use_rest(self) -> None:
+        """Set the dose to the rest of the bag in use; nothing is started."""
+        if self.busy():
+            raise fail("refused_machine_busy")
+        dose = self.rest_of_bag_dose(await self.lab.async_active_bean())
+        if dose is None:
+            raise fail("rest_none")
+        await self.hass.services.async_call(
+            "number", "set_value", {"entity_id": DOSE_NUMBER, "value": dose}, blocking=True,
+        )
 
     async def async_use(self) -> None:
         """Pick the bag, the recipe and the dose on the Brew tab; nothing is started."""

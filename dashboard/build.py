@@ -416,6 +416,8 @@ def brew_view(t: dict) -> dict:
             tile(f"binary_sensor.{E}_in_range", name=t["machine"]),
             # What the picked recipe draws from: the bag, the xPod box or the tea.
             tile(f"sensor.{E}_coffee_left", visibility=[*present(f"sensor.{E}_coffee_left"), *coffee]),
+            # Only when it is the bag's last cup: the dose that uses all of it.
+            press(f"button.{E}_use_rest_of_bag", visibility=available(f"button.{E}_use_rest_of_bag")),
             tile(f"select.{E}_xpod_box", visibility=[is_(kind, "xpod"), *present(f"select.{E}_xpod_box")]),
             tile(f"select.{E}_tea", visibility=[is_(kind, "tea"), *present(f"select.{E}_tea")]),
             # What the picked recipe draws from, only while it is running low;

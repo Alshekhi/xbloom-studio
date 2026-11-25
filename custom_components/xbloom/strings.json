@@ -1016,6 +1016,9 @@
       },
       "coffee_lab_keep_asked": {
         "name": "Keep bag"
+      },
+      "coffee_lab_use_rest_of_bag": {
+        "name": "Use the rest of the bag"
       }
     },
     "text": {
@@ -1194,6 +1197,9 @@
     },
     "not_a_link": {
       "message": "{argument} must be a web link, starting with https://."
+    },
+    "rest_none": {
+      "message": "This bag has no last cup to use."
     }
   },
   "services": {

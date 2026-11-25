@@ -342,3 +342,76 @@ async def test_a_last_cup_is_fitted_to_what_the_cup_takes():
 async def test_a_last_cup_within_the_cup_keeps_its_dose():
     cup, *_ = await _cup(_Home(), library=[{"name": "R", "dose_g": 17, "cup_type": 3}])
     assert cup._fit_dose(_last(25.0), 17.0).dose_g == 25.0
+
+
+# ── The rest of the bag, on the Brew tab ─────────────────────────────────────
+
+from custom_components.xbloom.coffee_lab.models import Bean  # noqa: E402
+
+
+def _rest_home(recipe="R", status="idle", low=5.0, high=25.0):
+    home = _Home(status)
+    if recipe:
+        home.calls.append(("recipe", recipe))
+    real = home.get
+
+    def get(entity_id):
+        if entity_id == "number.xbloom_studio_brew_dose":
+            return SimpleNamespace(state="17", attributes={"min": low, "max": high})
+        return real(entity_id)
+    home.hass.states.get = get
+    return home
+
+
+def _left(grams):
+    return Bean(id="b", name="Bag", status="open", tracked=True, remaining_g=grams, bag_size_g=250.0)
+
+
+async def _rest_cup(home, cup_type=3):
+    cup, lab, bag, _ = await _cup(home, library=[{"name": "R", "dose_g": 17, "cup_type": cup_type}])
+    return cup, lab
+
+
+async def test_the_rest_is_offered_for_a_bag_short_of_two_recipe_doses():
+    cup, _ = await _rest_cup(_rest_home())
+    assert cup.rest_of_bag_dose(_left(25.5)) == 25.0
+
+
+async def test_the_rest_is_not_offered_with_two_cups_left():
+    cup, _ = await _rest_cup(_rest_home())
+    assert cup.rest_of_bag_dose(_left(34.0)) is None
+
+
+async def test_the_rest_is_not_offered_when_the_cup_would_leave_more_than_five_grams():
+    cup, _ = await _rest_cup(_rest_home(high=18.0), cup_type=2)
+    assert cup.rest_of_bag_dose(_left(24.0)) is None
+
+
+async def test_the_rest_within_five_grams_of_the_limit_is_offered_at_the_limit():
+    cup, _ = await _rest_cup(_rest_home(high=18.0), cup_type=2)
+    assert cup.rest_of_bag_dose(_left(22.0)) == 18.0
+
+
+async def test_the_rest_is_not_offered_without_a_recipe_or_while_brewing():
+    cup, _ = await _rest_cup(_rest_home(recipe=None))
+    assert cup.rest_of_bag_dose(_left(25.5)) is None
+    cup, _ = await _rest_cup(_rest_home(status="brewing"))
+    assert cup.rest_of_bag_dose(_left(25.5)) is None
+
+
+async def test_using_the_rest_sets_the_dose_slider():
+    home = _rest_home()
+    cup, lab = await _rest_cup(home)
+    bag = await lab.store.async_add_bean(name="Last", status="open", tracked=True, remaining_g=25.5)
+    await lab.async_select(bag.id)
+    await cup.async_use_rest()
+    assert ("number.set_value", {"entity_id": "number.xbloom_studio_brew_dose", "value": 25.0}) in home.calls
+
+
+async def test_using_the_rest_with_none_to_use_is_refused():
+    home = _rest_home()
+    cup, lab = await _rest_cup(home)
+    bag = await lab.store.async_add_bean(name="Full", status="open", tracked=True, remaining_g=200.0)
+    await lab.async_select(bag.id)
+    with pytest.raises(HomeAssistantError):
+        await cup.async_use_rest()

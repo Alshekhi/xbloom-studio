@@ -105,6 +105,22 @@ views:
         entity: sensor.xbloom_studio_recipe_kind
         state_not: tea
     - type: tile
+      entity: button.xbloom_studio_use_rest_of_bag
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_use_rest_of_bag
+      visibility:
+      - condition: state
+        entity: button.xbloom_studio_use_rest_of_bag
+        state_not: unavailable
+    - type: tile
       entity: select.xbloom_studio_xpod_box
       name:
         type: entity

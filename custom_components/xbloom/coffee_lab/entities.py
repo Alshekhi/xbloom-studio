@@ -33,7 +33,7 @@ from .inventory import kind_of_cup
 from .models import BUY_AGAIN, ISSUES, KINDS, VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER, window
 from .opening import USUAL_DAYS, fading, open_next, usual_dose
-from .todays_cup_runtime import SIGNAL_TODAYS_CUP
+from .todays_cup_runtime import BREW_STATUS, DOSE_NUMBER, RECIPE_SELECT, SIGNAL_TODAYS_CUP
 from .stock import MEASURES, figure, floor
 
 _LOGGER = logging.getLogger(__name__)
@@ -789,6 +789,42 @@ class AnotherCupButton(_TodaysCupButton):
         await self._cup().async_another()
 
 
+class UseRestOfBagButton(CoffeeLabEntity, ButtonEntity):
+    """Set the dose to the rest of the bag in use, when that is its last cup."""
+
+    _attr_icon = "mdi:sack-percent"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "use_rest_of_bag")
+        self.entity_id = "button.xbloom_studio_use_rest_of_bag"
+        self._dose: float | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # The recipe, the dose slider's limits and the machine decide it too.
+        @callback
+        def _moved(_event: Any) -> None:
+            self._changed()
+
+        self.async_on_remove(async_track_state_change_event(
+            self.hass, [RECIPE_SELECT, DOSE_NUMBER, BREW_STATUS], _moved,
+        ))
+
+    @property
+    def available(self) -> bool:
+        return self._dose is not None
+
+    async def async_read(self) -> None:
+        cup = getattr(self.lab, "todays_cup", None)
+        self._dose = cup.rest_of_bag_dose(await self.lab.async_active_bean()) if cup is not None else None
+
+    async def async_press(self) -> None:
+        cup = getattr(self.lab, "todays_cup", None)
+        if cup is None:
+            raise refuse("rest_none")
+        await cup.async_use_rest()
+
+
 class _OpeningNumber(CoffeeLabEntity, NumberEntity):
     """One of the opening rules: a setting kept in Coffee Lab's state."""
 
@@ -842,6 +878,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
         "number": [ManualDoseNumber, OpenLimitNumber, RestDaysNumber, FadeDaysNumber],
         "button": [
             RecordManualBrewButton, UseTodaysCupButton, AnotherCupButton, FinishAskedButton, KeepAskedButton,
+            UseRestOfBagButton,
         ],
     }
     # Only a store edited elsewhere — Notion — can be out of date here.
