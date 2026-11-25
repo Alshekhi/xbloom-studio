@@ -351,6 +351,7 @@ async def test_the_buttons_finish_or_keep_the_bag_asked_about():
     assert finish.available is True
     await finish.async_press()
     assert (await lab.store.async_get_bean(bag.id)).status == "finished"
+    assert lab.finish_question is None and lab.bag_question["bean_id"] == bag.id
 
 
 async def test_the_ai_tools_see_the_question():
@@ -460,3 +461,52 @@ async def test_with_nothing_to_finish_the_picker_is_unavailable():
     select = FinishChoiceSelect(lab)
     await select.async_read()
     assert select.available is False
+
+
+async def test_finish_from_the_question_goes_through_the_finish_rules():
+    # Re-weighed elsewhere to a full amount, the bag is no longer finished from
+    # a question asked about its old amount.
+    lab, bag = await _asked()
+    await lab.store.async_update_bean(bag.id, remaining_g=150.0)
+    from homeassistant.exceptions import HomeAssistantError
+    with pytest.raises(HomeAssistantError):
+        await FinishAskedButton(lab).async_press()
+    assert (await lab.store.async_get_bean(bag.id)).status == "open"
+
+
+async def test_finish_with_the_question_gone_is_a_refusal_not_an_error():
+    lab = await _lab()
+    from homeassistant.exceptions import HomeAssistantError
+    with pytest.raises(HomeAssistantError):
+        await FinishAskedButton(lab).async_press()
+
+
+async def test_a_chosen_bag_finished_by_a_brew_leaves_nothing_to_press():
+    lab, short, *_ = await _finishable()
+    await lab.async_choose_to_finish(short.id)
+    await lab.async_consume(bean_id=short.id, grams=8.5, run_id="r1")
+    button = FinishChosenButton(lab)
+    await button.async_read()
+    assert button.available is False
+
+
+async def test_the_rest_button_skips_a_slider_step_that_keeps_its_limits():
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+    from custom_components.xbloom.coffee_lab import entities as module
+    lab = await _lab()
+    button = UseRestOfBagButton(lab)
+    button.hass = MagicMock()
+    button._changed = MagicMock()
+    module.async_track_state_change_event.reset_mock()
+    await button.async_added_to_hass()
+    moved = module.async_track_state_change_event.call_args.args[2]
+    def event(entity, old, new):
+        return SimpleNamespace(data={"entity_id": entity,
+                                     "old_state": SimpleNamespace(state=old[0], attributes={"min": 5, "max": old[1]}),
+                                     "new_state": SimpleNamespace(state=new[0], attributes={"min": 5, "max": new[1]})})
+    moved(event("number.xbloom_studio_brew_dose", ("17", 25), ("17.5", 25)))
+    button._changed.assert_not_called()
+    moved(event("number.xbloom_studio_brew_dose", ("17", 25), ("17", 18)))
+    moved(event("select.xbloom_studio_recipe", ("A", 0), ("B", 0)))
+    assert button._changed.call_count == 2

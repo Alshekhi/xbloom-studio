@@ -29,6 +29,7 @@ from ..tool_common import refuse
 from ..const import DOMAIN, SIGNAL_COFFEE_LAB_HISTORY, SIGNAL_COFFEE_LAB_STOCK, SIGNAL_COFFEE_LAB_UPDATED
 from . import actions
 from .lab import CoffeeLab, focus_text
+from .store import UnknownBean
 from .inventory import kind_of_cup
 from .models import BUY_AGAIN, ISSUES, KINDS, VERDICTS, Bean
 from .stats import PERIODS, UNKNOWN_BREWER as OTHER_BREWER, window
@@ -433,6 +434,15 @@ class BagToFinishSensor(CoffeeLabEntity, SensorEntity):
         super().__init__(lab, "finish_question")
         self.entity_id = "sensor.xbloom_studio_bag_to_finish"
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # The question lapses with the clock, not only with a change.
+        self.async_on_remove(async_track_time_interval(self.hass, self._tick, QUESTION_TICK))
+
+    @callback
+    def _tick(self, _now) -> None:
+        self._changed()
+
     async def async_read(self) -> None:
         question = self.lab.finish_question
         self._attr_native_value = question["name"] if question else None
@@ -464,7 +474,12 @@ class FinishAskedButton(_FinishQuestionButton):
         self.entity_id = "button.xbloom_studio_finish_bag"
 
     async def async_press(self) -> None:
-        await self.lab.async_finish_asked()
+        question = self.lab.finish_question
+        if question is None:
+            raise refuse("finish_none_asked")
+        # The bag as it is now, through the finish rules: it may have been
+        # weighed again since the question was asked.
+        await actions.finish_bag(self.lab, {"bean_id": question["bean_id"]})
 
 
 class KeepAskedButton(_FinishQuestionButton):
@@ -525,13 +540,23 @@ class FinishChosenButton(CoffeeLabEntity, ButtonEntity):
     def __init__(self, lab: CoffeeLab) -> None:
         super().__init__(lab, "finish_chosen")
         self.entity_id = "button.xbloom_studio_finish_chosen_bag"
+        self._finishable = False
 
     @property
     def available(self) -> bool:
-        return self.lab.finish_choice is not None
+        return self._finishable
 
     async def async_read(self) -> None:
-        """Nothing to read: availability follows the choice."""
+        # The chosen bag may have been finished or weighed since it was chosen.
+        chosen = self.lab.finish_choice
+        bean = None
+        if chosen is not None:
+            try:
+                bean = await self.lab.store.async_get_bean(chosen)
+            except UnknownBean:
+                bean = None
+        self._finishable = (bean is not None and bean.status == "open"
+                            and CoffeeLab.finish_refusal(bean) is None)
 
     async def async_press(self) -> None:
         chosen = self.lab.finish_choice
@@ -864,7 +889,12 @@ class UseRestOfBagButton(CoffeeLabEntity, ButtonEntity):
         await super().async_added_to_hass()
         # The recipe, the dose slider's limits and the machine decide it too.
         @callback
-        def _moved(_event: Any) -> None:
+        def _moved(event: Any) -> None:
+            # A dose slider step that keeps its limits changes nothing here.
+            old, new = event.data.get("old_state"), event.data.get("new_state")
+            if (event.data.get("entity_id") == DOSE_NUMBER and old is not None and new is not None
+                    and all(old.attributes.get(k) == new.attributes.get(k) for k in ("min", "max"))):
+                return
             self._changed()
 
         self.async_on_remove(async_track_state_change_event(

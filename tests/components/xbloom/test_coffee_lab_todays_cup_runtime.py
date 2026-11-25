@@ -415,3 +415,28 @@ async def test_using_the_rest_with_none_to_use_is_refused():
     await lab.async_select(bag.id)
     with pytest.raises(HomeAssistantError):
         await cup.async_use_rest()
+
+
+async def test_the_rest_is_not_offered_while_a_tea_recipe_is_picked():
+    cup, _ = await _rest_cup(_rest_home(low=1.0, high=5.0), cup_type=4)
+    cup._library = lambda: [{"name": "R", "dose_g": 4, "cup_type": 4}]
+    assert cup.rest_of_bag_dose(_left(7.2)) is None
+
+
+async def test_the_rest_measures_what_the_cup_leaves_from_the_bag_not_the_rounded_dose():
+    # 23.4 g with an 18 g limit leaves 5.4 g: the brew would not finish it.
+    cup, _ = await _rest_cup(_rest_home(high=18.0), cup_type=2)
+    assert cup.rest_of_bag_dose(_left(23.4)) is None
+
+
+async def test_a_last_cup_the_cup_cannot_finish_is_a_usual_cup():
+    # 28 g with the Omni dripper's 18 g leaves 10 g: not the bag's last cup.
+    cup, *_ = await _cup(_Home(), library=[{"name": "R", "dose_g": 15, "cup_type": 2}])
+    fitted = cup._fit_dose(_last(28.0), 15.0, left=28.0)
+    assert fitted.dose_g == 15.0 and "last_cup" not in fitted.reasons
+
+
+async def test_a_last_cup_the_cup_finishes_stays_one():
+    cup, *_ = await _cup(_Home(), library=[{"name": "R", "dose_g": 15, "cup_type": 2}])
+    fitted = cup._fit_dose(_last(22.0), 15.0, left=22.0)
+    assert fitted.dose_g == 18.0 and "last_cup" in fitted.reasons

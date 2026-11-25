@@ -715,13 +715,6 @@ class CoffeeLab:
         if asked and asked.get("bean_id") == bean_id:
             await self._async_set_state(finish_question=None)
 
-    async def async_finish_asked(self) -> Bean:
-        """Finish the bag the question names."""
-        question = self.finish_question
-        if question is None:
-            raise UnknownBean("")
-        return await self.async_finish(question["bean_id"])
-
     async def async_keep_asked(self) -> None:
         """Leave the bag the question names open, and stop asking."""
         await self._async_set_state(finish_question=None)
@@ -1018,11 +1011,15 @@ class CoffeeLab:
             if not await self.store.async_has_run(run_id):
                 written = await self._async_write_brew(record(bag["bean_id"]))
             await self._runs.async_add(run_id)
-            if bag.get("finished"):
-                try:
-                    await self._async_ask_about_bag(await self.store.async_get_bean(bag["bean_id"]))
-                except UnknownBean:
-                    pass
+            try:
+                taken = await self.store.async_get_bean(bag["bean_id"])
+            except UnknownBean:
+                taken = None
+            if taken is not None:
+                if bag.get("finished"):
+                    await self._async_ask_about_bag(taken)
+                if taken.kind == "coffee" and bag.get("remaining_g") is not None:
+                    await self._async_note_leftover(taken, bag["grams"], bag["remaining_g"], bool(bag.get("finished")))
             self.on_change()
             return Consumption(
                 "counted", bean_id=bag["bean_id"], grams=bag["grams"],

@@ -30,7 +30,7 @@ from ..suggestions import HISTORY_DAYS, rank
 from ..tool_common import fail
 from .habits import habits
 from .lab import STORE_UNREACHABLE, CoffeeLab
-from .inventory import DEFAULT_FINISHED_BELOW_G
+from .inventory import DEFAULT_FINISHED_BELOW_G, kind_of_cup
 from .models import Bean
 from .opening import USUAL_DAYS, last_cup_dose, usual_dose
 from .stock import pace
@@ -206,7 +206,8 @@ class TodaysCup:
             self._brews = brews
             self._last_coffee = None
             chosen = self.pick if self.index > 0 and not reset else None
-            self.picks = [self._fit_dose(p, dose) for p in picks]
+            left = {b.id: b.remaining_g for b in beans}
+            self.picks = [self._fit_dose(p, dose, left=left.get(p.bag_id)) for p in picks]
             self.index = next((i for i, p in enumerate(self.picks) if chosen is not None
                                and (p.bag_id, p.recipe) == (chosen.bag_id, chosen.recipe)), 0)
             self._last_refresh = time.monotonic()
@@ -219,8 +220,12 @@ class TodaysCup:
         usual = habits(brews, [], now - timedelta(days=USUAL_DAYS), now)["usual"].get("iced")
         return float(usual["dose_g"]) if usual else None
 
-    def _fit_dose(self, pick: Pick, dose: float | None) -> Pick:
-        """The dose within what the recipe's cup takes; a recipe's own without a usual one."""
+    def _fit_dose(self, pick: Pick, dose: float | None, left: float | None = None) -> Pick:
+        """The dose within what the recipe's cup takes; a recipe's own without a usual one.
+
+        A last cup the cup cannot take all of (more than a brew finishes by
+        itself would be left in the bag) is offered as a usual cup instead.
+        """
         recipe = next((r for r in self._library() or [] if r.get("name") == pick.recipe), None)
         if "last_cup" in pick.reasons:
             value = pick.dose_g
@@ -232,6 +237,9 @@ class TodaysCup:
             window = None
         if window is not None:
             value = min(max(value, float(window.min)), float(window.max))
+        if "last_cup" in pick.reasons and left is not None and left - value > DEFAULT_FINISHED_BELOW_G:
+            usual = replace(pick, reasons=tuple(r for r in pick.reasons if r != "last_cup"))
+            return self._fit_dose(usual, dose)
         return replace(pick, dose_g=float(value))
 
     async def async_another(self) -> None:
@@ -253,7 +261,7 @@ class TodaysCup:
         picked = self.hass.states.get(RECIPE_SELECT)
         recipe = next((r for r in self._library() or []
                        if picked is not None and r.get("name") == picked.state), None)
-        if not recipe or not recipe.get("dose_g"):
+        if not recipe or not recipe.get("dose_g") or kind_of_cup(recipe.get("cup_type")) != "coffee":
             return None
         rest = last_cup_dose(bean, float(recipe["dose_g"]))
         slider = self.hass.states.get(DOSE_NUMBER)
@@ -263,7 +271,8 @@ class TodaysCup:
             low, high = float(slider.attributes["min"]), float(slider.attributes["max"])
         except (KeyError, TypeError, ValueError):
             return None
-        if rest - high > DEFAULT_FINISHED_BELOW_G:
+        # What the brew leaves in the bag, not in the rounded dose.
+        if bean.remaining_g - high > DEFAULT_FINISHED_BELOW_G:
             return None
         return min(max(rest, low), high)
 

@@ -1209,6 +1209,9 @@
     },
     "finish_none_chosen": {
       "message": "Choose a bag to finish first."
+    },
+    "finish_none_asked": {
+      "message": "There is no bag waiting to be finished."
     }
   },
   "services": {

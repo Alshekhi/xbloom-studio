@@ -1209,6 +1209,9 @@
     },
     "finish_none_chosen": {
       "message": "اختر الكيس الذي تريد إنهاءه أولًا."
+    },
+    "finish_none_asked": {
+      "message": "لا يوجد كيس ينتظر الإنهاء."
     }
   },
   "services": {

@@ -435,19 +435,6 @@ async def test_a_brew_to_five_grams_finishes_without_asking():
     assert lab.finish_question is None and lab.bag_question["bean_id"] == bag.id
 
 
-async def test_finish_from_the_question_finishes_and_asks_buy_again():
-    lab, store, bag = await _short_bag()
-    await lab.async_finish_asked()
-    assert lab.finish_question is None and lab.bag_question["bean_id"] == bag.id
-    assert (await store.async_get_bean(bag.id)).status == "finished"
-
-
-async def test_finish_with_no_question_is_refused():
-    lab, store, bag = await _lab()
-    with pytest.raises(lab_module.UnknownBean):
-        await lab.async_finish_asked()
-
-
 async def test_keep_closes_the_question_and_leaves_the_bag_open():
     lab, store, bag = await _short_bag()
     await lab.async_keep_asked()
@@ -485,3 +472,12 @@ async def test_the_finish_question_lapses_with_the_bag_question():
     lab, store, bag = await _short_bag()
     with _at(lab, lab_module.BAG_QUESTION_LAPSE.total_seconds() / 60 + 1):
         assert lab.finish_question is None
+
+
+def test_the_bag_to_finish_looks_at_the_clock_so_a_lapsed_question_leaves():
+    import ast, inspect
+    from custom_components.xbloom.coffee_lab.entities import BagToFinishSensor
+    tree = ast.parse(inspect.getsource(BagToFinishSensor))
+    assert "async_track_time_interval" in inspect.getsource(BagToFinishSensor)
+    tick = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_tick")
+    assert any(isinstance(d, ast.Name) and d.id == "callback" for d in tick.decorator_list)
