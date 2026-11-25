@@ -843,7 +843,7 @@ class _TodaysCupButton(CoffeeLabEntity, ButtonEntity):
     def _cup(self):
         cup = getattr(self.lab, "todays_cup", None)
         if cup is None:
-            raise refuse("suggestion_none")
+            raise refuse("todays_cup_none")
         return cup
 
 
@@ -859,6 +859,19 @@ class UseTodaysCupButton(_TodaysCupButton):
 
     async def async_press(self) -> None:
         await self._cup().async_use()
+
+
+class ByHandButton(_TodaysCupButton):
+    """Today's bag and grams for a brew by hand; the machine is left alone."""
+
+    _attr_icon = "mdi:hand-back-right-outline"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "by_hand")
+        self.entity_id = "button.xbloom_studio_by_hand"
+
+    async def async_press(self) -> None:
+        await self._cup().async_by_hand()
 
 
 class AnotherCupButton(_TodaysCupButton):
@@ -970,7 +983,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
         "number": [ManualDoseNumber, OpenLimitNumber, RestDaysNumber, FadeDaysNumber],
         "button": [
             RecordManualBrewButton, UseTodaysCupButton, AnotherCupButton, FinishAskedButton, KeepAskedButton,
-            UseRestOfBagButton,
+            UseRestOfBagButton, ByHandButton,
             FinishChosenButton,
         ],
     }

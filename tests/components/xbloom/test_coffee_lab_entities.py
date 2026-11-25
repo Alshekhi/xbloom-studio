@@ -511,3 +511,15 @@ async def test_the_rest_button_skips_a_slider_step_that_keeps_its_limits():
     moved(event("number.xbloom_studio_brew_dose", ("17", 25), ("17", 18)))
     moved(event("select.xbloom_studio_recipe", ("A", 0), ("B", 0)))
     assert button._changed.call_count == 2
+
+
+async def test_the_by_hand_button_presses_through_to_todays_cup():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from custom_components.xbloom.coffee_lab.entities import ByHandButton
+    lab = await _lab()
+    lab.todays_cup = SimpleNamespace(async_by_hand=AsyncMock())
+    button = ByHandButton(lab)
+    assert button.entity_id == "button.xbloom_studio_by_hand"
+    await button.async_press()
+    lab.todays_cup.async_by_hand.assert_awaited_once()

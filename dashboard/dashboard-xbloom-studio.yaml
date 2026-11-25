@@ -53,6 +53,18 @@ views:
         perform_action: button.press
         target:
           entity_id: button.xbloom_studio_another_cup
+    - type: tile
+      entity: button.xbloom_studio_by_hand
+      name:
+        type: entity
+      icon_tap_action:
+        action: none
+      hide_state: true
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.xbloom_studio_by_hand
     visibility:
     - condition: state
       entity: sensor.xbloom_studio_todays_cup

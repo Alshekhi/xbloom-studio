@@ -409,6 +409,7 @@ def brew_view(t: dict) -> dict:
             {"type": "markdown", "content": todays_cup_card(t)},
             press(f"button.{E}_use_todays_cup"),
             press(f"button.{E}_another_cup"),
+            press(f"button.{E}_by_hand"),
         ], "visibility": [
             *present(f"sensor.{E}_todays_cup"),
             is_not(f"sensor.{E}_brew_status", "grinding"),

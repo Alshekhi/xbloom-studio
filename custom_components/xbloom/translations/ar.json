@@ -1025,6 +1025,9 @@
       },
       "coffee_lab_finish_chosen": {
         "name": "إنهاء الكيس المختار"
+      },
+      "coffee_lab_by_hand": {
+        "name": "حضّر يدويًا"
       }
     },
     "text": {
@@ -1212,6 +1215,9 @@
     },
     "finish_none_asked": {
       "message": "لا يوجد كيس ينتظر الإنهاء."
+    },
+    "todays_cup_none": {
+      "message": "لا يوجد كوب مقترح اليوم."
     }
   },
   "services": {

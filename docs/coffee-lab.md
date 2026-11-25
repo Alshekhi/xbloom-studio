@@ -287,6 +287,14 @@ Asked for, an AI assistant offers it at any time, for a second cup.
 library first — and the dose on the Brew tab, which prepares the machine; the
 brew is started as any other. **Another cup** offers the next one.
 
+**By hand** is for a brew without the xBloom: it makes today's bag the bag in
+use and sets **Manual brew dose** to the usual dose (for iced with no usual
+iced dose, the recipe's own), or to all of the bag on its last cup, with no
+machine to limit it. The tool is yours to pick in
+**Manual brewer**; nothing on the xBloom is touched. When the dashboard has
+the switch that shows the manual brew controls, it is turned on. Brew, change
+the grams if you used more or less, and **Record manual brew**.
+
 **Today's cup** carries `bag`, `bag_id`, `recipe`, `source` (`own` or
 `community`), `hub_id`, `drink`, `dose_g`, `due` (offered now), `shows_from`
 (the usual time, when there is one) and `reasons`: for the bag `liked`,

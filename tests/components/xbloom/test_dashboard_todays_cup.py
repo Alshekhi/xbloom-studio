@@ -79,3 +79,10 @@ def test_the_rest_of_the_bag_button_sits_by_coffee_left_and_shows_only_when_avai
     button = now["cards"][left + 1]
     assert any(v.get("entity") == "button.xbloom_studio_use_rest_of_bag" and v.get("state_not") == "unavailable"
                for v in button["visibility"])
+
+
+def test_by_hand_sits_with_the_todays_cup_buttons():
+    build = _build()
+    entities = [c.get("entity") for c in _section(build)["cards"]]
+    i = entities.index("button.xbloom_studio_another_cup")
+    assert entities[i + 1] == "button.xbloom_studio_by_hand"

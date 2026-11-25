@@ -43,6 +43,8 @@ SIGNAL_TODAYS_CUP = "xbloom_todays_cup"
 BREW_STATUS = "sensor.xbloom_studio_brew_status"
 RECIPE_SELECT = "select.xbloom_studio_recipe"
 DOSE_NUMBER = "number.xbloom_studio_brew_dose"
+# The dashboard's switch that shows the manual brew controls, when it has one.
+SHOW_MANUAL = "input_boolean.xbloom_show_manual_brew"
 BUSY = ("grinding", "brewing")
 # How long the dose slider is given to follow the recipe just picked.
 SEED_WAIT_S = 2.0
@@ -77,6 +79,8 @@ class TodaysCup:
         # The coffee used a day, last worked out.
         self.daily_g: float | None = None
         self._brews: list = []
+        # The usual dose for the drink at the last refresh; None for iced with no habit.
+        self._usual: float | None = None
         # A coffee recorded since the brews were last read.
         self._last_coffee: datetime | None = None
         self._refreshing = asyncio.Lock()
@@ -190,6 +194,7 @@ class TodaysCup:
             rate = pace("coffee", beans, brews, now)
             daily_g = rate[1] if rate else (dose or 15.0)
             self.daily_g = daily_g
+            self._usual = dose
             picks = candidates(beans, brews, own, {}, drink, now, rules, dose or 15.0, daily_g)
             first = picks[0] if picks else None
             if first is not None and first.recipe is None:
@@ -287,11 +292,29 @@ class TodaysCup:
             "number", "set_value", {"entity_id": DOSE_NUMBER, "value": dose}, blocking=True,
         )
 
+    async def async_by_hand(self) -> None:
+        """Today's bag and grams for a brew by hand; the tool is the person's.
+
+        The grams are the usual dose, or all of the bag on its last cup, with
+        no machine to limit them. Nothing on the xBloom is touched.
+        """
+        pick = self.pick
+        if pick is None:
+            raise fail("todays_cup_none")
+        bean = await self.lab.async_select(pick.bag_id)
+        base = self._usual or pick.dose_g
+        rest = last_cup_dose(bean, base) if bean is not None else None
+        await self.lab.async_set_manual_dose(rest if rest is not None else base)
+        if self.hass.states.get(SHOW_MANUAL) is not None:
+            await self.hass.services.async_call(
+                "input_boolean", "turn_on", {"entity_id": SHOW_MANUAL}, blocking=True,
+            )
+
     async def async_use(self) -> None:
         """Pick the bag, the recipe and the dose on the Brew tab; nothing is started."""
         pick = self.pick
         if pick is None:
-            raise fail("suggestion_none")
+            raise fail("todays_cup_none")
         if self.busy():
             raise fail("refused_machine_busy")
         await self.lab.async_select(pick.bag_id)
