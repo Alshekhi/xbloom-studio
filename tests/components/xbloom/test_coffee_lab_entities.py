@@ -41,8 +41,9 @@ def test_a_shared_name_without_distinct_roast_dates_is_numbered(dates):
 
 async def test_picking_a_label_selects_that_bag_by_id():
     lab = await _lab()
+    # Two unopened bags of one coffee, no roast dates: numbered.
     await _bag(lab)
-    second = await _bag(lab, status="open")
+    second = await _bag(lab)
     select = ActiveBagSelect(lab)
     await select.async_read()
     assert select._attr_options == ["Kenya", "Kenya 2"]
@@ -413,15 +414,8 @@ async def test_only_bags_that_may_be_finished_are_offered():
     select = FinishChoiceSelect(lab)
     await select.async_read()
     assert select.entity_id == "select.xbloom_studio_bag_to_finish"
-    assert sorted(select._attr_options) == ["Gayo", "Kenya (2026-09-03)"]
+    assert sorted(select._attr_options) == ["Gayo", "Kenya"]
     assert select._attr_current_option is None and select.available is True
-
-
-async def test_same_named_bags_are_told_apart_even_when_one_is_offered():
-    lab, short, *_ = await _finishable()
-    select = FinishChoiceSelect(lab)
-    await select.async_read()
-    assert "Kenya (2026-09-03)" in select._attr_options and "Kenya" not in select._attr_options
 
 
 async def test_choosing_a_bag_shows_what_is_left_and_enables_finish():
@@ -442,7 +436,7 @@ async def test_finishing_the_chosen_bag_clears_the_choice():
     lab, short, *_ = await _finishable()
     select, button = FinishChoiceSelect(lab), FinishChosenButton(lab)
     await select.async_read()
-    await select.async_select_option("Kenya (2026-09-03)")
+    await select.async_select_option("Kenya")
     await button.async_press()
     assert (await lab.store.async_get_bean(short.id)).status == "finished"
     # An unopened Kenya is still on hand: Buy again waits for it.
@@ -523,3 +517,105 @@ async def test_the_by_hand_button_presses_through_to_todays_cup():
     assert button.entity_id == "button.xbloom_studio_by_hand"
     await button.async_press()
     lab.todays_cup.async_by_hand.assert_awaited_once()
+
+
+# ── The Coffee bag list: one bag per coffee while one is open ────────────────
+
+
+async def _picker(*bags):
+    lab = await _lab()
+    made = [await _bag(lab, **values) for values in bags]
+    select = ActiveBagSelect(lab)
+    await select.async_read()
+    return lab, select, made
+
+
+async def test_an_unopened_bag_is_left_out_while_its_coffee_has_an_open_bag():
+    lab, select, (opened, sealed) = await _picker(
+        {"status": "open", "remaining_g": 36.0, "roast_date": "2026-09-03"},
+        {"status": "unopened", "roast_date": "2026-11-02"})
+    assert select._attr_options == ["Kenya"]
+    await select.async_select_option("Kenya")
+    assert lab.active_bean_id == opened.id
+
+
+async def test_once_the_open_bag_is_finished_the_unopened_one_is_offered_by_name():
+    lab, select, (opened, sealed) = await _picker(
+        {"status": "open", "remaining_g": 10.0, "roast_date": "2026-09-03"},
+        {"status": "unopened", "roast_date": "2026-11-02"})
+    await lab.async_finish(opened.id)
+    await select.async_read()
+    assert select._attr_options == ["Kenya"]
+    await select.async_select_option("Kenya")
+    assert lab.active_bean_id == sealed.id
+
+
+async def test_two_unopened_bags_of_a_coffee_are_both_offered_by_roast_date():
+    lab, select, _ = await _picker(
+        {"status": "unopened", "roast_date": "2026-10-20"},
+        {"status": "unopened", "roast_date": "2026-11-02"})
+    assert select._attr_options == ["Kenya (2026-10-20)", "Kenya (2026-11-02)"]
+
+
+async def test_another_roasters_coffee_of_the_same_name_is_not_left_out():
+    lab, select, _ = await _picker(
+        {"status": "open", "remaining_g": 36.0, "roaster": "Roaster A", "roast_date": "2026-09-03"},
+        {"status": "unopened", "roaster": "Roaster B", "roast_date": "2026-11-02"})
+    assert len(select._attr_options) == 2
+
+
+async def test_an_unopened_bag_chosen_elsewhere_stays_in_the_list():
+    lab, select, (opened, sealed) = await _picker(
+        {"status": "open", "remaining_g": 36.0, "roast_date": "2026-09-03"},
+        {"status": "unopened", "roast_date": "2026-11-02"})
+    await lab.async_select(sealed.id)
+    await select.async_read()
+    assert select._attr_current_option in select._attr_options and len(select._attr_options) == 2
+
+
+async def test_an_open_bag_short_of_a_cup_no_longer_hides_the_next_one():
+    # 12 g cannot make a usual cup, and finishing refuses nothing under 20 g
+    # only from the Bags tab: the new bag must be pickable meanwhile.
+    from types import SimpleNamespace
+    lab = await _lab()
+    lab.todays_cup = SimpleNamespace(usual_dose_g=17.0)
+    await _bag(lab, status="open", remaining_g=12.0, roast_date="2026-09-03")
+    await _bag(lab, status="unopened", roast_date="2026-11-02")
+    select = ActiveBagSelect(lab)
+    await select.async_read()
+    assert select._attr_options == ["Kenya (2026-09-03)", "Kenya (2026-11-02)"]
+
+
+async def test_the_chosen_unopened_bag_shows_by_its_dated_label():
+    lab, select, (opened, sealed) = await _picker(
+        {"status": "open", "remaining_g": 36.0, "roast_date": "2026-09-03"},
+        {"status": "unopened", "roast_date": "2026-11-02"})
+    await lab.async_select(sealed.id)
+    await select.async_read()
+    assert select._attr_options == ["Kenya (2026-09-03)", "Kenya (2026-11-02)"]
+    assert select._attr_current_option == "Kenya (2026-11-02)"
+
+
+async def test_a_tea_bought_again_is_one_choice_too():
+    from custom_components.xbloom.coffee_lab.entities import ActiveTeaSelect
+    lab = await _lab()
+    await _bag(lab, name="Sencha", kind="tea", status="open", remaining_g=30.0)
+    await _bag(lab, name="Sencha", kind="tea", status="unopened", remaining_g=100.0)
+    select = ActiveTeaSelect(lab)
+    await select.async_read()
+    assert select._attr_options == ["Sencha"]
+
+
+async def test_a_name_differing_only_in_case_is_the_same_coffee():
+    lab, select, _ = await _picker(
+        {"status": "open", "remaining_g": 36.0},
+        {"name": "kenya ", "status": "unopened"})
+    assert select._attr_options == ["Kenya"]
+
+
+async def test_the_finish_list_names_a_bag_as_the_coffee_bag_list_does():
+    lab, short, *_ = await _finishable()
+    select = FinishChoiceSelect(lab)
+    await select.async_read()
+    # The unopened Kenya is not offered here, so the open one needs no date.
+    assert sorted(select._attr_options) == ["Gayo", "Kenya"]
