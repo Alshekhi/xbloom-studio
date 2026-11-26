@@ -395,7 +395,7 @@ async def test_without_todays_cup_the_rest_button_is_unavailable():
 # ── Finish a bag from the Bags tab ───────────────────────────────────────────
 
 from custom_components.xbloom.coffee_lab.entities import (  # noqa: E402
-    FinishChoiceSelect, FinishChosenButton,
+    ChosenBagGramsNumber, FinishChoiceSelect, FinishChosenButton,
 )
 
 
@@ -409,27 +409,29 @@ async def _finishable():
     return lab, short, full, sealed, unknown, tea
 
 
-async def test_only_bags_that_may_be_finished_are_offered():
+async def test_every_open_coffee_bag_is_offered():
     lab, *_ = await _finishable()
     select = FinishChoiceSelect(lab)
     await select.async_read()
     assert select.entity_id == "select.xbloom_studio_bag_to_finish"
-    assert sorted(select._attr_options) == ["Gayo", "Kenya"]
+    assert sorted(select._attr_options) == ["Brazil", "Gayo", "Kenya"]
     assert select._attr_current_option is None and select.available is True
 
 
-async def test_choosing_a_bag_shows_what_is_left_and_enables_finish():
+async def test_finish_is_offered_only_for_a_bag_finishing_allows():
     lab, short, full, sealed, unknown, tea = await _finishable()
     select, button = FinishChoiceSelect(lab), FinishChosenButton(lab)
     await select.async_read()
     await button.async_read()
     assert button.available is False and button.entity_id == "button.xbloom_studio_finish_chosen_bag"
+    await select.async_select_option("Brazil")
+    await select.async_read()
+    await button.async_read()
+    assert select._attr_current_option == "Brazil" and button.available is False
     await select.async_select_option("Gayo")
     await select.async_read()
     await button.async_read()
-    assert select._attr_current_option == "Gayo"
-    assert select._attr_extra_state_attributes == {"remaining_g": None, "tracked": False}
-    assert button.available is True
+    assert select._attr_current_option == "Gayo" and button.available is True
 
 
 async def test_finishing_the_chosen_bag_clears_the_choice():
@@ -450,12 +452,62 @@ async def test_finish_with_nothing_chosen_is_refused():
         await FinishChosenButton(lab).async_press()
 
 
-async def test_with_nothing_to_finish_the_picker_is_unavailable():
+async def test_with_no_open_bag_the_picker_is_unavailable():
     lab = await _lab()
-    await _bag(lab, status="open", remaining_g=120.0)
+    await _bag(lab, status="unopened", remaining_g=250.0)
+    await _bag(lab, name="Sencha", kind="tea", status="open", remaining_g=10.0)
     select = FinishChoiceSelect(lab)
     await select.async_read()
     assert select.available is False
+
+
+async def test_grams_left_shows_the_chosen_bag():
+    lab, short, full, sealed, unknown, tea = await _finishable()
+    number = ChosenBagGramsNumber(lab)
+    assert number.entity_id == "number.xbloom_studio_grams_left_in_bag"
+    await number.async_read()
+    assert number.available is False
+    await lab.async_choose_to_finish(full.id)
+    await number.async_read()
+    assert number.available is True and number._attr_native_value == 120.0
+    # Never counted: nothing to show until it is weighed.
+    await lab.async_choose_to_finish(unknown.id)
+    await number.async_read()
+    assert number.available is True and number._attr_native_value is None
+
+
+async def test_setting_grams_left_counts_the_bag_from_it():
+    lab, short, full, *_ = await _finishable()
+    number, button = ChosenBagGramsNumber(lab), FinishChosenButton(lab)
+    await lab.async_choose_to_finish(full.id)
+    await number.async_set_native_value(12.5)
+    bag = await lab.store.async_get_bean(full.id)
+    assert bag.remaining_g == 12.5 and bag.tracked is True and bag.status == "open"
+    await number.async_read()
+    await button.async_read()
+    assert number._attr_native_value == 12.5 and button.available is True
+
+
+async def test_grams_left_starts_counting_a_bag_never_counted():
+    lab, short, full, sealed, unknown, tea = await _finishable()
+    await lab.async_choose_to_finish(unknown.id)
+    await ChosenBagGramsNumber(lab).async_set_native_value(22.0)
+    bag = await lab.store.async_get_bean(unknown.id)
+    assert bag.remaining_g == 22.0 and bag.tracked is True
+
+
+async def test_grams_left_for_a_bag_gone_meanwhile_is_refused():
+    lab, short, *_ = await _finishable()
+    await lab.async_choose_to_finish(short.id)
+    await lab.async_finish(short.id)
+    await lab.async_choose_to_finish(short.id)
+    number = ChosenBagGramsNumber(lab)
+    await number.async_read()
+    assert number.available is False
+    from homeassistant.exceptions import HomeAssistantError
+    with pytest.raises(HomeAssistantError):
+        await number.async_set_native_value(10.0)
+    assert (await lab.store.async_get_bean(short.id)).remaining_g == 8.5
 
 
 async def test_finish_from_the_question_goes_through_the_finish_rules():
@@ -618,4 +670,4 @@ async def test_the_finish_list_names_a_bag_as_the_coffee_bag_list_does():
     select = FinishChoiceSelect(lab)
     await select.async_read()
     # The unopened Kenya is not offered here, so the open one needs no date.
-    assert sorted(select._attr_options) == ["Gayo", "Kenya"]
+    assert sorted(select._attr_options) == ["Brazil", "Gayo", "Kenya"]

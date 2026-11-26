@@ -71,7 +71,8 @@ repair appears if one has waited more than an hour.
 - **Bags** — the open bags, each with what is left and how long it has been
   open, the bag in use first; the unopened bags, oldest roast first, each with
   its size, and which to open next when it is time; open bags past their best
-  marked; the opening settings; each bag opening to where and how it was made, with its shop page
+  marked; an open bag to weigh again, by typing what is left, or to finish;
+  the opening settings; each bag opening to where and how it was made, with its shop page
   when it has one; a link to where bags are added and edited; and, for each kind the
   home has had, what is left — about so many days or cups, or the grams, bags,
   pods or boxes — with its measure and level.

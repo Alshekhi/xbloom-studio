@@ -686,7 +686,7 @@
         }
       },
       "coffee_lab_finish_choice": {
-        "name": "كيس للإنهاء"
+        "name": "الكيس"
       }
     },
     "sensor": {
@@ -853,6 +853,9 @@
       }
     },
     "number": {
+      "coffee_lab_chosen_bag_grams": {
+        "name": "الغرامات المتبقية"
+      },
       "coffee_lab_manual_dose": {
         "name": "جرعة التحضير اليدوي"
       },
@@ -1211,7 +1214,7 @@
       "message": "لا يوجد في هذا الكيس كوب أخير."
     },
     "finish_none_chosen": {
-      "message": "اختر الكيس الذي تريد إنهاءه أولًا."
+      "message": "اختر كيسًا أولًا."
     },
     "finish_none_asked": {
       "message": "لا يوجد كيس ينتظر الإنهاء."

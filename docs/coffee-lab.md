@@ -34,9 +34,11 @@ Finishing from the dashboard:
   more than 5 g and less than 20 g, asks on the Brew tab: **Finish bag** or
   **Keep bag**. The question goes when answered, when the bag is finished or
   weighed again, when the next brew from it is counted, and after a week.
-- **Finish a bag**, on the Bags tab: any open bag finishing allows — one
-  showing less than 20 g, or one never counted — picked by name, with what is
-  left shown before **Finish the chosen bag** asks to confirm.
+- **Weigh or finish a bag**, on the Bags tab: any open coffee bag, picked by
+  name. **Grams left** shows what it holds; typing what the bag weighs counts
+  it down from that, as `start_tracking` does. **Finish the chosen bag**
+  appears once finishing allows it — under 20 g, or never counted — and asks
+  to confirm.
 
 Each way, **Buy again** follows, as for a bag a brew finishes.
 
