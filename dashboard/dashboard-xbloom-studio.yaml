@@ -1830,7 +1830,7 @@ views:
     cards:
     - type: markdown
       text_only: true
-      content: '## Finish a bag'
+      content: '## Weigh or finish a bag'
     - type: tile
       entity: select.xbloom_studio_bag_to_finish
       name:
@@ -1842,15 +1842,14 @@ views:
       hide_state: true
       tap_action:
         action: none
-    - type: markdown
-      text_only: true
-      show_empty: false
-      content: '{% macro e(s) %}{{ (s or '''') | string | regex_replace(''([\\\\`*_{}\\[\\]()<>#+!|~])'',
-        ''\\\\\\1'') }}{% endmacro %}{% set p = ''select.xbloom_studio_bag_to_finish'' %}{% set chosen
-        = states(p) %}{% if chosen not in (''unknown'', ''unavailable'', '''') %}{% set bag = ''⁨'' ~
-        e(chosen) ~ ''⁩'' %}{% set g = state_attr(p, ''remaining_g'') %}{% if g is not none %}**{{ bag
-        }}**: {{ g | float | round(1) | string | replace(''.0'', '''') }} g left{% else %}**{{ bag }}**:
-        amount not known{% endif %}{% endif %}'
+    - type: entities
+      entities:
+      - entity: number.xbloom_studio_grams_left_in_bag
+        name: Grams left
+      visibility:
+      - condition: state
+        entity: number.xbloom_studio_grams_left_in_bag
+        state_not: unavailable
     - type: tile
       entity: button.xbloom_studio_finish_chosen_bag
       name:

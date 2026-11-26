@@ -686,7 +686,7 @@
         }
       },
       "coffee_lab_finish_choice": {
-        "name": "Bag to finish"
+        "name": "Bag"
       }
     },
     "sensor": {
@@ -853,6 +853,9 @@
       }
     },
     "number": {
+      "coffee_lab_chosen_bag_grams": {
+        "name": "Grams left"
+      },
       "coffee_lab_manual_dose": {
         "name": "Manual brew dose"
       },
@@ -1211,7 +1214,7 @@
       "message": "This bag has no last cup to use."
     },
     "finish_none_chosen": {
-      "message": "Choose a bag to finish first."
+      "message": "Choose a bag first."
     },
     "finish_none_asked": {
       "message": "There is no bag waiting to be finished."

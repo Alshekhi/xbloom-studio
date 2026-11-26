@@ -507,10 +507,9 @@ class KeepAskedButton(_FinishQuestionButton):
 
 
 class FinishChoiceSelect(CoffeeLabEntity, SelectEntity):
-    """An open bag to finish from the Bags tab: only those finishing allows.
+    """An open bag chosen on the Bags tab, to weigh again or to finish.
 
-    Labelled over every coffee bag, so two bags sharing a name are told apart
-    even when only one of them is offered.
+    Labelled among the open bags, as the Coffee bag list names them.
     """
 
     _attr_icon = "mdi:sack-outline"
@@ -523,18 +522,12 @@ class FinishChoiceSelect(CoffeeLabEntity, SelectEntity):
         self._attr_current_option = None
 
     async def async_read(self) -> None:
-        coffee = [b for b in await self.lab.store.async_list_beans() if b.kind == "coffee"]
-        # Labelled among the open bags, as the Coffee bag list names them.
-        labels = bag_labels([b for b in coffee if b.status == "open"])
-        offered = [b for b in coffee if b.status == "open" and CoffeeLab.finish_refusal(b) is None]
+        offered = [b for b in await self.lab.store.async_list_beans() if b.kind == "coffee" and b.status == "open"]
+        labels = bag_labels(offered)
         self._ids_by_label = {labels[b.id]: b.id for b in offered}
         self._attr_options = list(self._ids_by_label)
         chosen = next((b for b in offered if b.id == self.lab.finish_choice), None)
         self._attr_current_option = labels[chosen.id] if chosen else None
-        self._attr_extra_state_attributes = (
-            {"remaining_g": chosen.remaining_g if chosen.tracked else None, "tracked": chosen.tracked}
-            if chosen else {}
-        )
 
     @property
     def available(self) -> bool:
@@ -542,6 +535,51 @@ class FinishChoiceSelect(CoffeeLabEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         await self.lab.async_choose_to_finish(self._ids_by_label[option])
+
+
+async def _chosen_open_bag(lab: CoffeeLab) -> Bean | None:
+    """The bag chosen on the Bags tab, while it is still an open coffee bag."""
+    chosen = lab.finish_choice
+    if chosen is None:
+        return None
+    try:
+        bean = await lab.store.async_get_bean(chosen)
+    except UnknownBean:
+        return None
+    return bean if bean.kind == "coffee" and bean.status == "open" else None
+
+
+class ChosenBagGramsNumber(CoffeeLabEntity, NumberEntity):
+    """What is left in the bag chosen on the Bags tab; a new amount is a weighing."""
+
+    _attr_native_min_value = 0
+    _attr_native_max_value = 5000
+    _attr_native_step = 0.1
+    _attr_mode = NumberMode.BOX
+    _attr_native_unit_of_measurement = UnitOfMass.GRAMS
+    _attr_icon = "mdi:scale"
+
+    def __init__(self, lab: CoffeeLab) -> None:
+        super().__init__(lab, "chosen_bag_grams")
+        self.entity_id = "number.xbloom_studio_grams_left_in_bag"
+        self._has_bag = False
+
+    @property
+    def available(self) -> bool:
+        return self._has_bag
+
+    async def async_read(self) -> None:
+        bean = await _chosen_open_bag(self.lab)
+        self._has_bag = bean is not None
+        # A bag never counted shows nothing until it is weighed.
+        self._attr_native_value = bean.remaining_g if bean is not None and bean.tracked else None
+
+    async def async_set_native_value(self, value: float) -> None:
+        bean = await _chosen_open_bag(self.lab)
+        if bean is None:
+            raise refuse("finish_none_chosen")
+        # The action's own checks: one way to weigh a bag.
+        await actions.start_tracking(self.lab, {"bean_id": bean.id, "grams": value})
 
 
 class FinishChosenButton(CoffeeLabEntity, ButtonEntity):
@@ -560,15 +598,8 @@ class FinishChosenButton(CoffeeLabEntity, ButtonEntity):
 
     async def async_read(self) -> None:
         # The chosen bag may have been finished or weighed since it was chosen.
-        chosen = self.lab.finish_choice
-        bean = None
-        if chosen is not None:
-            try:
-                bean = await self.lab.store.async_get_bean(chosen)
-            except UnknownBean:
-                bean = None
-        self._finishable = (bean is not None and bean.status == "open"
-                            and CoffeeLab.finish_refusal(bean) is None)
+        bean = await _chosen_open_bag(self.lab)
+        self._finishable = bean is not None and CoffeeLab.finish_refusal(bean) is None
 
     async def async_press(self) -> None:
         chosen = self.lab.finish_choice
@@ -992,7 +1023,7 @@ def entities_for(lab: CoffeeLab | None, platform: str) -> list[Entity]:
             RatingQuestionSensor, BagQuestionSensor, RecipeKindSensor, TodaysCupSensor, BrewHistorySensor,
             BagToFinishSensor,
         ],
-        "number": [ManualDoseNumber, OpenLimitNumber, RestDaysNumber, FadeDaysNumber],
+        "number": [ManualDoseNumber, OpenLimitNumber, RestDaysNumber, FadeDaysNumber, ChosenBagGramsNumber],
         "button": [
             RecordManualBrewButton, UseTodaysCupButton, AnotherCupButton, FinishAskedButton, KeepAskedButton,
             UseRestOfBagButton, ByHandButton,
